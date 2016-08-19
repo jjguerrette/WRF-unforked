@@ -52,7 +52,8 @@ CONTAINS
   USE modal_aero_data,         only: numptr_amode, lmassptr_amode, ntot_amode, nspec_amode !Added by Balwinder.Singh@pnnl.gov to avoid mixing of CHEM array constituents multiple times
   USE module_cam_mam_drydep, only:  cam_mam_drydep_driver
   use module_scalar_tables,     only: chem_dname_table !Balwinder.Singh@pnnl.gov:Added for MAM aerosols dry deposition
-  
+  USE module_aerosols_sorgam_vbs, only: sorgam_vbs_depdriver
+
   IMPLICIT NONE
 
    TYPE(grid_config_rec_type),  INTENT(IN   )    :: config_flags
@@ -107,6 +108,9 @@ CONTAINS
                                                      snowh,     &
                                           xland,znt,raincv
 
+   REAL,  DIMENSION( ims:ime , jms:jme , num_chem )         ::  &
+                    ddflx    !dry deposition flux
+
       REAL,      INTENT(IN   ) ::                               &
                              dtstep,gmt,dx
 
@@ -149,6 +153,10 @@ CONTAINS
    LOGICAL, DIMENSION( num_chem ) ::   vertMixAero    !Balwinder.Singh@pnnl.gov: Flag (true or false) which decides whether to  vertical mix a constituent or not
 
    real, parameter :: m2cm = 100.
+
+   REAL RSI                   ! gas constant in SI units (J/mol-K)
+   PARAMETER (RSI = 8.314510) ! RSI is the same as RGASUNIV in CONST.EXT
+
 
    integer :: k_a, k_c, kmax, m_mam
    real, dimension( its:ite, jts:jte ) :: frac_removed
@@ -385,6 +393,17 @@ CONTAINS
           ddvel(:,:,:) = 0.
        END IF
 
+! diagnose output dry deposition flux
+       if( config_flags%diagnostic_dep == 1) then
+       ddflx(:,:,:) = 0.D0
+       do i = its, ite
+       do j = jts, jte
+       ddflx(i, j,1:numgas)=ddflx(i,j,1:numgas)+chem(i,kts,j,1:numgas)*p_phy(i,kts,j)/(RSI*t_phy(i,kts,j))*ddvel(i,j,1:numgas)*dtstep*1.E-6
+       enddo
+       enddo
+       end if
+
+
        if (config_flags%aer_aerodynres_opt == 2) then
           ! use aerodynamic resistance from center of layer kts to surface
           aer_res(:,:) = aer_res_zcen(:,:)
@@ -431,6 +450,7 @@ CONTAINS
        else if (config_flags%aer_drydep_opt <= 99) then
 
    adrydep_select: SELECT CASE(config_flags%chem_opt)
+     CASE (RADM2SORG,RADM2SORG_AQ,RADM2SORG_AQCHEM,RADM2SORG_KPP,RACM_ESRLSORG_KPP,CBMZSORG,CBMZSORG_AQ)
        CALL wrf_debug(15,'DOING DRY DEP VELOCITIES FOR AEROSOLS/RADM')
        call sorgam_depdriver (id,config_flags,ktau,dtstep,              &
                ust,t_phy,moist,p8w,t8w,rmol,znt,pbl,                    &
@@ -579,6 +599,9 @@ CONTAINS
       enddo
       enddo
 
+!      if( config_flags%diagnostic_dep == 1) then
+!       ddlen(its:ite,jts:jte,:)=ddlen(its:ite,jts:jte,:)+ddvel(its:ite,jts:jte,:)*m2cm
+!      end if
 
        CALL wrf_debug(15,'end of dry_dep_vel')
 

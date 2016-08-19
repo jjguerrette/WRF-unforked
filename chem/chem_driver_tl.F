@@ -351,9 +351,9 @@ as (check chemics_init.F),', ' numgas_mam=', numgas_mam, ' and numgas='&
     END DO
   END DO
   SELECT CASE  (config_flags%chem_opt) 
-  CASE (RADM2SORG, RADM2SORG_AQ, RADM2SORG_AQCHEM, RADM2SORG_KPP, &
-  RACM_ESRLSORG_KPP, RACMSORG_AQ, RACMSORG_KPP, RACMSORG_AQCHEM_KPP, &
-  RACM_SOA_VBS_KPP) 
+  case (RADM2SORG, RADM2SORG_AQ, RADM2SORG_AQCHEM, RADM2SORG_KPP, &
+        RACM_ESRLSORG_KPP,RACMSORG_AQ,RACMSORG_KPP, RACMSORG_AQCHEM_KPP, RACM_ESRLSORG_AQCHEM_KPP, &
+        RACM_SOA_VBS_KPP,RACM_SOA_VBS_AQCHEM_KPP)
     DO j=jps,jpe
       DO k=kps,kpe
         DO i=ips,ipe
@@ -364,9 +364,10 @@ as (check chemics_init.F),', ' numgas_mam=', numgas_mam, ' and numgas='&
         END DO
       END DO
     END DO
-  CASE (CBMZ_MOSAIC_4BIN_VBS2_KPP, SAPRC99_KPP, &
-  SAPRC99_MOSAIC_4BIN_VBS2_KPP) 
-    CALL WRF_DEBUG(15, ' fixing ch4 conc using co conc')
+! Special treatment of CH4 in SAPRC99
+  case (SAPRC99_KPP,SAPRC99_MOSAIC_4BIN_VBS2_KPP, &
+       SAPRC99_MOSAIC_8BIN_VBS2_AQ_KPP,SAPRC99_MOSAIC_8BIN_VBS2_KPP) !BSINGH -  Added for SAPRC 8 bin and non-aq on (04/04/2014)
+     CALL wrf_debug ( 15 , ' fixing ch4 conc using co conc' )
     DO j=jps,jpe
       DO k=kps,kpe
         DO i=ips,ipe

@@ -216,7 +216,7 @@
          ids,ide, jds,jde, kds,kde,                                        &
          ims,ime, jms,jme, kms,kme,                                        &
          its,ite, jts,jte, kts,kte                                         )
-#if ( WRFPLUS == 1 )
+#if ( WRFPLUS != 1 )
    CASE (RADM2SORG,RADM2SORG_AQ,RADM2SORG_AQCHEM,RADM2SORG_KPP,CBMZSORG,CBMZSORG_AQ, &
           CB05_SORG_AQ_KPP) 
        CALL wrf_debug(15,'aerosols_driver calling sorgam_driver')

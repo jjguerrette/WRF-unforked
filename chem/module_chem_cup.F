@@ -27,7 +27,11 @@
 
       logical, parameter :: do_deep = .true.
 
+#if (WRFPLUS == 1)
+      integer, parameter :: r4=8
+#else
       integer, parameter :: r4=4
+#endif
       integer, parameter :: r8=8
 
       integer, parameter :: mode_chemcup_timeinteg = 2

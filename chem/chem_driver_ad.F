@@ -349,9 +349,9 @@ and subgrid transport chem_driver')
     END DO
   END DO
   SELECT CASE  (config_flags%chem_opt) 
-  CASE (radm2sorg, radm2sorg_aq, radm2sorg_aqchem, radm2sorg_kpp, &
-&  racm_esrlsorg_kpp, racmsorg_aq, racmsorg_kpp, racmsorg_aqchem_kpp, &
-&  racm_soa_vbs_kpp) 
+  case (RADM2SORG, RADM2SORG_AQ, RADM2SORG_AQCHEM, RADM2SORG_KPP, &
+        RACM_ESRLSORG_KPP,RACMSORG_AQ,RACMSORG_KPP, RACMSORG_AQCHEM_KPP, RACM_ESRLSORG_AQCHEM_KPP, &
+        RACM_SOA_VBS_KPP,RACM_SOA_VBS_AQCHEM_KPP)
     DO j=jps,jpe
       DO k=kps,kpe
         DO i=ips,ipe
@@ -365,8 +365,10 @@ and subgrid transport chem_driver')
       END DO
     END DO
     CALL PUSHCONTROL2B(1)
-  CASE (cbmz_mosaic_4bin_vbs2_kpp, saprc99_kpp, &
-&  saprc99_mosaic_4bin_vbs2_kpp) 
+! Special treatment of CH4 in SAPRC99
+  case (SAPRC99_KPP,SAPRC99_MOSAIC_4BIN_VBS2_KPP, &
+       SAPRC99_MOSAIC_8BIN_VBS2_AQ_KPP,SAPRC99_MOSAIC_8BIN_VBS2_KPP) !BSINGH -  Added for SAPRC 8 bin and non-aq on (04/04/2014)
+     CALL wrf_debug ( 15 , ' fixing ch4 conc using co conc' )
     DO j=jps,jpe
       DO k=kps,kpe
         DO i=ips,ipe
@@ -647,7 +649,9 @@ chem_tile_loop_ad:DO ij=1,grid%num_tiles
               config_flags, &
               grid%gmt,ijulian,rri,t_phy,moist,p8w,t8w,u_phy,v_phy,vvel, &
               grid%e_bio,p_phy,chem,rho,dz8w,grid%ne_area,emis_ant,emis_vol,grid%tsk, &
-              grid%erod,g,emis_seas,emis_dust,tracer, &
+              grid%erod,grid%erod_dri,grid%lai_vegmask,                                    &
+              g,emis_seas,emis_dust,tracer,                                                &
+              emis_seas2, &
               scaleant,grid%scaleant_frq,grid%stepscaleant,grid%num_ant_steps,grid%scaleant_rpt_int, &
               scalebb,grid%scalebb_frq,grid%stepscalebb,grid%num_bb_steps,grid%scalebb_rpt_int, &
               grid%check_count, grid%checkpoint_interval,                            &
@@ -667,7 +671,7 @@ chem_tile_loop_ad:DO ij=1,grid%num_tiles
               grid%ebio_iso,grid%ebio_oli,grid%ebio_api,grid%ebio_lim,grid%ebio_xyl, &
               grid%ebio_hc3,grid%ebio_ete,grid%ebio_olt,grid%ebio_ket,grid%ebio_ald, &
               grid%ebio_hcho,grid%ebio_eth,grid%ebio_ora2,grid%ebio_co,grid%ebio_nr, &
-              grid%ebio_no,grid%ebio_sesq,grid%ebio_mbo, &
+              grid%ebio_no,grid%ebio_sesq,grid%ebio_mbo,grid%ebio_bpi,grid%ebio_myrc, &
               grid%ebio_c10h16,grid%ebio_tol,grid%ebio_bigalk, &
               grid%ebio_ch3oh,grid%ebio_acet,grid%ebio_nh3,grid%ebio_no2, &
               grid%ebio_c2h5oh,grid%ebio_ch3cooh,grid%ebio_mek,grid%ebio_bigene, &
@@ -677,8 +681,10 @@ chem_tile_loop_ad:DO ij=1,grid%num_tiles
               grid%ebio_aro1, grid%ebio_aro2, grid%ebio_ccho, grid%ebio_meoh, &
               grid%ebio_ethene, grid%ebio_hcooh, grid%ebio_terp, grid%ebio_bald, &
               grid%ebio_cco_oh, grid%ebio_rco_oh, &
-              grid%clayfrac,grid%sandfrac,grid%dust_alpha,grid%dust_gamma,grid%dust_smtune,&
-              grid%snowh,grid%zs, &
+              grid%clayfrac,grid%sandfrac,grid%dust_alpha,grid%dust_gamma,grid%dust_smtune, grid%dust_ustune, &
+              grid%clayfrac_nga,grid%sandfrac_nga,                                        &
+              grid%snowh,grid%zs,grid%afwa_dustloft,                                      &
+              grid%tot_dust,grid%tot_edust,grid%vis_dust,                                  &
               grid%soilctop, grid%ust_t, grid%rough_cor, grid%smois_cor,                  &
               grid%ebio_c5h8,grid%ebio_apinene,grid%ebio_bpinene,grid%ebio_toluene,        &
               grid%ebio_ch3cho,grid%ebio_ch3co2h,grid%ebio_tbut2ene,                      &
@@ -701,6 +707,7 @@ chem_tile_loop_ad:DO ij=1,grid%num_tiles
               grid%potevp,grid%SFCEVP,grid%LU_INDEX, &
               grid%biomt_par,grid%emit_par,grid%ebio_co2oce, &
               eghg_bio, &
+              grid%dust_flux, grid%seas_flux,                                              &
               ids,ide, jds,jde, kds,kde, &
               ims,ime, jms,jme, kms,kme, &
               its,ite,jts,jte,kts,kte)

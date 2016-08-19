@@ -303,7 +303,7 @@ CALL g_surface_driver(                                                &
      &        ,ACSNOM=grid%acsnom      ,ACSNOW=grid%acsnow      ,AKHS=grid%akhs          &
      &        ,AKMS=grid%akms          ,ALBBCK=grid%albbck      ,ALBEDO=grid%albedo      &
      &        ,EMBCK=grid%embck                                                          &
-     &        ,BR=br              ,CANWAT=grid%canwat,g_CANWAT=grid%g_canwat      ,CHKLOWQ=chklowq    &
+     &        ,BR=grid%br              ,CANWAT=grid%canwat,g_CANWAT=grid%g_canwat      ,CHKLOWQ=chklowq    &
      &        ,CT=grid%ct              ,DT=grid%dt         ,DX=grid%dx         &
      &        ,DZ8W=dz8w     ,g_DZ8W=g_dz8w    ,DZS=grid%dzs            ,FLHC=grid%flhc          &
      &        ,FM=grid%fm         ,FHH=grid%fh                                      &

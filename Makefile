@@ -723,7 +723,7 @@ em_heldsuarez : wrf
 
 #### anthropogenic emissions converter
 
-emi_conv : wrf
+emi_conv : em_real
 	@ echo '--------------------------------------'
 	( cd chem ; $(MAKE) MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=real convert_emiss )
 	( cd test/em_real ; /bin/rm -f convert_emiss.exe ; ln -s ../../chem/convert_emiss.exe . )
