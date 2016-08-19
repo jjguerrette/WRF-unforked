@@ -42,7 +42,10 @@ MODULE module_wrf_top
 #endif
 
 #ifdef DM_PARALLEL
-   USE module_dm, ONLY : wrf_dm_initialize, wrf_dm_sum_real, local_communicator
+   USE module_dm, ONLY : wrf_dm_initialize,wrf_get_hostid,domain_active_this_task,mpi_comm_allcompute,wrf_dm_sum_real, &
+                         local_communicator
+#else
+   USE module_dm, ONLY : domain_active_this_task
 #endif
 
    USE module_date_time, ONLY : current_date, start_date
@@ -80,7 +83,7 @@ MODULE module_wrf_top
    LOGICAL , EXTERNAL      :: wrf_dm_on_monitor
 #endif
 
-   CHARACTER (LEN=80)      :: rstname
+   CHARACTER (LEN=256)     :: rstname
    CHARACTER (LEN=80)      :: message
    LOGICAL                 :: gradient_out = .FALSE.
    CHARACTER (LEN=256) , PRIVATE :: a_message
@@ -138,11 +141,12 @@ CONTAINS
      use accel_lib
 #endif
      LOGICAL, OPTIONAL, INTENT(IN) :: no_init1
-     INTEGER i, myproc, nproc, hostid, loccomm, ierr, buddcounter, mydevice
+     INTEGER i, myproc, nproc, hostid, loccomm, ierr, buddcounter, mydevice, save_comm
      INTEGER, ALLOCATABLE :: hostids(:), budds(:)
      CHARACTER*512 hostname
+     CHARACTER*512 mminlu_loc
 #ifdef _ACCEL
-     integer :: it, nt, in, devnum
+     INTEGER :: it, nt, in, devnum
 #endif
 #if defined(DM_PARALLEL) && !defined(STUBMPI) && ( defined(RUN_ON_GPU) || defined(_ACCEL))
      include "mpif.h"
@@ -194,6 +198,8 @@ CONTAINS
 !</DESCRIPTION>
 
 #ifdef DM_PARALLEL
+   CALL wrf_get_dm_communicator( save_comm )
+   CALL wrf_set_dm_communicator( mpi_comm_allcompute )
    IF ( wrf_dm_on_monitor() ) THEN
      CALL initial_config
    ENDIF
@@ -201,6 +207,7 @@ CONTAINS
    CALL wrf_dm_bcast_bytes( configbuf, nbytes )
    CALL set_config_as_buffer( configbuf, configbuflen )
    CALL wrf_dm_initialize
+   CALL wrf_set_dm_communicator( save_comm )
 #else
    CALL initial_config
 #endif
@@ -345,6 +352,7 @@ CONTAINS
    CALL       wrf_message ( program_name )
    CALL       wrf_debug ( 100 , 'wrf: calling alloc_and_configure_domain ' )
    CALL alloc_and_configure_domain ( domain_id  = 1 ,                  &
+                               active_this_task = domain_active_this_task(1), &
                                      grid       = head_grid ,          &
                                      parent     = null_domain ,        &
                                      kid        = -1                   )
@@ -357,9 +365,12 @@ CONTAINS
    CALL init_wrfio
 
 #ifdef DM_PARALLEL
+   CALL wrf_get_dm_communicator( save_comm )
+   CALL wrf_set_dm_communicator( mpi_comm_allcompute )
    CALL get_config_as_buffer( configbuf, configbuflen, nbytes )
    CALL wrf_dm_bcast_bytes( configbuf, nbytes )
    CALL set_config_as_buffer( configbuf, configbuflen )
+   CALL wrf_set_dm_communicator( save_comm )
 #endif
 
 ! #if (EM_CORE == 1)
@@ -392,6 +403,7 @@ CONTAINS
 ! 
 !</DESCRIPTION>
 
+ IF ( domain_active_this_task(1) ) THEN
    CALL med_initialdata_input( head_grid , config_flags )
 
    IF ( config_flags%write_restart_at_0h ) THEN
@@ -406,11 +418,13 @@ CONTAINS
       CALL wrf_finalize( )
 #endif
    END IF
+  ENDIF  ! domain_active_this_task
 
    ! set default values for subtimes
    head_grid%start_subtime = domain_get_start_time ( head_grid )
    head_grid%stop_subtime = domain_get_stop_time ( head_grid )
 
+ IF ( domain_active_this_task(1) ) THEN
    !  For EM (but not DA), if this is a DFI run, we can allocate some space.  We are
    !  not allowing anyting tricky for nested DFI.  If there are any nested domains,
    !  they all need to start at the same time.  Otherwise, why even do the DFI?  If
@@ -424,6 +438,7 @@ CONTAINS
 #endif
 
    IF (coupler_on) CALL cpl_defdomain( head_grid ) 
+  ENDIF  ! domain_active_this_task
 
    END SUBROUTINE wrf_init
 
@@ -689,7 +704,7 @@ IF ( config_flags%check_TL .or. config_flags%check_AD ) THEN
    CALL wrf_message(TRIM(wrf_err_message))
 
    CALL restore_grid ( head_grid )
-   CALL copy_s_to_g_adjtest ( head_grid, 0.1 )
+   CALL copy_s_to_g_adjtest ( head_grid, 0.01 )
 
    CALL copy_g_to_b_adjtest ( head_grid )
 
@@ -1929,11 +1944,15 @@ ENDIF
    ENDIF
    IF ( model_config_rec%mp_physics(head_grid%id) .EQ. LSCONDSCHEME ) THEN
       head_grid%h_diabatic = 0.0D0
+      head_grid%qv_diabatic = 0.0D0
+      head_grid%qc_diabatic = 0.0D0
       head_grid%rainnc = 0.0D0
       head_grid%rainncv = 0.0D0
    ENDIF
    IF ( model_config_rec%mp_physics(head_grid%id) .EQ. MKESSLERSCHEME ) THEN
       head_grid%h_diabatic = 0.0
+      head_grid%qv_diabatic = 0.0
+      head_grid%qc_diabatic = 0.0
       head_grid%rainnc = 0.0
       head_grid%rainncv = 0.0
    ENDIF
@@ -3912,11 +3931,15 @@ ENDIF
    ENDIF
    IF ( model_config_rec%mp_physics(head_grid%id) .EQ. LSCONDSCHEME ) THEN
       head_grid%h_diabatic = 0.0D0
+      head_grid%qv_diabatic = 0.0D0
+      head_grid%qc_diabatic = 0.0D0
       head_grid%rainnc = 0.0D0
       head_grid%rainncv = 0.0D0
    ENDIF
    IF ( model_config_rec%mp_physics(head_grid%id) .EQ. MKESSLERSCHEME ) THEN
       head_grid%h_diabatic = 0.0
+      head_grid%qv_diabatic = 0.0
+      head_grid%qc_diabatic = 0.0
       head_grid%rainnc = 0.0
       head_grid%rainncv = 0.0
    ENDIF
@@ -4610,6 +4633,18 @@ ENDIF
         ENDDO
       END IF
 ! #endif
+
+#if (EM_CORE == 1)
+      IF ( model_config_rec % dfi_opt .EQ. DFI_NODFI ) THEN
+        DO i = 1, model_config_rec % max_dom
+           model_config_rec % bl_pbl_physics_dfi(i) = -1
+        ENDDO
+      ELSE
+        DO i = 1, model_config_rec % max_dom
+           model_config_rec % bl_pbl_physics_dfi(i) = model_config_rec % bl_pbl_physics(i)
+        ENDDO
+      END IF
+#endif
 
 #if (DA_CORE == 1)
       IF ( model_config_rec % dyn_opt .EQ. 2 ) THEN

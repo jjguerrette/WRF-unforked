@@ -53,7 +53,7 @@ CONTAINS
 
      CALL init_domain_rk( grid &
 !
-#include <actual_new_args.inc>
+#include "actual_new_args.inc"
 !
                         )
 
@@ -63,7 +63,7 @@ CONTAINS
 
    SUBROUTINE init_domain_rk ( grid &
 !
-# include <dummy_new_args.inc>
+# include "dummy_new_args.inc"
 !
 )
    IMPLICIT NONE
@@ -71,7 +71,7 @@ CONTAINS
    !  Input data.
    TYPE (domain), POINTER :: grid
 
-# include <dummy_new_decl.inc>
+# include "dummy_new_decl.inc"
 
    TYPE (grid_config_rec_type)              :: config_flags
 
@@ -426,7 +426,7 @@ CONTAINS
 
     grid%ph_1(i,1,j) = 0.
     DO k  = 2,kte
-      grid%ph_1(i,k,j) = grid%ph_1(i,k-1,j) - (1./grid%rdnw(k-1))*(       &
+      grid%ph_1(i,k,j) = grid%ph_1(i,k-1,j) - (grid%dnw(k-1))*(       &
                    (grid%mub(i,j)+grid%mu_1(i,j))*grid%al(i,k-1,j)+ &
                     grid%mu_1(i,j)*grid%alb(i,k-1,j)  )
                                                    
@@ -481,7 +481,7 @@ CONTAINS
 !  rebalance hydrostatically
 
       DO k  = 2,kte
-        grid%ph_1(i,k,j) = grid%ph_1(i,k-1,j) - (1./grid%rdnw(k-1))*(       &
+        grid%ph_1(i,k,j) = grid%ph_1(i,k-1,j) - (grid%dnw(k-1))*(       &
                      (grid%mub(i,j)+grid%mu_1(i,j))*grid%al(i,k-1,j)+ &
                       grid%mu_1(i,j)*grid%alb(i,k-1,j)  )
                                                    
@@ -693,6 +693,7 @@ CONTAINS
       parameter(n=1000)
       logical debug
       parameter( debug = .true.)
+      character*256 message
 
 ! input sounding data
 
@@ -774,6 +775,11 @@ CONTAINS
             do it=1,10
               pm_input(k) = pm_input(k-1) &
                       - 0.5*dz*(rho_input(k)+rho_input(k-1))*g*qvf1
+              IF(pm_input(k) .LE. 0. )THEN
+                CALL wrf_message("Integrated pressure has gone negative - too cold for chosen height")
+                WRITE(message,*)'k,pm_input(k),h_input(k),th_input(k) = ',k,pm_input(k),h_input(k),th_input(k)
+                CALL wrf_error_fatal ( message )
+              ENDIF
               rho_input(k) = 1./((r/p1000mb)*th_input(k)*qvf*((pm_input(k)/p1000mb)**cvpm))
             enddo
           enddo

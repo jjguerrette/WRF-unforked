@@ -149,6 +149,8 @@ subroutine plumerise(m1,m2,m3,ia,iz,ja,jz,firesize,mean_fct   &
 	   enddo ! enddo do loop em imm
 	   
 	   !- define o dominio vertical onde a emissao flaming ira ser colocada
+
+!nkp, zzcon, W_VMD, and VMD are available from the "use module_zero_plumegen_coms" statement above (JJ Guerrette)
 	   call set_flam_vert(ztopmax,k1,k2)!,nkp,zzcon,W_VMD,VMD)
 	   
 	   !- espessura da camada vertical 
@@ -483,7 +485,7 @@ FMOIST   = MOIST / 100.D0       !- fuel moisture fraction
 !
                         
   DO I = 1, ntime         !- make sure of energy release
-    HEATING (I) = 0.0001  !- avoid possible divide by 0
+    HEATING (I) = 0.0001D0  !- avoid possible divide by 0
   enddo  
 !                                  
   TDUR = MDUR * 60.D0       !- number of seconds in the burn
@@ -521,8 +523,8 @@ FMOIST   = MOIST / 100.D0       !- fuel moisture fraction
        HEATING (3) = 2.D0 * HINC  
        HEATING (4) = 3.D0 * HINC 
     ELSE 
-       HINC = (HEATING (1) - heat_flux(imm-1,iveg_ag) * 1000.D0 *0.55)/ 4.D0
-       HEATING (1) = heat_flux(imm-1,iveg_ag) * 1000.D0 *0.55 + 0.1  
+       HINC = (HEATING (1) - heat_flux(imm-1,iveg_ag) * 1000.D0 *0.55D0)/ 4.D0
+       HEATING (1) = heat_flux(imm-1,iveg_ag) * 1000.D0 *0.55D0 + 0.1D0  
        HEATING (2) = HEATING (1)+ HINC  
        HEATING (3) = HEATING (2)+ HINC  
        HEATING (4) = HEATING (3)+ HINC 
@@ -604,7 +606,8 @@ real ::  vc, g,  r,  cp,  eps,  &
          ztopmax, wmax, rmaxtime, es, esat, heat,dt_save !ESAT_PR,
 character (len=2) :: cixx	 
 ! Set threshold to be the same as dz=100., the constant grid spacing of plume grid model(meters) found in set_grid()
-    REAL :: DELZ_THRESOLD = 100.D0
+    REAL :: DELZ_THRESOLD = 100. 
+
     INTEGER     :: imm
 
 !  real, external:: esat_pr!
@@ -668,7 +671,7 @@ icount=icount+1
 !-- set timestep
     !dt = (zm(2)-zm(1)) / (tstpf * wmax)  
 
-    !Added by JJG to prevent infinite while loop.
+    !Modified to prevent infinite while loop (JJ Guerrette).
 !    if (wmax .gt. 1.D10) then
     if (wmax .gt. 1.D40) then
        dt = 0.D0

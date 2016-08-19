@@ -300,7 +300,6 @@ print*,__FILE__,jte,' xa2_v.xa2_v for row= ',jte+1,sum(xa2_v(its:ite, jte+1, kts
 
    if ( (use_radarobs .and. use_radar_rf) .or. (use_rad .and. crtm_cloud) ) then
     if ( cloud_cv_options == 1 )then
-      print*,'Options: set CLOUD_CV and cloud_cv_options to 2 or 3 !'
       ! Partition of hydrometeor increments via warm rain process
       call da_moist_phys_lin(grid)
     end if
@@ -347,6 +346,7 @@ print*,__FILE__,jte,' xa2_v.xa2_v for row= ',jte+1,sum(xa2_v(its:ite, jte+1, kts
       if (iv%info(bogus)%nlocal    > 0) call da_check_xtoy_adjoint_bogus    (iv, y, partial_lhs, pertile_lhs)
       if (iv%num_inst              > 0) call da_check_xtoy_adjoint_rad      (iv, y, partial_lhs, pertile_lhs)
       if (iv%info(rain)%nlocal     > 0) call da_check_xtoy_adjoint_rain     (iv, y, partial_lhs, pertile_lhs)
+      if (iv%info(pseudo)%nlocal   > 0) call da_check_xtoy_adjoint_pseudo   (iv, y, partial_lhs, pertile_lhs)
 
       !----------------------------------------------------------------------
       ! [5.0] Perform adjoint operation:

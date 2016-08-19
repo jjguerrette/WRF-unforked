@@ -34,7 +34,7 @@ subroutine da_calculate_j(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size_jp,
    type (y_type)    :: jo_grad_y ! Grad_y(jo)
    real             :: cv_xhat_jb(cv_size_jb), cv_xhat_je(cv_size_je), cv_xhat_jl(cv_size_jl)
 #ifdef CLOUD_CV
-   integer          :: mz(11)
+   integer          :: mz(13)
 #else
    integer          :: mz(7)
 #endif
@@ -50,6 +50,7 @@ subroutine da_calculate_j(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size_jp,
    real                              :: bgerr, gnorm_jp  
     
    integer                           :: n, cldtoplevel(1), icld, nclouds, ncv, minlev_cld
+   real                              :: jd_local
    real                              :: js_local
    real, allocatable                 :: cc(:)
    
@@ -59,7 +60,8 @@ subroutine da_calculate_j(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size_jp,
    ! [0.0] initialization:
    !-------------------------------------------------------------------------
 #ifdef CLOUD_CV
-   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%v6%mz, be%v7%mz,be%v8%mz, be%v9%mz, be%alpha%mz, be % ne /)
+   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
+           be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne /)
 #else
    mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be % ne /)
 #endif
@@ -151,6 +153,37 @@ subroutine da_calculate_j(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size_jp,
    if (be % ne > 0) then
       cv_xhat_je(1:cv_size_je) = cv(je_start:je_end) + xhat(je_start:je_end)
       j % je = je_factor * 0.5 * da_dot_cv(cv_size_je, cv_xhat_je, cv_xhat_je, grid, mz)
+   end if
+
+
+   !----------------------------------------------------------------------
+   ![1.0.1] calculate grad_v (jd):
+   !----------------------------------------------------------------------
+
+   j % jd = 0.0
+
+   if (use_wpec) then
+
+      if (var4d) call da_error(__FILE__,__LINE__,(/'Cannot use 4dvar with dynamic constraint'/))
+      if (wpec_factor <= 0) call da_error(__FILE__,__LINE__,(/'"wpec_factor" for dynamic constraint must be greater than zero'/))
+
+      grid%xa%grad_p_x(:,:,:)=0.0
+      grid%xa%grad_p_y(:,:,:)=0.0
+
+      call da_transform_vtod_wpec(cv_size, be, grid%ep, xhat+cv, grid%vp, grid%vv, xbx, grid)
+
+      do i=its,ite
+         do jj=jts,jte
+            do k=kts,kte
+               j % jd = j % jd + 0.5*(grid%xa%grad_p_x(i,jj,k)**2+grid%xa%grad_p_y(i,jj,k)**2)/wpec_factor
+            end do
+         end do
+      end do
+
+      jd_local = j % jd
+      ! summation across processors:
+      j % jd  = wrf_dm_sum_real(jd_local)
+
    end if
 
    !-------------------------------------------------------------------------
@@ -261,10 +294,10 @@ subroutine da_calculate_j(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size_jp,
    end if
 
    !-------------------------------------------------------------------------
-   ! [7.0] calculate total cost function j = jo + jb + jc + je + jp + js:
+   ! [7.0] calculate total cost function j = jo + jb + jc + je + jd + jp + js:
    !-------------------------------------------------------------------------
 
-   j % total = j % jb + j % jo % total + j % je + j % jp + j % js
+   j % total = j % jb + j % jo % total + j % je + j % jd + j % jp + j % js
    if (grid%jcdfi_use) j % total = j % total  + j % jc
    if (var4d) j % total = j % total  + j % jl
 
@@ -273,18 +306,18 @@ subroutine da_calculate_j(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size_jp,
    !-------------------------------------------------------------------------
    if (rootproc) then
       if (it == 1 .and. iter == 0) then
-         write(unit=cost_unit,fmt='(a)')'Outer    EPS     Inner      J           Jb       Jo           Jc         Je         Jp         Js        jl'
+         write(unit=cost_unit,fmt='(a)')'Outer    EPS     Inner      J           Jb       Jo           Jc         Je         Jd         Jp         Js        jl'
          write(unit=cost_unit,fmt='(a)')'Iter             Iter                            '
-         write(unit=grad_unit,fmt='(a)')'Outer    EPS     Inner      G           Gb       Go           Ge           Gp           Gs        Gl'
+         write(unit=grad_unit,fmt='(a)')'Outer    EPS     Inner      G           Gb       Go           Ge         Gd         Gp         Gs        Gl'
          write(unit=grad_unit,fmt='(a)')'Iter             Iter                            '
       end if
 
-      write(unit=cost_unit,fmt='(2x,i2,1x,e10.3,2x,i4,8(1x,f10.3))') &
-         it, EPS(it), iter, j % total, j % jb, j % jo % total, j % jc, j % je, j % jp, j%js, j%jl
+      write(unit=cost_unit,fmt='(2x,i2,1x,e10.3,2x,i4,9(1x,f10.3))') &
+         it, EPS(it), iter, j % total, j % jb, j % jo % total, j % jc, j % je, j % jd, j % jp, j%js, j%jl
    end if
          
    !-------------------------------------------------------------------------
-   ! [8.0] Calculate Gradient:
+   ! [9.0] Calculate Gradient:
    !-------------------------------------------------------------------------
    call da_calculate_gradj(it,iter,cv_size,cv_size_jb,cv_size_je,cv_size_jp, &
                            cv_size_jl,xbx, be, iv, xhat+cv, y, grad, grid, config_flags, re)

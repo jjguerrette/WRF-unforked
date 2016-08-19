@@ -10,6 +10,26 @@ MAKE    =       make -i -r
 RM      =       rm -f
 
 MODULES =                                 \
+        module_data_isrpia_data.o         \
+        module_data_ISRPIA.o              \
+        module_data_isrpia_asrc.o         \
+        module_data_isrpia_solut.o        \
+        module_data_isrpia_kmc198.o       \
+        module_data_isrpia_kmc223.o       \
+        module_data_isrpia_kmc248.o       \
+        module_data_isrpia_kmc273.o       \
+        module_data_isrpia_kmc298.o       \
+        module_data_isrpia_kmc323.o       \
+        module_data_isrpia_expnc.o        \
+        module_data_isrpia_caseg.o        \
+        module_data_isrpia_casej.o        \
+        isofwd.o                          \
+        isorev.o                          \
+        isocom.o                          \
+        moduleHETDATA.o                   \
+        moduleHETAERO.o                   \
+        moduleAERODATA.o                  \
+        aerorate_so2.o                    \
         module_aer_opt_out.o              \
         module_add_emiss_burn.o           \
         module_add_emiss_burn_tl.o        \
@@ -33,6 +53,7 @@ MODULES =                                 \
         module_data_megan2.o              \
         module_data_soa_vbs.o             \
         module_data_sorgam.o              \
+        module_data_sorgam_vbs.o          \
         module_ftuv_subs.o                \
         module_ghg_fluxes.o               \
         module_gocart_drydep.o            \
@@ -63,6 +84,8 @@ MODULES =                                 \
         module_qf03.o                     \
         module_soilpsd.o                  \
         module_dust_load.o                \
+        module_uoc_dustwd.o               \
+        module_data_uoc_wd.o              \
         module_mosaic_addemiss.o          \
         module_mosaic_initmixrats.o       \
         module_mosaic_movesect.o          \
@@ -78,16 +101,21 @@ MODULES =                                 \
         module_input_chem_data_tl.o       \
         module_input_chem_data_ad.o       \
         module_mosaic_coag.o              \
+        module_mosaic_gly.o               \
         module_mosaic_wetscav.o           \
         module_mosaic_therm.o             \
         module_phot_mad.o                 \
         module_radm.o                     \
         module_sorgam_aqchem.o            \
+        module_sorgam_vbs_aqchem.o        \
         module_aerosols_soa_vbs.o         \
         module_aerosols_sorgam.o          \
+        module_aerosols_sorgam_vbs.o      \
         module_bioemi_megan2.o            \
         module_bioemi_simple.o            \
         module_cbm4_initmixrats.o         \
+        module_cb05_initmixrats.o         \
+        module_cb05_vbs_initmixrats.o     \
         module_cbmz.o                     \
         module_cbmz_initmixrats.o         \
         module_cbmz_rodas_prep.o          \
@@ -105,11 +133,13 @@ MODULES =                                 \
         module_plumerise1.o               \
         module_mosaic_drydep.o            \
         module_wetscav_driver.o           \
+        module_prep_wetscav_sorgam.o      \
         module_input_chem_bioemiss.o      \
         module_input_dust_errosion.o      \
         module_input_gocart_dms.o         \
         module_cbmz_addemiss.o            \
         module_cbm4_addemiss.o            \
+        module_cb05_addemiss.o            \
         module_emissions_anthropogenics.o \
         module_emissions_anthropogenics_tl.o \
         module_emissions_anthropogenics_ad.o \
@@ -135,6 +165,7 @@ MODULES =                                 \
         module_cam_mam_mo_chem_utls.o     \
         module_mosaic_cloudchem.o         \
         module_sorgam_cloudchem.o         \
+        module_sorgam_vbs_cloudchem.o     \
         module_cam_mam_gas_wetdep_driver.o \
         module_cam_mam_mo_sethet.o         \
         module_phot_fastj.o                \
@@ -144,7 +175,8 @@ MODULES =                                 \
         module_dep_simple_tl.o             \
         module_dep_simple_ad.o             \
         module_gocart_drydep_tl.o          \
-        module_gocart_drydep_ad.o
+        module_gocart_drydep_ad.o          \
+        module_chem_cup.o
 
 OBJS    =                           \
         chemics_init.o              \
@@ -164,7 +196,6 @@ OBJS    =                           \
         aerosol_driver.o            \
         aerosol_driver_tl.o         \
         aerosol_driver_ad.o
-
 
 LIBTARGET    =  chemics
 TARGETDIR    =  ./

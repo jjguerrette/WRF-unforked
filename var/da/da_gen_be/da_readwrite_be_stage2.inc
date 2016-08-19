@@ -78,6 +78,7 @@ subroutine da_readwrite_be_stage2(outunit, nk)
         form='formatted', status='old', action='read')
    read(namelist_unit, gen_be_stage2_nl)
    close(namelist_unit)
+   call da_free_unit(namelist_unit)
   
    ! Read in the coefficients:
 
@@ -100,6 +101,12 @@ subroutine da_readwrite_be_stage2(outunit, nk)
    allocate( regcoeff_t_u_rh(1:nk,1:nk,1:num_bins2d) )
 
    if( cv_options == 5) then
+   read(iunit)regcoeff_psi_chi
+   read(iunit)regcoeff_psi_ps
+   read(iunit)regcoeff_psi_t
+   end if
+
+   if( cv_options == 7) then
    read(iunit)regcoeff_psi_chi
    read(iunit)regcoeff_psi_ps
    read(iunit)regcoeff_psi_t
@@ -170,6 +177,12 @@ subroutine da_readwrite_be_stage2(outunit, nk)
    ! Write out the coefficients:
 
    if( cv_options == 5) then
+   write(outunit)regcoeff_psi_chi
+   write(outunit)regcoeff_psi_ps
+   write(outunit)regcoeff_psi_t
+   end if
+
+   if( cv_options == 7) then
    write(outunit)regcoeff_psi_chi
    write(outunit)regcoeff_psi_ps
    write(outunit)regcoeff_psi_t

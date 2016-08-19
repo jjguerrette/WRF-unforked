@@ -40,7 +40,7 @@ subroutine da_minimise_lz(grid, config_flags,            &
    
    integer                           :: i, j, k, n, inst, iter
 #ifdef CLOUD_CV
-   integer                           :: mz(11), info, nsstwrk
+   integer                           :: mz(13), info, nsstwrk
 #else
    integer                           :: mz(7), info, nsstwrk
 #endif
@@ -69,7 +69,7 @@ subroutine da_minimise_lz(grid, config_flags,            &
    ! [1.0] Initialization:
    !-------------------------------------------------------------------------
 #ifdef CLOUD_CV
-   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz,  be%v6%mz, be%v7%mz,  be%v8%mz, be%v9%mz, be%alpha%mz, be % ne /)
+   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz,  be%v6%mz, be%v7%mz,  be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be % ne /)
 #else
    mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz,be%alpha%mz, be % ne /)
 #endif   
@@ -80,7 +80,10 @@ subroutine da_minimise_lz(grid, config_flags,            &
                        be%cv%size_jl, xbx, be, iv, xhat, cv, re, y, j_cost, ghat0, grid, config_flags)
  
    j0_total = j_cost%total
-   if (j0_total == 0.0) return
+   if (j0_total == 0.0) then
+      if (trace_use) call da_trace_exit("da_minimise_lz")
+      return
+   end if
    ghat      = - ghat0
    beta(0)   = SQRT(da_dot_cv(cv_size, ghat, ghat, grid, mz, jp_start, jp_end))
    qhat(:,0) = 0.0

@@ -11,7 +11,8 @@ SUBROUTINE solve_em ( grid , config_flags  &
                   domain, get_ijk_from_grid, get_ijk_from_subgrid                          &
                  ,domain_get_current_time, domain_get_start_time                           &
                  ,domain_get_sim_start_time, domain_clock_get,is_alarm_tstep
-   USE module_domain_type, ONLY : history_alarm, restart_alarm, auxinput4_alarm
+   USE module_domain_type, ONLY : history_alarm, restart_alarm, auxinput4_alarm            &
+                 ,boundary_alarm
    USE module_configure, ONLY : grid_config_rec_type
    USE module_driver_constants
    USE module_machine
@@ -43,7 +44,7 @@ SUBROUTINE solve_em ( grid , config_flags  &
                  ,period_bdy_em_scalar_sub,period_bdy_em_tke_old_sub                       &
                  ,period_bdy_em_tracer2_sub,period_bdy_em_tracer_old_sub                   &
                  ,period_bdy_em_tracer_sub,period_em_da_sub,period_em_hydro_uv_sub         &
-                 ,halo_em_f_sub,halo_em_init_4_sub
+                 ,halo_em_f_sub,halo_em_init_4_sub,halo_em_thetam_sub,period_em_thetam_sub
 #endif
    USE module_utility
 ! Mediation layer modules
@@ -116,7 +117,7 @@ SUBROUTINE solve_em ( grid , config_flags  &
 
    LOGICAL                         :: specified_bdy, channel_bdy
 
-   REAL                            :: t_new
+   REAL                            :: t_new, time_duration_of_lbcs
    
    ! Changes in tendency at this timestep
    real ,DIMENSION(grid%sm31:grid%em31,grid%sm32:grid%em32,grid%sm33:grid%em33) :: h_tendency, &
@@ -135,7 +136,7 @@ SUBROUTINE solve_em ( grid , config_flags  &
 
 ! storage for tendencies and decoupled state (generated from Registry)
 
-#include <i1_decl.inc>
+#include "i1_decl.inc"
 ! Previous time level of tracer arrays now defined as i1 variables;
 ! the state 4d arrays now redefined as 1-time level arrays in Registry.
 ! Benefit: save memory in nested runs, since only 1 domain is active at a
@@ -188,7 +189,7 @@ SUBROUTINE solve_em ( grid , config_flags  &
 !!Timeseries TLNL Test -JJG
 
 ! Define benchmarking timers if -DBENCH is compiled
-#include <bench_solve_em_def.h>
+#include "bench_solve_em_def.h"
 
 !----------------------
 ! Executable statements
@@ -226,7 +227,7 @@ SUBROUTINE solve_em ( grid , config_flags  &
 !</DESCRIPTION>
 
 ! Initialize timers if compiled with -DBENCH
-#include <bench_solve_em_init.h>
+#include "bench_solve_em_init.h"
 
 !  set runge-kutta solver (2nd or 3rd order)
 
@@ -253,6 +254,12 @@ SUBROUTINE solve_em ( grid , config_flags  &
    num_3d_m        = num_moist
    num_3d_c        = num_chem
    num_3d_s        = num_scalar
+
+!  backward integration needs to advect only QV
+   if (grid%dfi_stage .EQ. DFI_BCK) then
+       num_3d_m    = P_QV
+       num_3d_s    = PARAM_FIRST_SCALAR - 1
+   endif
 
    f_flux = config_flags%do_avgflx_cugd .EQ. 1
 
@@ -315,11 +322,7 @@ SUBROUTINE solve_em ( grid , config_flags  &
    endif
 
    grid%itimestep = grid%itimestep + 1
-if(grid%itimestep.eq.1)then
-call random_number(tracer)
-tracer = tracer * 10.
-tracer = tracer + 375
-endif
+   grid%dtbc = grid%dtbc + grid%dt
 
 #if ( WRFPLUS == 1 )
    temp_itimestep = grid%itimestep
@@ -462,8 +465,46 @@ endif
                           k_start, k_end                               )
 
        ENDIF
+
+       !  If the user has requested to optionally select the moist theta (use_theta_m==1)
+       !  switch, the first setting of the "old" value of theta_m uses the "old"
+       !  value of Qv.  The moist_old variable does not exist until after the advection
+       !  towards the end of the RK loop.  For the first time in the RK loop, we need
+       !  a reasonable value for moist_old.
+
+       IF ( ( config_flags%use_theta_m .EQ. 1 ) .AND. (P_Qv .GE. PARAM_FIRST_SCALAR) ) THEN
+         CALL initialize_moist_old ( moist_old(:,:,:,P_Qv),              &
+                            moist(:,:,:,P_Qv) ,                          &
+                            ids,ide, jds,jde, kds,kde,                   &
+                            ims,ime, jms,jme, kms,kme,                   &
+                            grid%i_start(ij), grid%i_end(ij),            &
+                            grid%j_start(ij), grid%j_end(ij),            &
+                            k_start, k_end                               )
+       END IF
      ENDDO
      !$OMP END PARALLEL DO
+
+     !  Now that we might have initialized the moist_old values for P_Qv, fill
+     !  out some halos, etc.
+     IF ( ( config_flags%use_theta_m .EQ. 1 ) .AND. (P_Qv .GE. PARAM_FIRST_SCALAR) ) THEN
+#if ( defined( DM_PARALLEL ) && ( ! defined( STUBMPI ) ) )
+#  include "HALO_EM_MOIST_OLD_E_7.inc"
+#  include "PERIOD_BDY_EM_MOIST_OLD.inc"
+#endif
+       !$OMP PARALLEL DO   &
+       !$OMP PRIVATE ( ij )
+       DO ij = 1 , grid%num_tiles
+         im = P_Qv
+         CALL set_physical_bc3d( moist_old(ims,kms,jms,im), 'p', config_flags,  &
+                                 ids, ide, jds, jde, kds, kde,                  &
+                                 ims, ime, jms, jme, kms, kme,                  &
+                                 ips, ipe, jps, jpe, kps, kpe,                  &
+                                 grid%i_start(ij), grid%i_end(ij),              &
+                                 grid%j_start(ij), grid%j_end(ij),              &
+                                 k_start    , k_end                             )
+       END DO
+       !$OMP END PARALLEL DO
+     END IF
 
 !**********************************************************************
 !
@@ -728,7 +769,7 @@ BENCH_END(set_phys_bc_tim)
                              , config_flags%use_adaptive_time_step &
                              , curr_secs                        &
                              , psim , psih , wspd , gz1oz0      &
-                             , br , chklowq                     &
+                             , chklowq                          &
                              , cu_act_flag , hol , th_phy       &
                              , pi_phy , p_phy    & !, grid%t_phy      &
                              , dz8w , p8w , t8w                 &
@@ -762,7 +803,7 @@ BENCH_END(set_phys_bc_tim)
                              , tke_tend                         &
                              , adapt_step_flag , curr_secs      &
                              , psim , psih , wspd , gz1oz0      &
-                             , br , chklowq                     &
+                             , chklowq                          &
                              , cu_act_flag , hol , th_phy       &
                              , pi_phy , p_phy , grid%t_phy      &
                              , dz8w , p8w , t8w                 &
@@ -779,6 +820,49 @@ BENCH_END(set_phys_bc_tim)
                             )
 
      END IF rk_step_is_one
+
+!************************************************************************************************************************
+! LES_fix convert theta to theta_m: point 1  ! 28 January 2015
+
+     IF ( ( config_flags%use_theta_m .EQ. 1 ) .AND. (P_Qv .GE. PARAM_FIRST_SCALAR) ) THEN
+        CALL theta_to_thetam ( grid%t_1 , moist_old(ims,kms,jms,P_qv) ,  &
+                               t_tendf  , moist_tend(ims,kms,jms,P_qv) , &
+                               grid%t_2 , moist(ims,kms,jms,P_qv) ,      &
+                               grid%h_diabatic ,                         &
+                               grid%itimestep ,                          &
+                               rk_step ,                                 & 
+                               ids, ide, jds, jde, kds, kde ,            &
+                               ims, ime, jms, jme, kms, kme ,            &
+                               ips, ipe, jps, jpe, kps, kpe              )
+#if ( defined( DM_PARALLEL ) && ( ! defined( STUBMPI ) ) )
+#      include "HALO_EM_THETAM.inc"
+#      include "PERIOD_EM_THETAM.inc"
+#endif
+        its=ips ; ite = ipe
+        jts=jps ; jte = jpe
+        CALL set_physical_bc3d( grid%h_diabatic, 'p', config_flags,      &
+                                ids, ide, jds, jde, kds, kde,     &
+                                ims, ime, jms, jme, kms, kme,     &
+                                ips, ipe, jps, jpe, kps, kpe,     &
+                                its, ite, jts, jte,               &
+                                k_start    , k_end                )
+        CALL set_physical_bc3d( grid%t_1, 'p', config_flags,      &
+                                ids, ide, jds, jde, kds, kde,     &
+                                ims, ime, jms, jme, kms, kme,     &
+                                ips, ipe, jps, jpe, kps, kpe,     &
+                                its, ite, jts, jte,               &
+                                k_start    , k_end                )
+        CALL set_physical_bc3d( grid%t_2, 'p', config_flags,      &
+                                ids, ide, jds, jde, kds, kde,     &
+                                ims, ime, jms, jme, kms, kme,     &
+                                ips, ipe, jps, jpe, kps, kpe,     &
+                                its, ite, jts, jte,               &
+                                k_start    , k_end                )
+     END IF
+
+!
+! end theta_m fix point 1
+!************************************************************************************************************************
 
 BENCH_START(rk_tend_tim)
      !$OMP PARALLEL DO   &
@@ -841,7 +925,40 @@ BENCH_START(relax_bdy_dry_tim)
      !$OMP PRIVATE ( ij )
      DO ij = 1 , grid%num_tiles
 
-       IF( (config_flags%specified .or. config_flags%nested) .and. rk_step == 1 ) THEN 
+       IF ( (config_flags%specified .or. config_flags%nested) .and. ( rk_step == 1 ) ) THEN 
+
+!************************************************************************************************************************
+! LES_fix convert theta to theta_m: nested or specified LBC, only required on the first rk step
+
+         IF   ( ( config_flags%use_theta_m .EQ. 1 ) .AND. (P_Qv .GE. PARAM_FIRST_SCALAR) ) THEN
+           IF ( grid%grid_id .EQ. 1 ) THEN
+              time_duration_of_lbcs = grid%interval_seconds
+           ELSE
+              time_duration_of_lbcs = grid%parent_time_step_ratio * grid%dt
+           END IF
+           CALL theta_and_thetam_lbc_only (                                                   & 
+                                .TRUE.,                                                       &
+                                grid%mub,                                                     &
+                                grid%mu_bxs,grid%mu_bxe,grid%mu_bys,grid%mu_bye,              &
+                                grid%mu_btxs,grid%mu_btxe,grid%mu_btys,grid%mu_btye,          &
+                                grid%t_bxs,grid%t_bxe,grid%t_bys,grid%t_bye,                  &
+                                grid%t_btxs,grid%t_btxe,grid%t_btys,grid%t_btye,              &
+                                moist_bxs(jms,kms,1,P_Qv),moist_bxe(jms,kms,1,P_Qv),          &
+                                moist_bys(ims,kms,1,P_Qv),moist_bye(ims,kms,1,P_Qv),          &
+                                moist_btxs(jms,kms,1,P_Qv),moist_btxe(jms,kms,1,P_Qv),        &
+                                moist_btys(ims,kms,1,P_Qv),moist_btye(ims,kms,1,P_Qv),        &
+                                config_flags%spec_bdy_width,                                  &
+                                time_duration_of_lbcs,                                        &
+                                ids,ide, jds,jde, kds,kde,                                    &
+                                ims,ime, jms,jme, kms,kme,                                    &
+                                ips,ipe, jps,jpe, kps,kpe,                                    &
+                                grid%i_start(ij), grid%i_end(ij),                             &
+                                grid%j_start(ij), grid%j_end(ij),                             &
+                                k_start    , k_end                                            )
+         END IF
+
+! LES_fix convert theta to theta_m: nested or specified LBC
+!************************************************************************************************************************
 
          CALL relax_bdy_dry ( config_flags,                                &
                               grid%u_save, grid%v_save, ph_save, grid%t_save,             &
@@ -908,7 +1025,37 @@ BENCH_START(relax_bdy_dry_tim)
                              grid%i_start(ij), grid%i_end(ij),                &
                              grid%j_start(ij), grid%j_end(ij),                &
                              k_start, k_end                                  )
-     
+
+!************************************************************************************************************************
+! LES_fix convert theta_m to theta: nested or specified LBC, and only in the last rk step
+! since we do not need the theta_m lateral boundaries any more.
+
+         IF   ( ( config_flags%use_theta_m .EQ. 1 ) .AND. (P_Qv .GE. PARAM_FIRST_SCALAR) .AND. ( rk_step == rk_order ) ) THEN
+           CALL theta_and_thetam_lbc_only (                                                   & 
+                                .FALSE.,                                                      &           
+                                grid%mub,                                                     &
+                                grid%mu_bxs,grid%mu_bxe,grid%mu_bys,grid%mu_bye,              &
+                                grid%mu_btxs,grid%mu_btxe,grid%mu_btys,grid%mu_btye,          &
+                                grid%t_bxs,grid%t_bxe,grid%t_bys,grid%t_bye,                  &
+                                grid%t_btxs,grid%t_btxe,grid%t_btys,grid%t_btye,              &
+                                moist_bxs(jms,kms,1,P_Qv),moist_bxe(jms,kms,1,P_Qv),          &
+                                moist_bys(ims,kms,1,P_Qv),moist_bye(ims,kms,1,P_Qv),          &
+                                moist_btxs(jms,kms,1,P_Qv),moist_btxe(jms,kms,1,P_Qv),        &
+                                moist_btys(ims,kms,1,P_Qv),moist_btye(ims,kms,1,P_Qv),        &
+                                config_flags%spec_bdy_width,                                  &
+                                time_duration_of_lbcs,                                        &
+                                ids,ide, jds,jde, kds,kde,                                    &
+                                ims,ime, jms,jme, kms,kme,                                    &
+                                ips,ipe, jps,jpe, kps,kpe,                                    &
+                                grid%i_start(ij), grid%i_end(ij),                             &
+                                grid%j_start(ij), grid%j_end(ij),                             &
+                                k_start    , k_end                                            )
+         END IF
+
+! LES_fix convert theta_m to theta: nested or specified LBC, and only in the last rk step
+! since we do not need the theta_m lateral boundaries any more.
+!************************************************************************************************************************
+
        ENDIF
 
 !---------------------------------------------------------------------------------------------
@@ -920,9 +1067,10 @@ BENCH_START(relax_bdy_dry_tim)
          CALL spec_bdy_dry_perturb ( config_flags,                                 &
                              grid%ru_tend, grid%rv_tend, t_tend,                   &
                              grid%mu_2, grid%mub,                                  &
-                             grid%msfu, grid%msfv, grid%msft,	                   &
+                             grid%msfux, grid%msfvx, grid%msft,	                   &
                              grid%ru_tendf_stoch, grid%rv_tendf_stoch, grid%rt_tendf_stoch, &
                              config_flags%spec_bdy_width, grid%spec_zone,                   &
+                             grid%num_stoch_levels,      & ! stoch dims
                              ids,ide, jds,jde, kds,kde,  & ! domain dims
                              ims,ime, jms,jme, kms,kme,  & ! memory dims
                              ips,ipe, jps,jpe, kps,kpe,  & ! patch  dims
@@ -936,9 +1084,10 @@ BENCH_START(relax_bdy_dry_tim)
          CALL spec_bdy_dry_perturb ( config_flags,                                 &
                              grid%ru_tend, grid%rv_tend, t_tend,                   &
                              grid%mu_2, grid%mub,                                  &
-                             grid%msfu, grid%msfv, grid%msft,                      &
+                             grid%msfux, grid%msfvx, grid%msft,                    &
                              grid%field_u_tend_perturb, grid%field_v_tend_perturb, grid%field_t_tend_perturb, &
                              config_flags%spec_bdy_width, grid%spec_zone,                   &
+                             grid%num_stoch_levels,      & ! stoch dims
                              ids,ide, jds,jde, kds,kde,  & ! domain dims
                              ims,ime, jms,jme, kms,kme,  & ! memory dims
                              ips,ipe, jps,jpe, kps,kpe,  & ! patch  dims
@@ -997,7 +1146,7 @@ BENCH_START(small_step_prep_tim)
                              grid%u_save, grid%v_save, w_save,                        &
                              grid%t_save, ph_save, mu_save,                           &
                              grid%ww, ww1,                                            &
-                             grid%dnw, c2a, grid%pb, grid%p, grid%alt,                &
+                             c2a, grid%pb, grid%p, grid%alt,                          &
                              grid%msfux,grid%msfuy, grid%msfvx, grid%msfvx_inv,       &
                              grid%msfvy, grid%msftx,grid%msfty,                       &
                              grid%rdx, grid%rdy, rk_step,                             &
@@ -1214,6 +1363,8 @@ BENCH_END(advance_uv_tim)
                ,flag_tracer        = 0                                      &
                ,flag_scalar        = 0                                      &
                ,actual_distance_average  = .FALSE.                          &
+               ,pos_def            = .FALSE.                                &
+               ,swap_pole_with_next_j = .FALSE.                             &
                ,moist=moist,chem=chem,tracer=tracer,scalar=scalar           &
                ,fft_filter_lat = config_flags%fft_filter_lat                &
                ,dclat = dclat                                               &
@@ -1321,6 +1472,8 @@ BENCH_END(advance_mu_t_tim)
                 ,flag_tracer        = 0                                      &
                 ,flag_scalar        = 0                                      &
                 ,actual_distance_average  = .FALSE.                          &
+                ,pos_def            = .FALSE.                                &
+                ,swap_pole_with_next_j = .FALSE.                             &
                 ,moist=moist,chem=chem,tracer=tracer,scalar=scalar           &
                 ,fft_filter_lat = config_flags%fft_filter_lat                &
                 ,dclat = dclat                                               &
@@ -1427,6 +1580,8 @@ BENCH_END(advance_w_tim)
                 ,flag_tracer        = 0                                      &
                 ,flag_scalar        = 0                                      &
                 ,actual_distance_average  = .FALSE.                          &
+                ,pos_def            = .FALSE.                                &
+                ,swap_pole_with_next_j = .FALSE.                             &
                 ,moist=moist,chem=chem,tracer=tracer,scalar=scalar           &
                 ,fft_filter_lat = config_flags%fft_filter_lat                &
                 ,dclat = dclat                                               &
@@ -1700,6 +1855,8 @@ BENCH_END(small_step_finish_tim)
                   ,flag_tracer        = 0                                      &
                   ,flag_scalar        = 0                                      &
                   ,actual_distance_average  = .FALSE.                          &
+                  ,pos_def            = .FALSE.                                &
+                  ,swap_pole_with_next_j = .FALSE.                             &
                   ,moist=moist,chem=chem,tracer=tracer,scalar=scalar           &
                   ,fft_filter_lat = config_flags%fft_filter_lat                &
                   ,dclat = dclat                                               &
@@ -2103,6 +2260,21 @@ BENCH_START(rk_scalar_tend_tim)
                            grid%j_start(ij), grid%j_end(ij), &
                            k_start    , k_end               )
 
+               IF( rk_step == 1 .AND. config_flags%use_q_diabatic == 1 )THEN
+               IF( im.eq.p_qv .or. im.eq.p_qc )THEN
+                   CALL q_diabatic_add  ( im, im,            & 
+                           dt_rk, grid%mut,                  &
+                           grid%qv_diabatic,                 &
+                           grid%qc_diabatic,                 &
+                           moist_tend(ims,kms,jms,im),       &
+                           ids, ide, jds, jde, kds, kde,     &
+                           ims, ime, jms, jme, kms, kme,     &
+                           grid%i_start(ij), grid%i_end(ij), &
+                           grid%j_start(ij), grid%j_end(ij), &
+                           k_start    , k_end               )
+               ENDIF
+               ENDIF
+
 BENCH_END(rk_scalar_tend_tim)
 
 BENCH_START(rlx_bdy_scalar_tim)
@@ -2168,6 +2340,20 @@ BENCH_START(update_scal_tim)
                                its=grid%i_start(ij), ite=grid%i_end(ij),               &
                                jts=grid%j_start(ij), jte=grid%j_end(ij),               &
                                kts=k_start    , kte=k_end                              )
+               IF( rk_step == rk_order .AND. config_flags%use_q_diabatic == 1 )THEN
+               IF( im.eq.p_qv .or. im.eq.p_qc )THEN
+                   CALL q_diabatic_subtr( im, im,            & 
+                           dt_rk,                            &
+                           grid%qv_diabatic,                 &
+                           grid%qc_diabatic,                 &
+                           moist(ims,kms,jms,im),            &
+                           ids, ide, jds, jde, kds, kde,     &
+                           ims, ime, jms, jme, kms, kme,     &
+                           grid%i_start(ij), grid%i_end(ij), &
+                           grid%j_start(ij), grid%j_end(ij), &
+                           k_start    , k_end               )
+               ENDIF
+               ENDIF
 BENCH_END(update_scal_tim)
 
 BENCH_START(flow_depbdy_tim)
@@ -2389,6 +2575,26 @@ BENCH_START(chem_adv_tim)
                                   kts=k_start    , kte=k_end                              )
 
            IF( config_flags%specified  ) THEN
+
+             IF( config_flags%perturb_chem_bdy==1 ) THEN
+
+                 IF(ic.eq.PARAM_FIRST_SCALAR .and. ij.eq.1) &
+                 CALL wrf_debug (10 , ' spec_bdy_chem_perturb' )
+
+                 CALL spec_bdy_chem_perturb ( config_flags%periodic_x,   &
+                      chem_btxs(jms,kms,1,ic), chem_btxe(jms,kms,1,ic),  &
+                      chem_btys(ims,kms,1,ic), chem_btye(ims,kms,1,ic),  &
+                      grid%rand_pert,                                    &
+                      config_flags%spec_bdy_width, grid%spec_zone,       &
+                      grid%num_stoch_levels,      & ! stoch  dims
+                      ids,ide, jds,jde, kds,kde,  & ! domain dims
+                      ims,ime, jms,jme, kms,kme,  & ! memory dims
+                      ips,ipe, jps,jpe, kps,kpe,  & ! patch  dims
+                      grid%i_start(ij), grid%i_end(ij),                  &
+                      grid%j_start(ij), grid%j_end(ij),                  &
+                      k_start, k_end                                  )
+             ENDIF
+
              CALL flow_dep_bdy_chem( chem(ims,kms,jms,ic),                          &
                                      chem_bxs(jms,kms,1,ic), chem_btxs(jms,kms,1,ic),  &
                                      chem_bxe(jms,kms,1,ic), chem_btxe(jms,kms,1,ic),  &
@@ -2654,6 +2860,7 @@ BENCH_END(tracer_adv_tim)
                CALL flow_dep_bdy_qnn  ( scalar(ims,kms,jms,is),     &
                                   grid%ru_m, grid%rv_m, config_flags,   &
                                   grid%spec_zone,                  &
+                                  grid%ccn_conc,              & ! RAS
                                   ids,ide, jds,jde, kds,kde,  & ! domain dims
                                   ims,ime, jms,jme, kms,kme,  & ! memory dims
                                   ips,ipe, jps,jpe, kps,kpe,  & ! patch  dims
@@ -2708,6 +2915,39 @@ BENCH_END(tracer_adv_tim)
 
      ENDIF other_scalar_advance
 
+!************************************************************************************************************************
+! LES_fix: convert theta_m back to theta, point 2 ! 28 January 2015
+
+
+     IF ( ( config_flags%use_theta_m .EQ. 1 ) .AND. (P_Qv .GE. PARAM_FIRST_SCALAR) ) THEN
+        CALL thetam_to_theta ( grid%t_1 , moist_old(ims,kms,jms,P_qv) ,  &
+                               grid%t_2 , moist(ims,kms,jms,P_qv) ,      &
+                               ids, ide, jds, jde, kds, kde ,            &
+                               ims, ime, jms, jme, kms, kme ,            &
+                               ips, ipe, jps, jpe, kps, kpe              )
+# ifdef DM_PARALLEL
+#       include "HALO_EM_THETAM.inc"
+#       include "PERIOD_EM_THETAM.inc"
+#endif
+        its=ips ; ite = ipe
+        jts=jps ; jte = jpe
+        CALL set_physical_bc3d( grid%t_1, 'p', config_flags,      &
+                                ids, ide, jds, jde, kds, kde,     &
+                                ims, ime, jms, jme, kms, kme,     &
+                                ips, ipe, jps, jpe, kps, kpe,     &
+                                its, ite, jts, jte,               &
+                                k_start    , k_end                )
+        CALL set_physical_bc3d( grid%t_2, 'p', config_flags,      &
+                                ids, ide, jds, jde, kds, kde,     &
+                                ims, ime, jms, jme, kms, kme,     &
+                                ips, ipe, jps, jpe, kps, kpe,     &
+                                its, ite, jts, jte,               &
+                                k_start    , k_end                )
+     END IF
+
+! end theta_m fix point 2
+!************************************************************************************************************************
+
  !  update the pressure and density at the new time level
 
      !$OMP PARALLEL DO   &
@@ -2746,11 +2986,13 @@ BENCH_END(calc_p_rho_tim)
          IF ( num_3d_m >= PARAM_FIRST_SCALAR ) THEN
            CALL wrf_debug ( 200 , ' call filter moist ' )
            DO im = PARAM_FIRST_SCALAR, num_3d_m
+             IF ( config_flags%coupled_filtering ) THEN
              CALL couple_scalars_for_filter ( FIELD=moist(ims,kms,jms,im)              &
                     ,MU=grid%mu_2 , MUB=grid%mub                                 &
                     ,ids=ids,ide=ide,jds=jds,jde=jde,kds=kds,kde=kde             &
                     ,ims=ims,ime=ime,jms=jms,jme=jme,kms=kms,kme=kme             &
                     ,ips=ips,ipe=ipe,jps=jps,jpe=jpe,kps=kps,kpe=kpe          )
+             END IF
              CALL pxft ( grid=grid                                               &
                     ,lineno=__LINE__                                             &
                     ,flag_uv            = 0                                      &
@@ -2764,7 +3006,9 @@ BENCH_END(calc_p_rho_tim)
                     ,flag_chem          = 0                                      &
                     ,flag_scalar        = 0                                      &
                     ,flag_tracer        = 0                                      &
-                    ,actual_distance_average=.FALSE.                             &
+                    ,actual_distance_average=config_flags%actual_distance_average&
+                    ,pos_def            = config_flags%pos_def                   &
+                    ,swap_pole_with_next_j = config_flags%swap_pole_with_next_j  &
                     ,moist=moist,chem=chem,tracer=tracer,scalar=scalar           &
                     ,fft_filter_lat = config_flags%fft_filter_lat                &
                     ,dclat = dclat                                               &
@@ -2773,22 +3017,26 @@ BENCH_END(calc_p_rho_tim)
                     ,ips=ips,ipe=ipe,jps=jps,jpe=jpe,kps=kps,kpe=kpe             &
                     ,imsx=imsx,imex=imex,jmsx=jmsx,jmex=jmex,kmsx=kmsx,kmex=kmex &
                     ,ipsx=ipsx,ipex=ipex,jpsx=jmsx,jpex=jpex,kpsx=kpsx,kpex=kpex )
+             IF ( config_flags%coupled_filtering ) THEN
              CALL uncouple_scalars_for_filter ( FIELD=moist(ims,kms,jms,im)      &
                     ,MU=grid%mu_2 , MUB=grid%mub                                 &
                     ,ids=ids,ide=ide,jds=jds,jde=jde,kds=kds,kde=kde             &
                     ,ims=ims,ime=ime,jms=jms,jme=jme,kms=kms,kme=kme             &
                     ,ips=ips,ipe=ipe,jps=jps,jpe=jpe,kps=kps,kpe=kpe          )
+             END IF
            END DO
          END IF
    
          IF ( num_3d_c >= PARAM_FIRST_SCALAR ) THEN
            CALL wrf_debug ( 200 , ' call filter chem ' )
            DO im = PARAM_FIRST_SCALAR, num_3d_c
+             IF ( config_flags%coupled_filtering ) THEN
              CALL couple_scalars_for_filter ( FIELD=chem(ims,kms,jms,im)               &
                     ,MU=grid%mu_2 , MUB=grid%mub                                 &
                     ,ids=ids,ide=ide,jds=jds,jde=jde,kds=kds,kde=kde             &
                     ,ims=ims,ime=ime,jms=jms,jme=jme,kms=kms,kme=kme             &
                     ,ips=ips,ipe=ipe,jps=jps,jpe=jpe,kps=kps,kpe=kpe           )
+             END IF
              CALL pxft ( grid=grid                                               &
                     ,lineno=__LINE__                                             &
                     ,flag_uv            = 0                                      &
@@ -2802,7 +3050,9 @@ BENCH_END(calc_p_rho_tim)
                     ,flag_chem          = im                                     &
                     ,flag_tracer        = 0                                      &
                     ,flag_scalar        = 0                                      &
-                    ,actual_distance_average=.FALSE.                             &
+                    ,actual_distance_average=config_flags%actual_distance_average&
+                    ,pos_def            = config_flags%pos_def                   &
+                    ,swap_pole_with_next_j = config_flags%swap_pole_with_next_j  &
                     ,moist=moist,chem=chem,tracer=tracer,scalar=scalar           &
                     ,fft_filter_lat = config_flags%fft_filter_lat                &
                     ,dclat = dclat                                               &
@@ -2811,21 +3061,25 @@ BENCH_END(calc_p_rho_tim)
                     ,ips=ips,ipe=ipe,jps=jps,jpe=jpe,kps=kps,kpe=kpe             &
                     ,imsx=imsx,imex=imex,jmsx=jmsx,jmex=jmex,kmsx=kmsx,kmex=kmex &
                     ,ipsx=ipsx,ipex=ipex,jpsx=jmsx,jpex=jpex,kpsx=kpsx,kpex=kpex )
+             IF ( config_flags%coupled_filtering ) THEN
              CALL uncouple_scalars_for_filter ( FIELD=chem(ims,kms,jms,im)       &
                     ,MU=grid%mu_2 , MUB=grid%mub                                 &
                     ,ids=ids,ide=ide,jds=jds,jde=jde,kds=kds,kde=kde             &
                     ,ims=ims,ime=ime,jms=jms,jme=jme,kms=kms,kme=kme             &
                     ,ips=ips,ipe=ipe,jps=jps,jpe=jpe,kps=kps,kpe=kpe          )
+             END IF
            END DO
          END IF
          IF ( num_tracer >= PARAM_FIRST_SCALAR ) THEN
            CALL wrf_debug ( 200 , ' call filter tracer ' )
            DO im = PARAM_FIRST_SCALAR, num_tracer
+             IF ( config_flags%coupled_filtering ) THEN
              CALL couple_scalars_for_filter ( FIELD=tracer(ims,kms,jms,im)               &
                     ,MU=grid%mu_2 , MUB=grid%mub                                 &
                     ,ids=ids,ide=ide,jds=jds,jde=jde,kds=kds,kde=kde             &
                     ,ims=ims,ime=ime,jms=jms,jme=jme,kms=kms,kme=kme             &
                     ,ips=ips,ipe=ipe,jps=jps,jpe=jpe,kps=kps,kpe=kpe           )
+             END IF
              CALL pxft ( grid=grid                                               &
                     ,lineno=__LINE__                                             &
                     ,flag_uv            = 0                                      &
@@ -2839,7 +3093,9 @@ BENCH_END(calc_p_rho_tim)
                     ,flag_chem          = 0                                      &
                     ,flag_tracer        = im                                     &
                     ,flag_scalar        = 0                                      &
-                    ,actual_distance_average=.FALSE.                             &
+                    ,actual_distance_average=config_flags%actual_distance_average&
+                    ,pos_def            = config_flags%pos_def                   &
+                    ,swap_pole_with_next_j = config_flags%swap_pole_with_next_j  &
                     ,moist=moist,chem=chem,tracer=tracer,scalar=scalar           &
                     ,fft_filter_lat = config_flags%fft_filter_lat                &
                     ,dclat = dclat                                               &
@@ -2848,22 +3104,26 @@ BENCH_END(calc_p_rho_tim)
                     ,ips=ips,ipe=ipe,jps=jps,jpe=jpe,kps=kps,kpe=kpe             &
                     ,imsx=imsx,imex=imex,jmsx=jmsx,jmex=jmex,kmsx=kmsx,kmex=kmex &
                     ,ipsx=ipsx,ipex=ipex,jpsx=jmsx,jpex=jpex,kpsx=kpsx,kpex=kpex )
+             IF ( config_flags%coupled_filtering ) THEN
              CALL uncouple_scalars_for_filter ( FIELD=tracer(ims,kms,jms,im)     &
                     ,MU=grid%mu_2 , MUB=grid%mub                                 &
                     ,ids=ids,ide=ide,jds=jds,jde=jde,kds=kds,kde=kde             &
                     ,ims=ims,ime=ime,jms=jms,jme=jme,kms=kms,kme=kme             &
                     ,ips=ips,ipe=ipe,jps=jps,jpe=jpe,kps=kps,kpe=kpe          )
+             END IF
            END DO
          END IF
    
          IF ( num_3d_s >= PARAM_FIRST_SCALAR ) THEN
            CALL wrf_debug ( 200 , ' call filter scalar ' )
            DO im = PARAM_FIRST_SCALAR, num_3d_s
+             IF ( config_flags%coupled_filtering ) THEN
              CALL couple_scalars_for_filter ( FIELD=scalar(ims,kms,jms,im)           &
                   ,MU=grid%mu_2 , MUB=grid%mub                                 &
                   ,ids=ids,ide=ide,jds=jds,jde=jde,kds=kds,kde=kde             &
                   ,ims=ims,ime=ime,jms=jms,jme=jme,kms=kms,kme=kme             &
                   ,ips=ips,ipe=ipe,jps=jps,jpe=jpe,kps=kps,kpe=kpe          )
+             END IF
              CALL pxft ( grid=grid                                             &
                   ,lineno=__LINE__                                             &
                   ,flag_uv            = 0                                      &
@@ -2877,7 +3137,9 @@ BENCH_END(calc_p_rho_tim)
                   ,flag_chem          = 0                                      &
                   ,flag_tracer        = 0                                      &
                   ,flag_scalar        = im                                     &
-                  ,actual_distance_average=.FALSE.                             &
+                  ,actual_distance_average=config_flags%actual_distance_average&
+                  ,pos_def            = config_flags%pos_def                   &
+                  ,swap_pole_with_next_j = config_flags%swap_pole_with_next_j  &
                   ,moist=moist,chem=chem,tracer=tracer,scalar=scalar           &
                   ,fft_filter_lat = config_flags%fft_filter_lat                &
                   ,dclat = dclat                                               &
@@ -2886,11 +3148,13 @@ BENCH_END(calc_p_rho_tim)
                   ,ips=ips,ipe=ipe,jps=jps,jpe=jpe,kps=kps,kpe=kpe             &
                   ,imsx=imsx,imex=imex,jmsx=jmsx,jmex=jmex,kmsx=kmsx,kmex=kmex &
                   ,ipsx=ipsx,ipex=ipex,jpsx=jmsx,jpex=jpex,kpsx=kpsx,kpex=kpex )
+             IF ( config_flags%coupled_filtering ) THEN
              CALL uncouple_scalars_for_filter ( FIELD=scalar(ims,kms,jms,im)   &
                   ,MU=grid%mu_2 , MUB=grid%mub                                 &
                   ,ids=ids,ide=ide,jds=jds,jde=jde,kds=kds,kde=kde             &
                   ,ims=ims,ime=ime,jms=jms,jme=jme,kms=kms,kme=kme             &
                   ,ips=ips,ipe=ipe,jps=jps,jpe=jpe,kps=kps,kpe=kpe          )
+             END IF
            END DO
          END IF
        END IF ! polar filter test
@@ -3186,19 +3450,19 @@ BENCH_END(bc_end_tim)
      !$OMP PRIVATE ( ij )
        DO ij = 1 , grid%num_tiles
 
-           call trajectory (grid,config_flags,  &
+           call trajectory (grid,config_flags,                                     &
                             grid%dt,grid%itimestep,grid%ru_m, grid%rv_m, grid%ww_m,&
                             grid%mut,grid%muu,grid%muv,                            &
                             grid%rdx, grid%rdy, grid%rdn, grid%rdnw,grid%rdzw,     &
                             grid%traj_i,grid%traj_j,grid%traj_k,                   &
                             grid%traj_long,grid%traj_lat,                          &
-                            grid%xlong,grid%xlat,            &
+                            grid%xlong,grid%xlat,                                  &
                             grid%msftx,grid%msfux,grid%msfvy,                      &
-                            ids, ide, jds, jde, kds, kde,    &
-                            ims, ime, jms, jme, kms, kme,    &
-                            grid%i_start(ij), grid%i_end(ij), &
-                            grid%j_start(ij), grid%j_end(ij), &
-                            k_start  , k_end )
+                            ids, ide, jds, jde, kds, kde,                          &
+                            ims, ime, jms, jme, kms, kme,                          &
+                            grid%i_start(ij), grid%i_end(ij),                      &
+                            grid%j_start(ij), grid%j_end(ij),                      &
+                            k_start  , k_end                                       )
         ENDDO
      !$OMP END PARALLEL DO
    ENDIF
@@ -3270,6 +3534,7 @@ BENCH_END(bc_end_tim)
 BENCH_START(advance_ppt_tim)
      CALL wrf_debug ( 200 , ' call advance_ppt' )
      CALL advance_ppt(grid%rthcuten,grid%rqvcuten,grid%rqccuten,grid%rqrcuten, &
+                      grid%cldfra_cup,                                         & !BSINGH -  Added for CuP scheme
                       grid%rqicuten,grid%rqscuten,           &
                       grid%rainc,grid%raincv,grid%rainsh,grid%pratec,grid%pratesh, &
                       grid%nca,grid%htop,grid%hbot,grid%cutop,grid%cubot,  &
@@ -3327,7 +3592,9 @@ BENCH_START(moist_physics_prep_tim)
                                    grid%al, grid%alb, grid%p, p8w, p0, grid%pb,          &
                                    grid%ph_2, grid%phb, th_phy, pi_phy , p_phy, &
                                    grid%z, grid%z_at_w, dz8w,        &
-                                   dtm, grid%h_diabatic,                  &
+                                   dtm, grid%h_diabatic,                       &
+                                   moist(ims,kms,jms,P_QV),grid%qv_diabatic,   &
+                                   moist(ims,kms,jms,P_QC),grid%qc_diabatic,   &
                                    config_flags,grid%fnm, grid%fnp,            &
                                    ids, ide, jds, jde, kds, kde,     &
                                    ims, ime, jms, jme, kms, kme,     &
@@ -3472,7 +3739,8 @@ BENCH_START(micro_driver_tim)
 !       &        , QZS_CURR=scalar(ims,kms,jms,P_QZS), F_QZS=F_QZS          & ! "
 !       &        , QZG_CURR=scalar(ims,kms,jms,P_QZG), F_QZG=F_QZG          & ! "
 !       &        , QZH_CURR=scalar(ims,kms,jms,P_QZH), F_QZH=F_QZH          & ! "
-      &        , QVOLG_CURR=scalar(ims,kms,jms,P_QVOLG), F_QVOLG=F_QVOLG      & ! for nssl_2mom
+      &        , QVOLG_CURR=scalar(ims,kms,jms,P_QVOLG), F_QVOLG=F_QVOLG    & ! for nssl_2mom
+      &        , QVOLH_CURR=scalar(ims,kms,jms,P_QVOLH), F_QVOLH=F_QVOLH    & ! for nssl_2mom
       &        , qrcuten=grid%rqrcuten, qscuten=grid%rqscuten             &
       &        , qicuten=grid%rqicuten,mu=grid%mut                        &
       &        , HAIL=config_flags%gsfcgce_hail                           & ! for gsfcgce
@@ -3511,6 +3779,7 @@ BENCH_START(micro_driver_tim)
       &        ,kext_ft_qg=grid%kext_ft_qg         &
       &        ,height=grid%height                                         &
       &        ,tempc=grid%tempc                                         &
+      &        ,ccn_conc=grid%ccn_conc                                   & ! RAS
 
                                                                           )
 BENCH_END(micro_driver_tim)
@@ -3518,7 +3787,8 @@ BENCH_END(micro_driver_tim)
 #if 0
 BENCH_START(microswap_2)
 ! for load balancing; communication to redistribute the points
-     IF ( config_flags%mp_physics .EQ. ETAMPNEW ) THEN
+      IF ( config_flags%mp_physics .EQ. ETAMPNEW .OR. &
+     &     config_flags%mp_physics .EQ. FER_MP_HIRES) THEN
 #include "SWAP_ETAMP_NEW.inc"
      ELSE IF ( config_flags%mp_physics .EQ. WSM3SCHEME ) THEN
 #include "SWAP_WSM3.inc"
@@ -3605,7 +3875,10 @@ BENCH_START(moist_phys_end_tim)
                       k_start    , k_end                                )
 
        CALL moist_physics_finish_em( grid%t_2, grid%t_1, t0, grid%muts, th_phy,       &
-                                      grid%h_diabatic, dtm, config_flags,    &
+                                      grid%h_diabatic, dtm,                    &
+                                      moist(ims,kms,jms,P_QV),grid%qv_diabatic, &
+                                      moist(ims,kms,jms,P_QC),grid%qc_diabatic, &
+                                      config_flags,                            &
 #if ( WRF_DFI_RADAR == 1 )
                                       grid%dfi_tten_rad,grid%dfi_stage,        &
 #endif
@@ -3627,6 +3900,7 @@ BENCH_START(moist_phys_end_tim)
      IF ( num_3d_m >= PARAM_FIRST_SCALAR ) THEN
        CALL wrf_debug ( 200 , ' call filter moist' )
        DO im = PARAM_FIRST_SCALAR, num_3d_m
+         IF ( config_flags%coupled_filtering ) THEN
          DO jj = jps, MIN(jpe,jde-1)
            DO kk = kps, MIN(kpe,kde-1)
              DO ii = ips, MIN(ipe,ide-1)
@@ -3634,6 +3908,7 @@ BENCH_START(moist_phys_end_tim)
              ENDDO
            ENDDO
          ENDDO
+         END IF
  
          CALL pxft ( grid=grid                                                 &
                   ,lineno=__LINE__                                             &
@@ -3648,7 +3923,9 @@ BENCH_START(moist_phys_end_tim)
                   ,flag_chem          = 0                                      &
                   ,flag_tracer        = 0                                      &
                   ,flag_scalar        = 0                                      &
-                  ,actual_distance_average=.FALSE.                             &
+                  ,actual_distance_average=config_flags%actual_distance_average&
+                  ,pos_def            = config_flags%pos_def                   &
+                  ,swap_pole_with_next_j = config_flags%swap_pole_with_next_j  &
                   ,moist=moist,chem=chem,tracer=tracer,scalar=scalar           &
                   ,fft_filter_lat = config_flags%fft_filter_lat                &
                   ,dclat = dclat                                               &
@@ -3658,6 +3935,7 @@ BENCH_START(moist_phys_end_tim)
                   ,imsx=imsx,imex=imex,jmsx=jmsx,jmex=jmex,kmsx=kmsx,kmex=kmex &
                   ,ipsx=ipsx,ipex=ipex,jpsx=jmsx,jpex=jpex,kpsx=kpsx,kpex=kpex )
  
+         IF ( config_flags%coupled_filtering ) THEN
          DO jj = jps, MIN(jpe,jde-1)
            DO kk = kps, MIN(kpe,kde-1)
              DO ii = ips, MIN(ipe,ide-1)
@@ -3665,6 +3943,7 @@ BENCH_START(moist_phys_end_tim)
              ENDDO
            ENDDO
          ENDDO
+         END IF
        ENDDO
      ENDIF
    ENDIF
@@ -3734,6 +4013,7 @@ BENCH_END(moist_phys_end_tim)
 
      IF ( num_3d_c >= PARAM_FIRST_SCALAR ) then
        chem_filter_loop: DO im = PARAM_FIRST_SCALAR, num_3d_c
+         IF ( config_flags%coupled_filtering ) THEN
          DO jj = jps, MIN(jpe,jde-1)
            DO kk = kps, MIN(kpe,kde-1)
              DO ii = ips, MIN(ipe,ide-1)
@@ -3741,6 +4021,7 @@ BENCH_END(moist_phys_end_tim)
              ENDDO
            ENDDO
          ENDDO
+         END IF
 
          CALL pxft ( grid=grid                                                 &
                   ,lineno=__LINE__                                             &
@@ -3755,7 +4036,9 @@ BENCH_END(moist_phys_end_tim)
                   ,flag_chem          = im                                     &
                   ,flag_tracer        = 0                                      &
                   ,flag_scalar        = 0                                      &
-                  ,actual_distance_average=.FALSE.                             &
+                  ,actual_distance_average=config_flags%actual_distance_average&
+                  ,pos_def            = config_flags%pos_def                   &
+                  ,swap_pole_with_next_j = config_flags%swap_pole_with_next_j  &
                   ,moist=moist,chem=chem,tracer=tracer,scalar=scalar           &
                   ,fft_filter_lat = config_flags%fft_filter_lat                &
                   ,dclat = dclat                                               &
@@ -3765,6 +4048,7 @@ BENCH_END(moist_phys_end_tim)
                   ,imsx=imsx,imex=imex,jmsx=jmsx,jmex=jmex,kmsx=kmsx,kmex=kmex &
                   ,ipsx=ipsx,ipex=ipex,jpsx=jmsx,jpex=jpex,kpsx=kpsx,kpex=kpex )
 
+         IF ( config_flags%coupled_filtering ) THEN
          DO jj = jps, MIN(jpe,jde-1)
            DO kk = kps, MIN(kpe,kde-1)
              DO ii = ips, MIN(ipe,ide-1)
@@ -3772,10 +4056,12 @@ BENCH_END(moist_phys_end_tim)
              ENDDO
            ENDDO
          ENDDO
+         END IF
        ENDDO chem_filter_loop
      ENDIF
      IF ( num_tracer >= PARAM_FIRST_SCALAR ) then
        tracer_filter_loop: DO im = PARAM_FIRST_SCALAR, num_tracer
+         IF ( config_flags%coupled_filtering ) THEN
          DO jj = jps, MIN(jpe,jde-1)
            DO kk = kps, MIN(kpe,kde-1)
              DO ii = ips, MIN(ipe,ide-1)
@@ -3783,6 +4069,7 @@ BENCH_END(moist_phys_end_tim)
              ENDDO
            ENDDO
          ENDDO
+         END IF
 
          CALL pxft ( grid=grid                                                 &
                   ,lineno=__LINE__                                             &
@@ -3797,7 +4084,9 @@ BENCH_END(moist_phys_end_tim)
                   ,flag_chem          = 0                                      &
                   ,flag_tracer        = im                                     &
                   ,flag_scalar        = 0                                      &
-                  ,actual_distance_average=.FALSE.                             &
+                  ,actual_distance_average=config_flags%actual_distance_average&
+                  ,pos_def            = config_flags%pos_def                   &
+                  ,swap_pole_with_next_j = config_flags%swap_pole_with_next_j  &
                   ,moist=moist,chem=chem,tracer=tracer,scalar=scalar           &
                   ,fft_filter_lat = config_flags%fft_filter_lat                &
                   ,dclat = dclat                                               &
@@ -3807,6 +4096,7 @@ BENCH_END(moist_phys_end_tim)
                   ,imsx=imsx,imex=imex,jmsx=jmsx,jmex=jmex,kmsx=kmsx,kmex=kmex &
                   ,ipsx=ipsx,ipex=ipex,jpsx=jmsx,jpex=jpex,kpsx=kpsx,kpex=kpex )
 
+         IF ( config_flags%coupled_filtering ) THEN
          DO jj = jps, MIN(jpe,jde-1)
            DO kk = kps, MIN(kpe,kde-1)
              DO ii = ips, MIN(ipe,ide-1)
@@ -3814,11 +4104,13 @@ BENCH_END(moist_phys_end_tim)
              ENDDO
            ENDDO
          ENDDO
+         END IF
        ENDDO tracer_filter_loop
      ENDIF
 
      IF ( num_3d_s >= PARAM_FIRST_SCALAR ) then
        scalar_filter_loop: DO im = PARAM_FIRST_SCALAR, num_3d_s
+         IF ( config_flags%coupled_filtering ) THEN
          DO jj = jps, MIN(jpe,jde-1)
            DO kk = kps, MIN(kpe,kde-1)
              DO ii = ips, MIN(ipe,ide-1)
@@ -3826,6 +4118,7 @@ BENCH_END(moist_phys_end_tim)
              ENDDO
            ENDDO
          ENDDO
+         END IF
 
          CALL pxft ( grid=grid                                                 &
                   ,lineno=__LINE__                                             &
@@ -3840,7 +4133,9 @@ BENCH_END(moist_phys_end_tim)
                   ,flag_chem          = 0                                      &
                   ,flag_tracer        = 0                                      &
                   ,flag_scalar        = im                                     &
-                  ,actual_distance_average=.FALSE.                             &
+                  ,actual_distance_average=config_flags%actual_distance_average&
+                  ,pos_def            = config_flags%pos_def                   &
+                  ,swap_pole_with_next_j = config_flags%swap_pole_with_next_j  &
                   ,moist=moist,chem=chem,tracer=tracer,scalar=scalar           &
                   ,fft_filter_lat = config_flags%fft_filter_lat                &
                   ,dclat = dclat                                               &
@@ -3850,6 +4145,7 @@ BENCH_END(moist_phys_end_tim)
                   ,imsx=imsx,imex=imex,jmsx=jmsx,jmex=jmex,kmsx=kmsx,kmex=kmex &
                   ,ipsx=ipsx,ipex=ipex,jpsx=jmsx,jpex=jpex,kpsx=kpsx,kpex=kpex )
 
+         IF ( config_flags%coupled_filtering ) THEN
          DO jj = jps, MIN(jpe,jde-1)
            DO kk = kps, MIN(kpe,kde-1)
              DO ii = ips, MIN(ipe,ide-1)
@@ -3857,6 +4153,7 @@ BENCH_END(moist_phys_end_tim)
              ENDDO
            ENDDO
          ENDDO
+         END IF
        ENDDO scalar_filter_loop
      ENDIF
    ENDIF
@@ -4018,8 +4315,191 @@ BENCH_START(bc_2d_tim)
    !$OMP END PARALLEL DO
 BENCH_END(bc_2d_tim)
 
+!  this code forces boundary values to specified values to avoid drift
+
    IF( config_flags%specified .or. config_flags%nested ) THEN 
-     grid%dtbc = grid%dtbc + grid%dt
+!if ( .false. ) then !hcl
+   !$OMP PARALLEL DO   &
+   !$OMP PRIVATE ( ij )
+   tile_bc_loop_3: DO ij = 1 , grid%num_tiles
+
+     CALL wrf_debug ( 200 , ' call spec_bdy_final' )
+
+     CALL spec_bdy_final   ( grid%u_2, muus, grid%msfuy,                              &
+                                grid%u_bxs, grid%u_bxe, grid%u_bys, grid%u_bye,  &
+                                grid%u_btxs,grid%u_btxe,grid%u_btys,grid%u_btye, &
+                                'u', config_flags,                               &
+                                config_flags%spec_bdy_width, grid%spec_zone,     &
+                                grid%dtbc,                                       &
+                                ids,ide, jds,jde, kds,kde,  & ! domain dims
+                                ims,ime, jms,jme, kms,kme,  & ! memory dims
+                                ips,ipe, jps,jpe, kps,kpe,  & ! patch  dims
+                                grid%i_start(ij), grid%i_end(ij),       &
+                                grid%j_start(ij), grid%j_end(ij),       &
+                                k_start    , k_end                     )
+
+     CALL spec_bdy_final   ( grid%v_2, muvs, grid%msfvx,                              &
+                                grid%v_bxs, grid%v_bxe, grid%v_bys, grid%v_bye,  &
+                                grid%v_btxs,grid%v_btxe,grid%v_btys,grid%v_btye, &
+                                'v', config_flags,                               &
+                                config_flags%spec_bdy_width, grid%spec_zone,     &
+                                grid%dtbc,                                       &
+                                ids,ide, jds,jde, kds,kde,  & ! domain dims
+                                ims,ime, jms,jme, kms,kme,  & ! memory dims
+                                ips,ipe, jps,jpe, kps,kpe,  & ! patch  dims
+                                grid%i_start(ij), grid%i_end(ij),       &
+                                grid%j_start(ij), grid%j_end(ij),       &
+                                k_start    , k_end                     )
+
+     IF( config_flags%nested) THEN
+       CALL spec_bdy_final   ( grid%w_2, grid%muts, grid%msfty,                              &
+                                grid%w_bxs, grid%w_bxe, grid%w_bys, grid%w_bye,  &
+                                grid%w_btxs,grid%w_btxe,grid%w_btys,grid%w_btye, &
+                                'w', config_flags,                               &
+                                config_flags%spec_bdy_width, grid%spec_zone,     &
+                                grid%dtbc,                                       &
+                                ids,ide, jds,jde, kds,kde,  & ! domain dims
+                                ims,ime, jms,jme, kms,kme,  & ! memory dims
+                                ips,ipe, jps,jpe, kps,kpe,  & ! patch  dims
+                                grid%i_start(ij), grid%i_end(ij),       &
+                                grid%j_start(ij), grid%j_end(ij),       &
+                                k_start    , k_end                     )
+     ENDIF
+
+     CALL spec_bdy_final   ( grid%t_2, grid%muts, grid%msfty,                              &
+                                grid%t_bxs, grid%t_bxe, grid%t_bys, grid%t_bye,  &
+                                grid%t_btxs,grid%t_btxe,grid%t_btys,grid%t_btye, &
+                                't', config_flags,                               &
+                                config_flags%spec_bdy_width, grid%spec_zone,     &
+                                grid%dtbc,                                       &
+                                ids,ide, jds,jde, kds,kde,  & ! domain dims
+                                ims,ime, jms,jme, kms,kme,  & ! memory dims
+                                ips,ipe, jps,jpe, kps,kpe,  & ! patch  dims
+                                grid%i_start(ij), grid%i_end(ij),       &
+                                grid%j_start(ij), grid%j_end(ij),       &
+                                k_start    , k_end                     )
+
+     CALL spec_bdy_final   ( grid%ph_2, grid%muts, grid%msfty,                            &
+                                grid%ph_bxs, grid%ph_bxe, grid%ph_bys, grid%ph_bye,  &
+                                grid%ph_btxs,grid%ph_btxe,grid%ph_btys,grid%ph_btye, &
+                                'h', config_flags,                               &
+                                config_flags%spec_bdy_width, grid%spec_zone,     &
+                                grid%dtbc,                                       &
+                                ids,ide, jds,jde, kds,kde,  & ! domain dims
+                                ims,ime, jms,jme, kms,kme,  & ! memory dims
+                                ips,ipe, jps,jpe, kps,kpe,  & ! patch  dims
+                                grid%i_start(ij), grid%i_end(ij),       &
+                                grid%j_start(ij), grid%j_end(ij),       &
+                                k_start    , k_end                     )
+
+     IF( config_flags%spec_bdy_final_mu .EQ. 1 ) THEN
+     CALL spec_bdy_final   ( grid%mu_2, grid%muts, grid%msfty,                            &
+                                grid%mu_bxs, grid%mu_bxe, grid%mu_bys, grid%mu_bye,  &
+                                grid%mu_btxs,grid%mu_btxe,grid%mu_btys,grid%mu_btye, &
+                                'm', config_flags,                               &
+                                config_flags%spec_bdy_width, grid%spec_zone,     &
+                                grid%dtbc,                                       &
+                                ids,ide, jds,jde, 1,  1,    & ! domain dims
+                                ims,ime, jms,jme, 1,  1,    & ! memory dims
+                                ips,ipe, jps,jpe, 1,  1,    & ! patch  dims
+                                grid%i_start(ij), grid%i_end(ij),       &
+                                grid%j_start(ij), grid%j_end(ij),       &
+                                1  , 1                    )
+     ENDIF
+
+     moisture_loop_bdy_3 : DO im = PARAM_FIRST_SCALAR , num_3d_m
+
+     IF ( im .EQ. P_QV .OR. config_flags%nested .OR. &
+             ( config_flags%specified .AND. config_flags%have_bcs_moist ) ) THEN
+        CALL spec_bdy_final   ( moist(ims,kms,jms,im), grid%muts, grid%msfty,    &
+                                moist_bxs(jms,kms,1,im),moist_bxe(jms,kms,1,im), &
+                                moist_bys(ims,kms,1,im),moist_bye(ims,kms,1,im), &
+                                moist_btxs(jms,kms,1,im),moist_btxe(jms,kms,1,im), &
+                                moist_btys(ims,kms,1,im),moist_btye(ims,kms,1,im), &
+                                't', config_flags,                               &
+                                config_flags%spec_bdy_width, grid%spec_zone,     &
+                                grid%dtbc,                                       &
+                                ids,ide, jds,jde, kds,kde,  & ! domain dims
+                                ims,ime, jms,jme, kms,kme,  & ! memory dims
+                                ips,ipe, jps,jpe, kps,kpe,  & ! patch  dims
+                                grid%i_start(ij), grid%i_end(ij),       &
+                                grid%j_start(ij), grid%j_end(ij),       &
+                                k_start    , k_end                     )
+     ENDIF
+
+     END DO moisture_loop_bdy_3
+
+#if (WRF_CHEM == 1)
+     IF (num_3d_c >= PARAM_FIRST_SCALAR)  THEN
+         chem_species_bdy_loop_3 : DO ic = PARAM_FIRST_SCALAR , num_3d_c
+
+     IF( ( config_flags%nested ) ) THEN
+        CALL spec_bdy_final   ( chem(ims,kms,jms,ic), grid%muts, grid%msfty,    &
+                                chem_bxs(jms,kms,1,ic),chem_bxe(jms,kms,1,ic), &
+                                chem_bys(ims,kms,1,ic),chem_bye(ims,kms,1,ic), &
+                                chem_btxs(jms,kms,1,ic),chem_btxe(jms,kms,1,ic), &
+                                chem_btys(ims,kms,1,ic),chem_btye(ims,kms,1,ic), &
+                                't', config_flags,                               &
+                                config_flags%spec_bdy_width, grid%spec_zone,     &
+                                grid%dtbc,                                       &
+                                ids,ide, jds,jde, kds,kde,  & ! domain dims
+                                ims,ime, jms,jme, kms,kme,  & ! memory dims
+                                ips,ipe, jps,jpe, kps,kpe,  & ! patch  dims
+                                grid%i_start(ij), grid%i_end(ij),       &
+                                grid%j_start(ij), grid%j_end(ij),       &
+                                k_start    , k_end                     )
+     ENDIF
+
+         END DO chem_species_bdy_loop_3
+     ENDIF
+#endif
+
+     tracer_species_bdy_loop_3 : DO im = PARAM_FIRST_SCALAR , num_tracer
+
+     IF( ( config_flags%nested ) ) THEN
+        CALL spec_bdy_final   ( tracer(ims,kms,jms,im), grid%muts, grid%msfty,    &
+                                tracer_bxs(jms,kms,1,im),tracer_bxe(jms,kms,1,im), &
+                                tracer_bys(ims,kms,1,im),tracer_bye(ims,kms,1,im), &
+                                tracer_btxs(jms,kms,1,im),tracer_btxe(jms,kms,1,im), &
+                                tracer_btys(ims,kms,1,im),tracer_btye(ims,kms,1,im), &
+                                't', config_flags,                               &
+                                config_flags%spec_bdy_width, grid%spec_zone,     &
+                                grid%dtbc,                                       &
+                                ids,ide, jds,jde, kds,kde,  & ! domain dims
+                                ims,ime, jms,jme, kms,kme,  & ! memory dims
+                                ips,ipe, jps,jpe, kps,kpe,  & ! patch  dims
+                                grid%i_start(ij), grid%i_end(ij),       &
+                                grid%j_start(ij), grid%j_end(ij),       &
+                                k_start    , k_end                     )
+     ENDIF
+
+     END DO tracer_species_bdy_loop_3
+
+     scalar_species_bdy_loop_3 : DO is = PARAM_FIRST_SCALAR , num_3d_s
+
+     IF( ( config_flags%nested ) ) THEN
+        CALL spec_bdy_final   ( scalar(ims,kms,jms,is), grid%muts, grid%msfty,    &
+                                scalar_bxs(jms,kms,1,is),scalar_bxe(jms,kms,1,is), &
+                                scalar_bys(ims,kms,1,is),scalar_bye(ims,kms,1,is), &
+                                scalar_btxs(jms,kms,1,is),scalar_btxe(jms,kms,1,is), &
+                                scalar_btys(ims,kms,1,is),scalar_btye(ims,kms,1,is), &
+                                't', config_flags,                               &
+                                config_flags%spec_bdy_width, grid%spec_zone,     &
+                                grid%dtbc,                                       &
+                                ids,ide, jds,jde, kds,kde,  & ! domain dims
+                                ims,ime, jms,jme, kms,kme,  & ! memory dims
+                                ips,ipe, jps,jpe, kps,kpe,  & ! patch  dims
+                                grid%i_start(ij), grid%i_end(ij),       &
+                                grid%j_start(ij), grid%j_end(ij),       &
+                                k_start    , k_end                     )
+     ENDIF
+
+     END DO scalar_species_bdy_loop_3
+
+   END DO tile_bc_loop_3
+   !$OMP END PARALLEL DO
+!end if !hcl
+
    ENDIF
 
 ! reset surface w for consistency
@@ -4269,8 +4749,11 @@ BENCH_END(bc_2d_tim)
 !  for use in fractional merging of external/coupled SST and input SST. 
    IF ( coupler_on )   grid%just_read_auxinput4 = Is_alarm_tstep(grid%domain_clock, grid%alarms(AUXINPUT4_ALARM))
 
+!  Are we about to read the lateral boundary file?  This is a domain one action only.
+   IF ( grid%id .EQ. 1 ) grid%just_read_boundary = Is_alarm_tstep(grid%domain_clock, grid%alarms(BOUNDARY_ALARM))
+
 ! Finish timers if compiled with -DBENCH.
-#include <bench_solve_em_end.h>
+#include "bench_solve_em_end.h"
 
    RETURN
 

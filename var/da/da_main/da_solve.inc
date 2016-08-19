@@ -68,19 +68,27 @@
       call nl_get_iso_temp   ( 1 , iso_temp )
       if ( iso_temp .NE. grid%tiso ) THEN
          write(unit=message(1),fmt='(A)') &
-           'da_solve: namelist iso_temp does not equal iso_temp from fg. Reset namelist value and rerun'
-         call da_error(__FILE__,__LINE__,message(1:1))
+           'Namelist iso_temp does not equal iso_temp from fg. Reset namelist value and rerun.'
+         write(unit=message(2),fmt='(A,F10.5)')'Namelist iso_temp   = ',iso_temp
+         write(unit=message(3),fmt='(A,F10.5)')'Background iso_temp = ',grid%tiso
+         call da_error(__FILE__,__LINE__,message(1:3))
       end if
+      call nl_get_base_pres_strat  ( 1, base_pres_strat )
+      call nl_get_base_lapse_strat ( 1, base_lapse_strat )
 
       grid%p00   = base_pres
       grid%t00   = base_temp
       grid%tlp   = base_lapse
       grid%tiso  = iso_temp
+      grid%p_strat   = base_pres_strat
+      grid%tlp_strat = base_lapse_strat
    else
       base_pres  = grid%p00
       base_temp  = grid%t00
       base_lapse = grid%tlp
       iso_temp   = grid%tiso
+      base_pres_strat  = grid%p_strat
+      base_lapse_strat = grid%tlp_strat
       if ( base_temp < 100.0 .or. base_pres < 10000.0 ) then
          write(unit=message(1),fmt='(A)') &
          'did not find base state parameters in fg. Add use_baseparam_fr_nml = .t. in &dynamics and rerun '
@@ -102,12 +110,31 @@
        if ( var4d_bin < time_step ) call nl_set_var4d_bin (1, time_step)
        time_max = (time_max - time_min) * 60   ! unit is : seconds
        num_fgat_time = NINT(time_max/var4d_bin)
-       if ( NINT(time_max/var4d_bin)*var4d_bin .ne. NINT(time_max) .or. &
-          var4d_bin/time_step*time_step .ne. var4d_bin ) then
-          write(unit=message(1),fmt='(A,A,2I7)') &
-          'Please change var4d_bin in namelist and rerun==>', 'run_seconds, var4d_bin:',NINT(time_max),var4d_bin
-          call da_error(__FILE__,__LINE__,message(1:1))
+       if ( NINT(time_max/var4d_bin)*var4d_bin .ne. NINT(time_max) ) then
+          write(unit=message(1),fmt='(A)') &
+          '4DVAR assimilation window must be evenly divisible by var4d_bin!'
+          write(unit=message(2),fmt='(A,I7)') &
+          'var4d_bin       = ',var4d_bin
+          write(unit=message(3),fmt='(A,A)') &
+          'time_window_max = ',time_window_max
+          write(unit=message(4),fmt='(A,A)') &
+          'time_window_min = ',time_window_min
+          write(unit=message(5),fmt='(A,F10.4)') &
+          'time_window_max - time_window_min = ',time_max
+          write(unit=message(6),fmt='(A)')'Change var4d_bin, time_window_max, or time_window_min in namelist and rerun'
+          call da_error(__FILE__,__LINE__,message(1:6))
        endif
+       if ( var4d_bin/time_step*time_step .ne. var4d_bin ) then
+          write(unit=message(1),fmt='(A)') &
+          'var4d_bin must be evenly divisible by time_step!'
+          write(unit=message(2),fmt='(A,I7)') &
+          'var4d_bin = ',var4d_bin
+          write(unit=message(3),fmt='(A,I7)') &
+          'time_step = ',time_step
+          write(unit=message(4),fmt='(A)')'Change var4d_bin or time_step in namelist and rerun'
+          call da_error(__FILE__,__LINE__,message(1:4))
+       endif
+
        num_fgat_time = num_fgat_time + 1
        write(unit=message(1),fmt='(a,i10)') 'num_fgat_time is: ', num_fgat_time
        call da_message(message(1:1))
@@ -166,6 +193,14 @@
       write(unit=stdout,fmt='(a)') &
          ' Resetting ntmax = 0 for analysis_type = randomcv' 
    end if
+
+#ifdef CLOUD_CV
+   if ( cv_options == 3 ) then
+      write(unit=message(1),fmt='(A,I3)') &
+         'cloud_cv does NOT work with cv_options = ', cv_options
+      call da_error(__FILE__,__LINE__,message(1:1))
+   end if
+#endif
 
    !---------------------------------------------------------------------------
    ! [2.0] Initialise wrfvar parameters:
@@ -389,7 +424,8 @@
 
       call da_deallocate_y(re)
       call da_deallocate_observations (iv)
-      return   
+      if (trace_use) call da_trace_exit ("da_solve")
+      return
    end if
    
    !---------------------------------------------------------------------------
@@ -413,6 +449,14 @@
       be % v3 % mz = 0
       be % v4 % mz = 0
       be % v5 % mz = 0
+#ifdef CLOUD_CV
+      be % v6  % mz = 0
+      be % v7  % mz = 0
+      be % v8  % mz = 0
+      be % v9  % mz = 0
+      be % v10 % mz = 0
+      be % v11 % mz = 0
+#endif
    end if
 
     ! overwrite variables defined in da_setup_cv.inc set in the call to da_setup_background_errors
@@ -422,8 +466,6 @@
        cv_size_domain_je = (ide_int - ids_int + 1) * (jde_int - jds_int + 1) * be % alpha % mz * be % ne
     endif
    
-
-
    !---------------------------------------------------------------------------
    ! [5.2] Set up observation bias correction (VarBC):
    !---------------------------------------------------------------------------
@@ -520,7 +562,7 @@
       end if
 
 ! Re-scale the variances and the scale-length for outer-loop > 1:
-      if (it > 1 .and. cv_options == 5) then
+      if (it > 1 .and. (cv_options == 5 .or. cv_options == 7)) then
          print '(/10X,"===> Re-set BE SCALINGS for outer-loop=",i2)', it
          call  da_scale_background_errors ( be, it )
       else if (it > 1 .and. cv_options == 3) then
@@ -639,7 +681,10 @@
 
       num_qcstat_conv=0
       call da_get_innov_vector (it, num_qcstat_conv, ob, iv, grid , config_flags)
-      if ( multi_inc == 1 ) return      
+      if ( multi_inc == 1 ) then 
+         if (trace_use) call da_trace_exit ("da_solve")
+         return
+      end if
 
       if (test_transforms .or. test_gradient) then
 
@@ -647,7 +692,7 @@
             call da_allocate_y (iv, re)
             call da_allocate_y (iv, y)
             call da_check_gradient (grid, config_flags, cv_size, xhat, cvt, 1.0e-10, 8, &
-                         xbx, be, iv, y, re, j) 
+                 xbx, be, iv, y, re, j)
             call da_deallocate_y (re)
             call da_deallocate_y (y)
          endif
@@ -657,19 +702,9 @@
                         grid%vv, grid%vp, y)
          endif
 
-         ! No point continuing, as data corrupted
-         call da_wrfvar_finalize
-#ifdef VAR4D
-         if (var4d) call da_finalize_model
-#endif
+         if (trace_use) call da_trace_exit("da_solve")
+         return
 
-         call wrf_message("*** WRF-Var check completed successfully ***")
-         if (trace_use) call da_trace_exit("da_wrfvar_main")
-         if (trace_use) call da_trace_report
-
-         call wrfu_finalize
-         call wrf_shutdown
-         stop
       end if
 
       ! [8.4] Minimize cost function:
@@ -701,8 +736,9 @@
 
 	 
       else
+
          call da_minimise_cg( grid, config_flags, it, be % cv % size, & 
-            xbx, be, iv, j_grad_norm_target, xhat, cvt, re, y, j )
+              xbx, be, iv, j_grad_norm_target, xhat, cvt, re, y, j)
       end if
  
       ! Update outer-loop control variable
@@ -853,193 +889,10 @@
 !      deallocate (full_eignvec)
 !   end if
 
+   ! clean up radiance related arrays
 #if defined(RTTOV) || defined(CRTM)
    if (use_rad) then
-      do i =1, iv%num_inst
-         deallocate (j % jo % rad(i) % jo_ichan)
-         deallocate (j % jo % rad(i) % num_ichan)
-         deallocate (satinfo(i) % ichan)
-         deallocate (satinfo(i) % iuse)
-         deallocate (satinfo(i) % error)
-         deallocate (satinfo(i) % polar)
-
-         deallocate (satinfo(i) % scanbias) 
-         deallocate (satinfo(i) % scanbias_b)
-         deallocate (satinfo(i) % bcoef)
-         deallocate (satinfo(i) % bcoef0)
-         deallocate (satinfo(i) % error_std)
-
-         deallocate (ob%instid(i) % ichan)
-         deallocate (iv%instid(i)%ichan)
-
-         if (iv%instid(i)%num_rad > 0) then
- 
-            deallocate (iv%instid(i)%info%date_char)
-            deallocate (iv%instid(i)%info%name)
-            deallocate (iv%instid(i)%info%platform)
-            deallocate (iv%instid(i)%info%id)
-            deallocate (iv%instid(i)%info%levels)     
-            deallocate (iv%instid(i)%info%lat)      
-            deallocate (iv%instid(i)%info%lon)      
-            deallocate (iv%instid(i)%info%elv)   
-
-            deallocate (iv%instid(i)%info%pstar)
-            deallocate (iv%instid(i)%info%i)
-            deallocate (iv%instid(i)%info%j)
-            deallocate (iv%instid(i)%info%k)
-            deallocate (iv%instid(i)%info%zk)
-            deallocate (iv%instid(i)%info%dx)
-            deallocate (iv%instid(i)%info%dy)
-            deallocate (iv%instid(i)%info%dz)
-            deallocate (iv%instid(i)%info%dxm)
-            deallocate (iv%instid(i)%info%dym)
-            deallocate (iv%instid(i)%info%dzm)
-            deallocate (iv%instid(i)%info%proc_domain)
-
-            deallocate (iv%instid(i)%t)
-            deallocate (iv%instid(i)%mr)
-            deallocate (iv%instid(i)%tm)
-            deallocate (iv%instid(i)%qm)
-            deallocate (iv%instid(i)%qrn)
-            deallocate (iv%instid(i)%qcw)
-            if ( crtm_cloud ) then
-               deallocate (iv%instid(i)%qci)
-               deallocate (iv%instid(i)%qsn)
-               deallocate (iv%instid(i)%qgr)
-               deallocate (iv%instid(i)%qhl)
-               deallocate (iv%instid(i)%rcw)
-               deallocate (iv%instid(i)%rci)
-               deallocate (iv%instid(i)%rrn)
-               deallocate (iv%instid(i)%rsn)
-               deallocate (iv%instid(i)%rgr)
-               deallocate (iv%instid(i)%rhl)
-            end if
-            deallocate (iv%instid(i)%pm)
-            deallocate (iv%instid(i)%pf)
-            deallocate (iv%instid(i)%u10)
-            deallocate (iv%instid(i)%v10)
-            deallocate (iv%instid(i)%t2m)
-            deallocate (iv%instid(i)%q2m)
-            deallocate (iv%instid(i)%mr2m)
-            deallocate (iv%instid(i)%psfc)
-            deallocate (iv%instid(i)%ts)
-            deallocate (iv%instid(i)%smois)
-            deallocate (iv%instid(i)%tslb)
-            deallocate (iv%instid(i)%snowh)
-            deallocate (iv%instid(i)%isflg)
-            deallocate (iv%instid(i)%soiltyp)
-            deallocate (iv%instid(i)%landsea_mask)
-            if (rtm_option == rtm_option_rttov) then
-               deallocate (iv%instid(i)%surftype)
-               deallocate (iv%instid(i)%snow_frac)
-            end if
-            deallocate (iv%instid(i)%elevation)
-            deallocate (iv%instid(i)%vegfra)
-            deallocate (iv%instid(i)%vegtyp)
-            deallocate (iv%instid(i)%clwp)
-            deallocate (iv%instid(i)%ps)
-            deallocate (iv%instid(i)%tb_xb)
-            deallocate (iv%instid(i)%tb_qc)
-            deallocate (iv%instid(i)%tb_inv)
-            deallocate (iv%instid(i)%tb_error)
-            deallocate (iv%instid(i)%tb_sens)
-            deallocate (iv%instid(i)%tb_imp)
-            deallocate (iv%instid(i)%rad_xb)
-            deallocate (iv%instid(i)%rad_obs)
-            deallocate (iv%instid(i)%rad_ovc)
-            deallocate (iv%instid(i)%emiss)
-            deallocate (iv%instid(i)%scanpos)
-            deallocate (iv%instid(i)%scanline)
-            deallocate (iv%instid(i)%ifgat)
-            deallocate (iv%instid(i)%cloud_flag)
-            deallocate (iv%instid(i)%rain_flag)
-            deallocate (iv%instid(i)%satzen)
-            deallocate (iv%instid(i)%satazi)
-            deallocate (iv%instid(i)%solzen)
-            deallocate (iv%instid(i)%solazi)
-            deallocate (iv%instid(i)%gamma_jacobian)
-
-           if (ANY(use_satcv)) then
-	      if (use_satcv(2)) then
-                 do n = 1,iv%instid(i)%num_rad
-                    deallocate (iv%instid(i)%cv_index(n)%cc)
-                    deallocate (iv%instid(i)%cv_index(n)%vtox)
-                 end do
-	      end if
-              deallocate (iv%instid(i)%cv_index)  
-           end if
-        
-           if ( use_rttov_kmatrix .or. use_crtm_kmatrix ) then
-              deallocate(iv%instid(i)%ts_jacobian)
-              deallocate(iv%instid(i)%ps_jacobian)
-              deallocate(iv%instid(i)%emiss_jacobian)
-              deallocate(iv%instid(i)%windspeed_jacobian)
-              deallocate(iv%instid(i)%t_jacobian)
-              deallocate(iv%instid(i)%q_jacobian)
-           end if
-            if (rtm_option == rtm_option_crtm) then
-               deallocate(iv%instid(i)%crtm_climat)
-               deallocate(iv%instid(i)%water_coverage)
-               deallocate(iv%instid(i)%land_coverage)
-               deallocate(iv%instid(i)%ice_coverage)
-               deallocate(iv%instid(i)%snow_coverage)
-               if (use_crtm_kmatrix) then
-                 if ( crtm_cloud ) then
-                     deallocate(iv%instid(i)%water_jacobian)
-                     deallocate(iv%instid(i)%ice_jacobian)
-                     deallocate(iv%instid(i)%rain_jacobian)
-                     deallocate(iv%instid(i)%snow_jacobian)
-                     deallocate(iv%instid(i)%graupel_jacobian)
-                     deallocate(iv%instid(i)%hail_jacobian)
-                     deallocate(iv%instid(i)%water_r_jacobian)
-                     deallocate(iv%instid(i)%ice_r_jacobian)
-                     deallocate(iv%instid(i)%rain_r_jacobian)
-                     deallocate(iv%instid(i)%snow_r_jacobian)
-                     deallocate(iv%instid(i)%graupel_r_jacobian)
-                     deallocate(iv%instid(i)%hail_r_jacobian)
-                 end if
-                 if ( calc_weightfunc ) then
-                    deallocate(iv%instid(i)%lod)
-                    deallocate(iv%instid(i)%lod_jacobian)
-                    deallocate(iv%instid(i)%trans)
-                    deallocate(iv%instid(i)%trans_jacobian)
-                    deallocate(iv%instid(i)%der_trans)
-                 end if
-              end if
-            end if
-
-         end if
-
-	  if ( use_rad .and. (use_varbc.or.freeze_varbc) ) then
-	     if (iv%instid(i)%varbc_info%npredmax > 0) then
-                deallocate (iv%instid(i)%varbc_info%pred)
-                deallocate (iv%instid(i)%varbc_info%pred_mean)
-                deallocate (iv%instid(i)%varbc_info%pred_std)
-                deallocate (iv%instid(i)%varbc_info%nbgerr)
-	     end if
-	     do ichan = 1, iv%instid(i)%nchan
-	        if (iv%instid(i)%varbc(ichan)%npred <= 0) cycle	 
-	        deallocate (iv%instid(i)%varbc(ichan)%pred_use)
-	        deallocate (iv%instid(i)%varbc(ichan)%ipred)
-	        deallocate (iv%instid(i)%varbc(ichan)%index)
-	        deallocate (iv%instid(i)%varbc(ichan)%param)
-    	        deallocate (iv%instid(i)%varbc(ichan)%bgerr)
-	        deallocate (iv%instid(i)%varbc(ichan)%vtox)
-	     end do
-   	     deallocate (iv%instid(i)%varbc)
-	  end if
-#ifdef RTTOV
-         if (rtm_option == rtm_option_rttov) then
-            call rttov_dealloc_coefs (ierr,coefs(i))
-            if ( ierr /= 0 ) then
-               call da_error(__FILE__,__LINE__,(/'failure in rttov_dealloc_coefs'/))
-            end if
-         end if
-#endif
-      end do
-      deallocate (iv%instid)
-      deallocate (j % jo % rad)     
-      deallocate (satinfo)
+      call da_deallocate_radiance (ob, iv, j)
       deallocate (time_slots)
 #ifdef RTTOV
       if (rtm_option == rtm_option_rttov) then

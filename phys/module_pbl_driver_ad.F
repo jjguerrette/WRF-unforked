@@ -65,12 +65,12 @@ SUBROUTINE A_PBL_DRIVER(itimestep, dt, u_frame, v_frame, bldt, curr_secs&
                    YSUSCHEME,MRFSCHEME,GFSSCHEME,MYJPBLSCHEME,ACMPBLSCHEME,&
                    QNSEPBLSCHEME,MYNNPBLSCHEME2,MYNNPBLSCHEME3,BOULACSCHEME,&
                    CAMUWPBLSCHEME,BEPSCHEME,BEP_BEMSCHEME,MYJSFCSCHEME, &
-                   SURFDRAGSCHEME, TEMFPBLSCHEME, QNSEPBL09SCHEME, &
-                   p_qi, &
-#if (WRF_CHEM == 1)
-                   num_chem, &
-#endif
-                   param_first_scalar
+                   SURFDRAGSCHEME, TEMFPBLSCHEME, &
+                   p_qi, param_first_scalar
+!#if (WRF_CHEM == 1)
+!                   num_chem, &
+!#endif
+                   
 
   USE module_model_constants
 
@@ -82,8 +82,7 @@ SUBROUTINE A_PBL_DRIVER(itimestep, dt, u_frame, v_frame, bldt, curr_secs&
   USE A_MODULE_BL_SURFACE_DRAG
   USE A_MODULE_BL_ACM
   IMPLICIT NONE
-!------------------------------------------------------------------
-!CAMMGMPSCHEME, p_qni,p_qnc is used for camuwpbl scheme
+
 !======================================================================
 ! Grid structure in physics part of WRF
 !----------------------------------------------------------------------
@@ -583,7 +582,6 @@ SUBROUTINE A_PBL_DRIVER(itimestep, dt, u_frame, v_frame, bldt, curr_secs&
       IF (run_param) THEN
 !---- 
 ! CALCULATE CONSTANT
-        dtmin = dt/60.
 ! PBL schemes need PBL time step for updates
         IF (PRESENT(adapt_step_flag)) THEN
           IF (adapt_step_flag) THEN
@@ -687,7 +685,7 @@ SUBROUTINE A_PBL_DRIVER(itimestep, dt, u_frame, v_frame, bldt, curr_secs&
 &                rqvblten) .AND. PRESENT(rqcblten) .AND. .true.) THEN
 
                CALL PUSHREAL8ARRAY (pblh ,(ime-ims+1)*(jme-jms+1))
-               CALL PUSHREAL8ARRAY (chem ,(ime-ims+1)*(kme-kms+1)*(jme-jms+1)*num_chem)
+               CALL PUSHREAL8ARRAY (chem ,(ime-ims+1)*(kme-kms+1)*(jme-jms+1)*nchem)
                CALL ACMPBL(                                                        &
                  xtime=itimestep, dtpbl=dtbl, znw=znw, sigmah=znu               &
                 ,u3d=u_phytmp, v3d=v_phytmp, pp3d=p_phy, dz8w=dz8w, th3d=th_phy, t3d=t_phy   &
@@ -717,22 +715,22 @@ SUBROUTINE A_PBL_DRIVER(itimestep, dt, u_frame, v_frame, bldt, curr_secs&
 &                        jte=jte, kts=kts, kte=kte)
           CASE DEFAULT
           END SELECT
-!          IF (PRESENT(dtaux3d)) THEN
-!            IF (gwd_opt .EQ. 1) THEN
-!              CALL GWDO(u3d=u_phytmp, v3d=v_phytmp, t3d=t_phy, qv3d=&
-!&                  qv_curr, p3d=p_phy, p3di=p8w, pi3d=pi_phy, z=z, rublten=&
-!&                  rublten, rvblten=rvblten, dtaux3d=dtaux3d, dtauy3d=&
-!&                  dtauy3d, dusfcg=dusfcg, dvsfcg=dvsfcg, var2d=var2d, &
-!&                  oc12d=oc12d, oa2d1=oa1, oa2d2=oa2, oa2d3=oa3, oa2d4=oa4&
-!&                  , ol2d1=ol1, ol2d2=ol2, ol2d3=ol3, ol2d4=ol4, znu=znu, &
-!&                  znw=znw, mut=mut, p_top=p_top, cp=cp, g=g, rd=r_d, rv=&
-!&                  r_v, ep1=ep_1, pi=3.141592653, dt=dtbl, dx=dx, kpbl2d=&
-!&                  kpbl, itimestep=itimestep, ids=ids, ide=ide, jds=jds, &
-!&                  jde=jde, kds=kds, kde=kde, ims=ims, ime=ime, jms=jms, &
-!&                  jme=jme, kms=kms, kme=kme, its=its, ite=ite, jts=jts, &
-!&                  jte=jte, kts=kts, kte=kte)
-!            END IF
-!          END IF
+          IF (PRESENT(dtaux3d)) THEN
+            IF (gwd_opt .EQ. 1) THEN
+              CALL GWDO(u3d=u_phytmp, v3d=v_phytmp, t3d=t_phy, qv3d=&
+&                  qv_curr, p3d=p_phy, p3di=p8w, pi3d=pi_phy, z=z, rublten=&
+&                  rublten, rvblten=rvblten, dtaux3d=dtaux3d, dtauy3d=&
+&                  dtauy3d, dusfcg=dusfcg, dvsfcg=dvsfcg, var2d=var2d, &
+&                  oc12d=oc12d, oa2d1=oa1, oa2d2=oa2, oa2d3=oa3, oa2d4=oa4&
+&                  , ol2d1=ol1, ol2d2=ol2, ol2d3=ol3, ol2d4=ol4, znu=znu, &
+&                  znw=znw, mut=mut, p_top=p_top, cp=cp, g=g, rd=r_d, rv=&
+&                  r_v, ep1=ep_1, pi=3.141592653, dt=dtbl, dx=dx, kpbl2d=&
+&                  kpbl, itimestep=itimestep, ids=ids, ide=ide, jds=jds, &
+&                  jde=jde, kds=kds, kde=kde, ims=ims, ime=ime, jms=jms, &
+&                  jme=jme, kms=kms, kme=kme, its=its, ite=ite, jts=jts, &
+&                  jte=jte, kts=kts, kte=kte)
+            END IF
+          END IF
         END DO
 !$OMP END PARALLEL DO
 
@@ -768,7 +766,7 @@ SUBROUTINE A_PBL_DRIVER(itimestep, dt, u_frame, v_frame, bldt, curr_secs&
 !!  These are values that are not supplied to pbl driver, but are required by ACM
             IF (PRESENT(qv_curr) .AND. PRESENT(qc_curr) .AND. PRESENT(&
 &                rqvblten) .AND. PRESENT(rqcblten) .AND. .true.) THEN
-              CALL POPREAL8ARRAY (chem ,(ime-ims+1)*(kme-kms+1)*(jme-jms+1)*num_chem)
+              CALL POPREAL8ARRAY (chem ,(ime-ims+1)*(kme-kms+1)*(jme-jms+1)*nchem)
               CALL POPREAL8ARRAY (pblh ,(ime-ims+1)*(jme-jms+1))
               CALL A_ACMPBL(xtime=itimestep, dtpbl=dtbl, znw=znw, sigmah&
 &                      =znu, u3d=u_phytmp, a_u3d=a_u_phytmp, v3d=v_phytmp&

@@ -28,6 +28,7 @@ MODULE module_write
   USE module_map
 
   INCLUDE 'constants.inc'
+  INCLUDE '../../../inc/version_decl'
 
   REAL (kind=8), parameter             :: bufrlib_missing = 10.D10
 
@@ -562,8 +563,8 @@ SUBROUTINE output_gts_31 (max_number_of_obs, obs, number_of_obs, windex,&
 
 !      filename = 'obs_gts.'//use_for
 
-      WRITE (0,'(5A)') 'Write 3DVAR ',use_for,' GTS observations in file ',&
-                        TRIM (filename),' (wrfvar version 3.0)'
+      WRITE (0,'(7A)') 'Write ',use_for,' GTS observations in file ',&
+                        TRIM (filename),' (WRFDA ',TRIM(release_version),')'
 
 
 ! 1.2 OPEN FILE AT VERSION 3.1 FORMAT
@@ -1032,7 +1033,7 @@ levels:&
 ! 5.  PRINT DIAGNOSTIC
 ! =====================
  
-      WRITE (0, '(/,A,I7,A,A)') &
+      WRITE (0, '(/,A,I8,A,A)') &
      'Wrote ',nwrites,' lines of data in file: ',TRIM (filename) 
       WRITE (0, '(A)') ' ' 
 
@@ -1573,11 +1574,11 @@ SUBSET: &
         if (cfm(fm) .eq. 'SPSSMI') then
           r8arr(1:11,1) = bufrlib_missing
           r8arr(1,1) = 6.
-          r8arr(2,1) = obs (loop_index) % ground  % pw   % data
+          r8arr(2,1) = 10.0*obs (loop_index) % ground  % pw  % data  !cm to mm
           r8arr(3,1) = qz (obs (loop_index) % ground  % pw   % qc)
           r8arr(4,1) = 1
           r8arr(5,1) = 100
-          r8arr(6,1) = obs (loop_index) % ground  % pw   % error
+          r8arr(6,1) = 10.0*obs (loop_index) % ground  % pw  % error !cm to mm
 	  if (vld) then
             call assignv( obs (loop_index) % surface % meas % speed % data, &
               r8arr(7,1) )                        ! FFO

@@ -1,4 +1,4 @@
-subroutine da_get_var_diagnostics( iv, j)
+subroutine da_get_var_diagnostics(it, iv, j)
 
    !-----------------------------------------------------------------------
    ! Purpose: TBD
@@ -6,6 +6,7 @@ subroutine da_get_var_diagnostics( iv, j)
 
    implicit none
 
+   integer,        intent(in)  :: it
    type(iv_type), intent(inout):: iv      ! innovation vector.
    type(j_type), intent(inout) :: j       ! Cost function.
 
@@ -207,6 +208,7 @@ subroutine da_get_var_diagnostics( iv, j)
       write(unit=stdout,fmt='(a,i8)')    '   Total number of obs.        = ', num_stats_tot
       write(unit=stdout,fmt='(a,f15.5)') '   Final value of J            = ', j % total
       write(unit=stdout,fmt='(a,f15.5)') '   Final value of Jo           = ', j % jo % total
+      write(unit=stdout,fmt='(a,f15.5)') '   Final value of Jd           = ', j % jd
       write(unit=stdout,fmt='(a,f15.5)') '   Final value of Jb           = ', j % jb
       write(unit=stdout,fmt='(a,f15.5)') '   Final value of Jc           = ', j % jc
       write(unit=stdout,fmt='(a,f15.5)') '   Final value of Je           = ', j % je
@@ -216,11 +218,11 @@ subroutine da_get_var_diagnostics( iv, j)
          write(unit=stdout,fmt='(a,f15.5)') '   Final J / total num_obs     = ', j % total / &
                                                           real(num_stats_tot)
       if (cv_options /= 3) then
-        write(unit=stdout,fmt='(a,(5f15.5))') '   Jb factor used(1)           = ', var_scaling1
-        write(unit=stdout,fmt='(a,(5f15.5))') '   Jb factor used(2)           = ', var_scaling2
-        write(unit=stdout,fmt='(a,(5f15.5))') '   Jb factor used(3)           = ', var_scaling3
-        write(unit=stdout,fmt='(a,(5f15.5))') '   Jb factor used(4)           = ', var_scaling4
-        write(unit=stdout,fmt='(a,(5f15.5))') '   Jb factor used(5)           = ', var_scaling5
+        write(unit=stdout,fmt='(a,(5f15.5))') '   Jb factor used(1)           = ', var_scaling1(it)
+        write(unit=stdout,fmt='(a,(5f15.5))') '   Jb factor used(2)           = ', var_scaling2(it)
+        write(unit=stdout,fmt='(a,(5f15.5))') '   Jb factor used(3)           = ', var_scaling3(it)
+        write(unit=stdout,fmt='(a,(5f15.5))') '   Jb factor used(4)           = ', var_scaling4(it)
+        write(unit=stdout,fmt='(a,(5f15.5))') '   Jb factor used(5)           = ', var_scaling5(it)
       endif
 
       write(unit=stdout,fmt='(a, f15.5)') '   Jb factor used              = ', jb_factor

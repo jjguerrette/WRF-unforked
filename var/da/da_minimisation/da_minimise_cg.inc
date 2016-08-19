@@ -40,7 +40,7 @@ subroutine da_minimise_cg(grid, config_flags,            &
    integer                           :: iter            
    integer                           :: jp_start, jp_end       ! Start/end indices of Jp.
 #ifdef CLOUD_CV
-   integer                           :: mz(11)
+   integer                           :: mz(13)
 #else
    integer                           :: mz(7)
 #endif
@@ -58,7 +58,7 @@ subroutine da_minimise_cg(grid, config_flags,            &
    real                              :: g_total, g_partial, jo_partial                          
    integer                           :: i, ii, nv, nn, istart, iend
 #ifdef CLOUD_CV
-   integer                           ::  sz(9)
+   integer                           ::  sz(11)
 #else
    integer                           ::  sz(5)
 #endif
@@ -72,8 +72,8 @@ subroutine da_minimise_cg(grid, config_flags,            &
    ! [1.0] Initialization:
    !-------------------------------------------------------------------------
 #ifdef CLOUD_CV
-   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%v6%mz, be%v7%mz,be%v8%mz,be%v9%mz, be%alpha%mz, be % ne /)
-   sz = (/ be%cv%size1, be%cv%size2, be%cv%size3, be%cv%size4, be%cv%size5, be%cv%size6, be%cv%size7,be%cv%size8, be%cv%size9 /)
+   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%v6%mz, be%v7%mz,be%v8%mz,be%v9%mz,be%v10%mz,be%v11%mz, be%alpha%mz, be % ne /)
+   sz = (/ be%cv%size1, be%cv%size2, be%cv%size3, be%cv%size4, be%cv%size5, be%cv%size6, be%cv%size7,be%cv%size8, be%cv%size9,be%cv%size10,be%cv%size11i /)
 #else
    mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be % ne /)
    sz = (/ be%cv%size1, be%cv%size2, be%cv%size3, be%cv%size4, be%cv%size5 /)
@@ -85,7 +85,10 @@ subroutine da_minimise_cg(grid, config_flags,            &
                        be%cv%size_jl, xbx, be, iv, xhat, cv, re, y, j_cost, ghat, grid, config_flags)
 
    j0_total = j_cost%total
-   if (j0_total == 0.0) return
+   if (j0_total == 0.0) then
+      if (trace_use) call da_trace_exit("da_minimise_cg")
+      return
+   end if
    ghat0 = ghat
    
    ! [1.1] Preconditioning:
@@ -97,7 +100,7 @@ subroutine da_minimise_cg(grid, config_flags,            &
       
       iend    = 0
 #ifdef CLOUD_CV
-      do nv = 1, 9
+      do nv = 1, 11 
 #else
       do nv = 1, 5
 #endif
@@ -107,7 +110,7 @@ subroutine da_minimise_cg(grid, config_flags,            &
             iend       = istart + nn - 1
 	    g_partial  = da_dot(nn, ghat(istart:iend), ghat(istart:iend))
 #ifdef CLOUD_CV
-            jo_partial = j0_total / SUM(mz(1:8))
+            jo_partial = j0_total / SUM(mz(1:10))
 #else
             jo_partial = j0_total / SUM(mz(1:5))
 #endif
@@ -133,9 +136,11 @@ subroutine da_minimise_cg(grid, config_flags,            &
 11 format('Starting cost function: ' ,1PD22.15,', Gradient= ',1PD22.15,/,&
           'For this outer iteration gradient target is:       ',1PD22.15)
    write(unit=stdout,fmt='(A)') &
-      '----------------------------------------------------------'
+      '----------------------------------------------------------------------'
    write(unit=stdout,fmt='(A)') &
-      'Iter    Cost Function         Gradient             Step'
+      '              Loop Iter     Cost Function              Gradient                   Step'
+
+   write(unit=stdout,fmt=12) " minimize_cg ", it, 0, j0_total, sqrt(rrmold), 0.0
 
    !-------------------------------------------------------------------------
    ! [2.0] iteratively solve for minimum of cost function:
@@ -189,10 +194,10 @@ subroutine da_minimise_cg(grid, config_flags,            &
          j_total = j0_total + 0.5 * da_dot_cv(cv_size,ghat0,xhat,grid,mz,jp_start,jp_end)
       endif
 
-      write(unit=stdout,fmt=12)iter, j_total, rrmnew_norm, step         	 
+      write(unit=stdout,fmt=12) " minimize_cg ", it, iter, j_total, rrmnew_norm, step         	 
       if (rrmnew_norm  < eps(it) * j_grad_norm_target) exit
 
-12    format(i3,5x,1PD22.15,5x,1PD22.15,5x,1PD22.15)
+12    format(a13,1x,i3,1x,i4,5x,1PD22.15,5x,1PD22.15,5x,1PD22.15)
 
    end do
 
@@ -211,7 +216,7 @@ subroutine da_minimise_cg(grid, config_flags,            &
    end if
    
    write(unit=stdout,fmt='(A)') &
-      '----------------------------------------------------------'
+      '----------------------------------------------------------------------'
    write(unit=stdout,fmt='(A)') " "
    write(unit=stdout, &
       fmt='("Inner iteration stopped after ",i4," iterations")') iter
@@ -225,7 +230,7 @@ subroutine da_minimise_cg(grid, config_flags,            &
     write(unit=stdout,fmt=15) iter, j_cost%total , rrmnew_norm
 15  format('Final: ',I3,' iter, J=',1PD22.15,', g=',1PD22.15)
     write(unit=stdout,fmt='(A)') &
-      '----------------------------------------------------------'
+      '----------------------------------------------------------------------'
 
    if (trace_use) call da_trace_exit("da_minimise_cg")
 

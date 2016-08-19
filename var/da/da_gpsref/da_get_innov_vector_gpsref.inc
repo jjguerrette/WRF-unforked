@@ -139,7 +139,10 @@ subroutine da_get_innov_vector_gpsref(it, num_qcstat_conv, grid, ob, iv)
       write(stdout,'(3f15.5)')    pseudo_x, pseudo_y, pseudo_z
    end if
 
-   if (iv%info(gpsref)%nlocal < 1) return
+   if (iv%info(gpsref)%nlocal < 1) then
+      if (trace_use_dull) call da_trace_exit("da_get_innov_vector_gpsref")
+      return
+   end if
 
    ntotal = 0
 
@@ -202,7 +205,7 @@ subroutine da_get_innov_vector_gpsref(it, num_qcstat_conv, grid, ob, iv)
       end if
 
 !
-! To assign the retieved pressure to GPSREF data (YRG, 06/15/2011)............
+! To assign the retrieved pressure to GPSREF data (YRG, 06/15/2011)............
    do k=1, iv%info(gpsref)%levels(n)
       kk = int (iv%info(gpsref)%zk(k,n))
       if (kk >= kts .and. kk+1 <= kte) then
@@ -213,8 +216,6 @@ subroutine da_get_innov_vector_gpsref(it, num_qcstat_conv, grid, ob, iv)
         iv%gpsref(n)%p(k)%qc = -5
       else
         n_rej = n_rej + 1
-        !write (*,'(a,3i6,i10,a,f15.3)') "GPSREF: n_rej, n, k, kk:", &
-        !         n_rej, n, k, kk, "  zk=",iv%info(gpsref)%zk(k,n)
       endif
    end do
 !..............................................................................
@@ -256,14 +257,10 @@ subroutine da_get_innov_vector_gpsref(it, num_qcstat_conv, grid, ob, iv)
       end if
    end do
 
-! Skip over the special QC for gpsref (temporary mods, YRG, 06/12/2011):
-!   goto 12221
 
-!   ! Quality check 1: Gross error(departure from the background) check 
-
+   ! Quality check 1: Gross error(departure from the background) check 
     if (.not.(pseudo_var(1:3) == 'ref' .and. num_pseudo > 0) .and. check_max_iv ) &
        call da_check_max_iv_gpsref(iv, it, num_qcstat_conv, 1)
-!   goto 12221
 
 ! refer to Poli et al. (2009) ------------------------------------------------
 ! flag if fit in each of these two qc steps for both of obs. and model
@@ -398,6 +395,7 @@ subroutine da_get_innov_vector_gpsref(it, num_qcstat_conv, grid, ob, iv)
 
 !  process refracticity data n from n1 to n2
 !
+if (.not. anal_type_verify) then
    do n=iv%info(gpsref)%n1,iv%info(gpsref)%n2
        do k=1,iv%info(gpsref)%levels(n)
          if (model_ref(k,n) > 0.0) top_level=k
@@ -461,6 +459,7 @@ subroutine da_get_innov_vector_gpsref(it, num_qcstat_conv, grid, ob, iv)
 
        end do
    end do
+end if
 
    deallocate (model_t)
 !

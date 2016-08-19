@@ -13,7 +13,7 @@ SUBROUTINE Setup_Timekeeping ( grid )
    INTEGER :: start_year,start_month,start_day,start_hour,start_minute,start_second
    INTEGER :: end_year,end_month,end_day,end_hour,end_minute,end_second
    INTEGER :: vortex_interval
-#ifdef HWRF
+#if ( HWRF == 1 )
 !zhang's doing
    real (kind=8) :: day_in_sec
    REAL :: tstart
@@ -85,7 +85,7 @@ SUBROUTINE Setup_Timekeeping ( grid )
       CALL nl_get_start_hour(grid%id,start_hour)
       CALL nl_get_start_minute(grid%id,start_minute)
       CALL nl_get_start_second(grid%id,start_second)
-#ifdef HWRF
+#if ( HWRF == 1 )
 !zhang's doing - check with zhan before adding this bit
 !   CALL nl_get_tstart ( grid%id , tstart )
 !   CALL jdn_sec(day_in_sec,start_year,start_month,start_day,start_hour,start_minute,start_second)
@@ -558,7 +558,7 @@ SUBROUTINE Setup_Timekeeping ( grid )
 ! the nests.  Parallel NetCDF does a header check on all the metadata being written
 ! from multiple processors and if it differs, it throws up an error. This avoids that.
    IF ( grid%id .EQ. 1 ) THEN   ! only moad can have specified boundaries
-     CALL domain_alarm_create( grid, BOUNDARY_ALARM )
+     CALL domain_alarm_create( grid, BOUNDARY_ALARM, interval )
      CALL WRFU_AlarmEnable( grid%alarms( BOUNDARY_ALARM ), rc=rc )
      CALL wrf_check_error( WRFU_SUCCESS, rc, &
                            'WRFU_AlarmEnable(BOUNDARY_ALARM) FAILED', &

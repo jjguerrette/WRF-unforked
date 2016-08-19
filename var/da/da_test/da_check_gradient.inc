@@ -31,8 +31,8 @@ subroutine da_check_gradient(grid, config_flags, cv_size, xhat, cv, pdx, itertes
    real    :: ZERMIN,ZT1TST,ZREF
    integer                           :: jp_start, jp_end       ! Start/end indices of Jp.
 #ifdef CLOUD_CV
-   integer                           :: mz(11)
-   integer                           :: sz(9)
+   integer                           :: mz(13)
+   integer                           :: sz(11)
 #else
    integer                           :: mz(7)
    integer                           :: sz(5)
@@ -43,8 +43,8 @@ subroutine da_check_gradient(grid, config_flags, cv_size, xhat, cv, pdx, itertes
    call da_trace_entry("da_check_gradient")
 
 #ifdef CLOUD_CV
-   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%v6%mz, be%v7%mz,be%v8%mz,be%v9%mz, be%alpha%mz, be % ne /)
-   sz = (/ be%cv%size1, be%cv%size2, be%cv%size3, be%cv%size4, be%cv%size5, be%cv%size6, be%cv%size7,be%cv%size8,be%cv%size9/)
+   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%v6%mz, be%v7%mz,be%v8%mz,be%v9%mz,be%v10%mz,be%v11%mz,be%alpha%mz, be % ne /)
+   sz = (/ be%cv%size1, be%cv%size2, be%cv%size3, be%cv%size4, be%cv%size5, be%cv%size6, be%cv%size7,be%cv%size8,be%cv%size9,be%cv%size10,be%cv%size11i/)
 #else
    mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be % ne /)
    sz = (/ be%cv%size1, be%cv%size2, be%cv%size3, be%cv%size4, be%cv%size5 /)
@@ -57,6 +57,7 @@ subroutine da_check_gradient(grid, config_flags, cv_size, xhat, cv, pdx, itertes
    if (pdx<=EPSILON(pdx)) then
       if (rootproc) write(6,*)'grtest, pdx=',pdx
       write(6,*)'grtest: pdx too small',pdx
+      call da_trace_exit("da_check_gradient")
       return
    endif
 
@@ -86,7 +87,6 @@ subroutine da_check_gradient(grid, config_flags, cv_size, xhat, cv, pdx, itertes
    call da_message((/' The test direction is the opposite of the gradient '/))
 
    xdir  = -1.0  * grad
-   
    !----------------------------------------------------------------------------
    ! [1.2] Set function f value and derivative at origin
    !----------------------------------------------------------------------------

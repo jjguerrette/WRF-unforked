@@ -258,8 +258,8 @@ state   real   g_xkhv            ikj      misc        1         -     -         
 state   real   g_xkhh            ikj      misc        1         -     -         "g_xkhh"                  "HORIZONTAL EDDY DIFFUSIVITY OF HEAT"                             "m2 s-1"      
 state   real    g_div            ikj      misc        1         -     -         "g_div"                   "DIVERGENCE"                                                      "s-1"
 state   real    g_BN2            ikj      misc        1         -     -         "g_BN2"                   "BRUNT-VAISALA FREQUENCY"                                         "s-2"
-state    real   g_zx             ikj     dyn_em      1         X      -         " "  " "  " "    
-state    real   g_zy             ikj     dyn_em      1         Y      -         " "  " "  " "   
+state    real   g_zx             ikj     dyn_em      1         XZ     -         " "  " "  " "    
+state    real   g_zy             ikj     dyn_em      1         YZ     -         " "  " "  " "   
 state    real   g_rdz            ikj     dyn_em      1         Z      -         " "  " "  " "   
 state    real   g_rdzw           ikj     dyn_em      1         Z       -        " "  " "  " "   
 state    real  g_HFX              ij      misc        1         -      i{18}h{18}       "g_HFX"                   "UPWARD HEAT FLUX AT THE SURFACE"              "W m-2"      
@@ -324,8 +324,8 @@ state   real   a_xkhv            ikj      misc        1         -     -         
 state   real   a_xkhh            ikj      misc        1         -     -         "a_xkhh"                  "HORIZONTAL EDDY DIFFUSIVITY OF HEAT"                             "m2 s-1"      
 state   real    a_div            ikj      misc        1         -     -         "a_div"                   "DIVERGENCE"                                                      "s-1"
 state   real    a_BN2            ikj      misc        1         -     -         "a_BN2"                   "BRUNT-VAISALA FREQUENCY"                                         "s-2"
-state    real   a_zx             ikj     dyn_em      1         X      -         " "  " "  " "    
-state    real   a_zy             ikj     dyn_em      1         Y      -         " "  " "  " "   
+state    real   a_zx             ikj     dyn_em      1         XZ     -         " "  " "  " "    
+state    real   a_zy             ikj     dyn_em      1         YZ     -         " "  " "  " "   
 state    real   a_rdz            ikj     dyn_em      1         Z      -         " "  " "  " "   
 state    real   a_rdzw           ikj     dyn_em      1         Z       -        " "  " "  " "   
 state    real  a_HFX              ij      misc        1         -      i{17}h{17}       "a_HFX"                   "UPWARD HEAT FLUX AT THE SURFACE"              "W m-2"      
@@ -443,9 +443,12 @@ state   real   a_DUSFCG           ij     misc        1         -     h        "a
 state   real   a_DVSFCG           ij     misc        1         -     h        "a_DVSFCG"                "COLUMN-INTEGRATED V GWDO STRESS"   "Pa m s-1"
 
 # g_h_diabatic and a_h_diabatic (Added by Ning Pan, 2010-07-10) 
-state   real    g_h_diabatic     ikj     misc         1         -      du      "g_h_diabatic"            "PREVIOUS TIMESTEP CONDENSATIONAL HEATING"         "K s-1"      
-state   real    a_h_diabatic     ikj     misc         1         -      du      "a_h_diabatic"            "PREVIOUS TIMESTEP CONDENSATIONAL HEATING"         "K s-1"      
-
+state   real    g_h_diabatic     ikj     misc         1        -      du      "g_h_diabatic"            "PREVIOUS TIMESTEP CONDENSATIONAL HEATING"         "K s-1"      
+state   real    a_h_diabatic     ikj     misc         1        -      du      "a_h_diabatic"            "PREVIOUS TIMESTEP CONDENSATIONAL HEATING"         "K s-1"      
+state   real    g_qv_diabatic    ikj     misc         1        -      du      "g_qv_diabatic"           "MICROPHYSICS QV TENDENCY"            "g g-1 s-1"
+state   real    a_qv_diabatic    ikj     misc         1        -      du      "a_qv_diabatic"           "MICROPHYSICS QV TENDENCY"            "g g-1 s-1"
+state   real    g_qc_diabatic    ikj     misc         1        -      du      "g_qc_diabatic"           "MICROPHYSICS QC TENDENCY"            "g g-1 s-1"
+state   real    a_qc_diabatic    ikj     misc         1        -      du      "a_qc_diabatic"           "MICROPHYSICS QC TENDENCY"            "g g-1 s-1"
 
 # Arrays for Specified LBCs  (lbc arrays REMOVED; Boundary arrays are now specified with the state array; see above, 20050413 JM )
 
@@ -525,13 +528,15 @@ state   real    a_qnn            ikjftb  a_scalar      1         -     \
 state   real    a_qnc            ikjftb  a_scalar      1         -     \
    i{17}h{17}usdf=(bdy_interp:dt)    "A_QNCLOUD"       "cloud water Number concentration" "# kg(-1)"
 state   real    a_qnwfa          ikjftb  a_scalar      1         -     \
-   usdf=(bdy_interp:dt)    "A_QNWFA"         "water-friendly aerosol number con" "# kg(-1)"
+   i{17}h{17}usdf=(bdy_interp:dt)    "A_QNWFA"         "water-friendly aerosol number con" "# kg(-1)"
 state   real    a_qnifa          ikjftb  a_scalar      1         -     \
-   usdf=(bdy_interp:dt)    "A_QNIFA"         "ice-friendly aerosol number con"   "# kg(-1)"
+   i{17}h{17}usdf=(bdy_interp:dt)    "A_QNIFA"         "ice-friendly aerosol number con"   "# kg(-1)"
 state   real    a_qvolg          ikjftb  a_scalar      1         -     \
    i{17}h{17}usdf=(bdy_interp:dt)    "A_QVGRAUPEL"     "Graupel Particle Volume" "m(3) kg(-1)"
-#state   real    a_qvolh          ikjftb  a_scalar      1         -     \
-#   usdf=(bdy_interp:dt)    "A_QVHAIL"        "Hail Particle Volume" "m(3) kg(-1)""
+state   real    a_qvolh          ikjftb  a_scalar      1         -     \
+   i{17}h{17}usdf=(bdy_interp:dt)    "A_QVHAIL"        "Hail Particle Volume" "m(3) kg(-1)"
+state   real    a_qrimef         ikjftb  a_scalar      1         -     \
+   i{17}h{17}usdf=(bdy_interp:dt)    "A_QRIMEF"        "rime factor * qi" "kg kg-1"
 
 state   real    -              ikjftb  g_scalar      1         -     -   -
 state   real    g_qndrop         ikjftb  g_scalar      1         -     \
@@ -553,13 +558,15 @@ state   real    g_qnn            ikjftb  g_scalar      1         -     \
 state   real    g_qnc            ikjftb  g_scalar      1         -     \
    i{18}h{18}usdf=(bdy_interp:dt)    "G_QNCLOUD"       "cloud water Number concentration" "# kg(-1)"
 state   real    g_qnwfa          ikjftb  g_scalar      1         -     \
-   usdf=(bdy_interp:dt)    "G_QNWFA"         "water-friendly aerosol number con" "# kg(-1)"
+   i{18}h{18}usdf=(bdy_interp:dt)    "G_QNWFA"         "water-friendly aerosol number con" "# kg(-1)"
 state   real    g_qnifa          ikjftb  g_scalar      1         -     \
-   usdf=(bdy_interp:dt)    "G_QNIFA"         "ice-friendly aerosol number con"   "# kg(-1)"
+   i{18}h{18}usdf=(bdy_interp:dt)    "G_QNIFA"         "ice-friendly aerosol number con"   "# kg(-1)"
 state   real    g_qvolg          ikjftb  g_scalar      1         -     \
    i{18}h{18}usdf=(bdy_interp:dt)    "G_QVGRAUPEL"     "Graupel Particle Volume" "m(3) kg(-1)"
-#state   real    g_qvolh          ikjftb  g_scalar      1         -     \
-#   usdf=(bdy_interp:dt)    "G_QVHAIL"        "Hail Particle Volume" "m(3) kg(-1)""
+state   real    g_qvolh          ikjftb  g_scalar      1         -     \
+   i{18}h{18}usdf=(bdy_interp:dt)    "G_QVHAIL"        "Hail Particle Volume" "m(3) kg(-1)"
+state   real    g_qrimef         ikjftb  g_scalar      1         -     \
+   i{18}h{18}usdf=(bdy_interp:dt)    "G_QRIMEF"        "rime factor * qi" "kg kg-1"
 
 # Placeholder for decoupled advective tendency diagnostics for non-chem
 state   real  -               ikjf      g_advh_t      1         -     -         -
@@ -616,10 +623,10 @@ state   real    a_tr17_6     ikjftb  a_tracer        1         -     ih    "a_tr
 state   real    a_tr17_7     ikjftb  a_tracer        1         -     ih    "a_tr17_7"         "a_tr17_7"          -
 state   real    a_tr17_8     ikjftb  a_tracer        1         -     ih    "a_tr17_8"         "a_tr17_8"
 
-state    real    g_th_old         ikj   misc        1         -    i1usd    "g_TH_OLD"        "Old Value of Th"   "K"
-state    real    g_qv_old         ikj   misc        1         -    i1usd    "g_QV_OLD"        "Old Value of qv"   "kg kg^-1"
-state    real    a_th_old         ikj   misc        1         -    i1usd    "a_TH_OLD"        "Old Value of Th"   "K"
-state    real    a_qv_old         ikj   misc        1         -    i1usd    "a_QV_OLD"        "Old Value of qv"   "kg kg^-1"
+state    real    g_th_old         ikj   misc        1         -    i01usd    "g_TH_OLD"        "Old Value of Th"   "K"
+state    real    g_qv_old         ikj   misc        1         -    i01usd    "g_QV_OLD"        "Old Value of qv"   "kg kg^-1"
+state    real    a_th_old         ikj   misc        1         -    i01usd    "a_TH_OLD"        "Old Value of Th"   "K"
+state    real    a_qv_old         ikj   misc        1         -    i01usd    "a_QV_OLD"        "Old Value of qv"   "kg kg^-1"
 
 #Used for TLNLonly_spot_check
 state     integer ni_tlnl      -        -          -         -           -         "ni_tlnl"             ""         ""
@@ -647,7 +654,7 @@ package   jcdfi_on      jcdfi_diag==1                  -             state:jcdfi
 halo_nta      HALO_EM_INIT_1 dyn_em 48:u_1,u_2,v_1,v_2,w_1,w_2,ph_1,ph_2
 halo_nta      HALO_EM_INIT_2 dyn_em 48:t_1,t_2,mu_1,mu_2,tke_1,tke_2,ww
 halo_nta      HALO_EM_INIT_3 dyn_em 48:php,p,al,alt
-halo_nta      HALO_EM_INIT_4 dyn_em 48:h_diabatic
+halo_nta      HALO_EM_INIT_4 dyn_em 48:h_diabatic,qv_diabatic,qc_diabatic
 halo_nta      HALO_EM_INIT_5 dyn_em 48:moist,scalar,chem,tracer
 halo_nta      HALO_EM_A dyn_em  8:ru,rv,rw,ww,php,alt,al,p,muu,muv,mut
 halo_nta      HALO_EM_B dyn_em 4:ph_2,al,p,t_1,t_save,u_save,v_save,mu_1,mu_2,mudf,php,alt
@@ -667,9 +674,9 @@ halo_nta      HALO_EM_MOIST_E_5 dyn_em 48:moist
 halo_nta      HALO_EM_MOIST_E_7 dyn_em 80:moist
 halo_nta      HALO_EM_MOIST_OLD_E_5 dyn_em 48:moist_old
 halo_nta      HALO_EM_MOIST_OLD_E_7 dyn_em 80:moist_old
-halo_nta      HALO_EM_TKE_C dyn_em 8:u_2,v_2,z,zx,zy,rdz,rdzw,ustm
+halo_nta      HALO_EM_TKE_C dyn_em 8:u_2,v_2,z,zx,zy,rdz,rdzw,ustm,ust
 halo_nta      HALO_EM_TKE_D dyn_em 8:defor11,defor22,defor33,defor12,defor13,defor23,div
-halo_nta      HALO_EM_TKE_E dyn_em 8:xkmv,xkmh,xkhv,xkhh,BN2,moist
+halo_nta      HALO_EM_TKE_E dyn_em 8:xkmv,xkmh,xkhv,xkhh,BN2,moist,rho
 halo_nta      HALO_EM_TKE_3 dyn_em   24:tke_1,tke_2
 halo_nta      HALO_EM_TKE_5 dyn_em   48:tke_1,tke_2
 halo_nta      HALO_EM_TKE_7 dyn_em   80:tke_1,tke_2

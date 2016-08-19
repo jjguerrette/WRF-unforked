@@ -8,7 +8,8 @@ module da_wrfvar_top
       model_to_grid_config_rec, get_config_as_buffer,set_config_as_buffer, &
       initial_config
    use module_domain, only : domain,alloc_and_configure_domain, head_grid, &
-      program_name, domain_clock_get, domain_clock_set, x_type, dealloc_space_domain
+      program_name, domain_clock_get, domain_clock_set, x_type, dealloc_space_domain, &
+      domain_destroy
    use module_driver_constants, only : max_comms
    use module_symbols_util, only : wrfu_finalize, wrfu_initialize, &
       wrfu_cal_gregorian
@@ -38,7 +39,8 @@ module da_wrfvar_top
       ntasks, data_order_xy,wrf_dm_initialize
    use module_comm_dm, only : halo_radar_xa_w_sub,halo_ssmi_xa_sub, &
       halo_sfc_xa_sub, halo_xa_sub, halo_psichi_uv_adj_sub, halo_bal_eqn_adj_sub, &
-      halo_psichi_uv_sub, halo_init_sub, halo_psichi_uv_adj_sub, halo_2d_work_sub
+      halo_psichi_uv_sub, halo_init_sub, halo_psichi_uv_adj_sub, halo_2d_work_sub,&
+      halo_wpec_sub, halo_wpec_adj_sub, halo_xa_all_sub, halo_xb_all_sub
 #endif
 
    ! too many namelist options to list
@@ -57,6 +59,7 @@ module da_wrfvar_top
    use da_par_util, only : da_system,da_copy_tile_dims,da_copy_dims
    use da_physics, only : da_uvprho_to_w_lin
 #if defined (CRTM) || defined (RTTOV)
+   use da_radiance, only : da_deallocate_radiance
    use da_radiance1, only : num_tovs_before, tovs_recv_pe,tovs_copy_count, &
       tovs_send_pe,tovs_send_count,tovs_recv_start, num_tovs_after, &
       tovs_send_start, da_oi_stats_rad, da_write_oa_rad_ascii, da_setup_satcv

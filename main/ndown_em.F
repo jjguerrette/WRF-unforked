@@ -26,7 +26,7 @@ PROGRAM ndown_em
    USE module_bc
    USE module_big_step_utilities_em
    USE module_get_file_names
-#ifdef WRF_CHEM
+#if ( WRF_CHEM == 1 )
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! for chemistry
    USE module_input_chem_data
@@ -86,7 +86,7 @@ PROGRAM ndown_em
    REAL , DIMENSION(:,:,:) , ALLOCATABLE :: sbdy3dtemp1 , sbdy3dtemp2
    REAL , DIMENSION(:,:,:,:) , ALLOCATABLE :: cbdy3dtemp0
    REAL , DIMENSION(:,:,:,:) , ALLOCATABLE :: qbdy3dtemp1_coupled, qbdy3dtemp2_coupled
-   REAL , DIMENSION(:,:,:,:) , ALLOCATABLE :: sbdy3dtemp0
+   REAL , DIMENSION(:,:,:,:) , ALLOCATABLE :: sbdy3dtemp1_coupled, sbdy3dtemp2_coupled
 
    CHARACTER(LEN=19) :: start_date_char , current_date_char , end_date_char
    CHARACTER(LEN=19) :: stopTimeStr
@@ -121,8 +121,8 @@ PROGRAM ndown_em
 #endif
 
    INTEGER                 :: idsi
-   CHARACTER (LEN=80)      :: inpname , outname , bdyname
-   CHARACTER (LEN=80)      :: si_inpname
+   CHARACTER (LEN=256)     :: inpname , outname , bdyname
+   CHARACTER (LEN=256)     :: si_inpname
 character *19 :: temp19
 character *24 :: temp24 , temp24b
 character(len=24) :: start_date_hold
@@ -368,7 +368,15 @@ real :: cf1_c,cf2_c,cf3_c,cfn_c,cfn1_c
             CALL close_dataset      ( fid , config_flags , "DATASET=INPUT" )
             file_counter = file_counter + 1
             IF ( file_counter .GT. number_of_eligible_files ) THEN
-               WRITE( wrf_err_message , FMT='(A,A,A,I8)' ) 'program ndown: opening too many files'
+               WRITE( wrf_err_message , FMT='(A)' ) 'program ndown: opening too many files'
+               CALL wrf_message ( TRIM(wrf_err_message) )
+               WRITE( wrf_err_message , FMT='(A)' ) 'Usually, this is caused by trying to run ndown past the last time available d01 model output'
+               CALL wrf_message ( TRIM(wrf_err_message) )
+               WRITE( wrf_err_message , FMT='(A)' ) 'The CG model output is used to supply lateral boundary conditions'
+               CALL wrf_message ( TRIM(wrf_err_message) )
+               WRITE( wrf_err_message , FMT='(A)' ) 'The ndown program uses the start and end times, the WRF model for d01 likely used the run times option.'
+               CALL wrf_message ( TRIM(wrf_err_message) )
+               WRITE( wrf_err_message , FMT='(A)' ) 'Check the namelist.input time_control section for inconsistencies.'
                CALL WRF_ERROR_FATAL ( wrf_err_message )
             END IF
             CALL wrf_debug      ( 100 , 'ndown_em main: calling open_r_dataset for ' // TRIM(eligible_file_name(file_counter)) )
@@ -465,7 +473,7 @@ real :: cf1_c,cf2_c,cf3_c,cfn_c,cfn1_c
          CALL nl_set_bdyfrq ( nested_grid%id , new_bdy_frq )
          config_flags%bdyfrq = new_bdy_frq
 
-#ifdef WRF_CHEM
+#if ( WRF_CHEM == 1 )
 nested_grid%chem_opt    = parent_grid%chem_opt
 nested_grid%chem_in_opt = parent_grid%chem_in_opt
 #endif
@@ -534,9 +542,10 @@ nested_grid%chem_in_opt = parent_grid%chem_in_opt
          ALLOCATE ( cbdy3dtemp0(ims:ime,kms:kme,jms:jme,1:num_chem) )
          ALLOCATE ( cbdy3dtemp1(ims:ime,kms:kme,jms:jme) )
          ALLOCATE ( cbdy3dtemp2(ims:ime,kms:kme,jms:jme) )
-         ALLOCATE ( sbdy3dtemp0(ims:ime,kms:kme,jms:jme,1:num_scalar) )
          ALLOCATE ( sbdy3dtemp1(ims:ime,kms:kme,jms:jme) )
          ALLOCATE ( sbdy3dtemp2(ims:ime,kms:kme,jms:jme) )
+         ALLOCATE ( sbdy3dtemp1_coupled(ims:ime,kms:kme,jms:jme,1:num_scalar) )
+         ALLOCATE ( sbdy3dtemp2_coupled(ims:ime,kms:kme,jms:jme,1:num_scalar) )
 
 
       END IF
@@ -697,7 +706,7 @@ nested_grid%chem_in_opt = parent_grid%chem_in_opt
 !        print *,'current_date = ',current_date
          CALL domain_clock_set( nested_grid, &
                                 current_timestr=current_date(1:19) )
-#ifdef WRF_CHEM
+#if ( WRF_CHEM == 1 )
 !
 !         Put in chemistry data
 !
@@ -799,6 +808,12 @@ nested_grid%chem_in_opt = parent_grid%chem_in_opt
                          ids, ide, jds, jde, kds, kde, ims, ime, jms, jme, kms, kme, ips, ipe, jps, jpe, kps, kpe )
            qbdy3dtemp1_coupled(:,:,:,nvmoist) =  qbdy3dtemp1
          END DO
+         DO nvscalar=PARAM_FIRST_SCALAR, num_scalar
+           CALL couple ( nested_grid%mu_2 , nested_grid%mub , sbdy3dtemp1 , nested_grid%scalar(ims:ime,kms:kme,jms:jme,nvscalar)    , &
+                         't' , nested_grid%msfty , &
+                         ids, ide, jds, jde, kds, kde, ims, ime, jms, jme, kms, kme, ips, ipe, jps, jpe, kps, kpe )
+           sbdy3dtemp1_coupled(:,:,:,nvscalar) =  sbdy3dtemp1
+         END DO
 
           DO j = jps , jpe
              DO i = ips , ipe
@@ -846,7 +861,7 @@ nested_grid%chem_in_opt = parent_grid%chem_in_opt
          END DO
 
          DO nvscalar=PARAM_FIRST_SCALAR, num_scalar
-           sbdy3dtemp1 = nested_grid%scalar(:,:,:,nvscalar)
+           sbdy3dtemp1 = sbdy3dtemp1_coupled(:,:,:,nvscalar)
            CALL stuff_bdy     ( sbdy3dtemp1 , nested_grid%scalar_bxs(jms:jme,kms:kme,1:spec_bdy_width,nvscalar), &
                                               nested_grid%scalar_bxe(jms:jme,kms:kme,1:spec_bdy_width,nvscalar), &
                                               nested_grid%scalar_bys(ims:ime,kms:kme,1:spec_bdy_width,nvscalar), &
@@ -855,7 +870,6 @@ nested_grid%chem_in_opt = parent_grid%chem_in_opt
                                                                              ids , ide , jds , jde , kds , kde , &
                                                                              ims , ime , jms , jme , kms , kme , &
                                                                              ips , ipe , jps , jpe , kps , kpe )
-           sbdy3dtemp0(:,:,:,nvscalar) = sbdy3dtemp1
          END DO
 
          CALL stuff_bdy     ( mbdy2dtemp1 , nested_grid%mu_bxs, nested_grid%mu_bxe,                      &
@@ -864,7 +878,7 @@ nested_grid%chem_in_opt = parent_grid%chem_in_opt
                                                                            ids , ide , jds , jde , 1 , 1 , &
                                                                            ims , ime , jms , jme , 1 , 1 , &
                                                                            ips , ipe , jps , jpe , 1 , 1 )
-#ifdef WRF_CHEM
+#if ( WRF_CHEM == 1 )
          do nvchem=1,num_chem
 !        if(nvchem.eq.p_o3)then
 !          write(0,*)'fill ch_b',cbdy3dtemp1(5,1,5),nvchem
@@ -907,6 +921,12 @@ nested_grid%chem_in_opt = parent_grid%chem_in_opt
                          't' , nested_grid%msfty , &
                          ids, ide, jds, jde, kds, kde, ims, ime, jms, jme, kms, kme, ips, ipe, jps, jpe, kps, kpe )
            qbdy3dtemp2_coupled(:,:,:,nvmoist) =  qbdy3dtemp2
+         END DO
+         DO nvscalar=PARAM_FIRST_SCALAR, num_scalar
+           CALL couple ( nested_grid%mu_2 , nested_grid%mub , sbdy3dtemp2 , nested_grid%scalar(ims:ime,kms:kme,jms:jme,nvscalar)    , &
+                         't' , nested_grid%msfty , &
+                         ids, ide, jds, jde, kds, kde, ims, ime, jms, jme, kms, kme, ips, ipe, jps, jpe, kps, kpe )
+           sbdy3dtemp2_coupled(:,:,:,nvscalar) =  sbdy3dtemp2
          END DO
 
           DO j = jps , jpe
@@ -967,19 +987,18 @@ nested_grid%chem_in_opt = parent_grid%chem_in_opt
          END DO
 
          DO nvscalar=PARAM_FIRST_SCALAR, num_scalar
-           sbdy3dtemp1=sbdy3dtemp0(:,:,:,nvscalar)
-           sbdy3dtemp2=nested_grid%scalar(:,:,:,nvscalar)
+           sbdy3dtemp1 = sbdy3dtemp1_coupled(:,:,:,nvscalar)
+           sbdy3dtemp2 = sbdy3dtemp2_coupled(:,:,:,nvscalar)
            CALL stuff_bdytend ( sbdy3dtemp2 , sbdy3dtemp1 , new_bdy_frq ,  &
-                                            nested_grid%scalar_btxs(jms:jme,kms:kme,1:spec_bdy_width,nvscalar), &
-                                            nested_grid%scalar_btxe(jms:jme,kms:kme,1:spec_bdy_width,nvscalar), &
-                                            nested_grid%scalar_btys(ims:ime,kms:kme,1:spec_bdy_width,nvscalar), &
-                                            nested_grid%scalar_btye(ims:ime,kms:kme,1:spec_bdy_width,nvscalar), &
+                                              nested_grid%scalar_btxs(jms:jme,kms:kme,1:spec_bdy_width,nvscalar), &
+                                              nested_grid%scalar_btxe(jms:jme,kms:kme,1:spec_bdy_width,nvscalar), &
+                                              nested_grid%scalar_btys(ims:ime,kms:kme,1:spec_bdy_width,nvscalar), &
+                                              nested_grid%scalar_btye(ims:ime,kms:kme,1:spec_bdy_width,nvscalar), &
                                                                  'T' , &
                                                                                 spec_bdy_width,       &
                                                                   ids , ide , jds , jde , kds , kde , &
                                                                   ims , ime , jms , jme , kms , kme , &
                                                                   ips , ipe , jps , jpe , kps , kpe )
-           sbdy3dtemp0(:,:,:,nvscalar)=sbdy3dtemp2
          END DO
 
          CALL stuff_bdytend ( mbdy2dtemp2 , mbdy2dtemp1 , new_bdy_frq ,                               &
@@ -990,7 +1009,7 @@ nested_grid%chem_in_opt = parent_grid%chem_in_opt
                                                                   ids , ide , jds , jde , 1 , 1 , &
                                                                   ims , ime , jms , jme , 1 , 1 , &
                                                                   ips , ipe , jps , jpe , 1 , 1 )
-#ifdef WRF_CHEM
+#if ( WRF_CHEM == 1 )
          do nvchem=1,num_chem
          cbdy3dtemp1(ips:ipe,kps:kpe,jps:jpe)=cbdy3dtemp0(ips:ipe,kps:kpe,jps:jpe,nvchem) 
          cbdy3dtemp2(ips:ipe,kps:kpe,jps:jpe)=nested_grid%chem(ips:ipe,kps:kpe,jps:jpe,nvchem)
@@ -1069,6 +1088,7 @@ print *,'bdy time = ',time_loop-1,'  bdy date = ',current_date,' ',start_date
                    tbdy3dtemp1(i,k,j) = tbdy3dtemp2(i,k,j)
                    pbdy3dtemp1(i,k,j) = pbdy3dtemp2(i,k,j)
                    qbdy3dtemp1_coupled(i,k,j,:) = qbdy3dtemp2_coupled(i,k,j,:)
+                   sbdy3dtemp1_coupled(i,k,j,:) = sbdy3dtemp2_coupled(i,k,j,:)
                 END DO
              END DO
           END DO
@@ -1124,12 +1144,12 @@ print *,'bdy time = ',time_loop-1,'  bdy date = ',current_date,' ',start_date
          END DO
 
          DO nvscalar=PARAM_FIRST_SCALAR, num_scalar
-           sbdy3dtemp1=sbdy3dtemp0(:,:,:,nvscalar)
+           sbdy3dtemp1 = sbdy3dtemp1_coupled(:,:,:,nvscalar)
            CALL stuff_bdy     ( sbdy3dtemp1 , &
-                              nested_grid%scalar_bxs(jms:jme,kms:kme,1:spec_bdy_width,nvscalar), &
-                              nested_grid%scalar_bxe(jms:jme,kms:kme,1:spec_bdy_width,nvscalar), &
-                              nested_grid%scalar_bys(ims:ime,kms:kme,1:spec_bdy_width,nvscalar), &
-                              nested_grid%scalar_bye(ims:ime,kms:kme,1:spec_bdy_width,nvscalar), &
+                                nested_grid%scalar_bxs(jms:jme,kms:kme,1:spec_bdy_width,nvscalar), &
+                                nested_grid%scalar_bxe(jms:jme,kms:kme,1:spec_bdy_width,nvscalar), &
+                                nested_grid%scalar_bys(ims:ime,kms:kme,1:spec_bdy_width,nvscalar), &
+                                nested_grid%scalar_bye(ims:ime,kms:kme,1:spec_bdy_width,nvscalar), &
                                                       'T' ,                  spec_bdy_width,   &
                                                                            ids , ide , jds , jde , kds , kde , &
                                                                            ims , ime , jms , jme , kms , kme , &
@@ -1137,7 +1157,7 @@ print *,'bdy time = ',time_loop-1,'  bdy date = ',current_date,' ',start_date
          END DO 
 
 
-#ifdef WRF_CHEM
+#if ( WRF_CHEM == 1 )
          do nvchem=1,num_chem
          cbdy3dtemp1(ips:ipe,kps:kpe,jps:jpe)=cbdy3dtemp0(ips:ipe,kps:kpe,jps:jpe,nvchem) 
 !        if(nvchem.eq.p_o3)then
@@ -1187,12 +1207,18 @@ print *,'bdy time = ',time_loop-1,'  bdy date = ',current_date,' ',start_date
                          ids, ide, jds, jde, kds, kde, ims, ime, jms, jme, kms, kme, ips, ipe, jps, jpe, kps, kpe )
            qbdy3dtemp2_coupled(:,:,:,nvmoist) = qbdy3dtemp2
          END DO
+         DO nvscalar=PARAM_FIRST_SCALAR, num_scalar
+           CALL couple ( nested_grid%mu_2 , nested_grid%mub , sbdy3dtemp2 , nested_grid%scalar(ims:ime,kms:kme,jms:jme,nvscalar)    , &
+                         't' , nested_grid%msfty , &
+                         ids, ide, jds, jde, kds, kde, ims, ime, jms, jme, kms, kme, ips, ipe, jps, jpe, kps, kpe )
+           sbdy3dtemp2_coupled(:,:,:,nvscalar) = sbdy3dtemp2
+         END DO
          mbdy2dtemp2(:,1,:) = nested_grid%mu_2(:,:)
 
          !  During all of the loops after the first loop, we first compute the boundary
          !  tendencies with the current data values and the previously save information
          !  stored in the *bdy3dtemp1 arrays.
-#ifdef WRF_CHEM
+#if ( WRF_CHEM == 1 )
          do nvchem=1,num_chem
          cbdy3dtemp1(ips:ipe,kps:kpe,jps:jpe)=cbdy3dtemp0(ips:ipe,kps:kpe,jps:jpe,nvchem) 
          cbdy3dtemp2(ips:ipe,kps:kpe,jps:jpe)=nested_grid%chem(ips:ipe,kps:kpe,jps:jpe,nvchem)
@@ -1264,8 +1290,8 @@ print *,'bdy time = ',time_loop-1,'  bdy date = ',current_date,' ',start_date
          END DO
 
          DO nvscalar=PARAM_FIRST_SCALAR, num_scalar
-           sbdy3dtemp1=sbdy3dtemp0(:,:,:,nvscalar)
-           sbdy3dtemp2=nested_grid%scalar(:,:,:,nvscalar)
+           sbdy3dtemp1 = sbdy3dtemp1_coupled(:,:,:,nvscalar)
+           sbdy3dtemp2 = sbdy3dtemp2_coupled(:,:,:,nvscalar)
            CALL stuff_bdytend ( sbdy3dtemp2 , sbdy3dtemp1 , new_bdy_frq ,  &
                               nested_grid%scalar_btxs(jms:jme,kms:kme,1:spec_bdy_width,nvscalar), &
                               nested_grid%scalar_btxe(jms:jme,kms:kme,1:spec_bdy_width,nvscalar), &
@@ -1276,7 +1302,6 @@ print *,'bdy time = ',time_loop-1,'  bdy date = ',current_date,' ',start_date
                                                                   ids , ide , jds , jde , kds , kde , &
                                                                   ims , ime , jms , jme , kms , kme , &
                                                                   ips , ipe , jps , jpe , kps , kpe )
-           sbdy3dtemp0(:,:,:,nvscalar)=cbdy3dtemp2
          END DO  
 
          CALL stuff_bdytend ( mbdy2dtemp2 , mbdy2dtemp1 , new_bdy_frq , &

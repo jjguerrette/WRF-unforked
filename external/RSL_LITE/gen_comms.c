@@ -132,8 +132,9 @@ if ( nta == 2 )
 fprintf(fp,"  %s, INTENT(INOUT) :: a_%s ( grid%%sm31:grid%%em31,grid%%sm32:grid%%em32,grid%%sm33:grid%%em33%snum_%s)\n",
                      q->type->name , varref , moredims, q->name ) ;
 #else
-fprintf(fp,"  %s, INTENT(INOUT) :: %s ( grid%%sm31:grid%%em31,grid%%sm32:grid%%em32,grid%%sm33:grid%%em33%snum_%s)\n",
-                     q->type->name , varref , moredims, q->name ) ;
+              dimspec=dimension_with_ranges( "grid%","",-1,tmp3,q,"","" ) ;
+fprintf(fp,"  %s, INTENT(INOUT) :: %s ( %s %snum_%s)\n",
+                     q->type->name , varref , dimspec, moredims, q->name ) ;
 #endif
                 }
               }
@@ -235,6 +236,7 @@ int print_decl( FILE * fp , node_t *p, char * communicator,
 int print_body( FILE * fp, char * commname, int nta /* 0=NLM,1=TLM,2=ADM */ )
   {
   fprintf(fp,"  \n") ;
+  fprintf(fp,"CALL push_communicators_for_domain( grid%%id )\n") ;
   fprintf(fp,"#ifdef DM_PARALLEL\n") ;
 #ifdef WRFPLUS
   if ( nta == 0 ) { fprintf(fp,"#include \"%s_inline.inc\"\n",commname) ; }
@@ -244,6 +246,7 @@ int print_body( FILE * fp, char * commname, int nta /* 0=NLM,1=TLM,2=ADM */ )
   fprintf(fp,"#include \"%s_inline.inc\"\n",commname) ;
 #endif
   fprintf(fp,"#endif\n") ;
+  fprintf(fp,"CALL pop_communicators_for_domain\n") ;
   fprintf(fp,"  \n") ;
 #ifdef WRFPLUS
   if ( nta == 0 ) { fprintf(fp,"  END SUBROUTINE %s_sub\n",commname) ; }
@@ -288,6 +291,7 @@ gen_halos ( char * dirname , char * incname , node_t * halos, int split )
   char name_4d[MAX_4DARRAYS][NAMELEN] ;
 #define FRAC 4
   int num_halos, fraction, ihalo, j ;
+  int always_interp_mp = 1 ;
 
   if ( dirname == NULL ) return(1) ;
 
@@ -306,6 +310,14 @@ gen_halos ( char * dirname , char * incname , node_t * halos, int split )
       }
     } 
   } 
+
+#if (NMM_CORE==1)
+  if (    !strcmp(commname,"HALO_INTERP_DOWN")
+       || !strcmp(commname,"HALO_FORCE_DOWN")
+       || !strcmp(commname,"HALO_INTERP_UP") 
+       || !strcmp(commname,"HALO_INTERP_SMOOTH") )
+    always_interp_mp=0;
+#endif
 
   ihalo = 0 ;
   for ( p = halos ; p != NULL ; p = p->next )
@@ -561,12 +573,12 @@ fprintf(fp,"CALL wrf_debug(3,'calling RSL_LITE_INIT_EXCH %s for Y %s')\n",maxste
     }
 
 /* generate packs prior to stencil exchange in Y */
-    gen_packs_halo( fp, p, maxstenwidth, 0, 0, 0, "RSL_LITE_PACK", "local_communicator" ) ;
+    gen_packs_halo( fp, p, maxstenwidth, 0, 0, 0, "RSL_LITE_PACK", "local_communicator", always_interp_mp ) ;
 /* generate stencil exchange in Y */
     fprintf(fp,"   CALL RSL_LITE_EXCH_Y ( local_communicator , mytask, ntasks, ntasks_x, ntasks_y, &\n") ;
     fprintf(fp,"                          rsl_sendw_m,  rsl_sendw_p, rsl_recvw_m,  rsl_recvw_p    )\n" ) ;
 /* generate unpacks after stencil exchange in Y */
-    gen_packs_halo( fp, p, maxstenwidth, 0, 1 , 0, "RSL_LITE_PACK", "local_communicator" ) ;
+    gen_packs_halo( fp, p, maxstenwidth, 0, 1 , 0, "RSL_LITE_PACK", "local_communicator", always_interp_mp ) ;
     fprintf(fp,"ENDDO\n") ; 
 
 /* generate the stencil init statement for X transfer */
@@ -601,12 +613,12 @@ fprintf(fp,"CALL wrf_debug(3,'calling RSL_LITE_INIT_EXCH %s for Y %s')\n",maxste
       fprintf(fp,"(ips-1)*grid%%sr_x+1,ipe*grid%%sr_x,(jps-1)*grid%%sr_y+1,jpe*grid%%sr_y,kps,kpe)\n") ;
     }
 /* generate packs prior to stencil exchange in X */
-    gen_packs_halo( fp, p, maxstenwidth, 1, 0, 0, "RSL_LITE_PACK", "local_communicator" ) ;
+    gen_packs_halo( fp, p, maxstenwidth, 1, 0, 0, "RSL_LITE_PACK", "local_communicator", always_interp_mp ) ;
 /* generate stencil exchange in X */
     fprintf(fp,"   CALL RSL_LITE_EXCH_X ( local_communicator , mytask, ntasks, ntasks_x, ntasks_y, &\n") ;
     fprintf(fp,"                          rsl_sendw_m,  rsl_sendw_p, rsl_recvw_m,  rsl_recvw_p    )\n" ) ;
 /* generate unpacks after stencil exchange in X */
-    gen_packs_halo( fp, p, maxstenwidth, 1, 1, 0, "RSL_LITE_PACK", "local_communicator" ) ;
+    gen_packs_halo( fp, p, maxstenwidth, 1, 1, 0, "RSL_LITE_PACK", "local_communicator", always_interp_mp ) ;
     fprintf(fp,"    ENDDO\n") ; 
     if ( subgrid != 0 ) {
       fprintf(fp,"ENDIF\n") ;
@@ -666,6 +678,7 @@ gen_halos_nta ( char * dirname , char * incname , node_t * halos, int split )
   char name_4d[MAX_4DARRAYS][NAMELEN] ;
 #define FRAC 4
   int num_halos, fraction, ihalo, j ;
+  int always_interp_mp = 1 ;
 
   if ( dirname == NULL ) return(1) ;
 
@@ -999,10 +1012,10 @@ fprintf(fp,"CALL wrf_debug(3,'calling RSL_LITE_INIT_EXCH %s for Y %s')\n",maxste
     }
 /* generate packs prior to stencil exchange in Y */
     /*    TLM    */
-    gen_packs_halo( fp1, p, maxstenwidth, 0, 0, 0, "RSL_LITE_PACK", "local_communicator" ) ;
-    gen_packs_halo( fp1, p, maxstenwidth, 0, 0, 1, "RSL_LITE_PACK", "local_communicator" ) ;
+    gen_packs_halo( fp1, p, maxstenwidth, 0, 0, 0, "RSL_LITE_PACK", "local_communicator", always_interp_mp ) ;
+    gen_packs_halo( fp1, p, maxstenwidth, 0, 0, 1, "RSL_LITE_PACK", "local_communicator", always_interp_mp ) ;
     /*    ADM    */
-    gen_packs_halo( fp2, p, maxstenwidth, 0, 0, 2, "RSL_LITE_PACK_AD", "local_communicator" ) ;
+    gen_packs_halo( fp2, p, maxstenwidth, 0, 0, 2, "RSL_LITE_PACK_AD", "local_communicator", always_interp_mp ) ;
 /* generate stencil exchange in Y */
     /*    TLM    */
 /* generate stencil exchange in Y */
@@ -1014,10 +1027,10 @@ fprintf(fp,"CALL wrf_debug(3,'calling RSL_LITE_INIT_EXCH %s for Y %s')\n",maxste
     fprintf(fp2,"                          rsl_sendw_m,  rsl_sendw_p, rsl_recvw_m,  rsl_recvw_p    )\n" ) ;
 /* generate unpacks after stencil exchange in Y */
     /*    TLM    */
-    gen_packs_halo( fp1, p, maxstenwidth, 0, 1 , 0, "RSL_LITE_PACK", "local_communicator" ) ;
-    gen_packs_halo( fp1, p, maxstenwidth, 0, 1 , 1, "RSL_LITE_PACK", "local_communicator" ) ;
+    gen_packs_halo( fp1, p, maxstenwidth, 0, 1 , 0, "RSL_LITE_PACK", "local_communicator", always_interp_mp ) ;
+    gen_packs_halo( fp1, p, maxstenwidth, 0, 1 , 1, "RSL_LITE_PACK", "local_communicator", always_interp_mp ) ;
     /*    ADM    */
-    gen_packs_halo( fp2, p, maxstenwidth, 0, 1 , 2, "RSL_LITE_PACK_AD", "local_communicator" ) ;
+    gen_packs_halo( fp2, p, maxstenwidth, 0, 1 , 2, "RSL_LITE_PACK_AD", "local_communicator", always_interp_mp ) ;
     /*    TLM    */
     fprintf(fp1,"ENDDO\n") ; 
     /*    ADM    */
@@ -1090,10 +1103,10 @@ fprintf(fp,"CALL wrf_debug(3,'calling RSL_LITE_INIT_EXCH %s for Y %s')\n",maxste
     }
 /* generate packs prior to stencil exchange in X */
     /*    TLM    */
-    gen_packs_halo( fp1, p, maxstenwidth, 1, 0, 0, "RSL_LITE_PACK", "local_communicator" ) ;
-    gen_packs_halo( fp1, p, maxstenwidth, 1, 0, 1, "RSL_LITE_PACK", "local_communicator" ) ;
+    gen_packs_halo( fp1, p, maxstenwidth, 1, 0, 0, "RSL_LITE_PACK", "local_communicator", always_interp_mp ) ;
+    gen_packs_halo( fp1, p, maxstenwidth, 1, 0, 1, "RSL_LITE_PACK", "local_communicator", always_interp_mp ) ;
     /*    ADM    */
-    gen_packs_halo( fp2, p, maxstenwidth, 1, 0, 2, "RSL_LITE_PACK_AD", "local_communicator" ) ;
+    gen_packs_halo( fp2, p, maxstenwidth, 1, 0, 2, "RSL_LITE_PACK_AD", "local_communicator", always_interp_mp ) ;
 /* generate stencil exchange in X */
     /*    TLM    */
 /* generate stencil exchange in X */
@@ -1105,10 +1118,10 @@ fprintf(fp,"CALL wrf_debug(3,'calling RSL_LITE_INIT_EXCH %s for Y %s')\n",maxste
     fprintf(fp2,"                          rsl_sendw_m,  rsl_sendw_p, rsl_recvw_m,  rsl_recvw_p    )\n" ) ;
 /* generate unpacks after stencil exchange in X */
     /*    TLM    */
-    gen_packs_halo( fp1, p, maxstenwidth, 1, 1, 0, "RSL_LITE_PACK", "local_communicator" ) ;
-    gen_packs_halo( fp1, p, maxstenwidth, 1, 1, 1, "RSL_LITE_PACK", "local_communicator" ) ;
+    gen_packs_halo( fp1, p, maxstenwidth, 1, 1, 0, "RSL_LITE_PACK", "local_communicator", always_interp_mp ) ;
+    gen_packs_halo( fp1, p, maxstenwidth, 1, 1, 1, "RSL_LITE_PACK", "local_communicator", always_interp_mp ) ;
     /*    ADM    */
-    gen_packs_halo( fp2, p, maxstenwidth, 1, 1, 2, "RSL_LITE_PACK_AD", "local_communicator" ) ;
+    gen_packs_halo( fp2, p, maxstenwidth, 1, 1, 2, "RSL_LITE_PACK_AD", "local_communicator", always_interp_mp ) ;
     /*    TLM    */
     fprintf(fp1,"    ENDDO\n") ; 
     if ( subgrid != 0 ) {
@@ -1145,12 +1158,12 @@ fprintf(fp,"CALL wrf_debug(3,'calling RSL_LITE_INIT_EXCH %s for Y %s')\n",maxste
 }
 #endif
 
-gen_packs_halo ( FILE *fp , node_t *p, char *shw, int xy /* 0=y,1=x */ , int pu /* 0=pack,1=unpack */, int nta /* 0=NLM,1=TLM,2=ADM*/, char * packname, char * commname )   
+gen_packs_halo ( FILE *fp , node_t *p, char *shw, int xy /* 0=y,1=x */ , int pu /* 0=pack,1=unpack */, int nta /* 0=NLM,1=TLM,2=ADM*/, char * packname, char * commname, int always_interp_mp )   
 {
   node_t * q ;
   node_t * dimd ;
   char fname[NAMELEN] ;
-  char tmp[NAMELEN_LONG], tmp2[NAMELEN_LONG], tmp3[NAMELEN_LONG] ;
+  char tmp[NAMELEN_LONG], tmp2[NAMELEN_LONG], tmp3[NAMELEN_LONG], tmp4[NAMELEN_LONG] ;
   char commuse[NAMELEN] ;
   int maxstenwidth, stenwidth ;
   char * t1, * t2 , *wordsize ;
@@ -1194,6 +1207,10 @@ gen_packs_halo ( FILE *fp , node_t *p, char *shw, int xy /* 0=y,1=x */ , int pu 
           else if ( q->boundary_array ) { ; }
           else
           { 
+            if(!always_interp_mp && p->mp_var) {
+              fprintf(fp,"if(interp_mp) then\n");
+            }
+
             if      ( ! strcmp( q->type->name, "real") )            { wordsize = "RWORDSIZE" ; }
             else if ( ! strcmp( q->type->name, "integer") )         { wordsize = "IWORDSIZE" ; }
             else if ( ! strcmp( q->type->name, "doubleprecision") ) { wordsize = "DWORDSIZE" ; }
@@ -1201,11 +1218,14 @@ gen_packs_halo ( FILE *fp , node_t *p, char *shw, int xy /* 0=y,1=x */ , int pu 
             {
               node_t *member ;
               zdex = get_index_for_coord( q , COORD_Z ) ;
-              if ( zdex >=1 && zdex <= 3 )
+              dimd = get_dimnode_for_coord( q , COORD_Z ) ;
+              if ( zdex >=1 && zdex <= 3 && dimd != NULL )
               {
                 int d ;
                 char * colon ;
                 char moredims[80], tx[80], temp[10], r[80] ;
+                char sd[256], ed[256] , sm[256], em[256] , sp[256], ep[256] ;
+
                 set_mem_order( q->members, memord , 3 ) ;
 fprintf(fp,"DO itrace = PARAM_FIRST_SCALAR, num_%s\n",q->name ) ;
                 strcpy(moredims,"") ; 
@@ -1222,23 +1242,42 @@ fprintf(fp,"  DO idim%d = %s_sdim%d,%s_edim%d\n",d-2,q->name,d-2,q->name,d-2 ) ;
                 strcat(moredims,",") ;
                 xdex = get_index_for_coord( q , COORD_X ) ;
                 ydex = get_index_for_coord( q , COORD_Y ) ;
+                if      ( dimd->len_defined_how == DOMAIN_STANDARD ) {
+                  strcpy(sd,"kds") ; strcpy(ed,"kde" ) ;
+                  strcpy(sm,"kms") ; strcpy(em,"kme" ) ;
+                  strcpy(sp,"kps") ; strcpy(ep,"kpe" ) ;
+                } else if ( dimd->len_defined_how == NAMELIST ) {
+                  if ( !strcmp(dimd->assoc_nl_var_s,"1") ) {
+                    strcpy(sd,"1") ;
+                    sprintf(ed,"config_flags%%%s",dimd->assoc_nl_var_e) ;
+                  } else {
+                    sprintf(sd,"config_flags%%%s",dimd->assoc_nl_var_s) ;
+                    sprintf(ed,"config_flags%%%s",dimd->assoc_nl_var_e) ;
+                  }
+                  strcpy(sm,sd) ; strcpy(em,ed ) ;
+                  strcpy(sp,sd) ; strcpy(ep,ed ) ;
+                } else if ( dimd->len_defined_how == CONSTANT ) {
+                  sprintf(sd,"%d",dimd->coord_start) ; sprintf(ed,"%d",dimd->coord_end) ;
+                  strcpy(sm,sd) ; strcpy(em,ed ) ;
+                  strcpy(sp,sd) ; strcpy(ep,ed ) ;
+                }
 fprintf(fp," IF ( SIZE(%s,%d)*SIZE(%s,%d) .GT. 1 ) THEN\n",varref,xdex+1,varref,ydex+1 ) ; 
-fprintf(fp,"  CALL %s ( %s,&\n%s ( grid%%sm31,grid%%sm32,grid%%sm33%sitrace),%s,&\nrsl_sendbeg_m, rsl_sendw_m, rsl_sendbeg_p, rsl_sendw_p, &\nrsl_recvbeg_m, rsl_recvw_m, rsl_recvbeg_p, rsl_recvw_p, &\n%s, %d, %d, DATA_ORDER_%s, %d, &\n",
-                       packname, commname, varref , moredims, shw, wordsize, xy, pu, memord, xy?(q->stag_x?1:0):(q->stag_y?1:0) ) ;
+fprintf(fp,"  CALL %s ( %s,&\n%s ( %s%sitrace),%s,&\nrsl_sendbeg_m, rsl_sendw_m, rsl_sendbeg_p, rsl_sendw_p, &\nrsl_recvbeg_m, rsl_recvw_m, rsl_recvbeg_p, rsl_recvw_p, &\n%s, %d, %d, DATA_ORDER_%s, %d, &\n",
+                       packname, commname, varref , index_with_firstelem("","grid%",-1,tmp4,q,""),moredims, shw, wordsize, xy, pu, memord, xy?(q->stag_x?1:0):(q->stag_y?1:0) ) ;
 fprintf(fp,"mytask, ntasks, ntasks_x, ntasks_y,       &\n") ;
 if ( !strcmp( packname, "RSL_LITE_PACK_SWAP" ) ||
      !strcmp( packname, "RSL_LITE_PACK_CYCLE" ) ) {
   fprintf(fp,"thisdomain_max_halo_width,                         &\n") ;
 }
-if ( q->subgrid == 0 ) {
-fprintf(fp,"ids, ide, jds, jde, kds, kde,             &\n") ;
-fprintf(fp,"ims, ime, jms, jme, kms, kme,             &\n") ;
-fprintf(fp,"ips, ipe, jps, jpe, kps, kpe              )\n") ;
-} else {
-fprintf(fp,"ids, ide*grid%%sr_x, jds, jde*grid%%sr_y, kds, kde, &\n") ;
-fprintf(fp,"(ims-1)*grid%%sr_x+1,ime*grid%%sr_x,(jms-1)*grid%%sr_y+1,jme*grid%%sr_y,kms,kme,&\n") ;
-fprintf(fp,"(ips-1)*grid%%sr_x+1,ipe*grid%%sr_x,(jps-1)*grid%%sr_y+1,jpe*grid%%sr_y,kps,kpe)\n") ;
-}
+                if ( q->subgrid == 0 ) {
+fprintf(fp,"ids, ide, jds, jde, %s, %s,             &\n",sd,ed) ;
+fprintf(fp,"ims, ime, jms, jme, %s, %s,             &\n",sm,em) ;
+fprintf(fp,"ips, ipe, jps, jpe, %s, %s              )\n",sp,ep) ;
+                } else {
+fprintf(fp,"ids, ide*grid%%sr_x, jds, jde*grid%%sr_y, %s, %s, &\n",sd,ed) ;
+fprintf(fp,"(ims-1)*grid%%sr_x+1,ime*grid%%sr_x,(jms-1)*grid%%sr_y+1,jme*grid%%sr_y,%s,%s,&\n",sm,em) ;
+fprintf(fp,"(ips-1)*grid%%sr_x+1,ipe*grid%%sr_x,(jps-1)*grid%%sr_y+1,jpe*grid%%sr_y,%s,%s)\n",sp,ep) ;
+                }
 fprintf(fp," ENDIF\n") ;
                for ( d = 3 ; d < q->ndims ; d++ ) {
 fprintf(fp,"  ENDDO ! idim%d \n",d-2 ) ;
@@ -1261,14 +1300,13 @@ fprintf(fp,"ENDDO\n") ;
                 ydex = get_index_for_coord( q , COORD_Y ) ;
                 zdex = get_index_for_coord( q , COORD_Z ) ;
                 fprintf(fp,"IF ( SIZE(%s,%d)*SIZE(%s,%d) .GT. 1 ) THEN\n",varref,xdex+1,varref,ydex+1 ) ; 
+                fprintf(fp,"CALL %s ( %s,&\n %s, %s,&\nrsl_sendbeg_m, rsl_sendw_m, rsl_sendbeg_p, rsl_sendw_p, &\nrsl_recvbeg_m, rsl_recvw_m, rsl_recvbeg_p, rsl_recvw_p, &\n%s, %d, %d, DATA_ORDER_%s, %d, &\n", 
+                        packname, commname, varref, shw, wordsize, xy, pu, memord, xy?(q->stag_x?1:0):(q->stag_y?1:0) ) ;
+                fprintf(fp,"mytask, ntasks, ntasks_x, ntasks_y,       &\n") ;
                 if ( dimd != NULL )
                 {
                   char s[256], e[256] ;
-
                   if      ( dimd->len_defined_how == DOMAIN_STANDARD ) {
-                    fprintf(fp,"CALL %s ( %s,&\n %s, %s,&\nrsl_sendbeg_m, rsl_sendw_m, rsl_sendbeg_p, rsl_sendw_p, &\nrsl_recvbeg_m, rsl_recvw_m, rsl_recvbeg_p, rsl_recvw_p, &\n%s, %d, %d, DATA_ORDER_%s, %d, &\n", 
-                        packname, commname, varref, shw, wordsize, xy, pu, memord, xy?(q->stag_x?1:0):(q->stag_y?1:0) ) ;
-                    fprintf(fp,"mytask, ntasks, ntasks_x, ntasks_y,       &\n") ;
                     if ( q->subgrid == 0 ) {
                       fprintf(fp,"ids, ide, jds, jde, kds, kde,             &\n") ;
                       fprintf(fp,"ims, ime, jms, jme, kms, kme,             &\n") ;
@@ -1288,9 +1326,6 @@ fprintf(fp,"(ips-1)*grid%%sr_x+1,ipe*grid%%sr_x,(jps-1)*grid%%sr_y+1,jpe*grid%%s
                       sprintf(s,"config_flags%%%s",dimd->assoc_nl_var_s) ;
                       sprintf(e,"config_flags%%%s",dimd->assoc_nl_var_e) ;
                     }
-                    fprintf(fp,"CALL %s ( %s,&\n %s, %s,&\nrsl_sendbeg_m, rsl_sendw_m, rsl_sendbeg_p, rsl_sendw_p, &\nrsl_recvbeg_m, rsl_recvw_m, rsl_recvbeg_p, rsl_recvw_p, &\n%s, %d, %d, DATA_ORDER_%s, %d, &\n", 
-                        packname, commname, varref, shw, wordsize, xy, pu, memord, xy?(q->stag_x?1:0):(q->stag_y?1:0) ) ;
-                    fprintf(fp,"mytask, ntasks, ntasks_x, ntasks_y,       &\n") ;
                     if ( q->subgrid == 0 ) {
                       fprintf(fp,"ids, ide, jds, jde, %s, %s,             &\n",s,e) ;
                       fprintf(fp,"ims, ime, jms, jme, %s, %s,             &\n",s,e) ;
@@ -1303,9 +1338,6 @@ fprintf(fp,"(ips-1)*grid%%sr_x+1,ipe*grid%%sr_x,(jps-1)*grid%%sr_y+1,jpe*grid%%s
                   }
                   else if ( dimd->len_defined_how == CONSTANT )
                   {
-                    fprintf(fp,"CALL %s ( %s,&\n %s, %s,&\nrsl_sendbeg_m, rsl_sendw_m, rsl_sendbeg_p, rsl_sendw_p, &\nrsl_recvbeg_m, rsl_recvw_m, rsl_recvbeg_p, rsl_recvw_p, &\n%s, %d, %d, DATA_ORDER_%s, %d, &\n", 
-                        packname, commname, varref, shw, wordsize, xy, pu, memord, xy?(q->stag_x?1:0):(q->stag_y?1:0) ) ;
-                    fprintf(fp,"mytask, ntasks, ntasks_x, ntasks_y,       &\n") ;
                     if ( q->subgrid == 0 ) {
                       fprintf(fp,"ids, ide, jds, jde, %d, %d,             &\n",dimd->coord_start,dimd->coord_end) ;
                       fprintf(fp,"ims, ime, jms, jme, %d, %d,             &\n",dimd->coord_start,dimd->coord_end) ;
@@ -1337,8 +1369,10 @@ fprintf(fp,"(ips-1)*grid%%sr_x+1,ipe*grid%%sr_x,(jps-1)*grid%%sr_y+1,jpe*grid%%s
                 fprintf(fp,"ENDIF\n") ;
               }
             }
+            if(!always_interp_mp && p->mp_var) {
+              fprintf(fp,"endif\n");
+            }
           }
-          
         }
         t2 = strtok_rentr( NULL , "," , &pos2 ) ;
       }
@@ -2567,6 +2601,7 @@ gen_nest_pack ( char * dirname )
   int down_path[] = { INTERP_DOWN , FORCE_DOWN , INTERP_UP } ;
   int ipath ;
   char ** fnp ; char * fn ;
+  char * parent ;
   char * shw_str ;
   char fname[NAMELEN] ;
   node_t *node, *p, *dim ;
@@ -2602,6 +2637,8 @@ gen_nest_pack ( char * dirname )
 #else
       count_fields ( node , &d2 , &d3 , fourd_names, down_path[ipath] ,0,0) ;
 #endif
+      parent= "" ;
+      if ( !strcmp(fn,"nest_feedbackup_pack.inc") ) parent="parent_" ; 
 
       if ( d2 + d3 > 0 ) {
         if ( down_path[ipath] == INTERP_UP )
@@ -2623,13 +2660,18 @@ gen_nest_pack ( char * dirname )
                 d3_mp,fourd_names_mp,d2_mp);
 #endif
 
-        fprintf(fp,"CALL %s( local_communicator, msize*RWORDSIZE                               &\n",info_name ) ;
+/*        fprintf(fp,"CALL %s( local_communicator, msize*RWORDSIZE                               &\n",info_name ) ;  */
+        fprintf(fp,"CALL %s( msize*RWORDSIZE                               &\n",info_name ) ;
         fprintf(fp,"                        ,cips,cipe,cjps,cjpe                               &\n") ;
 if (sw) fprintf(fp,"                        ,iids,iide,ijds,ijde                               &\n") ;
         fprintf(fp,"                        ,nids,nide,njds,njde                               &\n") ;
 if (sw) fprintf(fp,"                        ,pgr , sw                                          &\n") ;
-        fprintf(fp,"                        ,ntasks_x,ntasks_y                                 &\n") ; 
-        fprintf(fp,"                        ,thisdomain_max_halo_width                                  &\n") ;
+        fprintf(fp,"                        ,nest_task_offsets(ngrid%%id)                      &\n") ;
+        fprintf(fp,"                        ,nest_pes_x(%sgrid%%id)                            &\n",parent) ;
+        fprintf(fp,"                        ,nest_pes_y(%sgrid%%id)                            &\n",parent) ; 
+        fprintf(fp,"                        ,nest_pes_x(intermediate_grid%%id)                 &\n") ;
+        fprintf(fp,"                        ,nest_pes_y(intermediate_grid%%id)                 &\n") ; 
+        fprintf(fp,"                        ,thisdomain_max_halo_width                         &\n") ;
         fprintf(fp,"                        ,icoord,jcoord                                     &\n") ;
         fprintf(fp,"                        ,idim_cd,jdim_cd                                   &\n") ;
         fprintf(fp,"                        ,pig,pjg,retval )\n") ;
@@ -2638,13 +2680,18 @@ if (sw) fprintf(fp,"                        ,pgr , sw                           
   
         gen_nest_packunpack ( fp , Domain.fields, PACKIT, down_path[ipath] ) ;
 
-        fprintf(fp,"CALL %s( local_communicator, msize*RWORDSIZE                               &\n",info_name ) ;
+/*        fprintf(fp,"CALL %s( local_communicator, msize*RWORDSIZE                               &\n",info_name ) ; */
+        fprintf(fp,"CALL %s( msize*RWORDSIZE                               &\n",info_name ) ;
         fprintf(fp,"                        ,cips,cipe,cjps,cjpe                               &\n") ;
 if (sw) fprintf(fp,"                        ,iids,iide,ijds,ijde                               &\n") ;
         fprintf(fp,"                        ,nids,nide,njds,njde                               &\n") ;
 if (sw) fprintf(fp,"                        ,pgr , sw                                          &\n") ;
-        fprintf(fp,"                        ,ntasks_x,ntasks_y                                 &\n") ; 
-        fprintf(fp,"                        ,thisdomain_max_halo_width                                  &\n") ;
+        fprintf(fp,"                        ,nest_task_offsets(ngrid%%id)                      &\n") ;
+        fprintf(fp,"                        ,nest_pes_x(%sgrid%%id)                            &\n",parent) ;
+        fprintf(fp,"                        ,nest_pes_y(%sgrid%%id)                            &\n",parent) ; 
+        fprintf(fp,"                        ,nest_pes_x(intermediate_grid%%id)                 &\n") ;
+        fprintf(fp,"                        ,nest_pes_y(intermediate_grid%%id)                 &\n") ; 
+        fprintf(fp,"                        ,thisdomain_max_halo_width                         &\n") ;
         fprintf(fp,"                        ,icoord,jcoord                                     &\n") ;
         fprintf(fp,"                        ,idim_cd,jdim_cd                                   &\n") ;
         fprintf(fp,"                        ,pig,pjg,retval )\n") ;
@@ -2727,6 +2774,7 @@ gen_nest_packunpack ( FILE *fp , node_t * node , int dir, int down_path )
   int d2, d3, xdex, ydex, zdex ;
   int nest_mask ;
   char * grid ; 
+  const char * feed="NEST_INFLUENCE";
   char ddim[3][2][NAMELEN] ;
   char mdim[3][2][NAMELEN] ;
   char pdim[3][2][NAMELEN] ;
@@ -2755,7 +2803,7 @@ gen_nest_packunpack ( FILE *fp , node_t * node , int dir, int down_path )
     }
     p = p1 ;
 
-    if ( nest_mask & down_path )
+    if ( nest_mask & down_path && ! ( down_path==INTERP_UP && p->no_feedback ) )
     {
           if(p->mp_var) {
             fprintf(fp,"if(interp_mp .eqv. .true.) then\n");
@@ -2856,10 +2904,18 @@ fprintf(fp,"IF ( cd_feedback_mask%s( pig, ips_save, ipe_save , pjg, jps_save, jp
                     fprintf(fp,"IF(feedback_flag%s) THEN\n",sjl);
                   }
 #endif
-            if ( zdex >= 0 ) {
-fprintf(fp,"DO k = %s,%s\nNEST_INFLUENCE(%s%s,xv(k))\nENDDO\n", ddim[zdex][0], ddim[zdex][1], grid, vname ) ;
+
+#if ( NMM_CORE == 1)
+            if ( node->full_feedback ) {
+                feed="NEST_FULL_INFLUENCE";
             } else {
-fprintf(fp,"NEST_INFLUENCE(%s%s,xv(1))\n", grid, vname ) ;
+                feed="NEST_INFLUENCE";
+            }
+#endif
+            if ( zdex >= 0 ) {
+fprintf(fp,"DO k = %s,%s\n%s(%s%s,xv(k))\nENDDO\n", ddim[zdex][0], ddim[zdex][1], feed, grid, vname ) ;
+            } else {
+fprintf(fp,"%s(%s%s,xv(1))\n", feed, grid, vname ) ;
             }
 fprintf(fp,"ENDIF\n") ;
           }
