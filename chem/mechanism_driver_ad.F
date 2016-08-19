@@ -60,7 +60,7 @@ SUBROUTINE a_mechanism_driver(id, curr_secs, ktau, dtstep, ktauc, &
 !  LOGICAL :: mask0(ite-its+1, kte-kts+1, jte-jts+1)
 !  LOGICAL :: mask(ite-its+1, kte-kts+1, jte-jts+1)
   SELECT CASE  (config_flags%chem_opt) 
-  CASE (gocart_simple, gocartracm_kpp, gocartradm2_kpp, gocartradm2) 
+  CASE (gocart_simple, gocartracm_kpp, gocartradm2) 
 !    CALL PUSHREAL8ARRAY(chem, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
 !    CALL GOCART_CHEM_DRIVER(curr_secs, dtstepc, config_flags, gmt, &
 !&                      julday, t_phy, moist, chem, rho_phy, dz8w, p8w, &

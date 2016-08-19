@@ -752,9 +752,6 @@ CONTAINS
       expl_conv=.true. ! backward compatibility for ARW
    endif
 
-<<<<<<< HEAD
-   CALL wrf_debug (5, 'Top of Radiation Driver')
-=======
    IF ( ICLOUD == 3 ) THEN
       IF (PRESENT(dxkm)) then
          gridkm = 1.414*SQRT(dxkm*dxkm + dy*0.001*dy*0.001)
@@ -769,7 +766,6 @@ CONTAINS
    END IF
 
    CALL wrf_debug (1, 'Top of Radiation Driver')
->>>>>>> WRFPLUSV3
 !  WRITE ( wrf_err_message , * ) 'itimestep = ',itimestep,', dt = ',dt,', lw and sw options = ',lw_physics,sw_physics
 !  CALL wrf_debug (1, wrf_err_message )
    if (lw_physics .eq. 0 .and. sw_physics .eq. 0)         return

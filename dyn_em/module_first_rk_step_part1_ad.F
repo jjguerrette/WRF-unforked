@@ -699,8 +699,9 @@ BENCH_START(pbl_driver_tim)
                     k_start, k_end                   )
                  
                if( config_flags%chem_opt == MOZART_KPP .or. &
-                   config_flags%chem_opt == MOZCART_KPP .or. &
-                   config_flags%chem_opt == MOZART_MOSAIC_4BIN_VBS0_KPP ) then
+                 config_flags%chem_opt == MOZCART_KPP .or. &
+                 config_flags%chem_opt == MOZART_MOSAIC_4BIN_KPP .or. &
+                 config_flags%chem_opt == MOZART_MOSAIC_4BIN_AQ_KPP) then
                   call mozcart_lbc_set( chem, num_chem, grid%id, &
                                         ims, ime, jms, jme, kms, kme,    & 
                                         grid%i_start(ij), grid%i_end(ij), &
@@ -1185,8 +1186,9 @@ BENCH_START(a_pbl_driver_tim)
                     k_start, k_end                   )
 
 !               if( config_flags%chem_opt == MOZART_KPP .or. &
-!                   config_flags%chem_opt == MOZCART_KPP .or. &
-!                   config_flags%chem_opt == MOZART_MOSAIC_4BIN_VBS0_KPP ) then
+!                 config_flags%chem_opt == MOZCART_KPP .or. &
+!                 config_flags%chem_opt == MOZART_MOSAIC_4BIN_KPP .or. &
+!                 config_flags%chem_opt == MOZART_MOSAIC_4BIN_AQ_KPP) then
 !                  call mozcart_lbc_set( chem, num_chem, grid%id, &
 !                                        ims, ime, jms, jme, kms, kme,    & 
 !                                        grid%i_start(ij), grid%i_end(ij), &

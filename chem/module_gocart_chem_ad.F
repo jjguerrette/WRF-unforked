@@ -233,7 +233,7 @@ CONTAINS
           CALL POPREAL8(cossza(1, 1))
         END DO
       END DO
-    CASE (gocartracm_kpp, gocartradm2_kpp, gocartradm2) 
+    CASE (gocartracm_kpp, gocartradm2) 
       DO j=jts,jte
         DO i=its,ite
           rlat = xlat(i, j)*3.1415926535590/180.

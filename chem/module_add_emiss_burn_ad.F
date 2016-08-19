@@ -512,7 +512,7 @@ CONTAINS
           END DO
         END DO
       END DO
-    CASE (GOCARTRACM_KPP, GOCARTRADM2_KPP, GOCARTRADM2) 
+    CASE (GOCARTRACM_KPP, GOCARTRADM2) 
       DO j=jte,jts,-1
         DO i=ite,its,-1
           DO k=kte,kts,-1
@@ -715,7 +715,7 @@ CONTAINS
           END DO
         END DO
       END DO
-    CASE (MOZART_KPP, MOZCART_KPP, MOZART_MOSAIC_4BIN_VBS0_KPP) 
+    CASE (MOZART_KPP,MOZCART_KPP,MOZART_MOSAIC_4BIN_KPP, MOZART_MOSAIC_4BIN_AQ_KPP )
       IF (biomass_burn_opt .EQ. biomassb_mozc .OR. biomass_burn_opt .EQ.&
 &          biomassb_moz) THEN
         IF (biomass_burn_opt .EQ. biomassb_mozc) THEN

@@ -58,7 +58,7 @@ SUBROUTINE g_mechanism_driver(id, curr_secs, ktau, dtstep, ktauc, &
 &  :jme)
   INTRINSIC MAX, MIN
   SELECT CASE  (config_flags%chem_opt) 
-  CASE (GOCART_SIMPLE, GOCARTRACM_KPP, GOCARTRADM2_KPP, GOCARTRADM2) 
+  CASE (GOCART_SIMPLE, GOCARTRACM_KPP, GOCARTRADM2) 
     CALL WRF_DEBUG(15, 'calling g_gocart_chem_driver from g_mechanism_driver')
     CALL G_GOCART_CHEM_DRIVER(curr_secs, dtstepc, config_flags, gmt, &
 &                        julday, t_phy, g_t_phy, moist, chem, g_chem, &

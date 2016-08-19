@@ -320,7 +320,7 @@ CONTAINS
 &      WRF_ERROR_FATAL3('<stdin>', 471, &
 &                 'emissions_driver: scale_emiss_opt /= emiss_opt')
     SELECT CASE  (config_flags%chem_opt) 
-    CASE (GOCARTRACM_KPP, GOCARTRADM2, GOCARTRADM2_KPP) 
+    CASE (GOCARTRACM_KPP, GOCARTRADM2) 
       IF (config_flags%emiss_inpt_opt .NE. 3) THEN
         IF (config_flags%kemit .GT. kte - ksub) THEN
           k = config_flags%kemit

@@ -249,8 +249,9 @@ CONTAINS
           ENDIF
           if( config_flags%diagnostic_chem == DEPVEL1 .and. &
               (config_flags%chem_opt == MOZCART_KPP .or. &
-              config_flags%chem_opt == MOZART_KPP   .or. & 
-              config_flags%chem_opt == MOZART_MOSAIC_4BIN_VBS0_KPP) ) then
+              config_flags%chem_opt == MOZART_KPP   .or. &
+              config_flags%chem_opt == MOZART_MOSAIC_4BIN_KPP .or. &
+              config_flags%chem_opt == MOZART_MOSAIC_4BIN_AQ_KPP ) ) then
                do j = jts,jte
                   dvel(its:ite,1,j,p_dvel_o3) = m2cm*ddvel(its:ite,j,p_o3)
                   dvel(its:ite,1,j,p_dvel_no) = m2cm*ddvel(its:ite,j,p_no)
@@ -293,6 +294,21 @@ CONTAINS
                   dvel(its:ite,1,j,p_dvel_terpooh) = m2cm*ddvel(its:ite,j,p_terpooh)
                enddo
           endif
+
+          if ( config_flags%chem_opt == MOZART_MOSAIC_4BIN_AQ_KPP ) then
+               do j = jts,jte
+                   dvel(its:ite,1,j,p_dvel_cvasoaX) = 0.0
+                   dvel(its:ite,1,j,p_dvel_cvasoa1) = m2cm*ddvel(its:ite,j,p_cvasoa1)
+                   dvel(its:ite,1,j,p_dvel_cvasoa2) = m2cm*ddvel(its:ite,j,p_cvasoa2)
+                   dvel(its:ite,1,j,p_dvel_cvasoa3) = m2cm*ddvel(its:ite,j,p_cvasoa3)
+                   dvel(its:ite,1,j,p_dvel_cvasoa4) = m2cm*ddvel(its:ite,j,p_cvasoa4)
+                   dvel(its:ite,1,j,p_dvel_cvbsoaX) = 0.0
+                   dvel(its:ite,1,j,p_dvel_cvbsoa1) = m2cm*ddvel(its:ite,j,p_cvbsoa1)
+                   dvel(its:ite,1,j,p_dvel_cvbsoa2) = m2cm*ddvel(its:ite,j,p_cvbsoa2)
+                   dvel(its:ite,1,j,p_dvel_cvbsoa3) = m2cm*ddvel(its:ite,j,p_cvbsoa3)
+                   dvel(its:ite,1,j,p_dvel_cvbsoa4) = m2cm*ddvel(its:ite,j,p_cvbsoa4)
+                enddo
+           endif
        ELSEIF ( config_flags%chem_opt == GOCART_SIMPLE &
 #if ( WRFPLUS == 1 )
                 .OR. config_flags%chem_opt == GOCART_BCCO &
@@ -380,21 +396,27 @@ CONTAINS
 
        idrydep_onoff = 1
        aer_mech_id_select: SELECT CASE(config_flags%chem_opt)
+!!! TUCCELLA
           CASE (RADM2SORG,RADM2SORG_AQ,RADM2SORG_AQCHEM,RADM2SORG_KPP, &
-                RACM_ESRLSORG_KPP,RACM_SOA_VBS_KPP, &
-                CBMZSORG,CBMZSORG_AQ)
+                RACM_ESRLSORG_KPP,RACM_SOA_VBS_KPP,RACM_SOA_VBS_AQCHEM_KPP, &
+                CBMZSORG,CBMZSORG_AQ, &
+                CB05_SORG_AQ_KPP,CB05_SORG_VBS_AQ_KPP)
              aer_mech_id = 1
-          CASE (RACMSORG_AQ,RACMSORG_AQCHEM_KPP,RACMSORG_KPP)
+          CASE (RACMSORG_AQ,RACMSORG_AQCHEM_KPP,RACM_ESRLSORG_AQCHEM_KPP,RACMSORG_KPP)
              aer_mech_id = 2
           CASE ( CBMZ_MOSAIC_4BIN, CBMZ_MOSAIC_KPP, CBMZ_MOSAIC_8BIN, CBMZ_MOSAIC_4BIN_AQ, &
-                 CBMZ_MOSAIC_8BIN_AQ,CBMZ_MOSAIC_4BIN_VBS2_KPP,SAPRC99_MOSAIC_4BIN_VBS2_KPP,MOZART_MOSAIC_4BIN_VBS0_KPP,  &
-                 CBMZ_MOSAIC_DMS_4BIN, CBMZ_MOSAIC_DMS_8BIN, CBMZ_MOSAIC_DMS_4BIN_AQ, CBMZ_MOSAIC_DMS_8BIN_AQ)
+                 CBMZ_MOSAIC_8BIN_AQ,SAPRC99_MOSAIC_4BIN_VBS2_KPP, &
+                 CBMZ_MOSAIC_DMS_4BIN, CBMZ_MOSAIC_DMS_8BIN, CBMZ_MOSAIC_DMS_4BIN_AQ, CBMZ_MOSAIC_DMS_8BIN_AQ, &
+                 MOZART_MOSAIC_4BIN_KPP, MOZART_MOSAIC_4BIN_AQ_KPP, &
+                 CRI_MOSAIC_8BIN_AQ_KPP, CRI_MOSAIC_4BIN_AQ_KPP, SAPRC99_MOSAIC_8BIN_VBS2_AQ_KPP, &!BSINGH(12/03/2013): Added SAPRC 8 bin
+                 SAPRC99_MOSAIC_8BIN_VBS2_KPP)!BSINGH(04/04/2014): Added SAPRC 8 bin non-aq
              aer_mech_id = 3
           CASE ( CBMZ_CAM_MAM3_NOAQ, CBMZ_CAM_MAM3_AQ, CBMZ_CAM_MAM7_NOAQ, CBMZ_CAM_MAM7_AQ )
              aer_mech_id = 4
           CASE DEFAULT
              aer_mech_id = 0
        END SELECT aer_mech_id_select
+
 
 !  config_flags%aer_drydep_opt <= 0   -- aerosol depositon velocities are set to zero
 !  config_flags%aer_drydep_opt >= 100 -- aerosol depvels are calculated in subr aer_depvel_driver
@@ -409,7 +431,6 @@ CONTAINS
        else if (config_flags%aer_drydep_opt <= 99) then
 
    adrydep_select: SELECT CASE(config_flags%chem_opt)
-     CASE (RADM2SORG,RADM2SORG_AQ,RADM2SORG_AQCHEM,RADM2SORG_KPP,RACM_ESRLSORG_KPP,CBMZSORG,CBMZSORG_AQ)
        CALL wrf_debug(15,'DOING DRY DEP VELOCITIES FOR AEROSOLS/RADM')
        call sorgam_depdriver (id,config_flags,ktau,dtstep,              &
                ust,t_phy,moist,p8w,t8w,rmol,znt,pbl,                    &
@@ -417,11 +438,12 @@ CONTAINS
                h2oaj,h2oai,nu3,ac3,cor3,asulf,ahno3,anh3,cvaro1,cvaro2, &
                cvalk1,cvole1,cvapi1,cvapi2,cvlim1,cvlim2,               &
                aer_res,ddvel(:,:,numgas+1:num_chem),                    &
+               numgas,ddflx(:,:,numgas+1:num_chem), &
                num_chem-numgas,                                         &
                ids,ide, jds,jde, kds,kde,                               &
                ims,ime, jms,jme, kms,kme,                               &
                its,ite, jts,jte, kts,kte                                )
-     CASE (RACMSORG_AQ,RACMSORG_AQCHEM_KPP,RACMSORG_KPP)
+     CASE (RACMSORG_AQ,RACMSORG_AQCHEM_KPP,RACM_ESRLSORG_AQCHEM_KPP,RACMSORG_KPP)
        CALL wrf_debug(15,'DOING DRY DEP VELOCITIES FOR AEROSOLS/RACM')
        call sorgam_depdriver (id,config_flags,ktau,dtstep,              &
                ust,t_phy,moist,p8w,t8w,rmol,znt,pbl,                    &
@@ -429,13 +451,43 @@ CONTAINS
                h2oaj,h2oai,nu3,ac3,cor3,asulf,ahno3,anh3,cvaro1,cvaro2, &
                cvalk1,cvole1,cvapi1,cvapi2,cvlim1,cvlim2,               &
                aer_res,ddvel(:,:,numgas+1:num_chem),                    &
+               numgas,ddflx(:,:,numgas+1:num_chem), &
                num_chem-numgas,                                         &
                ids,ide, jds,jde, kds,kde,                               &
                ims,ime, jms,jme, kms,kme,                               &
                its,ite, jts,jte, kts,kte                                )
+     CASE (CB05_SORG_AQ_KPP)
+       CALL wrf_debug(15,'DOING DRY DEP VELOCITIES FOR AEROSOLS/CB05')
+       call sorgam_depdriver (id,config_flags,ktau,dtstep,              &
+               ust,t_phy,moist,p8w,t8w,rmol,znt,pbl,                    &
+               alt,p_phy,chem,rho_phy,dz8w,z,z_at_w,                    &
+               h2oaj,h2oai,nu3,ac3,cor3,asulf,ahno3,anh3,cvaro1,cvaro2, &
+               cvalk1,cvole1,cvapi1,cvapi2,cvlim1,cvlim2,               &
+               aer_res,ddvel(:,:,numgas+1:num_chem),                    &
+               numgas,ddflx(:,:,numgas+1:num_chem), &
+               num_chem-numgas,                                         &
+               ids,ide, jds,jde, kds,kde,                               &
+               ims,ime, jms,jme, kms,kme,                               &
+               its,ite, jts,jte, kts,kte                                )
+     CASE (CB05_SORG_VBS_AQ_KPP)
+       CALL wrf_debug(15,'DOING DRY DEP VELOCITIES FOR AEROSOLS/CB05')
+       call sorgam_vbs_depdriver (id,config_flags,ktau,dtstep,          &
+               ust,t_phy,moist,p8w,t8w,rmol,znt,pbl,                    &
+               alt,p_phy,chem,rho_phy,dz8w,rh,z,z_at_w,                 &
+               h2oaj,h2oai,nu3,ac3,cor3,asulf,ahno3,anh3,               &
+               aer_res,ddvel(:,:,numgas+1:num_chem),                    &
+               numgas,ddflx(:,:,numgas+1:num_chem), &
+               num_chem-numgas,                                         &
+               ids,ide, jds,jde, kds,kde,                               &
+               ims,ime, jms,jme, kms,kme,                               &
+               its,ite, jts,jte, kts,kte                                )
+
      CASE ( CBMZ_MOSAIC_4BIN, CBMZ_MOSAIC_KPP, CBMZ_MOSAIC_8BIN, CBMZ_MOSAIC_4BIN_AQ, CBMZ_MOSAIC_8BIN_AQ, &
           CBMZ_MOSAIC_DMS_4BIN, CBMZ_MOSAIC_DMS_8BIN, CBMZ_MOSAIC_DMS_4BIN_AQ, CBMZ_MOSAIC_DMS_8BIN_AQ, &
-          CBMZ_MOSAIC_4BIN_VBS2_KPP,SAPRC99_MOSAIC_4BIN_VBS2_KPP, MOZART_MOSAIC_4BIN_VBS0_KPP)
+          SAPRC99_MOSAIC_4BIN_VBS2_KPP, &
+          MOZART_MOSAIC_4BIN_KPP, MOZART_MOSAIC_4BIN_AQ_KPP, &
+          CRI_MOSAIC_8BIN_AQ_KPP, CRI_MOSAIC_4BIN_AQ_KPP, &
+          SAPRC99_MOSAIC_8BIN_VBS2_AQ_KPP,SAPRC99_MOSAIC_8BIN_VBS2_KPP)!BSINGH(12/03/2013): Added SAPRC 8 bin and non-aq on 04/04/2014
        CALL wrf_debug(15,'DOING DRY DEP VELOCITIES FOR MOSAIC AEROSOLS')
        call mosaic_drydep_driver(                                       &
                id, curr_secs, ktau, dtstep, config_flags,               &
@@ -446,17 +498,9 @@ CONTAINS
                ids,ide, jds,jde, kds,kde,                               &
                ims,ime, jms,jme, kms,kme,                               &
                its,ite, jts,jte, kts,kte                                )
-     CASE ( RACM_SOA_VBS_KPP )
+!!! TUCCELLA
+     CASE ( RACM_SOA_VBS_KPP,RACM_SOA_VBS_AQCHEM_KPP )
        CALL wrf_debug(15,'DOING DRY DEP VELOCITIES FOR SOA_VBS AEROSOLS')
-          do j = jts,jte
-          do k = kts,kte
-          do i = its,ite
-            rh(i,k,j) = max(.1,MIN( .95, moist(i,k,j,p_qv) / &
-                     (3.80*exp(17.27*(t_phy(i,k,j)-273.)/ &
-                     (t_phy(i,k,j)-36.))/(.01*p_phy(i,k,j)))))
-          enddo
-          enddo
-          enddo
        call soa_vbs_depdriver (id,config_flags,ktau,dtstep,             &
                ust,t_phy,moist,p8w,t8w,rmol,znt,pbl,                    &
                alt,p_phy,chem,rho_phy,dz8w,rh,z,z_at_w,                 &
@@ -479,7 +523,7 @@ CONTAINS
                its,ite, jts,jte, kts,kte                                )
 !
      CASE DEFAULT
-                                                     
+
      END SELECT adrydep_select
    else ! (config_flags%aer_drydep_opt > 99)
               CALL wrf_debug(15,'DOING DRY DEP VELOCITIES THRU AER_DRYDEP_DRIVER')

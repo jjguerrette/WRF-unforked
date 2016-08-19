@@ -170,9 +170,10 @@ tile_lon_loop:DO i=its,ite
         CALL G_RC(rcx, g_rcx, ta, rad, rhchem, g_rhchem, iland, iseason&
 &            , numgas, wetflag, rainflag, highnh3, iprt, moist(i, kts, j&
 &            , p_qv), p8w(i, kts, j), config_flags%chem_opt)
-        IF (config_flags%chem_opt .NE. mozart_kpp .AND. config_flags%&
-&            chem_opt .NE. mozcart_kpp .AND. config_flags%chem_opt .NE. &
-&            mozart_mosaic_4bin_vbs0_kpp) THEN
+        if( config_flags%chem_opt == MOZART_KPP .or. &
+            config_flags%chem_opt == MOZCART_KPP .or. &
+            config_flags%chem_opt == MOZART_MOSAIC_4BIN_KPP .or. &
+            config_flags%chem_opt == MOZART_MOSAIC_4BIN_AQ_KPP )   then
           g_srfres(1:numgas-2) = g_rcx(1:numgas-2)
           srfres(1:numgas-2) = rcx(1:numgas-2)
           g_srfres(numgas-1:numgas) = 0.0_8
@@ -202,9 +203,8 @@ tile_lon_loop:DO i=its,ite
     END DO tile_lat_loop
 ! For gocartracm,radm
 !-----------------------------------------------------------
-    IF ((config_flags%chem_opt .EQ. gocartracm_kpp .OR. config_flags%&
-&        chem_opt .EQ. gocartradm2_kpp) .OR. config_flags%chem_opt .EQ. &
-&        gocartradm2) THEN
+    IF (config_flags%chem_opt .EQ. gocartracm_kpp .OR. &
+&       config_flags%chem_opt .EQ. gocartradm2) THEN
       DO j=jts,jte
         DO i=its,ite
           g_ddvel(i, j, p_sulf) = 0.0_8

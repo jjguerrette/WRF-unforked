@@ -263,59 +263,6 @@ SUBROUTINE chem_driver_tl(grid, config_flags &
   END IF
   chem_minval = epsilc
   SELECT CASE  (config_flags%chem_opt) 
-  CASE (RADM2) 
-    CALL WRF_DEBUG(15, 'calling radm2 from chem_driver')
-    haveaer = .false.
-  CASE (RADM2_KPP) 
-    CALL WRF_DEBUG(15, 'calling radm2_kpp from chem_driver')
-    haveaer = .false.
-  CASE (RADM2SORG) 
-    CALL WRF_DEBUG(15, &
-             'calling radm2sorg aerosols driver from chem_driver')
-    haveaer = .true.
-  CASE (RADM2SORG_KPP) 
-    CALL WRF_DEBUG(15, &
-             'calling radm2sorg aerosols driver from chem_driver')
-    haveaer = .false.
-  CASE (RADM2SORG_AQ) 
-    CALL WRF_DEBUG(15, &
-             'calling radm2sorg_aq aerosols driver from chem_driver')
-    haveaer = .true.
-  CASE (RACMSORG_AQ) 
-    CALL WRF_DEBUG(15, &
-             'calling racmsorg_aq aerosols driver from chem_driver')
-    haveaer = .true.
-  CASE (RADM2SORG_AQCHEM) 
-    CALL WRF_DEBUG(15, &
-             'calling radm2sorg_aqchem aerosols driver from chem_driver'&
-            )
-    haveaer = .true.
-  CASE (RACMSORG_AQCHEM_KPP) 
-    CALL WRF_DEBUG(15, &
-             'calling racmsorg_aqchem_kpp aerosols driver from chem_driver')
-    haveaer = .true.
-  CASE (RACM_KPP) 
-    CALL WRF_DEBUG(15, 'calling racm_kpp from chem_driver')
-  CASE (RACMPM_KPP) 
-    CALL WRF_DEBUG(15, 'calling racmpm_kpp from chem_driver')
-    haveaer = .false.
-  CASE (RACM_MIM_KPP) 
-    CALL WRF_DEBUG(15, 'calling racm_mim_kpp from chem_driver')
-    haveaer = .false.
-  CASE (RACM_ESRLSORG_KPP) 
-    CALL WRF_DEBUG(15, &
-             'calling racmsorgesrl_kpp aerosols driver from chem_driver'&
-            )
-    haveaer = .false.
-  CASE (RACMSORG_KPP) 
-    CALL WRF_DEBUG(15, &
-             'calling racmsorg_kpp aerosols driver from chem_driver')
-    haveaer = .false.
-  CASE (RACM_SOA_VBS_KPP) 
-    CALL WRF_DEBUG(15, &
-             'calling racm_soa_vbs_kpp aerosols driver from chem_driver'&
-            )
-    haveaer = .false.
   CASE (GOCART_SIMPLE) 
     CALL WRF_DEBUG(15, &
              'calling only gocart aerosols driver from chem_driver')
@@ -324,95 +271,14 @@ SUBROUTINE chem_driver_tl(grid, config_flags &
     CALL WRF_DEBUG(15, &
              'calling only black carbon aerosols from chem_driver')
     haveaer = .false.
-  CASE (GOCARTRACM_KPP) 
-    CALL WRF_DEBUG(15, 'calling gocart and racm driver from chem_driver'&
-            )
-    haveaer = .false.
-  CASE (GOCARTRADM2_KPP) 
-    CALL WRF_DEBUG(15, &
-             'calling gocart and radmkpp driver from chem_driver')
-    haveaer = .false.
-  CASE (GOCARTRADM2) 
-    CALL WRF_DEBUG(15, 'calling gocart and radm driver from chem_driver'&
-            )
-    haveaer = .false.
-  CASE (SAPRC99_KPP) 
-    CALL WRF_DEBUG(15, 'calling saprc99_kpp from chem_driver')
-    haveaer = .false.
-  CASE (CBMZ_MOSAIC_4BIN_VBS2_KPP) 
-    CALL WRF_DEBUG(15, &
-             'calling cbmz_mosaic_4bin_vbs2_kpp from chem_driver')
-    haveaer = .false.
-  CASE (SAPRC99_MOSAIC_4BIN_VBS2_KPP) 
-    CALL WRF_DEBUG(15, &
-             'calling saprc99_mosaic_4bin_vbs2_kpp from chem_driver')
-    haveaer = .false.
-  CASE (MOZART_MOSAIC_4BIN_VBS0_KPP) 
-    CALL WRF_DEBUG(15, &
-             'calling mozart_mosaic_4bin_vbs0_kpp from chem_driver')
-    haveaer = .true.
-  CASE (CBMZSORG) 
-    CALL WRF_DEBUG(15, 'calling cbmzsorg aerosols from chem_driver')
-    haveaer = .true.
-  CASE (CBMZSORG_AQ) 
-    CALL WRF_DEBUG(15, 'calling cbmzsorg_aq aerosols from chem_driver')
-    haveaer = .true.
-  CASE (CBMZ) 
-    CALL WRF_DEBUG(15, 'calling cbmz from chem_driver')
-    haveaer = .false.
-  CASE (CBMZ_BB) 
-    CALL WRF_DEBUG(15, 'calling cbmz_bb from chem_driver')
-    haveaer = .false.
-  CASE (CBMZ_BB_KPP) 
-    CALL WRF_DEBUG(15, 'calling cbmz_bb_kpp from chem_driver')
-    haveaer = .false.
-  CASE (CBMZ_MOSAIC_KPP) 
-    CALL WRF_DEBUG(15, 'calling cbmz_mosaic_kpp from chem_driver')
-    haveaer = .false.
-  CASE (CBMZ_MOSAIC_4BIN) 
-    CALL WRF_DEBUG(15, &
-             'calling cbmz_mosaic_4bin aerosols driver from chem_driver'&
-            )
-    haveaer = .true.
-  CASE (CBMZ_MOSAIC_8BIN) 
-    CALL WRF_DEBUG(15, &
-             'calling cbmz_mosaic_8bin aerosols driver from chem_driver'&
-            )
-    haveaer = .true.
-  CASE (CBMZ_MOSAIC_4BIN_AQ) 
-    CALL WRF_DEBUG(15, &
-          'calling cbmz_mosaic_4bin_aq aerosols driver from chem_driver'&
-            )
-    haveaer = .true.
-  CASE (CBMZ_MOSAIC_8BIN_AQ) 
-    CALL WRF_DEBUG(15, &
-          'calling cbmz_mosaic_8bin_aq aerosols driver from chem_driver'&
-            )
-    haveaer = .true.
-  CASE (CBMZ_MOSAIC_DMS_4BIN) 
-    CALL WRF_DEBUG(15, &
-         'calling cbmz_mosaic_dms_4bin aerosols driver from chem_driver'&
-            )
-    haveaer = .true.
-  CASE (CBMZ_MOSAIC_DMS_8BIN) 
-    CALL WRF_DEBUG(15, &
-         'calling cbmz_mosaic_dms_8bin aerosols driver from chem_driver'&
-            )
-    haveaer = .true.
-  CASE (CBMZ_MOSAIC_DMS_4BIN_AQ) 
-    CALL WRF_DEBUG(15, &
-      'calling cbmz_mosaic_dms_4bin_aq aerosols driver from chem_driver'&
-            )
-    haveaer = .true.
-  CASE (CBMZ_MOSAIC_DMS_8BIN_AQ) 
-    CALL WRF_DEBUG(15, &
-      'calling cbmz_mosaic_dms_8bin_aq aerosols driver from chem_driver'&
-            )
-    haveaer = .true.
-  CASE (MOZART_KPP) 
-    CALL WRF_DEBUG(15, 'calling mozart driver from chem_driver')
-  CASE (MOZCART_KPP) 
-    CALL WRF_DEBUG(15, 'calling mozcart driver from chem_driver')
+!  CASE (GOCARTRACM_KPP) 
+!    CALL WRF_DEBUG(15, 'calling gocart and racm driver from chem_driver'&
+!            )
+!    haveaer = .false.
+!  CASE (GOCARTRADM2) 
+!    CALL WRF_DEBUG(15, 'calling gocart and radm driver from chem_driver'&
+!            )
+!    haveaer = .false.
   CASE (CHEM_TRACER, CHEM_TRACE2) 
     CALL WRF_DEBUG(15, &
           'tracer mode: only doing emissions and dry dep in chem_driver'&
@@ -436,7 +302,7 @@ and subgrid transport chem_driver')
     IF (config_flags%tracer_opt .GT. 0) THEN
       CALL WRF_DEBUG(15, 'only doing tracer transport in chem_driver')
     ELSE
-      CALL WRF_DEBUG(15, 'calling chem_opt=? from chem_driver')
+      CALL WRF_DEBUG(15, 'calling chem_opt=? from chem_driver_tl')
     END IF
   END SELECT
   SELECT CASE  (config_flags%tracer_opt) 
@@ -574,9 +440,10 @@ as (check chemics_init.F),', ' numgas_mam=', numgas_mam, ' and numgas='&
       pbl_h(i, j) = grid%pblh(i, j)
     END DO
   END DO
-  IF ((config_flags%chem_opt .EQ. mozart_kpp .OR. config_flags%chem_opt &
-      .EQ. mozcart_kpp) .OR. config_flags%chem_opt .EQ. &
-      mozart_mosaic_4bin_vbs0_kpp) THEN
+  if( config_flags%chem_opt == MOZART_KPP .or. &
+      config_flags%chem_opt == MOZCART_KPP .or. &
+      config_flags%chem_opt == MOZART_MOSAIC_4BIN_KPP .or. &
+      config_flags%chem_opt == MOZART_MOSAIC_4BIN_AQ_KPP) then
     IF (config_flags%phot_opt .EQ. ftuv) THEN
       CALL FTUV_TIMESTEP_INIT(grid%id, grid%julday)
     END IF

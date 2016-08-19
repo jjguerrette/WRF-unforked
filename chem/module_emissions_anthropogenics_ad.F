@@ -101,14 +101,15 @@ CONTAINS
           CALL PUSHREAL8(conv_rho)
           conv_rho = 4.828e-4/rho_phy(i, k, j)*dtstep/(dz8w(i, k, j)*60.&
 &            )
-          IF ((config_flags%chem_opt .EQ. mozart_kpp .OR. config_flags%&
-&              chem_opt .EQ. mozcart_kpp) .OR. config_flags%chem_opt .EQ.&
-&              mozart_mosaic_4bin_vbs0_kpp) THEN
+          if( config_flags%chem_opt == MOZART_KPP .or. &
+              config_flags%chem_opt == MOZCART_KPP .or. &
+              config_flags%chem_opt == MOZART_MOSAIC_4BIN_KPP .or. &
+              config_flags%chem_opt == MOZART_MOSAIC_4BIN_AQ_KPP ) then
             conv_rho_aer = alt(i, k, j)*dtstep/dz8w(i, k, j)
             IF (config_flags%chem_opt .EQ. mozcart_kpp) THEN
               CALL PUSHCONTROL2B(0)
             ELSE IF (config_flags%chem_opt .EQ. &
-&                mozart_mosaic_4bin_vbs0_kpp) THEN
+&                mozart_mosaic_4bin_kpp) THEN
               CALL PUSHCONTROL2B(1)
             ELSE
               CALL PUSHCONTROL2B(2)

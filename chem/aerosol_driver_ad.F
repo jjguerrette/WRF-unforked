@@ -58,7 +58,7 @@ SUBROUTINE a_aerosols_driver(id, curr_secs, ktau, dtstep, ktauc, &
 &  :: dvmrdt_sv13d, dvmrcwdt_sv13d
   INTEGER :: ii, jj, kk
   SELECT CASE  (config_flags%chem_opt) 
-  CASE (GOCART_SIMPLE, GOCARTRACM_KPP, GOCARTRADM2_KPP, GOCARTRADM2, &
+  CASE (GOCART_SIMPLE, GOCARTRACM_KPP, GOCARTRADM2, &
 &  MOZCART_KPP, GOCART_BCCO) 
     CALL WRF_DEBUG(15, 'a_aerosols_driver: calling a_gocart_aerosols_driver')
     CALL A_GOCART_AEROSOLS_DRIVER(ktauc, dtstepc, config_flags, t_phy, &
@@ -114,7 +114,7 @@ SUBROUTINE a_sum_pm_driver(config_flags, alt, a_alt, chem, a_chem, h2oaj&
 &  a_pm2_5_dry_ec, a_pm10
   TYPE(GRID_CONFIG_REC_TYPE), INTENT(IN) :: config_flags
   SELECT CASE  (config_flags%chem_opt) 
-  CASE (GOCART_SIMPLE, GOCARTRACM_KPP, GOCARTRADM2_KPP, GOCARTRADM2, &
+  CASE (GOCART_SIMPLE, GOCARTRACM_KPP, GOCARTRADM2, &
 &  MOZCART_KPP) 
     CALL WRF_DEBUG(15, 'a_sum_pm_driver: calling a_sum_pm_gocart')
     CALL A_SUM_PM_GOCART(alt, a_alt, chem, a_chem, pm2_5_dry, &

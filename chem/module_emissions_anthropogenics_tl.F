@@ -83,9 +83,10 @@ CONTAINS
 &            scaleant(i, j, p_scant_nh3)*g_conv_rho)
           chem(i, k, j, p_nh3) = chem(i, k, j, p_nh3) + emis_ant(i, k, j&
 &            , p_e_nh3)*scaleant(i, j, p_scant_nh3)*conv_rho
-          IF ((config_flags%chem_opt .EQ. mozart_kpp .OR. config_flags%&
-&              chem_opt .EQ. mozcart_kpp) .OR. config_flags%chem_opt .EQ.&
-&              mozart_mosaic_4bin_vbs0_kpp) THEN
+          if( config_flags%chem_opt == MOZART_KPP .or. &
+              config_flags%chem_opt == MOZCART_KPP .or. &
+              config_flags%chem_opt == MOZART_MOSAIC_4BIN_KPP .or. &
+              config_flags%chem_opt == MOZART_MOSAIC_4BIN_AQ_KPP ) then
             g_conv_rho_aer = (dtstep*g_alt(i, k, j)*dz8w(i, k, j)-alt(i&
 &              , k, j)*dtstep*g_dz8w(i, k, j))/dz8w(i, k, j)**2
             conv_rho_aer = alt(i, k, j)*dtstep/dz8w(i, k, j)
@@ -205,7 +206,7 @@ CONTAINS
               chem(i, k, j, p_bc1) = chem(i, k, j, p_bc1) + emis_ant(i, &
 &                k, j, p_e_bc)*scaleant(i, j, p_scant_bc)*conv_rho_aer
             ELSE IF (config_flags%chem_opt .EQ. &
-&                mozart_mosaic_4bin_vbs0_kpp) THEN
+&                mozart_mosaic_4bin_kpp) THEN
              g_chem(i,k,j,p_voca)  = g_chem(i,k,j,p_voca) + &
 &                         emis_ant(i,k,j,p_e_co_a)*0.04*28./250. &
 &                         *(g_scaleant(i,j,p_scant_co_a)*conv_rho_aer &

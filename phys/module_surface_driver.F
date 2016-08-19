@@ -6335,16 +6335,29 @@ HFX_SEA, LH_SEA, QFX_SEA, QGH_SEA, QSFC_SEA, TSK_SEA,  &
      ! QSFC
 
 ! Land/frozen-water call.
+
+!v3.6.1
      CALL pxsfclay(U3D,V3D,T3D,TH3D,QV3D,P3D,dz8w,                 &
                      CP,G,ROVCP,R,XLV,PSFC,CHS,CHS2,CQS2,CPM,      &
                      ZNT,UST,PBLH,MAVAIL,ZOL,MOL,REGIME,PSIM,PSIH, &
                      XLAND,HFX,QFX,LH,TSK_LOCAL,FLHC,FLQC,QGH,QSFC,RMOL, &
                      U10,V10,                                      &
                      GZ1OZ0,WSPD,BR,ISFFLX,DX,                     &
-                     SVP1,SVP2,SVP3,SVPT0,EP1,EP2,KARMAN,ITIMESTEP,&
+                     SVP1,SVP2,SVP3,SVPT0,EP1,EP2,KARMAN,          &
                      ids,ide, jds,jde, kds,kde,                    &
                      ims,ime, jms,jme, kms,kme,                    &
                      its,ite, jts,jte, kts,kte                     )
+!v3.8.1
+!     CALL pxsfclay(U3D,V3D,T3D,TH3D,QV3D,P3D,dz8w,                 &
+!                     CP,G,ROVCP,R,XLV,PSFC,CHS,CHS2,CQS2,CPM,      &
+!                     ZNT,UST,PBLH,MAVAIL,ZOL,MOL,REGIME,PSIM,PSIH, &
+!                     XLAND,HFX,QFX,LH,TSK_LOCAL,FLHC,FLQC,QGH,QSFC,RMOL, &
+!                     U10,V10,                                      &
+!                     GZ1OZ0,WSPD,BR,ISFFLX,DX,                     &
+!                     SVP1,SVP2,SVP3,SVPT0,EP1,EP2,KARMAN,ITIMESTEP,&
+!                     ids,ide, jds,jde, kds,kde,                    &
+!                     ims,ime, jms,jme, kms,kme,                    &
+!                     its,ite, jts,jte, kts,kte                     )
 
      DO j = JTS , JTE
         DO i= ITS , ITE
@@ -6393,16 +6406,28 @@ HFX_SEA, LH_SEA, QFX_SEA, QGH_SEA, QSFC_SEA, TSK_SEA,  &
      ! Variables newly set (INTENT(OUT)) or changed (INTENT(INOUT)) by
      ! PXSFCLAY are here appended with the "_SEA" label.
      ! Special intent(IN) variables here:  XLAND_SEA, MAVAIL_SEA, TSK_SEA
+!v3.6.1
      CALL pxsfclay(U3D,V3D,T3D,TH3D,QV3D,P3D,dz8w,                 &
                      CP,G,ROVCP,R,XLV,PSFC,CHS_SEA,CHS2_SEA,CQS2_SEA,CPM_SEA,      &
                      ZNT_SEA,UST_SEA,PBLH,MAVAIL_SEA,ZOL_SEA,MOL_SEA,REGIME_SEA,PSIM_SEA,PSIH_SEA, &
                      XLAND_SEA,HFX_SEA,QFX_SEA,LH_SEA,TSK_SEA,FLHC_SEA,FLQC_SEA,QGH_SEA,QSFC_SEA,RMOL_SEA, &
                      U10_SEA,V10_SEA,                              &
                      GZ1OZ0_SEA,WSPD_SEA,BR_SEA,ISFFLX,DX,         &
-                     SVP1,SVP2,SVP3,SVPT0,EP1,EP2,KARMAN,ITIMESTEP,&
+                     SVP1,SVP2,SVP3,SVPT0,EP1,EP2,KARMAN,          &
                      ids,ide, jds,jde, kds,kde,                    &
                      ims,ime, jms,jme, kms,kme,                    &
                      its,ite, jts,jte, kts,kte                     )
+!v3.8.1
+!     CALL pxsfclay(U3D,V3D,T3D,TH3D,QV3D,P3D,dz8w,                 &
+!                     CP,G,ROVCP,R,XLV,PSFC,CHS_SEA,CHS2_SEA,CQS2_SEA,CPM_SEA,      &
+!                     ZNT_SEA,UST_SEA,PBLH,MAVAIL_SEA,ZOL_SEA,MOL_SEA,REGIME_SEA,PSIM_SEA,PSIH_SEA, &
+!                     XLAND_SEA,HFX_SEA,QFX_SEA,LH_SEA,TSK_SEA,FLHC_SEA,FLQC_SEA,QGH_SEA,QSFC_SEA,RMOL_SEA, &
+!                     U10_SEA,V10_SEA,                              &
+!                     GZ1OZ0_SEA,WSPD_SEA,BR_SEA,ISFFLX,DX,         &
+!                     SVP1,SVP2,SVP3,SVPT0,EP1,EP2,KARMAN,ITIMESTEP,&
+!                     ids,ide, jds,jde, kds,kde,                    &
+!                     ims,ime, jms,jme, kms,kme,                    &
+!                     its,ite, jts,jte, kts,kte                     )
 
      DO j = JTS , JTE
         DO i = ITS , ITE

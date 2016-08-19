@@ -156,7 +156,7 @@ CONTAINS
           END DO
         END DO
       END DO
-    CASE (GOCARTRACM_KPP, GOCARTRADM2_KPP, GOCARTRADM2) 
+    CASE (GOCARTRACM_KPP, GOCARTRADM2) 
       CALL WRF_DEBUG(15, &
 &               'calling gocart chemistry in addition to racm_kpp')
       g_h2o2 = 0.0_8
