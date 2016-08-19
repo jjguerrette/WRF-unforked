@@ -89,6 +89,7 @@ export NL_CV_OPTIONS=${NL_CV_OPTIONS:-5}
 export NUM_PROCS=${NUM_PROCS:-1}
 export PROCESS_AERO=${PROCESS_AERO:-false}
 export AEROS_TO_PROCESS=${AEROS_TO_PROCESS:-" "}
+export NOCOLONS=${NOCOLONS:-false}                 # Set to true if using WRF "nocolons" option
 
 # Directories:
 export REL_DIR=${REL_DIR:-$HOME/trunk}            # Directory containing codes.
@@ -118,10 +119,14 @@ else
 fi
 
 if [[ $NL_CV_OPTIONS == 6 ]]; then
-export CONTROL_VARIABLES=${CONTROL_VARIABLES:-" psi chi_u t_u rh_u ps_u "}
-export RUN_GEN_BE_STAGE2A=false
+   export CONTROL_VARIABLES=${CONTROL_VARIABLES:-" psi chi_u t_u rh_u ps_u "}
+   export RUN_GEN_BE_STAGE2A=false
+elif [[ $NL_CV_OPTIONS == 7 ]]; then
+   export CONTROL_VARIABLES=${CONTROL_VARIABLES:-" u v t rh ps "}
+   export RUN_GEN_BE_STAGE2=false
+   export RUN_GEN_BE_STAGE2A=false
 else
-export CONTROL_VARIABLES=${CONTROL_VARIABLES:-" psi chi_u t_u rh ps_u "}
+   export CONTROL_VARIABLES=${CONTROL_VARIABLES:-" psi chi_u t_u rh ps_u "}
 fi
 export DELETE_DIRS=${DELETE_DIRS:-" "}
 

@@ -20,7 +20,7 @@ CONTAINS
                , tke_tend,a_tke_tend                                     &
                , adapt_step_flag , curr_secs                               &
                , psim ,a_psim , psih ,a_psih , wspd ,a_wspd ,        &
-                 gz1oz0 ,a_gz1oz0 , br ,a_br , chklowq,a_chklowq     &
+                 gz1oz0 ,a_gz1oz0 , chklowq,a_chklowq                &
                , cu_act_flag , hol ,a_hol, th_phy,a_th_phy             &
                , pi_phy ,a_pi_phy, p_phy ,a_p_phy , t_phy ,a_t_phy   &
                , dz8w ,a_dz8w , p8w ,a_p8w , t8w ,a_t8w              &
@@ -61,8 +61,7 @@ CONTAINS
     USE a_module_physics_addtendc, ONLY : a_update_phy_ten
 
 !   USE module_sfs_driver
-!   USE module_stoch, ONLY : update_stoch_ten, update_stoch , calculate_stoch_ten,  & 
-!                            do_fftback_along_x,do_fftback_along_y,sp2gp_prep
+!   USE module_stoch, ONLY : update_stoch_ten, perturb_physics_tend,RAND_PERT_UPDATE
 
     USE a_module_sfs_driver
 
@@ -97,7 +96,6 @@ CONTAINS
     REAL,DIMENSION(ims:ime,jms:jme), INTENT(INOUT)         :: psih,a_psih
     REAL,DIMENSION(ims:ime,jms:jme), INTENT(INOUT)         :: wspd,a_wspd
     REAL,DIMENSION(ims:ime,jms:jme), INTENT(INOUT)         :: gz1oz0,a_gz1oz0
-    REAL,DIMENSION(ims:ime,jms:jme), INTENT(INOUT)         :: br,a_br
     REAL,DIMENSION(ims:ime,jms:jme), INTENT(INOUT)         :: chklowq,a_chklowq
     REAL,DIMENSION(ims:ime,jms:jme), INTENT(INOUT)         :: hol,a_hol
     LOGICAL,DIMENSION(ims:ime,jms:jme), INTENT(INOUT)      :: cu_act_flag
@@ -180,6 +178,7 @@ BENCH_START(adj_hor_diff_tim)
                 grid%rdx, grid%rdy, grid%rdz,grid%a_rdz, grid%rdzw,grid%a_rdzw,                &
                 grid%fnm, grid%fnp, grid%cf1, grid%cf2, grid%cf3,          &
                 grid%zx,grid%a_zx, grid%zy,grid%a_zy, grid%dn, grid%dnw,                       &
+                grid%rho, grid%a_rho,                  &
                 ids, ide, jds, jde, kds, kde,          &
                 ims, ime, jms, jme, kms, kme,          &
                 grid%i_start(ij), grid%i_end(ij),      &

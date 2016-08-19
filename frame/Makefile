@@ -32,7 +32,8 @@ MODULES =       module_driver_constants.o  \
                 module_io_quilt.o          \
 		module_intermediate_nmm.o  \
 		module_cpl.o               \
-		module_cpl_oasis3.o
+		module_cpl_oasis3.o        \
+		module_clear_halos.o
 
 ALOBJS =\
                 module_alloc_space_0.o       \
@@ -176,11 +177,11 @@ adStack.o : adStack.c
 adBuffer.o : adBuffer.F
 	$(RM) $@
 	$(SED_FTN) $*.F > $*.b
-	$(CPP) $(CPPFLAGS) -I../inc $*.b  > $*.f
+	$(CPP) $(CPPFLAGS) -I../inc $*.b  > $*.for
 	$(RM) $*.b
 	$(RM) $@
-	$(SFC) -c $(FORMAT_FIXED) $(PROMOTION) $(FCNOOPT) $*.f
-	$(RM) adBuffer.f
+	$(SFC) -c $(FORMAT_FIXED) $(PROMOTION) $(FCNOOPT) $*.for
+	$(RM) adBuffer.for
 
 pack_utils.o :
 	$(CC) -c $(CFLAGS) -DIWORDSIZE=$(IWORDSIZE) pack_utils.c
@@ -194,6 +195,8 @@ clean:
 
 module_state_description.F : ../Registry/$(REGISTRY)
 		  ( cd .. ; tools/registry $(ARCHFLAGS) $(ENVCOMPDEFS) -DNEW_BDYS Registry/$(REGISTRY) ) ; 
+
+module_io_quilt.o : module_io_quilt.F module_io_quilt_new.F module_io_quilt_old.F
 
 md_calls.inc : md_calls.m4
 	if [ "$(M4)" = NA ] ; then \

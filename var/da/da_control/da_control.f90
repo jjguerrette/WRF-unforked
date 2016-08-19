@@ -188,6 +188,7 @@ module da_control
    integer, parameter :: Forward_FFT     = -1 ! Grid to spectral
    integer, parameter :: Inverse_FFT     =  1 ! Spectral to grid.
    integer, parameter :: num_fft_factors = 10 ! Max number of factors.
+   integer, parameter :: nrange          =1000! Range to search for efficient FFT.
  
    ! Balance:
    integer, parameter :: balance_geo = 1      ! Geostrophic balance.
@@ -216,6 +217,8 @@ module da_control
    real, parameter    :: typical_qrn_rms = 0.00001 ! g/kg
    real, parameter    :: typical_qcw_rms = 0.00001 ! g/kg
    real, parameter    :: typical_qci_rms = 0.00001 ! g/kg
+   real, parameter    :: typical_qsn_rms = 0.00001 ! g/kg
+   real, parameter    :: typical_qgr_rms = 0.00001 ! g/kg
    real, parameter    :: typical_w_rms = 0.1     ! m/s
    real, parameter    :: typical_rv_rms = 1.0    ! m/s
    real, parameter    :: typical_rf_rms = 1.0    ! dBZ
@@ -286,7 +289,8 @@ module da_control
    ! [3.0] Variables used in MM5 part of code:
    !---------------------------------------------------------------------------
 
-   integer            :: map_projection       ! 1=LamConf/2=PolarSte/3=Mercator
+   integer            :: map_projection       !1=LamConf/2=PolarSte/3=Mercator
+                                              !0=CylEqui/6=Cassini
    real               :: ycntr
    integer            :: coarse_ix            ! coarse domain dim in i direction.
    integer            :: coarse_jy            ! coarse domain dim in y direction.
@@ -519,7 +523,7 @@ module da_control
       "mtgirs        ", &
       "tamdar        ", &
       "tamdar_sfc    ", &
-      "rain          " &  
+      "rain          " &
    /)
 
    integer, parameter :: max_no_fm = 290

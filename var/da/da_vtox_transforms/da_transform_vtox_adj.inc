@@ -15,9 +15,10 @@ subroutine da_transform_vtox_adj(grid, cv_size, xbx, be, ep, vp, vv, cv)
    type(vp_type),  intent(out)   :: vv   ! grdipt/eof cv (local).
    real,           intent(inout) :: cv(1:cv_size) ! control variables.
 
-   if (trace_use) call da_trace_entry("da_transform_vtox_adj")
 
    if (.not. use_background_errors) return
+
+   if (trace_use) call da_trace_entry("da_transform_vtox_adj")
 
    if (  cv_options == 3 ) then
 
@@ -54,6 +55,8 @@ subroutine da_transform_vtox_adj(grid, cv_size, xbx, be, ep, vp, vv, cv)
       vv % v7(its:ite,jts:jte,kts:kte) = vp % v7(its:ite,jts:jte,kts:kte)
       vv % v8(its:ite,jts:jte,kts:kte) = vp % v8(its:ite,jts:jte,kts:kte)
       vv % v9(its:ite,jts:jte,kts:kte) = vp % v9(its:ite,jts:jte,kts:kte)
+      vv % v10(its:ite,jts:jte,kts:kte) = vp % v10(its:ite,jts:jte,kts:kte)
+      vv % v11(its:ite,jts:jte,kts:kte) = vp % v11(its:ite,jts:jte,kts:kte)
 #endif
    !  Uv for alpha is an identity transform:
       if (be % ne > 0) then

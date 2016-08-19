@@ -80,7 +80,7 @@ MODULE module_input_chem_data
     REAL                                         :: so4vaptoaer
     DATA so4vaptoaer/.999/
 
-    CHARACTER (LEN=4), DIMENSION(logg) :: ggnam
+    CHARACTER (LEN=20), DIMENSION(logg) :: ggnam !BSINGH(12/04/13): changed length(LEN) from 4 to 20
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
@@ -318,20 +318,22 @@ CONTAINS
 SUBROUTINE setup_gasprofile_maps(chem_opt, numgas)
   integer, intent(in) :: chem_opt, numgas
 
+!!! TUCCELLA
   select case(chem_opt)
   case (RADM2, RADM2_KPP, RADM2SORG, RADM2SORG_AQ, RADM2SORG_AQCHEM, RADM2SORG_KPP, &
         RACM_KPP, RACMPM_KPP, RACM_MIM_KPP, RACMSORG_AQ, RACMSORG_AQCHEM_KPP,       &
         RACM_ESRLSORG_AQCHEM_KPP, RACM_ESRLSORG_KPP, RACMSORG_KPP, RACM_SOA_VBS_KPP,&
-        GOCARTRACM_KPP, GOCARTRADM2,GOCARTRADM2_KPP,CHEM_TRACER, CHEM_TRACE2)
+        RACM_SOA_VBS_AQCHEM_KPP,GOCARTRACM_KPP, GOCARTRADM2, CHEM_TRACER, CHEM_TRACE2)
      call setup_gasprofile_map_radm_racm
 
-  case (SAPRC99_KPP,SAPRC99_MOSAIC_4BIN_VBS2_KPP)
+  case (SAPRC99_KPP,SAPRC99_MOSAIC_4BIN_VBS2_KPP,      &
+     SAPRC99_MOSAIC_8BIN_VBS2_AQ_KPP, SAPRC99_MOSAIC_8BIN_VBS2_KPP)!BSINGH(12/04/2013): Added SAPRC 8 bin and non-aq on 04/03/2014)
      call setup_gasprofile_map_saprcnov
 
 
 
   case (CBMZ, CBMZ_BB, CBMZ_BB_KPP, &
-        CBMZ_MOSAIC_KPP, CBMZ_MOSAIC_4BIN, CBMZ_MOSAIC_4BIN_VBS2_KPP,  &
+        CBMZ_MOSAIC_KPP, CBMZ_MOSAIC_4BIN,  &
         CBMZ_MOSAIC_8BIN, CBMZ_MOSAIC_4BIN_AQ, CBMZ_MOSAIC_8BIN_AQ,CBMZSORG, &
         CBMZSORG_AQ, CBMZ_MOSAIC_DMS_4BIN, CBMZ_MOSAIC_DMS_8BIN, &
         CBMZ_MOSAIC_DMS_4BIN_AQ, CBMZ_MOSAIC_DMS_8BIN_AQ, &
@@ -347,7 +349,8 @@ SUBROUTINE setup_gasprofile_maps(chem_opt, numgas)
 
   case (CBM4_KPP)
      call setup_gasprofile_map_cbm4(numgas)
-
+  case (CB05_SORG_AQ_KPP, CB05_SORG_VBS_AQ_KPP)
+     call wrf_debug("setup_profile_maps: nothing done for cb05")
   case (GOCART_SIMPLE)
      call wrf_debug("setup_profile_maps: nothing done for gocart simple")
 #if ( WRFPLUS == 1 )
@@ -371,8 +374,11 @@ SUBROUTINE setup_gasprofile_maps(chem_opt, numgas)
   case (MOZCART_KPP)
      call wrf_debug("setup_profile_maps: nothing done for mozcart_kpp")
 
-  case (MOZART_MOSAIC_4BIN_VBS0_KPP)
-     call wrf_debug("setup_profile_maps: nothing done for mozart_mosaic_4bin_vbs0__kpp")
+  case (MOZART_MOSAIC_4BIN_KPP)
+     call wrf_debug("setup_profile_maps: nothing done for mozart_mosaic_4bin_kpp")
+
+  case (MOZART_MOSAIC_4BIN_AQ_KPP)
+     call wrf_debug("setup_profile_maps: nothing done for mozart_mosaic_4bin_aq_kpp")
 
  case (CO2_TRACER,GHG_TRACER)
      call wrf_debug("setup_profile_maps: nothing done for the GHG options")
@@ -853,7 +859,7 @@ SUBROUTINE input_chem_profile (si_grid)
 !
       SELECT CASE(chem_opt)
       CASE (CBMZ,CBMZ_BB,CBMZ_BB_KPP, CBMZ_MOSAIC_KPP, &
-            CBMZ_MOSAIC_4BIN,CBMZ_MOSAIC_8BIN,CBMZ_MOSAIC_4BIN_VBS2_KPP, &
+            CBMZ_MOSAIC_4BIN,CBMZ_MOSAIC_8BIN, &
             CBMZ_MOSAIC_4BIN_AQ,CBMZ_MOSAIC_8BIN_AQ, &
             CBMZSORG,CBMZSORG_AQ, CBMZ_MOSAIC_DMS_4BIN, CBMZ_MOSAIC_DMS_8BIN, & 
             CBMZ_MOSAIC_DMS_4BIN_AQ, CBMZ_MOSAIC_DMS_8BIN_AQ, &
@@ -894,6 +900,41 @@ SUBROUTINE input_chem_profile (si_grid)
          end do
          end do
          end do
+
+      CASE (CB05_SORG_AQ_KPP)
+         do j = ny1,ny2
+         do k = nz1,nz2
+         do i = nx1,nx2
+            !Construct the sum of the profiles for hc3, hc5, & hc8
+            hc358 = ( 2.9*fracref(numgas+1)*stor(i,k,j,iref(numgas+1)) &
+                     +4.8*fracref(numgas+2)*stor(i,k,j,iref(numgas+2)) &
+                     +7.9*fracref(numgas+3)*stor(i,k,j,iref(numgas+3)) &
+                    )*1.E6
+            chem(i,k,j,p_par) =                                    &
+                 0.4*chem(i,k,j,p_ald2)  + hc358                     &
+                 +0.4*chem(i,k,j,p_aldx)  + 2.8*chem(i,k,j,p_ole)    &
+                 + 1.8*chem(i,k,j,p_iole) + 1.0*chem(i,k,j,p_aacd)
+         end do
+         end do
+         end do
+
+      CASE (CB05_SORG_VBS_AQ_KPP)
+         do j = ny1,ny2
+         do k = nz1,nz2
+         do i = nx1,nx2
+            !Construct the sum of the profiles for hc3, hc5, & hc8
+            hc358 = ( 2.9*fracref(numgas+1)*stor(i,k,j,iref(numgas+1)) &
+                     +4.8*fracref(numgas+2)*stor(i,k,j,iref(numgas+2)) &
+                     +7.9*fracref(numgas+3)*stor(i,k,j,iref(numgas+3)) &
+                    )*1.E6
+            chem(i,k,j,p_par) =                                    &
+                 0.4*chem(i,k,j,p_ald2)  + hc358                     &
+                 +0.4*chem(i,k,j,p_aldx)  + 2.8*chem(i,k,j,p_ole)    &
+                 + 1.8*chem(i,k,j,p_iole) + 1.0*chem(i,k,j,p_aacd)
+         end do
+         end do
+         end do
+
       END SELECT
 
       RETURN
@@ -939,8 +980,13 @@ SUBROUTINE input_chem_profile (si_grid)
 !
 ! method for bc calculation is determined by aer_bc_opt
 !
-       if (config_flags%aer_bc_opt == AER_BC_PNNL) then
+       if (config_flags%aer_bc_opt == AER_BC_PNNL .and. &
+           config_flags%chem_opt .ne. CB05_SORG_VBS_AQ_KPP) then
            call sorgam_set_aer_bc_pnnl( chem, z, nch, config_flags )
+           return
+       else if (config_flags%aer_bc_opt == AER_BC_PNNL .and. &
+            config_flags%chem_opt == CB05_SORG_VBS_AQ_KPP) then
+           call sorgam_vbs_set_aer_bc_pnnl( chem, z, nch, config_flags )
            return
        else if (config_flags%aer_bc_opt == AER_BC_DEFAULT) then
            continue
@@ -1441,7 +1487,7 @@ END SUBROUTINE bdy_chem_value_ghg
       i_bdy_method = 0
       if ((ic .ge. p_so2) .and. (ic .le. p_ho2)) then
           i_bdy_method = 1
-
+!!! TUCCELLA
         if (config_flags%chem_opt == RACM_KPP .or.          &
             config_flags%chem_opt == GOCARTRACM_KPP .or.      &
             config_flags%chem_opt == RACMSORG_KPP .or.      &
@@ -1449,7 +1495,8 @@ END SUBROUTINE bdy_chem_value_ghg
             config_flags%chem_opt == RACM_SOA_VBS_KPP .or.      & 
             config_flags%chem_opt == RACM_MIM_KPP .or.      & 
             config_flags%chem_opt == RACMSORG_AQCHEM_KPP .or.      & 
-            config_flags%chem_opt == RACM_ESRLSORG_AQCHEM_KPP ) then
+            config_flags%chem_opt == RACM_ESRLSORG_AQCHEM_KPP .or. &
+            config_flags%chem_opt == RACM_SOA_VBS_AQCHEM_KPP  ) then
           i_bdy_method = 9
         end if
         if (config_flags%chem_opt == RACMPM_KPP ) then
@@ -1489,6 +1536,14 @@ END SUBROUTINE bdy_chem_value_ghg
       else if (config_flags%chem_opt == GOCART_BCCO) then
           i_bdy_method = 7
 #endif
+      else if (config_flags%chem_opt == CB05_SORG_AQ_KPP) then
+          if (ic .le. numgas) then
+          i_bdy_method = 15
+          end if
+      else if (config_flags%chem_opt == CB05_SORG_VBS_AQ_KPP) then
+          if (ic .le. numgas) then
+          i_bdy_method = 17
+          end if
       else if (config_flags%chem_opt == DUST) then
           i_bdy_method = 7
       else if (config_flags%chem_opt == CHEM_VASH) then
@@ -1572,6 +1627,12 @@ END SUBROUTINE bdy_chem_value_ghg
                    CALL bdy_chem_value_gcm ( chem(i,k,j),chem_bys(i,k,1),chem_btys(i,k,1),dt,ic)
                 else if (i_bdy_method .eq. 16) then
                    CALL bdy_chem_value_ghg ( chem(i,k,j), ic ) 
+                else if (i_bdy_method .eq. 15) then
+                   CALL bdy_chem_value_cb05 (   &
+                        1, chem(i,k,j), k, ic, config_flags, numgas )
+                else if (i_bdy_method .eq. 17) then
+                   CALL bdy_chem_value_cb05_vbs (   &
+                        1, chem(i,k,j), k, ic, config_flags, numgas )
                 else if (i_bdy_method .eq. 501) then
                    tempfac=(t(i,k,j)+t0)*((p(i,k,j) + pb(i,k,j))/p1000mb)**rcp
                    convfac=(p(i,k,j)+pb(i,k,j))/rgasuniv/tempfac
@@ -1624,6 +1685,12 @@ END SUBROUTINE bdy_chem_value_ghg
                    chem(i,k,j) = 0.
                 else if (i_bdy_method .eq. 16) then
                    CALL bdy_chem_value_ghg ( chem(i,k,j), ic )  ! For GHGs
+                else if (i_bdy_method .eq. 15) then
+                   CALL bdy_chem_value_cb05 (   &
+                        2, chem(i,k,j), k, ic, config_flags, numgas )
+                else if (i_bdy_method .eq. 17) then
+                   CALL bdy_chem_value_cb05_vbs (   &
+                        2, chem(i,k,j), k, ic, config_flags, numgas )
                 else if (i_bdy_method .eq. 501) then
                    tempfac=(t(i,k,j)+t0)*((p(i,k,j) + pb(i,k,j))/p1000mb)**rcp
                    convfac=(p(i,k,j)+pb(i,k,j))/rgasuniv/tempfac
@@ -1677,6 +1744,12 @@ END SUBROUTINE bdy_chem_value_ghg
                    chem(i,k,j) = 0.
                 else if (i_bdy_method .eq. 16) then
                    CALL bdy_chem_value_ghg ( chem(i,k,j), ic )  ! For GHGs
+                else if (i_bdy_method .eq. 15) then
+                   CALL bdy_chem_value_cb05 (   &
+                        3, chem(i,k,j), k, ic, config_flags, numgas )
+                else if (i_bdy_method .eq. 17) then
+                   CALL bdy_chem_value_cb05_vbs (   &
+                        3, chem(i,k,j), k, ic, config_flags, numgas )
                 else if (i_bdy_method .eq. 501) then
                    tempfac=(t(i,k,j)+t0)*((p(i,k,j) + pb(i,k,j))/p1000mb)**rcp
                    convfac=(p(i,k,j)+pb(i,k,j))/rgasuniv/tempfac
@@ -1730,6 +1803,12 @@ END SUBROUTINE bdy_chem_value_ghg
                    chem(i,k,j) = 0.
                 else if (i_bdy_method .eq. 16) then
                    CALL bdy_chem_value_ghg ( chem(i,k,j), ic ) ! For GHGs
+                else if (i_bdy_method .eq. 15) then
+                   CALL bdy_chem_value_cb05 (   &
+                        4, chem(i,k,j), k, ic, config_flags, numgas )
+                else if (i_bdy_method .eq. 17) then
+                   CALL bdy_chem_value_cb05_vbs (   &
+                        4, chem(i,k,j), k, ic, config_flags, numgas )
                 else if (i_bdy_method .eq. 501) then
                    tempfac=(t(i,k,j)+t0)*((p(i,k,j) + pb(i,k,j))/p1000mb)**rcp
                    convfac=(p(i,k,j)+pb(i,k,j))/rgasuniv/tempfac
@@ -2118,13 +2197,15 @@ END SUBROUTINE bdy_chem_value_ghg
      case (0)
         get_last_gas = 0
 
+!!! TUCCELLA
      case (RADM2, RADM2_KPP, RADM2SORG, RADM2SORG_AQ, RADM2SORG_AQCHEM, RADM2SORG_KPP, &
            RACM_KPP, RACMPM_KPP, RACM_MIM_KPP, RACMSORG_AQ, RACMSORG_AQCHEM_KPP,       &
            RACM_ESRLSORG_AQCHEM_KPP, RACM_ESRLSORG_KPP, RACMSORG_KPP, RACM_SOA_VBS_KPP,& 
-           GOCARTRACM_KPP,GOCARTRADM2,GOCARTRADM2_KPP)
+           RACM_SOA_VBS_AQCHEM_KPP,GOCARTRACM_KPP,GOCARTRADM2)
         get_last_gas = p_ho2
 
-     case (CBMZ_MOSAIC_4BIN_VBS2_KPP, SAPRC99_KPP,SAPRC99_MOSAIC_4BIN_VBS2_KPP)
+     case (SAPRC99_KPP,SAPRC99_MOSAIC_4BIN_VBS2_KPP, &
+          SAPRC99_MOSAIC_8BIN_VBS2_AQ_KPP,SAPRC99_MOSAIC_8BIN_VBS2_KPP )!BSINGH(12/13/2013): Added SAPRC 8 bin AQ case and non-aq on 04/03/2014
         get_last_gas = p_ch4
 
 
@@ -2149,6 +2230,10 @@ END SUBROUTINE bdy_chem_value_ghg
 #endif
      case (CBM4_KPP)
         get_last_gas = p_ho2
+
+     case (CB05_SORG_AQ_KPP, CB05_SORG_VBS_AQ_KPP)
+        get_last_gas = p_nh3
+
      case (CHEM_VASH)
         get_last_gas = 0
      case (CHEM_VOLC)
@@ -2166,7 +2251,10 @@ END SUBROUTINE bdy_chem_value_ghg
      case (MOZCART_KPP)
         get_last_gas = p_meko2
 
-     case (MOZART_MOSAIC_4BIN_VBS0_KPP)
+     case (MOZART_MOSAIC_4BIN_KPP)
+        get_last_gas = p_meko2
+
+     case (MOZART_MOSAIC_4BIN_AQ_KPP)
         get_last_gas = p_meko2
 
      case (CO2_TRACER,GHG_TRACER) ! No gas chemistry or deposition for GHGs
@@ -2310,6 +2398,36 @@ END SUBROUTINE bdy_chem_value_ghg
       bv_seas   = mult*1.75
       bv_soila  = conmin
 
+#if (CASENAME == 4)
+        if( z <= 2000. ) then
+           mult = 1.0
+        elseif( z > 2000. &
+             .and. z <= 3000. ) then
+           mult = 1.0 - 0.00075*(z-2000.)
+        elseif( z > 3000. &
+             .and. z <= 5000. ) then
+           mult = 0.25 - 4.166666667e-5*(z-3000.)
+        else
+           mult = 0.125
+        end if
+      bv_so4aj = mult*(0.0004810001+0.7271175)*0.97
+      bv_so4ai = mult*(0.0004810001+0.7271175)*0.03
+      bv_nh4aj = mult*0.2133708*0.97
+      bv_nh4ai = mult*0.2133708*0.03
+      bv_no3aj = mult*0.01399485*0.97
+      bv_no3ai = mult*0.01399485*0.03
+      bv_ecj = mult*0.04612048*0.97
+      bv_eci = mult*0.04612048*0.03
+      bv_p25j = mult*1.890001e-05*0.97
+      bv_p25i = mult*1.890001e-05*0.03
+      bv_antha = conmin
+      bv_orgpaj = mult*0.5844942*0.97
+      bv_orgpai = mult*0.5844942*0.03
+      bv_seas = conmin
+      bv_soila = conmin
+
+#endif
+
 ! m3... calculations should match the very end of module_aerosols_sorgam.F
 !... i-mode (note that the 8 SOA species have bv=conmin)
       m3nuc = so4fac*bv_so4ai + nh4fac*bv_nh4ai + &
@@ -2371,6 +2489,148 @@ END SUBROUTINE bdy_chem_value_ghg
       if( nch == p_corn    ) chem = m3cor/((dginic**3)*esc36)
 
     END SUBROUTINE sorgam_set_aer_bc_pnnl
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    SUBROUTINE sorgam_vbs_set_aer_bc_pnnl( chem, z, nch, config_flags )
+      USE module_data_sorgam_vbs, ONLY : dginia, dginin, dginic, esn36, esc36, esa36, seasfac, no3fac, nh4fac, so4fac, soilfac, anthfac, orgfac
+
+      implicit none
+
+      INTEGER,INTENT(IN   ) :: nch
+      real,intent(in      ) :: z
+      REAL,INTENT(INOUT   ) :: chem
+      TYPE (grid_config_rec_type) , INTENT (in) :: config_flags
+
+      REAL :: mult,                       &
+              m3acc, m3cor, m3nuc,        &
+              bv_so4ai, bv_so4aj,         &
+              bv_nh4ai, bv_nh4aj,         &
+              bv_no3ai, bv_no3aj,         &
+              bv_eci,   bv_ecj,           &
+              bv_p25i,  bv_p25j,          &
+              bv_orgpai,bv_orgpaj,        &
+              bv_antha, bv_seas, bv_soila
+
+        if( z <= 500. ) then
+           mult = 1.0
+        elseif( z > 500. &
+             .and. z <= 1000. ) then
+           mult = 1.0 - 0.001074*(z-500.)
+        elseif( z > 1000. &
+             .and. z <= 5000. ) then
+           mult = 0.463 - 0.000111*(z-1000.)
+        else
+           mult = 0.019
+        end if
+
+      bv_so4aj = mult*0.300*0.97
+      bv_so4ai = mult*0.300*0.03
+      bv_nh4aj = mult*0.094*0.97
+      bv_nh4ai = mult*0.094*0.03
+      bv_no3aj = mult*0.001*0.97
+      bv_no3ai = mult*0.001*0.03
+      bv_ecj   = mult*0.013*0.97
+      bv_eci   = mult*0.013*0.03
+      bv_p25j  = mult*4.500*0.97
+      bv_p25i  = mult*4.500*0.03
+      bv_antha = mult*4.500/2.0
+      bv_orgpaj = mult*0.088*0.97
+      bv_orgpai = mult*0.088*0.03
+      bv_seas   = mult*1.75
+      bv_soila  = conmin
+
+#if (CASENAME == 4)
+        if( z <= 2000. ) then
+           mult = 1.0
+        elseif( z > 2000. &
+             .and. z <= 3000. ) then
+           mult = 1.0 - 0.00075*(z-2000.)
+        elseif( z > 3000. &
+             .and. z <= 5000. ) then
+           mult = 0.25 - 4.166666667e-5*(z-3000.)
+        else
+           mult = 0.125
+        end if
+      bv_so4aj = mult*(0.0004810001+0.7271175)*0.97
+      bv_so4ai = mult*(0.0004810001+0.7271175)*0.03
+      bv_nh4aj = mult*0.2133708*0.97
+      bv_nh4ai = mult*0.2133708*0.03
+      bv_no3aj = mult*0.01399485*0.97
+      bv_no3ai = mult*0.01399485*0.03
+      bv_ecj = mult*0.04612048*0.97
+      bv_eci = mult*0.04612048*0.03
+      bv_p25j = mult*1.890001e-05*0.97
+      bv_p25i = mult*1.890001e-05*0.03
+      bv_antha = conmin
+      bv_orgpaj = mult*0.5844942*0.97
+      bv_orgpai = mult*0.5844942*0.03
+      bv_seas = conmin
+      bv_soila = conmin
+
+#endif
+
+! m3... calculations should match the very end of module_aerosols_sorgam.F
+!... i-mode (note that the 8 SOA species have bv=conmin)
+      m3nuc = so4fac*bv_so4ai + nh4fac*bv_nh4ai + &
+        no3fac*bv_no3ai + &
+        orgfac*8.0*conmin + orgfac*bv_orgpai + &
+        anthfac*bv_p25i + anthfac*bv_eci
+
+!... j-mode (note that the 8 SOA species have bv=conmin)
+      m3acc = so4fac*bv_so4aj + nh4fac*bv_nh4aj + &
+        no3fac*bv_no3aj + &
+        orgfac*8.0*conmin + orgfac*bv_orgpaj + &
+        anthfac*bv_p25j + anthfac*bv_ecj
+
+!...c-mode
+      m3cor = soilfac*bv_soila + seasfac*bv_seas + &
+        anthfac*bv_antha
+
+! Cannot set_sulf here because it is a "radm2" species whose bc value
+! is set via bdy_chem_value. Instead, xl(iref(p_sulf-1),:) is set to
+! the value conmin in subroutine gasprofile_init_pnnl
+!      if( nch == p_sulf    ) chem = conmin !as per rce's 0 recommendation
+
+      if( nch == p_so4aj   ) chem = bv_so4aj
+      if( nch == p_so4ai   ) chem = bv_so4ai
+      if( nch == p_nh4aj   ) chem = bv_nh4aj
+      if( nch == p_nh4ai   ) chem = bv_nh4ai
+      if( nch == p_no3aj   ) chem = bv_no3aj
+      if( nch == p_no3ai   ) chem = bv_no3ai
+      if( nch == p_ecj     ) chem = bv_ecj
+      if( nch == p_eci     ) chem = bv_eci
+      if( nch == p_p25j    ) chem = bv_p25j
+      if( nch == p_p25i    ) chem = bv_p25i
+      if( nch == p_orgpaj  ) chem = bv_orgpaj
+      if( nch == p_orgpai  ) chem = bv_orgpai
+
+          if( nch == p_asoa1j) chem = conmin
+          if( nch == p_asoa1i) chem = conmin
+          if( nch == p_asoa2j) chem = conmin
+          if( nch == p_asoa2i) chem = conmin
+          if( nch == p_asoa3j) chem = conmin
+          if( nch == p_asoa3i) chem = conmin
+          if( nch == p_asoa4j) chem = conmin
+          if( nch == p_asoa4i) chem = conmin
+          if( nch == p_bsoa1j ) chem = conmin
+          if( nch == p_bsoa1i ) chem = conmin
+          if( nch == p_bsoa2j ) chem = conmin
+          if( nch == p_bsoa2i ) chem = conmin
+          if( nch == p_bsoa3j ) chem = conmin
+          if( nch == p_bsoa3i ) chem = conmin
+          if( nch == p_bsoa4j ) chem = conmin
+          if( nch == p_bsoa4i ) chem = conmin
+
+      if( nch == p_antha   ) chem = bv_antha
+      if( nch == p_soila   ) chem = bv_soila
+      if( nch == p_seas    ) chem = bv_seas
+
+      if( nch == p_nu0     ) chem = m3nuc/((dginin**3)*esn36)
+      if( nch == p_ac0     ) chem = m3acc/((dginia**3)*esa36)
+      if( nch == p_corn    ) chem = m3cor/((dginic**3)*esc36)
+
+    END SUBROUTINE sorgam_vbs_set_aer_bc_pnnl
+
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 !****************************************************************

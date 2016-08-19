@@ -31,6 +31,7 @@ MODULE module_decoded
 !--------------------------------------------------------------------------
 
    USE module_type
+   use module_stntbl
 
 !------------------------------------------------------------------------
 !                            FUNCTION
@@ -99,7 +100,7 @@ CONTAINS
 ! SUBROUTINE diagnostics ( new , longitude )
 ! SUBROUTINE insert_at ( surface , new , elevation )
 
-!
+!
 !-------------------------------------------------------------------------
 
 
@@ -147,9 +148,11 @@ time_window_min, time_window_max, map_projection , missing_flag)
    CHARACTER ( LEN =  80)               :: filename
    CHARACTER ( LEN = 160)               :: error_message
    CHARACTER ( LEN =  14)               :: newstring
-   INTEGER                              :: nlevels, num_unknown, m_miss, n101301 
+   INTEGER                              :: nlevels, num_unknown, m_miss
    TYPE ( measurement ) , POINTER       :: current
    real :: qnh, elev
+   real :: xla, xlo
+   integer :: ipos
 !-----------------------------------------------------------------------------!
   INCLUDE 'platform_interface.inc'
 !-----------------------------------------------------------------------------!
@@ -176,7 +179,6 @@ time_window_min, time_window_max, map_projection , missing_flag)
    num_empty = 0
    num_outside = 0
    m_miss = 0
-   n101301 = 0
 
    !  Open file for writing diagnostics
    IF (print_gts_read) THEN
@@ -240,6 +242,10 @@ time_window_min, time_window_max, map_projection , missing_flag)
             EXIT read_obs
 
       END IF
+
+      ! initialize the vaiable that will be used later for checking
+      ! if the pw info is read or not
+      obs(obs_num)%ground%pw%data = missing_r
 
       !  The first read is the "once only" type of information.
 
@@ -326,6 +332,7 @@ time_window_min, time_window_max, map_projection , missing_flag)
          if ( obs(obs_num)%info%platform(1:10) == 'FM-13 SHIP' ) then
             if ( index(obs(obs_num)%location%name, 'Platform Id >>>') > 0 ) then
                obs(obs_num)%info%platform(1:10) = 'FM-18 BUOY'
+               obs(obs_num)%location%id = obs(obs_num)%location%name(17:21)
             end if
          end if
       end if
@@ -335,7 +342,7 @@ time_window_min, time_window_max, map_projection , missing_flag)
 ! To ignore the data type without WMO code:
 
          if (IO_error > 0 ) then  ! error reading header info
-           write(0,'("IO_ERROR=",i2,1x,i5,1x,a,2(f9.3,a),1x,a,1x,f11.3)') &
+           write(0,'("IO_ERROR=",i2,1x,i7,1x,a,2(f9.3,a),1x,a,1x,f11.3)') &
                              io_error, obs_num, obs(obs_num)%info % platform, &
                                           obs(obs_num)%location%latitude, 'N',&
                                           obs(obs_num)%location%longitude,'E ', &
@@ -384,13 +391,13 @@ time_window_min, time_window_max, map_projection , missing_flag)
       IF (IPROJ > 0) THEN
          if (truelat1 > 0.0) then
             if (obs(obs_num)%location%latitude == -90.0) then
-              write(0,'(/i6,2x,"modified the original lat =",f8.2," to -89.5"/)') &
+              write(0,'(/i7,1x,"modified the original lat =",f8.2," to -89.5"/)') &
                      obs_num, obs(obs_num)%location%latitude  
                      obs(obs_num)%location%latitude = -89.5
             endif
          else if (truelat1 < 0.0) then
             if (obs(obs_num)%location%latitude == 90.0) then
-              write(0,'(/i6,2x,"modified the original lat =",f8.2," to  89.5"/)') &
+              write(0,'(/i7,1x,"modified the original lat =",f8.2," to  89.5"/)') &
                      obs_num, obs(obs_num)%location%latitude  
                      obs(obs_num)%location%latitude =  89.5
                  endif
@@ -405,11 +412,6 @@ time_window_min, time_window_max, map_projection , missing_flag)
           obs(obs_num)%ground%pw%error = missing_r
       ELSE
          !------------------------------------------------------------ 
-         ! modified by Claudia based on Guo's code (07/24/2003)
-         !
-         ! To be read in by 3dvar_preproc code, their
-         ! little_r format has to be: 
-         !  GPSZTD is in  m and its QC-error in 1.0 mm
          !  GPSPW  is in cm and its QC-error in 0.1 mm
          !
          ! Note: the variable: pw used for either GPSPW or GPSZTD.
@@ -963,7 +965,7 @@ time_window_min, time_window_max, map_projection , missing_flag)
                 end if
              else if (fm < 39) then
                 m_miss = m_miss + 1
-                write(0,'(I5,1X,A,1X,A,1X,A,1X,A,1X,2(F8.3,A),A,1X,f11.3)')&
+                write(0,'(I7,1X,A,1X,A,1X,A,1X,A,1X,2(F8.3,A),A,1X,f11.3)')&
                    m_miss,'Missing elevation(id,name,platform,lat,lon,date,elv:',  &
                    obs(obs_num)%location%id   (1: 5),&
                    obs(obs_num)%location%name (1:20),&
@@ -973,7 +975,51 @@ time_window_min, time_window_max, map_projection , missing_flag)
                    obs(obs_num)%valid_time%date_char,    &
                    obs(obs_num)%info % elevation
              endif
-          END IF
+
+             ! assigning elevation info for ships and buoys located in the Great
+             ! Lakes.
+             !http://www.nco.ncep.noaa.gov/pmb/codes/nwprod/decoders/decod_dcmsfc/sorc/maelev.f
+             xla = obs(obs_num)%location%latitude
+             xlo = obs(obs_num)%location%longitude
+             if ( fm .eq. 13 .or. fm .eq. 33 .or. fm .eq. 36 ) then
+                ! for ships
+                if ( ( xlo .ge. -92.5  .and. xlo .le. -84.52 )  .and.    &
+                     ( xla .ge.  46.48 .and. xla .le.  49.0 ) ) then
+                   !Ship located in Lake Superior
+                   obs(obs_num)%info % elevation = 183.
+                else if ( ( xlo .ge. -88.1 .and. xlo .le. -84.8 ) .and.  &
+                          ( xla .ge. 41.2  .and. xla .le.  46.2 ) ) then
+                   !Ship located in Lake Michigan
+                   obs(obs_num)%info % elevation = 176.
+                else if ( ( xlo .ge. -84.8 .and. xlo .le. -79.79 ) .and. &
+                          ( xla .ge. 43.0  .and. xla .le.  46.48 ) ) then
+                   !Ship located in Lake Huron or Georgian Bay
+                   obs(obs_num)%info % elevation = 176.
+                else if ( ( xlo .ge. -84.0 .and. xlo .le. -78.0 ) .and.  &
+                          ( xla .ge. 41.0  .and. xla .le.  42.9 ) ) then
+                   !Ship located in Lake Erie
+                   obs(obs_num)%info % elevation = 174.
+                else if ( ( xlo .ge. -80.0 .and. xlo .le. -76.0 ) .and.  &
+                       ( xla .ge. 43.1  .and. xla .le.  44.23 ) ) then
+                   !Ship located in Lake Ontario
+                   obs(obs_num)%info % elevation = 74.
+                end if
+             end if !end if ships
+             if ( fm .eq. 18 .and. obs(obs_num)%location%id(1:2) .eq. '45' ) then
+                ! for Great Lakes fixed buoys
+                ! get station elevation from station table if available
+                if ( use_msfc_tbl .and. num_stations_msfc > 0 ) then
+                   ipos = 0
+                   do while ( ipos < num_stations_msfc )
+                      ipos = ipos + 1
+                      if ( obs(obs_num)%location%id(1:5) == id_tbl(ipos) ) then
+                         obs(obs_num)%info % elevation = elev_tbl(ipos)
+                         exit
+                      end if
+                   end do
+                end if !table info available
+             end if ! end if buoys
+          END IF ! missing elevation
 
          END IF  ! not outside
 
@@ -985,29 +1031,28 @@ time_window_min, time_window_max, map_projection , missing_flag)
          ! in tenths of degree in the remarks section (RMK). These are
          ! decoded. JFB
 
-         IF ((obs (obs_num)%info%platform(1:12) .EQ. 'FM-15 METAR ' ) .AND. &
+         IF ((obs (obs_num)%info%platform(1:12) .EQ. 'FM-15 METAR ' .or. &
+              obs (obs_num)%info%platform(1:12) .EQ. 'FM-16 SPECI ') .AND. &
              (ASSOCIATED (obs (obs_num)%surface ) ) ) THEN
-            if ( calc_psfc_from_QNH ) then
-               if ( gts_from_mmm_archive ) then
-                  if ( obs(obs_num)%ground%psfc%data > 0.0 .and. &
-                       obs(obs_num)%info%elevation > 0.0 ) then
-                     QNH  = obs(obs_num)%ground%psfc%data * 0.01 ! Pa to hPa
-                     elev = obs(obs_num)%info%elevation
-                     obs(obs_num)%ground%psfc%data = psfc_from_QNH(QNH,elev) &
-                                                     * 100.0  ! hPa to Pa
-                     obs(obs_num)%ground%psfc%qc   = 0
-                     if ( associated(obs(obs_num)%surface) ) then
-                        obs(obs_num)%surface%meas%pressure%data = &
-                           obs(obs_num)%ground%psfc%data
-                        obs(obs_num)%surface%meas%pressure%qc   = &
-                           obs(obs_num)%ground%psfc%qc
-                     end if  ! associated data
-                  end if  ! valid QNH and elev
-               end if  ! gts_from_mmm_archive
+            if ( calc_psfc_from_QNH .and. gts_from_mmm_archive ) then
+               if ( obs(obs_num)%ground%psfc%data > 0.0 .and. &
+                    obs(obs_num)%info%elevation > 0.0 ) then
+                  QNH  = obs(obs_num)%ground%psfc%data * 0.01 ! Pa to hPa
+                  elev = obs(obs_num)%info%elevation
+                  obs(obs_num)%ground%psfc%data = psfc_from_QNH(QNH,elev) &
+                                                  * 100.0  ! hPa to Pa
+                  obs(obs_num)%ground%psfc%qc   = 0
+                  if ( associated(obs(obs_num)%surface) ) then
+                     obs(obs_num)%surface%meas%pressure%data = &
+                        obs(obs_num)%ground%psfc%data
+                     obs(obs_num)%surface%meas%pressure%qc   = &
+                        obs(obs_num)%ground%psfc%qc
+                  end if  ! associated data
+               end if  ! valid QNH and elev
             else
                obs(obs_num)%ground%psfc%data = missing_r
                obs(obs_num)%ground%psfc%qc   = missing
-            end if  ! calc_psfc_from_QNH
+            end if  ! calc_psfc_from_QNH and gts_from_mmm_archive
          END IF  ! metar
 
          ! for gts_from_mmm_archive:
@@ -1023,26 +1068,29 @@ time_window_min, time_window_max, map_projection , missing_flag)
          !  analysis.  Since we are at sea level, we also set the pressure 
          !  to equal to the sea level pressure.
 
-         !hcl-note: check if this can be general for other data source
-         if ( gts_from_mmm_archive ) then
-            IF ( (obs(obs_num)%info%platform(1:10) == 'FM-13 SHIP') .or. &
-                 (obs(obs_num)%info%platform(1:10) == 'FM-18 BUOY') ) then
-               if ( ASSOCIATED(obs(obs_num)%surface) ) then
-                  if ( (obs(obs_num)%info%elevation == 0.0) ) then
-                     obs(obs_num)%surface%meas%height%data   = &
-                        obs(obs_num)%info%elevation
-                     obs(obs_num)%surface%meas%height%qc     = 0
-                     obs(obs_num)%surface%meas%pressure%data = &
-                        obs(obs_num)%ground%slp%data
-                     obs(obs_num)%surface%meas%pressure%qc   = 0
-                  else
+         IF ( (obs(obs_num)%info%platform(1:10) == 'FM-13 SHIP') .or. &
+              (obs(obs_num)%info%platform(1:10) == 'FM-18 BUOY') ) then
+            if ( ASSOCIATED(obs(obs_num)%surface) ) then
+               obs(obs_num)%surface%meas%height%data   = &
+                  obs(obs_num)%info%elevation
+               obs(obs_num)%surface%meas%height%qc     = 0
+               if ( (obs(obs_num)%info%elevation == 0.0) ) then
+                  !obs(obs_num)%surface%meas%height%data   = &
+                  !   obs(obs_num)%info%elevation
+                  !obs(obs_num)%surface%meas%height%qc     = 0
+                  obs(obs_num)%surface%meas%pressure%data = &
+                     obs(obs_num)%ground%slp%data
+                  obs(obs_num)%surface%meas%pressure%qc   = 0
+               else
+                  if ( eps_equal(obs(obs_num)%surface%meas%pressure%data, &
+                                 101301.000, 1.) ) then
                      ! replace 1013.01 with missing value
                      obs(obs_num)%surface%meas%pressure%data = missing_r
                      obs(obs_num)%surface%meas%pressure%qc   = missing
-                  end if  ! elev is 0
-               end if  ! has associated data
-            end if  ! end if ship or buoy
-         end if  ! end if gts_from_mmm_archive
+                  end if
+               end if  ! elev is 0
+            end if  ! has associated data
+         end if  ! end if ship or buoy
 
          ! FENG GAO 03/07/2014
          ! QuikSCAT nominal mission ended on November 23, 2009
@@ -1078,38 +1126,17 @@ time_window_min, time_window_max, map_projection , missing_flag)
          ! hcl-note: disagrees with the above slp to psfc procedure.
          !     if both slp and psfc are available for synop reports,
          !     psfc should be used in DA system
+         ! hcl-note2: 101301 is simply a flag, real reports do not 
+         !     have 1/100 precision. Just replace 101301 with missing value
 
-         if ( gts_from_mmm_archive ) then
-            IF ( (obs(obs_num)%info%platform(1:5).EQ.'FM-12') .and.  &
-                 (ASSOCIATED(obs(obs_num)%surface)) ) THEN
-               if ( eps_equal(obs(obs_num)%surface%meas%pressure%data, &
-                                             101301.000, 1.) .and.  &
-                    eps_equal(obs(obs_num)%ground%slp%data,            &
-                                              missing_r, 1.) ) then
-                  n101301 = n101301 + 1 
-                  !print '("num=",i6,1X,A,1X,A,1X,A,1X,2(F8.3,A),A,1X,f11.3,2(a,f13.2,i8))',&
-                  !   n101301,  &
-                  !   obs(obs_num)%location%id   (1: 5),&
-                  !   obs(obs_num)%location%name (1:20),&
-                  !   obs(obs_num)%info%platform (1: 12),&
-                  !   obs(obs_num)%location%latitude, 'N',&
-                  !   obs(obs_num)%location%longitude,'E ', &
-                  !   obs(obs_num)%valid_time%date_char,    &
-                  !   obs(obs_num)%info % elevation,        &
-                  !   "  pressure:",                        &
-                  !   obs(obs_num)%surface%meas%pressure%data, &
-                  !   obs(obs_num)%surface%meas%pressure%qc, &
-                  !   "  Psfc:",                             &
-                  !   obs(obs_num)%ground%psfc%data, &
-                  !   obs(obs_num)%ground%psfc%qc
-
-                  obs(obs_num)%surface%meas%pressure%data = &
-                     obs(obs_num)%ground%psfc%data
-                  obs(obs_num)%surface%meas%pressure%qc   = &
-                     obs(obs_num)%ground%psfc%qc
-               endif
-            ENDIF  !end if FM-12 synop
-         end if  !end if gts_from_mmm_archive
+         IF ( (obs(obs_num)%info%platform(1:5).EQ.'FM-12') .and.  &
+              (ASSOCIATED(obs(obs_num)%surface)) ) THEN
+            if ( eps_equal(obs(obs_num)%surface%meas%pressure%data, &
+                                          101301.000, 1.) ) then
+               obs(obs_num)%surface%meas%pressure%data = missing_r
+               obs(obs_num)%surface%meas%pressure%qc   = missing
+            endif
+         ENDIF  !end if FM-12 synop
 
          !  This may be wasted print-out, but it is comforting to see.
 
@@ -1219,31 +1246,31 @@ time_window_min, time_window_max, map_projection , missing_flag)
    WRITE (UNIT = 0, FMT = '(A)') 'GTS OBSERVATIONS READ:'
 
    WRITE (UNIT = 0, FMT = '(A)')
-   WRITE (UNIT = 0, FMT = '(A,I6)') ' SYNOP reports:',nsynops (0)
-   WRITE (UNIT = 0, FMT = '(A,I6)') ' SHIPS reports:',nshipss (0)
-   WRITE (UNIT = 0, FMT = '(A,I6)') ' BUOYS reports:',nbuoyss (0)
-   WRITE (UNIT = 0, FMT = '(A,I6)') ' BOGUS reports:',nboguss (0)
-   WRITE (UNIT = 0, FMT = '(A,I6)') ' METAR reports:',nmetars (0)
-   WRITE (UNIT = 0, FMT = '(A,I6)') ' PILOT reports:',npilots (0)
-   WRITE (UNIT = 0, FMT = '(A,I6)') ' SOUND reports:',nsounds (0)
-   WRITE (UNIT = 0, FMT = '(A,I6)') ' AMDAR reports:',namdars (0)
-   WRITE (UNIT = 0, FMT = '(A,I6)') ' SATEM reports:',nsatems (0)
-   WRITE (UNIT = 0, FMT = '(A,I6)') ' SATOB reports:',nsatobs (0)
-   WRITE (UNIT = 0, FMT = '(A,I6)') ' GPSPW reports:',ngpspws (0)
-   WRITE (UNIT = 0, FMT = '(A,I6)') ' GPSZD reports:',ngpsztd (0)
-   WRITE (UNIT = 0, FMT = '(A,I6)') ' GPSRF reports:',ngpsref (0)
-   WRITE (UNIT = 0, FMT = '(A,I6)') ' GPSEP reports:',ngpseph (0)
-   WRITE (UNIT = 0, FMT = '(A,I6)') ' AIREP reports:',naireps (0)
-   WRITE (UNIT = 0, FMT = '(A,I6)') 'TAMDAR reports:',ntamdar (0)
-   WRITE (UNIT = 0, FMT = '(A,I6)') ' SSMT1 reports:',nssmt1s (0)
-   WRITE (UNIT = 0, FMT = '(A,I6)') ' SSMT2 reports:',nssmt2s (0)
-   WRITE (UNIT = 0, FMT = '(A,I6)') ' SSMI  reports:',nssmis  (0)
-   WRITE (UNIT = 0, FMT = '(A,I6)') ' TOVS  reports:',ntovss  (0)
-   WRITE (UNIT = 0, FMT = '(A,I6)') ' QSCAT reports:',nqscats (0)
-   WRITE (UNIT = 0, FMT = '(A,I6)') ' PROFL reports:',nprofls (0)
-   WRITE (UNIT = 0, FMT = '(A,I6)') ' AIRST reports:',nairss  (0)
-   WRITE (UNIT = 0, FMT = '(A,I6)') ' OTHER reports:',nothers (0)
-   WRITE (UNIT = 0, FMT = '(A,I6)') ' Total reports:', &
+   WRITE (UNIT = 0, FMT = '(A,I7)') ' SYNOP reports:',nsynops (0)
+   WRITE (UNIT = 0, FMT = '(A,I7)') ' SHIPS reports:',nshipss (0)
+   WRITE (UNIT = 0, FMT = '(A,I7)') ' BUOYS reports:',nbuoyss (0)
+   WRITE (UNIT = 0, FMT = '(A,I7)') ' BOGUS reports:',nboguss (0)
+   WRITE (UNIT = 0, FMT = '(A,I7)') ' METAR reports:',nmetars (0)
+   WRITE (UNIT = 0, FMT = '(A,I7)') ' PILOT reports:',npilots (0)
+   WRITE (UNIT = 0, FMT = '(A,I7)') ' SOUND reports:',nsounds (0)
+   WRITE (UNIT = 0, FMT = '(A,I7)') ' AMDAR reports:',namdars (0)
+   WRITE (UNIT = 0, FMT = '(A,I7)') ' SATEM reports:',nsatems (0)
+   WRITE (UNIT = 0, FMT = '(A,I7)') ' SATOB reports:',nsatobs (0)
+   WRITE (UNIT = 0, FMT = '(A,I7)') ' GPSPW reports:',ngpspws (0)
+   WRITE (UNIT = 0, FMT = '(A,I7)') ' GPSZD reports:',ngpsztd (0)
+   WRITE (UNIT = 0, FMT = '(A,I7)') ' GPSRF reports:',ngpsref (0)
+   WRITE (UNIT = 0, FMT = '(A,I7)') ' GPSEP reports:',ngpseph (0)
+   WRITE (UNIT = 0, FMT = '(A,I7)') ' AIREP reports:',naireps (0)
+   WRITE (UNIT = 0, FMT = '(A,I7)') 'TAMDAR reports:',ntamdar (0)
+   WRITE (UNIT = 0, FMT = '(A,I7)') ' SSMT1 reports:',nssmt1s (0)
+   WRITE (UNIT = 0, FMT = '(A,I7)') ' SSMT2 reports:',nssmt2s (0)
+   WRITE (UNIT = 0, FMT = '(A,I7)') ' SSMI  reports:',nssmis  (0)
+   WRITE (UNIT = 0, FMT = '(A,I7)') ' TOVS  reports:',ntovss  (0)
+   WRITE (UNIT = 0, FMT = '(A,I7)') ' QSCAT reports:',nqscats (0)
+   WRITE (UNIT = 0, FMT = '(A,I7)') ' PROFL reports:',nprofls (0)
+   WRITE (UNIT = 0, FMT = '(A,I7)') ' AIRST reports:',nairss  (0)
+   WRITE (UNIT = 0, FMT = '(A,I7)') ' OTHER reports:',nothers (0)
+   WRITE (UNIT = 0, FMT = '(A,I7)') ' Total reports:', &
           nsynops (0) + nshipss (0) + nmetars (0) + npilots (0) + nsounds (0)+&
           nsatems (0) + nsatobs (0) + naireps (0) +  ntamdar (0)+ ngpspws (0) + ngpsztd (0)+&
           ngpsref (0) + ngpseph (0) + &
@@ -1271,7 +1298,7 @@ time_window_min, time_window_max, map_projection , missing_flag)
 
     n_obs = obs_num
 
-    write(0,'(/"AIRCRAFT DATA: Total=",I6,"  Above cut_height=",I6)')&
+    write(0,'(/"AIRCRAFT DATA: Total=",I7,"  Above cut_height=",I7)')&
                                                      N_air, N_air_cut
 contains
 
@@ -1613,6 +1640,10 @@ SUBROUTINE read_measurements (file_num, surface, location, info, bad_data, &
       !  Assign the SSMI error (AFWA only)
       !
 
+      ! initialize the variable that might be used in module_err_ncep.F90
+      ! for checking if the error is pre-assigned
+      current%meas%speed%error = 0.0
+
       READ (info % platform (4:6), '(I3)') fm
 
       IF ((fm .EQ. 125) .AND. (current%meas%speed%qc .GT. missing)) THEN 
@@ -1817,8 +1848,8 @@ SUBROUTINE dealloc_meas ( head )
                                              , temp
    INTEGER                                  :: status
 
-   !  Start at the head, kill everything that is pointed to.  After no longer 
-   !  associated, deallocate the head.
+   !  Start at the head, kill everything that is pointed to.  After the list is
+   !  fully deallocated, disassociate the head pointer.
 
    IF ( ASSOCIATED ( head ) ) THEN
 
@@ -1834,10 +1865,9 @@ SUBROUTINE dealloc_meas ( head )
          END IF
       END DO list_loop
 
+      NULLIFY ( head )
    END IF
 
-!  NULLIFY ( head ) 
-  
 END SUBROUTINE dealloc_meas
 
 !
@@ -2265,7 +2295,7 @@ end Subroutine Aircraft_pressure
 function psfc_from_QNH(alt, elev) result(psfc)
    real,  intent(in) :: alt  ! altimeter setting/QNH
    real,  intent(in) :: elev ! elevation
-   real, intent(out) :: psfc
+   real              :: psfc
    psfc = (alt**0.190284-(((1013.25**0.190284)*0.0065/288.15)*elev))**5.2553026
 end function psfc_from_QNH
 

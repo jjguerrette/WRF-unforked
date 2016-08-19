@@ -22,7 +22,7 @@ CONTAINS
                              , ph_tendf, a_ph_tendf, mu_tendf, a_mu_tendf        &
                              , tke_tend, a_tke_tend             &
                              , adapt_step_flag , curr_secs      &
-                             , psim , psih , wspd , a_wspd , gz1oz0 , br , chklowq &
+                             , psim , psih , wspd , a_wspd , gz1oz0 , chklowq &
                              , cu_act_flag , hol , th_phy , a_th_phy      &
                              , pi_phy , a_pi_phy , p_phy , a_p_phy &!, t_phy , a_t_phy &
                              , dz8w , a_dz8w , p8w , a_p8w , t8w , a_t8w   &
@@ -51,7 +51,7 @@ CONTAINS
 !   USE module_force_scm
 !   USE module_convtrans_prep
     USE module_big_step_utilities_em, ONLY : phy_prep
-use module_scalar_tables
+!use module_scalar_tables
 #ifdef DM_PARALLEL
     USE module_dm, ONLY : local_communicator, mytask, ntasks, ntasks_x, ntasks_y, local_communicator_periodic, wrf_dm_maxval
     USE module_comm_dm, ONLY : halo_em_phys_a_sub,halo_em_phys_a_ad_sub,halo_pwp_sub,halo_em_phys_a_bl_surf_sub,halo_em_chem_e_3_sub,halo_em_chem_e_5_sub,halo_em_chem_e_3_ad_sub,halo_em_chem_e_5_ad_sub
@@ -112,7 +112,6 @@ use module_scalar_tables
     REAL    ,DIMENSION(ims:ime,jms:jme), INTENT(INOUT)         :: wspd
     REAL    ,DIMENSION(ims:ime,jms:jme), INTENT(INOUT)         :: a_wspd
     REAL    ,DIMENSION(ims:ime,jms:jme), INTENT(INOUT)         :: gz1oz0
-    REAL    ,DIMENSION(ims:ime,jms:jme), INTENT(INOUT)         :: br
     REAL    ,DIMENSION(ims:ime,jms:jme), INTENT(INOUT)         :: chklowq
     LOGICAL ,DIMENSION(ims:ime,jms:jme), INTENT(INOUT)         :: cu_act_flag
     REAL    ,DIMENSION(ims:ime,jms:jme), INTENT(INOUT)         :: hol
@@ -993,7 +992,7 @@ BENCH_END(a_cu_driver_tim)
 !
 
 
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
 # ifdef DM_PARALLEL
    IF ( num_chem >= PARAM_FIRST_SCALAR .AND. config_flags%bl_pbl_physics == ACMPBLSCHEME) then
      CALL wrf_debug ( 200 , ' call HALO CHEM AFTER PBL' )
@@ -1024,7 +1023,7 @@ BENCH_START(a_pbl_driver_tim)
      &        ,BL_PBL_PHYSICS=config_flags%bl_pbl_physics                           &
      &        ,BLDT=grid%bldt, CURR_SECS=curr_secs, ADAPT_STEP_FLAG=adapt_step_flag &
      &        ,BLDTACTTIME=grid%bldtacttime                                         &
-     &        ,BR=br              ,CHKLOWQ=chklowq    ,CT=grid%ct                   &
+     &        ,BR=grid%br              ,CHKLOWQ=chklowq    ,CT=grid%ct                   &
      &        ,DT=grid%dt              ,DX=grid%dx    ,DZ8W=dz8w, A_DZ8W=a_dz8w     &
      &        ,EXCH_H=grid%exch_h     ,EXCH_M=grid%exch_m                           &
      &        ,FM=grid%fm         ,FHH=grid%fh                                      &

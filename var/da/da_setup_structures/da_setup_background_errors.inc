@@ -32,6 +32,8 @@ subroutine da_setup_background_errors(grid, be)
             max_vert_var7 = 0
             max_vert_var8 = 0
             max_vert_var9 = 0
+            max_vert_var10 = 0
+            max_vert_var11 = 0
 #endif
       end if
       sigma_alpha = alpha_std_dev
@@ -51,14 +53,20 @@ subroutine da_setup_background_errors(grid, be)
    be % v7 % mz = 0
    be % v8 % mz = 0
    be % v9 % mz = 0
+   be % v10% mz = 0
+   be % v11% mz = 0
 #endif
    if (global) then
       call da_setup_be_global(be)
    else if(fg_format == fg_format_wrf_arw_regional) then    
-      if (cv_options == 5 .or. cv_options == 6) then
-            call da_setup_be_regional (grid%xb, be, grid)
+      if ( (cv_options == 5) .or. (cv_options == 6) .or. (cv_options == 7) ) then
+         call da_setup_be_regional (grid%xb, be, grid)
       else if(cv_options == 3 ) then
-            call da_setup_be_ncep_gfs (grid, be)
+         call da_setup_be_ncep_gfs (grid, be)
+      else 
+         write(unit=message(1),fmt='(A,I4)') &
+             'Invalid CV option chosen:  cv_options = ', cv_options
+         call da_error(__FILE__,__LINE__,message(1:1))
       endif
    else if(fg_format == fg_format_wrf_nmm_regional ) then
 !rizvi TBD            call da_setup_be_regional (grid%xb, be)

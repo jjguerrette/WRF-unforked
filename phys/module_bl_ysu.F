@@ -24,7 +24,8 @@ contains
                   exch_h,                                                      &
                   wstar,delta,                                                 &
                   u10,v10,                                                     &
-                  uoce,voce,                                                   &        
+                  uoce,voce,                                                   &
+                  rthraten,ysu_topdown_pblmix,                                 &
                   ctopo,ctopo2,                                                &
                   ids,ide, jds,jde, kds,kde,                                   &
                   ims,ime, jms,jme, kms,kme,                                   &
@@ -112,6 +113,8 @@ contains
    integer,  intent(in   )   ::      ids,ide, jds,jde, kds,kde,                &
                                      ims,ime, jms,jme, kms,kme,                &
                                      its,ite, jts,jte, kts,kte
+
+   integer,  intent(in)      ::      ysu_topdown_pblmix
 !
    real,     intent(in   )   ::      dt,cp,g,rovcp,rovg,rd,xlv,rv
 !
@@ -125,7 +128,8 @@ contains
                                                                          pi3d, &
                                                                          th3d, &
                                                                           t3d, &
-                                                                         dz8w
+                                                                         dz8w, &
+                                                                     rthraten
    real,     dimension( ims:ime, kms:kme, jms:jme )                          , &
              intent(in   )   ::                                          p3di
 !
@@ -263,6 +267,8 @@ contains
               ,delta=delta(ims,j)                                              &
               ,u10=u10(ims,j),v10=v10(ims,j)                                   &
               ,uox=uoce(ims,j),vox=voce(ims,j)                                 &
+              ,rthraten=rthraten(ims,kms,j),p2diORG=p3di(ims,kms,j)            &
+              ,ysu_topdown_pblmix=ysu_topdown_pblmix                           &
               ,ctopo=ctopo(ims,j),ctopo2=ctopo2(ims,j)                         &
               ,ids=ids,ide=ide, jds=jds,jde=jde, kds=kds,kde=kde               &
               ,ims=ims,ime=ime, jms=jms,jme=jme, kms=kms,kme=kme               &
@@ -295,6 +301,8 @@ contains
                   wstar,delta,                                                 &
                   u10,v10,                                                     &
                   uox,vox,                                                     &
+                  rthraten,p2diORG,                                            &
+                  ysu_topdown_pblmix,                                          &
                   ctopo,ctopo2,                                                &
                   ids,ide, jds,jde, kds,kde,                                   &
                   ims,ime, jms,jme, kms,kme,                                   &
@@ -347,6 +355,10 @@ contains
 !              ==> consider thermal z0 when differs from mechanical z0
 !              a bug fix in wscale computation in stable bl, sukanta basu, jun 2012
 !              ==> wscale becomes small with height, and less mixing in stable bl
+!              revision in background diffusion (kzo), jan 2016
+!              ==> kzo = 0.1 for momentum and = 0.01 for mass to account for
+!                  internal wave mixing of large et al. (1994), songyou hong, feb 2016
+!              ==> alleviate superious excessive mixing when delz is large
 !
 !     references:
 !
@@ -358,6 +370,7 @@ contains
 !
 !-------------------------------------------------------------------------------
 !
+   real,parameter    ::  xkzminm = 0.1,xkzminh = 0.01
    real,parameter    ::  xkzmin = 0.01,xkzmax = 1000.,rimin = -100.
    real,parameter    ::  rlam = 30.,prmin = 0.25,prmax = 4.
    real,parameter    ::  brcr_ub = 0.0,brcr_sb = 0.25,cori = 1.e-4
@@ -365,7 +378,7 @@ contains
    real,parameter    ::  phifac = 8.,sfcfrac = 0.1
    real,parameter    ::  d1 = 0.02, d2 = 0.05, d3 = 0.001
    real,parameter    ::  h1 = 0.33333335, h2 = 0.6666667
-   real,parameter    ::  ckz = 0.001,zfmin = 1.e-8,aphi5 = 5.,aphi16 = 16.
+   real,parameter    ::  zfmin = 1.e-8,aphi5 = 5.,aphi16 = 16.
    real,parameter    ::  tmin=1.e-2
    real,parameter    ::  gamcrt = 3.,gamcrq = 2.e-3
    real,parameter    ::  xka = 2.4e-5
@@ -375,6 +388,8 @@ contains
                                     ims,ime, jms,jme, kms,kme,                 &
                                     its,ite, jts,jte, kts,kte,                 &
                                     j,ndiff
+
+   integer,  intent(in)      ::     ysu_topdown_pblmix 
 !
    real,     intent(in   )   ::     dt,rcl,cp,g,rovcp,rovg,rd,xlv,rv
 !
@@ -382,7 +397,8 @@ contains
 !
    real,     dimension( ims:ime, kms:kme ),                                    &
              intent(in)      ::                                        dz8w2d, &
-                                                                         pi2d
+                                                                         pi2d, &
+                                                                      p2diorg
 !
    real,     dimension( ims:ime, kms:kme )                                   , &
              intent(in   )   ::                                            tx
@@ -401,7 +417,6 @@ contains
 !
    real,     dimension( its:ite, kts:kte )                                   , &
              intent(in   )   ::                                           p2d
-!
 !
    real,     dimension( ims:ime )                                            , &
              intent(inout)   ::                                           ust, &
@@ -423,7 +438,8 @@ contains
 !
    real,     dimension( ims:ime, kms:kme )                                   , &
              intent(in   )   ::                                            ux, &
-                                                                           vx
+                                                                           vx, &
+                                                                      rthraten
    real,     dimension( ims:ime )                                            , &
              optional                                                        , &
              intent(in   )   ::                                         ctopo, &
@@ -438,11 +454,12 @@ contains
    real,     dimension( its:ite, kts:kte+1 ) ::                            zq
 !
    real,     dimension( its:ite, kts:kte )   ::                                &
-                                                                     thx,thvx, &
+                                                               thx,thvx,thlix, &
                                                                           del, &
                                                                           dza, &
                                                                           dzq, &
-                                                                         xkzo, &
+                                                                        xkzom, &
+                                                                        xkzoh, &
                                                                            za
 !
    real,    dimension( its:ite )             ::                                &
@@ -456,7 +473,7 @@ contains
                                                                   dusfc,dvsfc, &
                                                                   dtsfc,dqsfc, &
                                                                         prpbl, &
-                                                                        wspd1
+                                                              wspd1,thermalli
 !
    real,    dimension( its:ite, kts:kte )    ::                     xkzm,xkzh, &
                                                                         f1,f2, &
@@ -465,7 +482,9 @@ contains
                                                                            cu, &
                                                                            al, &
                                                                          xkzq, &
-                                                                         zfac
+                                                                         zfac, &
+                                                                        rhox2, &
+                                                                       hgamt2
 !
 !jdf added exch_hx
 !
@@ -475,7 +494,7 @@ contains
    real,    dimension( ims:ime )                                             , &
             intent(inout)    ::                                           u10, &
                                                                           v10
-   real,    dimension( ims:ime )                                             , & 
+   real,    dimension( ims:ime )                                             , &
             intent(in  )    ::                                            uox, &
                                                                           vox
    real,    dimension( its:ite )    ::                                         &
@@ -485,13 +504,16 @@ contains
                                                                     brcr_sbro
 !
    real,    dimension( its:ite, kts:kte, ndiff)  ::                     r3,f3
-   integer, dimension( its:ite )             ::                          kpbl
+   integer, dimension( its:ite )             ::                  kpbl,kpblold
 !
    logical, dimension( its:ite )             ::                        pblflg, &
                                                                        sfcflg, &
-                                                                       stable
+                                                                       stable, &
+                                                                     cloudflg
+
+   logical                                   ::                     definebrup
 !
-   integer ::  n,i,k,l,ic,is
+   integer ::  n,i,k,l,ic,is,kk
    integer ::  klpbl, ktrace1, ktrace2, ktrace3
 !
 !
@@ -503,13 +525,14 @@ contains
    real    ::  cont, conq, conw, conwrc
 !
 
-   real, dimension( its:ite, kts:kte )     ::                         wscalek
+   real, dimension( its:ite, kts:kte )     ::                wscalek,wscalek2
    real, dimension( ims:ime )              ::                           wstar
    real, dimension( ims:ime )              ::                           delta
    real, dimension( its:ite, kts:kte )     ::                     xkzml,xkzhl, &
                                                                zfacent,entfac
    real, dimension( its:ite )              ::                            ust3, &
                                                                        wstar3, &
+                                                                     wstar3_2, &
                                                                   hgamu,hgamv, &
                                                                       wm2, we, &
                                                                        bfxpbl, &
@@ -518,7 +541,8 @@ contains
                                                                         dthvx
    real    ::  prnumfac,bfx0,hfx0,qfx0,delb,dux,dvx,                           &
                dsdzu,dsdzv,wm3,dthx,dqx,wspd10,ross,tem1,dsig,tvcon,conpr,     &
-               prfac,prfac2,phim8z
+               prfac,prfac2,phim8z,radsum,tmp1,templ,rvls,temps,ent_eff,    &
+               rcldb,bruptmp,radflux
 !
 !-------------------------------------------------------------------------------
 !
@@ -539,6 +563,7 @@ contains
    do k = kts,kte
      do i = its,ite
        thx(i,k) = tx(i,k)/pi2d(i,k)
+       thlix(i,k) = (tx(i,k)-xlv*qx(i,ktrace2+k)/cp-2.834E6*qx(i,ktrace3+k)/cp)/pi2d(i,k)
      enddo
    enddo
 !
@@ -565,6 +590,8 @@ contains
    do k = kts,kte
      do i = its,ite
        zq(i,k+1) = dz8w2d(i,k)+zq(i,k)
+       tvcon = (1.+ep1*qx(i,k))
+       rhox2(i,k) = p2d(i,k)/(rd*tx(i,k)*tvcon)
      enddo
    enddo
 !
@@ -616,11 +643,13 @@ contains
      hgamu(i)  = 0.0
      hgamv(i)  = 0.0
      delta(i)  = 0.0
+     wstar3_2(i) =  0.0
    enddo
 !
    do k = kts,klpbl
      do i = its,ite
        wscalek(i,k) = 0.0
+       wscalek2(i,k) = 0.0
      enddo
    enddo
 !
@@ -631,7 +660,8 @@ contains
    enddo
    do k = kts,klpbl-1
      do i = its,ite
-       xkzo(i,k) = ckz*dza(i,k+1)
+       xkzom(i,k) = xkzminm
+       xkzoh(i,k) = xkzminh
      enddo
    enddo
 !
@@ -650,6 +680,7 @@ contains
      hpbl(i)   = zq(i,1)
      zl1(i)    = za(i,1)
      thermal(i)= thvx(i,1)
+     thermalli(i) = thlix(i,1)
      pblflg(i) = .true.
      sfcflg(i) = .true.
      sflux(i) = hfx(i)/rhox(i)/cp + qfx(i)/rhox(i)*ep1*thx(i,1)
@@ -730,6 +761,7 @@ contains
        hgamq(i) = min(gamfac*qfx(i),gamcrq)
        vpert = (hgamt(i)+ep1*thx(i,1)*hgamq(i))/bfac*afac
        thermal(i) = thermal(i)+max(vpert,0.)*min(za(i,1)/(sfcfrac*hpbl(i)),1.0)
+       thermalli(i)= thermalli(i)+max(vpert,0.)*min(za(i,1)/(sfcfrac*hpbl(i)),1.0)
        hgamt(i) = max(hgamt(i),0.0)
        hgamq(i) = max(hgamq(i),0.0)
        brint    = -15.9*ust(i)*ust(i)/wspd(i)*wstar3(i)/(wscale(i)**4.)
@@ -769,6 +801,30 @@ contains
      enddo
    enddo
 !
+!     enhance pbl by theta-li
+!
+   if (ysu_topdown_pblmix.eq.1)then
+     do i = its,ite
+        kpblold(i) = kpbl(i)
+        definebrup=.false.
+        do k = kpblold(i), kte-1
+           spdk2   = max(ux(i,k)**2+vx(i,k)**2,1.)
+           bruptmp = (thlix(i,k)-thermalli(i))*(g*za(i,k)/thlix(i,1))/spdk2
+           stable(i) = bruptmp.ge.brcr(i)
+           if (definebrup) then
+           kpbl(i) = k
+           brup(i) = bruptmp
+           definebrup=.false.
+           endif
+           if (.not.stable(i)) then !overwrite brup brdn values
+           brdn(i)=bruptmp
+           definebrup=.true.
+           pblflg(i)=.true.
+           endif
+        enddo
+     enddo
+   endif
+
    do i = its,ite
      if(pblflg(i)) then
        k = kpbl(i)
@@ -846,16 +902,78 @@ contains
 !     estimate the entrainment parameters
 !
    do i = its,ite
+     cloudflg(i)=.false. 
      if(pblflg(i)) then
        k = kpbl(i) - 1
-       prpbl(i) = 1.0
        wm3       = wstar3(i) + 5. * ust3(i)
        wm2(i)    = wm3**h2
        bfxpbl(i) = -0.15*thvx(i,1)/g*wm3/hpbl(i)
        dthvx(i)  = max(thvx(i,k+1)-thvx(i,k),tmin)
+       we(i) = max(bfxpbl(i)/dthvx(i),-sqrt(wm2(i)))
+       if((qx(i,ktrace2+k)+qx(i,ktrace3+k)).gt.0.01e-3.and.ysu_topdown_pblmix.eq.1)then
+           if ( kpbl(i) .ge. 2) then
+                cloudflg(i)=.true. 
+                templ=thlix(i,k)*(p2di(i,k+1)/100000)**rovcp
+                !rvls is ws at full level
+                rvls=100.*6.112*EXP(17.67*(templ-273.16)/(templ-29.65))*(ep2/p2di(i,k+1))
+                temps=templ + ((qx(i,k)+qx(i,ktrace2+k))-rvls)/(cp/xlv  + &
+                ep2*xlv*rvls/(rd*templ**2))
+                rvls=100.*6.112*EXP(17.67*(temps-273.15)/(temps-29.65))*(ep2/p2di(i,k+1))
+                rcldb=max((qx(i,k)+qx(i,ktrace2+k))-rvls,0.)
+                !entrainment efficiency
+                dthvx(i)  = (thlix(i,k+2)+thx(i,k+2)*ep1*(qx(i,k+2)+qx(i,ktrace2+k+2))) &
+                          - (thlix(i,k) + thx(i,k)  *ep1*(qx(i,k)  +qx(i,ktrace2+k)))
+                dthvx(i)  = max(dthvx(i),0.1)
+                tmp1      = xlv/cp * rcldb/(pi2d(i,k)*dthvx(i))
+                ent_eff   = 0.2 * 8. * tmp1 +0.2
+
+                radsum=0.
+                do kk = 1,kpbl(i)-1
+                   radflux=rthraten(i,kk)*pi2d(i,kk) !converts theta/s to temp/s
+                   radflux=radflux*cp/g*(p2diORG(i,kk)-p2diORG(i,kk+1)) ! converts temp/s to W/m^2
+                   if (radflux < 0.0 ) radsum=abs(radflux)+radsum
+                enddo
+                radsum=max(radsum,0.0)
+
+                !recompute entrainment from sfc thermals
+                bfx0 = max(max(sflux(i),0.0)-radsum/rhox2(i,k)/cp,0.)
+                bfx0 = max(sflux(i),0.0)
+                wm3 = (govrth(i)*bfx0*hpbl(i))+5. * ust3(i)
+                wm2(i)    = wm3**h2
+                bfxpbl(i) = -0.15*thvx(i,1)/g*wm3/hpbl(i)
+                dthvx(i)  = max(thvx(i,k+1)-thvx(i,k),tmin)
+                we(i) = max(bfxpbl(i)/dthvx(i),-sqrt(wm2(i)))
+
+                !entrainment from PBL top thermals
+                bfx0 = max(radsum/rhox2(i,k)/cp-max(sflux(i),0.0),0.)
+                bfx0 = max(radsum/rhox2(i,k)/cp,0.)
+                wm3       = (g/thvx(i,k)*bfx0*hpbl(i)) ! this is wstar3(i)
+                wm2(i)    = wm2(i)+wm3**h2
+                bfxpbl(i) = - ent_eff * bfx0
+                dthvx(i)  = max(thvx(i,k+1)-thvx(i,k),0.1)
+                we(i) = we(i) + max(bfxpbl(i)/dthvx(i),-sqrt(wm3**h2))
+
+                !wstar3_2
+                bfx0 = max(radsum/rhox2(i,k)/cp,0.)
+                wstar3_2(i) =  (g/thvx(i,k)*bfx0*hpbl(i))
+                !recompute hgamt 
+                wscale(i) = (ust3(i)+phifac*karman*(wstar3(i)+wstar3_2(i))*0.5)**h1
+                wscale(i) = min(wscale(i),ust(i)*aphi16)
+                wscale(i) = max(wscale(i),ust(i)/aphi5)
+                gamfac   = bfac/rhox(i)/wscale(i)
+                hgamt(i) = min(gamfac*hfx(i)/cp,gamcrt)
+                hgamq(i) = min(gamfac*qfx(i),gamcrq)
+                gamfac   = bfac/rhox2(i,k)/wscale(i)
+                hgamt2(i,k) = min(gamfac*radsum/cp,gamcrt)
+                hgamt(i) = max(hgamt(i),0.0) + max(hgamt2(i,k),0.0)
+                brint    = -15.9*ust(i)*ust(i)/wspd(i)*(wstar3(i)+wstar3_2(i))/(wscale(i)**4.)
+                hgamu(i) = brint*ux(i,1)
+                hgamv(i) = brint*vx(i,1)
+           endif
+       endif
+       prpbl(i) = 1.0
        dthx  = max(thx(i,k+1)-thx(i,k),tmin)
        dqx   = min(qx(i,k+1)-qx(i,k),0.0)
-       we(i) = max(bfxpbl(i)/dthvx(i),-sqrt(wm2(i)))
        hfxpbl(i) = we(i)*dthx
        qfxpbl(i) = we(i)*dqx
 !
@@ -898,9 +1016,10 @@ contains
          zfac(i,k) = min(max((1.-(zq(i,k+1)-zl1(i))/(hpbl(i)-zl1(i))),zfmin),1.)
          zfacent(i,k) = (1.-zfac(i,k))**3.
          wscalek(i,k) = (ust3(i)+phifac*karman*wstar3(i)*(1.-zfac(i,k)))**h1
+         wscalek2(i,k) = (phifac*karman*wstar3_2(i)*(zfac(i,k)))**h1
          if(sfcflg(i)) then
            prfac = conpr
-           prfac2 = 15.9*wstar3(i)/ust3(i)/(1.+4.*karman*wstar3(i)/ust3(i))
+           prfac2 = 15.9*(wstar3(i)+wstar3_2(i))/ust3(i)/(1.+4.*karman*(wstar3(i)+wstar3_2(i))/ust3(i))
            prnumfac = -3.*(max(zq(i,k+1)-sfcfrac*hpbl(i),0.))**2./hpbl(i)**2.
          else
            prfac = 0.
@@ -912,18 +1031,23 @@ contains
          endif
          prnum0 = (phih(i)/phim(i)+prfac)
          prnum0 = max(min(prnum0,prmax),prmin)
-         xkzm(i,k) = wscalek(i,k)*karman*zq(i,k+1)*zfac(i,k)**pfac
+           xkzm(i,k) = wscalek(i,k) *karman*    zq(i,k+1)      *    zfac(i,k)**pfac+ &
+                       wscalek2(i,k)*karman*(hpbl(i)-zq(i,k+1))*(1-zfac(i,k))**pfac
+         !Do not include xkzm at kpbl-1 since it changes entrainment
+         if (k.eq.kpbl(i)-1.and.cloudflg(i).and.we(i).lt.0.0) then
+           xkzm(i,k) = 0.0
+         endif
          prnum =  1. + (prnum0-1.)*exp(prnumfac)
          xkzq(i,k) = xkzm(i,k)/prnum*zfac(i,k)**(pfac_q-pfac)
          prnum0 = prnum0/(1.+prfac2*karman*sfcfrac)
          prnum =  1. + (prnum0-1.)*exp(prnumfac)
          xkzh(i,k) = xkzm(i,k)/prnum
+         xkzm(i,k) = xkzm(i,k)+xkzom(i,k)
+         xkzh(i,k) = xkzh(i,k)+xkzoh(i,k)
+         xkzq(i,k) = xkzq(i,k)+xkzoh(i,k)
          xkzm(i,k) = min(xkzm(i,k),xkzmax)
-         xkzm(i,k) = max(xkzm(i,k),xkzo(i,k))
          xkzh(i,k) = min(xkzh(i,k),xkzmax)
-         xkzh(i,k) = max(xkzh(i,k),xkzo(i,k))
          xkzq(i,k) = min(xkzq(i,k),xkzmax)
-         xkzq(i,k) = max(xkzq(i,k),xkzo(i,k))
        endif
      enddo
    enddo
@@ -968,10 +1092,10 @@ contains
            xkzm(i,k) = xkzh(i,k)*prnum
          endif
 !
+         xkzm(i,k) = xkzm(i,k)+xkzom(i,k)
+         xkzh(i,k) = xkzh(i,k)+xkzoh(i,k)
          xkzm(i,k) = min(xkzm(i,k),xkzmax)
-         xkzm(i,k) = max(xkzm(i,k),xkzo(i,k))
          xkzh(i,k) = min(xkzh(i,k),xkzmax)
-         xkzh(i,k) = max(xkzh(i,k),xkzo(i,k))
          xkzml(i,k) = xkzm(i,k)
          xkzhl(i,k) = xkzh(i,k)
        endif
@@ -1008,8 +1132,8 @@ contains
        elseif(pblflg(i).and.k.ge.kpbl(i).and.entfac(i,k).lt.4.6) then
          xkzh(i,k) = -we(i)*dza(i,kpbl(i))*exp(-entfac(i,k))
          xkzh(i,k) = sqrt(xkzh(i,k)*xkzhl(i,k))
+         xkzh(i,k) = max(xkzh(i,k),xkzoh(i,k))
          xkzh(i,k) = min(xkzh(i,k),xkzmax)
-         xkzh(i,k) = max(xkzh(i,k),xkzo(i,k))
          f1(i,k+1) = thx(i,k+1)-300.
        else
          f1(i,k+1) = thx(i,k+1)-300.
@@ -1099,8 +1223,8 @@ contains
        elseif(pblflg(i).and.k.ge.kpbl(i).and.entfac(i,k).lt.4.6) then
          xkzq(i,k) = -we(i)*dza(i,kpbl(i))*exp(-entfac(i,k))
          xkzq(i,k) = sqrt(xkzq(i,k)*xkzhl(i,k))
+         xkzq(i,k) = max(xkzq(i,k),xkzoh(i,k))
          xkzq(i,k) = min(xkzq(i,k),xkzmax)
-         xkzq(i,k) = max(xkzq(i,k),xkzo(i,k))
          f3(i,k+1,1) = qx(i,k+1)
        else
          f3(i,k+1,1) = qx(i,k+1)
@@ -1211,8 +1335,8 @@ contains
        elseif(pblflg(i).and.k.ge.kpbl(i).and.entfac(i,k).lt.4.6) then
          xkzm(i,k) = prpbl(i)*xkzh(i,k)
          xkzm(i,k) = sqrt(xkzm(i,k)*xkzml(i,k))
+         xkzm(i,k) = max(xkzm(i,k),xkzom(i,k))
          xkzm(i,k) = min(xkzm(i,k),xkzmax)
-         xkzm(i,k) = max(xkzm(i,k),xkzo(i,k))
          f1(i,k+1) = ux(i,k+1)
          f2(i,k+1) = vx(i,k+1)
        else

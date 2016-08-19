@@ -79,6 +79,7 @@ subroutine da_read_obs_ascii (iv, filename, uvq_direct, grid)
    ilocal    = nlocal
    if ( thin_conv_ascii ) then
        do n = 1, num_ob_indexes
+          if ( n == radar ) cycle
           call cleangrids_conv(n)
        end do
    end if
@@ -210,14 +211,6 @@ subroutine da_read_obs_ascii (iv, filename, uvq_direct, grid)
       read (iunit, fmt = fmt_srfc)  &
          platform%loc%slp%inv, platform%loc%slp%qc, platform%loc%slp%error, &
          platform%loc%pw%inv, platform%loc%pw%qc, platform%loc%pw%error
-
-      ! levels < 1 and .not.GPSPW and .not.GPSZD, go back to reports
-
-      if ((platform%info%levels < 1) .AND.   &
-         ( (index(platform%info%platform, 'GPSPW') <= 0) .and. &
-           (index(platform%info%platform, 'GPSZD') <= 0) )) then
-         cycle reports
-      end if
 
       ! read each level
       ! ---------------
@@ -424,7 +417,6 @@ subroutine da_read_obs_ascii (iv, filename, uvq_direct, grid)
       end if
       
       obs_index = fm_index(fm)
-      iv%info(obs_index)%max_lev = max(iv%info(obs_index)%max_lev, nlevels)
 
       IF ( wind_sd ) THEN
          wind_sd_buoy   = .true.
@@ -962,7 +954,8 @@ subroutine da_read_obs_ascii (iv, filename, uvq_direct, grid)
             ! Geostationary ot Polar orbitting Satellite AMVs:
          case (88)    ;
             if (index(platform%info%name, 'MODIS') > 0 .or. &
-               index(platform%info%name, 'modis') > 0)  then
+                index(platform%info%name, 'modis') > 0 .or. &
+                index(platform%info%id, 'AVHRR') > 0)  then
                if (.not.use_polaramvobs .or. ntotal(polaramv) == max_polaramv_input) cycle reports
                if (n==1) ntotal(polaramv) = ntotal(polaramv) + 1
                if (outside) cycle reports
@@ -1554,6 +1547,7 @@ subroutine da_read_obs_ascii (iv, filename, uvq_direct, grid)
    ! thinning check
    if ( thin_conv_ascii ) then
       do n = 1, num_ob_indexes
+          if (n==radar) cycle
           allocate ( in(thinning_grid_conv(n)%itxmax) )
           allocate (out(thinning_grid_conv(n)%itxmax) )
             do i = 1, thinning_grid_conv(n)%itxmax
