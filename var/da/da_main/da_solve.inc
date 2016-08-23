@@ -54,9 +54,15 @@
    integer   :: cvt_unit, iost
    character(len=8) :: cvtfile
    logical :: ex
+#if defined(LAPACK)
+   character*10                 :: cproc
+   character*10                 :: cit
+   character(len=filename_len)  :: cvtfile_svd
+!   logical                      :: svd_nl
+#endif
+
 #if (WRF_CHEM == 1)
    character(len=2) :: itc
-   real             :: eta
    integer          :: cv_s, cv_e, cv_s_ant, cv_e_ant, cv_s_bb, cv_e_bb
 #endif
 
@@ -778,16 +784,41 @@
          endif
 
          call nl_set_var4d_run (head_grid%id, .true.)
-         if ( checkpoint_interval .gt. 0 ) write_checkpoints = 1
+         if ( checkpoint_interval .gt. 0 &
+#if defined(LAPACK)
+              .and. .not.(use_randomsvd .and. svd_stage.gt.0) &
+#endif
+            ) then
+             write_checkpoints = 1
+#if defined(LAPACK)
+          else
+             write_checkpoints = 2
+#endif
+          end if
+!         if ( checkpoint_interval .gt. 0 ) write_checkpoints = 1
          call da_nl_model(it)
-         if ( checkpoint_interval .gt. 0 ) write_checkpoints = 0
 
 #if (WRF_CHEM == 1)
          call da_retrieve_chem_hx( model_grid, iv )
-         call da_write_obs_chem( iv, ob, it )
+         if (write_checkpoints.eq.1) then
+#if defined(LAPACK)
+               if (use_randomsvd) then
+                  call da_write_obs_chem( iv, ob, svd_outer )
+               else
+#endif
+                  call da_write_obs_chem( iv, ob, it )
+#if defined(LAPACK)
+               end if
+#endif
+         end if
 
          ! Use this to exit after writing chem hx values
-         if( config_flags%calc_hx_only) then
+         ! or after stage 1 of randomised svd
+         if( config_flags%calc_hx_only &
+#if defined(LAPACK)
+            .or. (use_randomsvd .and. svd_stage.le.0) &
+#endif
+            ) then
             call da_deallocate_observations (iv)
             call da_deallocate_y (ob)
             if (use_background_errors) call da_deallocate_background_errors (be)
@@ -806,6 +837,8 @@
 
          end if
 #endif
+         write_checkpoints = 0
+
 
 !      elseif (var4d .and. multi_inc == 2 ) then
 #else
@@ -877,8 +910,45 @@
 
          if (adj_sens) call da_sensitivity(grid,config_flags,it,cv_size,xbx, &
                                            be,iv,xhat,qhat,cvt,y,eignvec,eignval,neign )
+#if defined(LAPACK)
+      else if ( use_randomsvd) then
+         if ( ensdim_svd .gt. 0  .and.  svd_outer .gt. 0  .and.  it .eq. 1 ) then
+            if (svd_outer .gt. 1) then
+               write(cproc,fmt='(i4.4)') myproc
+               write(cit,fmt='(i2.2)') svd_outer-1
+               cvtfile_svd = 'cvt.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
+               call da_cv_io ('r', cvtfile_svd, cv_size, cvt(1:cv_size))
+            end if
+            if (svd_stage .eq. 1 .and. ensmember .eq. ensdim_svd+1) then
+               call da_randomise_svd(grid, config_flags, cv_size, xbx, be, iv, cvt, re, y, xhat, j)
+            else
+               call da_randomise_svd(grid, config_flags, cv_size, xbx, be, iv, cvt, re, y, xhat)
+            end if
+            if (svd_stage .ne. 2) then
+               call da_deallocate_observations (iv)
+               call da_deallocate_y (ob)
+               if (use_background_errors) call da_deallocate_background_errors (be)
 
-	 
+               call da_wrfvar_finalize
+#ifdef VAR4D
+               if (var4d) call da_finalize_model
+#endif
+               call wrf_message("*** Completed Stage 1 of Randomised SVD ***")
+               if (trace_use) call da_trace_exit("da_wrfvar_main")
+               if (trace_use) call da_trace_report
+
+               call wrfu_finalize
+               call wrf_shutdown
+               stop
+
+            end if
+         else
+            write(unit=stdout,fmt='("ensdim_svd, svd_outer, it = ",3I4)') &
+                ensdim_svd, svd_outer, it
+
+            CALL wrf_error_fatal('In randomised SVD. Check namelist settings.')
+         end if
+#endif
       else
 
          call da_minimise_cg( grid, config_flags, it, be % cv % size, & 
@@ -897,6 +967,19 @@
 
       ! Update outer-loop control variable
       cvt = cvt + xhat
+
+#if defined(LAPACK)
+      if ( use_randomsvd .and. ensdim_svd .gt. 0 ) then
+         write(cproc,fmt='(i4.4)') myproc
+         write(cit,fmt='(i2.2)') svd_outer
+         cvtfile_svd = 'cvt.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
+         call da_cv_io ('w', cvtfile_svd, cv_size, cvt(1:cv_size))
+
+!         cvtfile_svd = 'xhat.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
+!         call da_cv_io ('w', cvtfile_svd, cv_size, xhat(1:cv_size))
+      end if
+#endif
+
       if ( outer_loop_restart ) then
         open(unit=cvt_unit,status='unknown',file=trim(cvtfile),iostat=iost,form='UNFORMATTED')
         if (iost /= 0) then

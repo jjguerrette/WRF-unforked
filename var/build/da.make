@@ -10,6 +10,7 @@ WRFVAR_OBJS = \
    da_setup_structures.o \
    da_transfer_model.o \
    da_minimisation.o \
+   da_randomisation.o \
    da_vtox_transforms.o \
    da_obs.o \
    da_chem.o \
@@ -165,9 +166,9 @@ da_wrfvar.exe : $(WRF_SRC_ROOT_DIR)/frame/module_internal_header_util.o \
                 da_control.o $(WRFVAR_LIBS) da_wrfvar_main.o
 	$(RM) $@
 	@ if echo $(ARCHFLAGS) | $(FGREP) 'DVAR4D'; then \
-          $(LD) -o da_wrfvar.exe $(LDFLAGS) $(MODULE_DIRS) $(ESMF_IO_INC) da_control.o da_wrfvar_main.o $(WRFPLUS_DIR)/main/module_wrf_top.o -L. -lwrfvar $(CRTM_LIB) $(RTTOV_LIB) ${MADIS_LIB} ${BUFR_LIB} -L$(WRFPLUS_DIR)/main -lwrflib $(LIB) $(WAVELET_LIB) ; \
+          $(LD) -o da_wrfvar.exe $(LDFLAGS) $(MODULE_DIRS) $(ESMF_IO_INC) da_control.o da_wrfvar_main.o $(WRFPLUS_DIR)/main/module_wrf_top.o -L. -lwrfvar $(CRTM_LIB) $(RTTOV_LIB) ${MADIS_LIB} ${BUFR_LIB} -L$(WRFPLUS_DIR)/main -lwrflib $(LIB) $(WAVELET_LIB) $(LAPACK_LIB) ; \
         else                                 \
-          $(LD) -o da_wrfvar.exe $(LDFLAGS) $(MODULE_DIRS) $(ESMF_IO_INC) module_quilt_outbuf_ops.o da_control.o da_wrfvar_main.o -L. -lwrfvar $(CRTM_LIB) $(RTTOV_LIB) ${MADIS_LIB} ${BUFR_LIB} $(LIB) $(WAVELET_LIB) ; \
+          $(LD) -o da_wrfvar.exe $(LDFLAGS) $(MODULE_DIRS) $(ESMF_IO_INC) module_quilt_outbuf_ops.o da_control.o da_wrfvar_main.o -L. -lwrfvar $(CRTM_LIB) $(RTTOV_LIB) ${MADIS_LIB} ${BUFR_LIB} $(LIB) $(WAVELET_LIB) $(LAPACK_LIB) ; \
         fi
 	@ if test -x $@ ; then cd ../da; $(LN) ../build/$@ . ; fi
 
@@ -371,9 +372,7 @@ da_4dvar.o :
 	$(RM) $*.b
 	$(FC) -c $(FCFLAGS) $(PROMOTION) $(WRFPLUS_INC) $*.f
 
-da_wrfvar_main.o \
-da_wrfvar_io.o \
-da_wrfvar_top.o :
+da_wrfvar_io.o :
 	$(RM) $@
 	$(SED_FTN) $*.f90 > $*.b
 	$(CPP) $(CPPFLAGS) $(OMPCPP) $(FPPFLAGS) $(RTTOV_SRC) $*.b  > $*.f
@@ -389,6 +388,25 @@ da_wrfvar_top.o :
         else \
           if [ -n "$(OMP)" ] ; then echo COMPILING $*.f90 WITHOUT OMP ; fi ; \
 	  $(FC) -c $(FCFLAGS) $(PROMOTION) $(CRTM_SRC) $(RTTOV_SRC) $(WRFPLUS_INC) $(HDF5_INC) -I$(NETCDF)/include $*.f ; \
+        fi
+
+da_wrfvar_main.o \
+da_wrfvar_top.o :
+	$(RM) $@
+	$(SED_FTN) $*.f90 > $*.b
+	$(CPP) $(CPPFLAGS) $(OMPCPP) $(FPPFLAGS) $(RTTOV_SRC) $*.b  > $*.f
+	$(RM) $*.b
+	@ if echo $(ARCHFLAGS) | $(FGREP) 'DVAR4D'; then \
+          echo COMPILING $*.f90 for 4DVAR ; \
+          $(WRF_SRC_ROOT_DIR)/var/build/da_name_space.pl $*.f > $*.f.tmp ; \
+          mv $*.f.tmp $*.f ; \
+        fi
+	if $(FGREP) '!$$OMP' $*.f ; then \
+          if [ -n "$(OMP)" ] ; then echo COMPILING $*.f90 WITH OMP ; fi ; \
+	  $(FC) -c $(FCFLAGS) $(OMP) $(PROMOTION) $(CRTM_SRC) $(RTTOV_SRC) $(LAPACK_SRC) $(WRFPLUS_INC) $(HDF5_INC) -I$(NETCDF)/include $*.f ; \
+        else \
+          if [ -n "$(OMP)" ] ; then echo COMPILING $*.f90 WITHOUT OMP ; fi ; \
+	  $(FC) -c $(FCFLAGS) $(PROMOTION) $(CRTM_SRC) $(RTTOV_SRC) $(LAPACK_SRC) $(WRFPLUS_INC) $(HDF5_INC) -I$(NETCDF)/include $*.f ; \
         fi
 
 da_radiance.o :
@@ -470,6 +488,18 @@ da_minimisation.o :
           if [ -n "$(OMP)" ] ; then echo COMPILING $*.f90 WITHOUT OMP ; fi ; \
 	  $(FC) -c $(FCFLAGS) $(PROMOTION) $(CRTM_SRC) $(RTTOV_SRC) $(WRFPLUS_INC) $(HDF5_INC) $*.f ; \
         fi
+
+da_randomisation.o :
+        $(RM) $@
+        $(SED_FTN) $*.f90 > $*.b
+        $(CPP) $(CPPFLAGS) $(OMPCPP) $(FPPFLAGS) $*.b  > $*.f
+        $(RM) $*.b
+        @ if echo $(ARCHFLAGS) | $(FGREP) 'DVAR4D'; then \
+          echo COMPILING $*.f90 for 4DVAR ; \
+          $(WRF_SRC_ROOT_DIR)/var/build/da_name_space.pl $*.f > $*.f.tmp ; \
+          mv $*.f.tmp $*.f ; \
+        fi
+        $(FC) -c $(FCFLAGS) $(PROMOTION) $(LAPACK_SRC) $*.f
 
 da_blas.o \
 da_lapack.o :

@@ -208,16 +208,21 @@ subroutine da_setup_firstguess_wrf(xbx, grid, config_flags, ens)
    mkz = grid%xb % mkz
 
 #if (WRF_CHEM == 1)
-   grid%scaleant = 0.D0
-   do ic = PARAM_FIRST_SCALAR, num_scaleant
-      grid%scaleant(:,:,:,ic) = REAL( init_scale, 8 )
-   end do
+#if defined(LAPACK)
+   if (.not. use_randomsvd .or. svd_outer .eq. 1) then
+#endif
+      grid%scaleant = 0.D0
+      do ic = PARAM_FIRST_SCALAR, num_scaleant
+         grid%scaleant(:,:,:,ic) = REAL( init_scale, 8 )
+      end do
 
-   grid%scalebb = 0.D0
-   do ic = PARAM_FIRST_SCALAR, num_scalebb
-      grid%scalebb(:,:,:,ic) = REAL( init_scale, 8 )
-   end do
-
+      grid%scalebb = 0.D0
+      do ic = PARAM_FIRST_SCALAR, num_scalebb
+         grid%scalebb(:,:,:,ic) = REAL( init_scale, 8 )
+      end do
+#if defined(LAPACK)
+   end if
+#endif
    call da_transfer_wrftoxb_chem(grid)
 #endif
 

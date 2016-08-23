@@ -56,6 +56,9 @@ module da_minimisation
       sigma_r_acft, sigma_c_acft, &
       num_ant_steps, num_bb_steps, &
 #endif
+#if defined(LAPACK)
+      use_randomsvd, &
+#endif
       info_stop, &
       sound, mtgirs, sonde_sfc, synop, profiler, gpsref, gpspw, polaramv, geoamv, ships, metar, &
       satem, radar, ssmi_rv, ssmi_tb, ssmt1, ssmt2, airsr, pilot, airep,tamdar, tamdar_sfc, rain, &

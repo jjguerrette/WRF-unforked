@@ -85,7 +85,16 @@ subroutine da_calculate_aminusb(grid, config_flags,   &
                              , grid%vch &
 #endif
                              )
-      lam = ( 1.D0 / eignval(jj)  - 1.D0 )
+#if defined(LAPACK)
+      if (use_randomsvd) then
+         lam = ( eignval(jj) - 1.D0 )
+      else
+#endif
+         lam = ( 1.D0 / eignval(jj)  - 1.D0 )
+#if defined(LAPACK)
+      end if
+#endif
+
       ! Store result in corresponding I/O capable variables
 #if (WRF_CHEM == 1)
       do ic = PARAM_FIRST_SCALAR, num_scaleant
