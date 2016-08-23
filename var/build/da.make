@@ -490,16 +490,16 @@ da_minimisation.o :
         fi
 
 da_randomisation.o :
-        $(RM) $@
-        $(SED_FTN) $*.f90 > $*.b
-        $(CPP) $(CPPFLAGS) $(OMPCPP) $(FPPFLAGS) $*.b  > $*.f
-        $(RM) $*.b
-        @ if echo $(ARCHFLAGS) | $(FGREP) 'DVAR4D'; then \
+	$(RM) $@
+	$(SED_FTN) $*.f90 > $*.b
+	$(CPP) $(CPPFLAGS) $(OMPCPP) $(FPPFLAGS) $*.b  > $*.f
+	$(RM) $*.b
+	@ if echo $(ARCHFLAGS) | $(FGREP) 'DVAR4D'; then \
           echo COMPILING $*.f90 for 4DVAR ; \
           $(WRF_SRC_ROOT_DIR)/var/build/da_name_space.pl $*.f > $*.f.tmp ; \
           mv $*.f.tmp $*.f ; \
         fi
-        $(FC) -c $(FCFLAGS) $(PROMOTION) $(LAPACK_SRC) $*.f
+	$(FC) -c $(FCFLAGS) $(PROMOTION) $(LAPACK_SRC) $*.f
 
 da_blas.o \
 da_lapack.o :
