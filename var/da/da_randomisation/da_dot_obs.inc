@@ -25,6 +25,8 @@ real function da_dot_obs(nobs, x, y)
       yy = y(1:nobs)
 
       dtemp1(1) = da_dot(nobs, xx, yy)
+
+      deallocate(xx,yy)
    else
       dtemp1(1) = 0
    end if
@@ -32,8 +34,6 @@ real function da_dot_obs(nobs, x, y)
    dtmp = dtemp1(1)
    ! summation across processors:
    dtemp1(1) = wrf_dm_sum_real(dtmp)
- 
-   if (allocated(xx)) deallocate(xx,yy)
 
    da_dot_obs = dtemp1(1)
 

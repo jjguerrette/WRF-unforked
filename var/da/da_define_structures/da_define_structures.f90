@@ -959,9 +959,9 @@ module da_define_structures
    end type y_type
 
 #if (LAPACK == 1)
-   type vec_type
-      real, allocatable :: vec(:)
-   end type vec_type
+   type yhat_type
+      real, allocatable :: obs(:)
+   end type yhat_type
 #endif
 
    !--------------------------------------------------------------------------

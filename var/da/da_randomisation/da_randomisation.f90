@@ -11,7 +11,7 @@ module da_randomisation
    use da_control, only : svd_stage, ensmember, ensdim_svd, svd_outer, &
        myproc, filename_len, test_dm_exact, rootproc, cv_size_domain, &
        stdout, trace_use, svd_amat_type, svd_symm_type, &
-       num_ob_indexes, &
+       num_ob_indexes, read_omega, &
 #if (WRF_CHEM == 1)
        chem_surf, chem_acft, &
 #endif
@@ -23,7 +23,7 @@ module da_randomisation
        da_amat_mul
    use da_define_structures, only : iv_type, y_type, j_type, be_type, xbx_type, &
 #if defined(LAPACK)
-      vec_type, &
+       yhat_type, &
 #endif
 #if (WRF_CHEM == 1)
       da_allocate_y_chem, &
@@ -92,13 +92,13 @@ contains
 #include "da_dot_z.inc"
 #include "da_dot_cv_z.inc"
 #include "da_dot_obs.inc"
-#include "da_randomise_svd.inc"
-#include "da_randomise_svd_51.inc"
 #include "da_cv_io.inc"
 #include "da_yhat_io.inc"
 #if defined(LAPACK)
 #include "da_transform_ytoyhat.inc"
 #include "da_transform_ytoyhat_adj.inc"
 #endif
+#include "da_randomise_svd.inc"
+#include "da_randomise_svd_51.inc"
 
 end module da_randomisation

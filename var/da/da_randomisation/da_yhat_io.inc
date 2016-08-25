@@ -11,11 +11,11 @@ subroutine da_yhat_io (io_config, filename, nall, nobs, obs)
 
    implicit none
    
-   character,                          intent(in)    :: io_config              ! 'r' = Read; 'w' = Write
-   character(*),                       intent(in)    :: filename               ! I/O filename
-   integer, dimension(num_ob_indexes), intent(inout) :: nall
-   integer,                            intent(inout) :: nobs
-   real, allocatable,                  intent(inout) :: obs(:)
+   character,         intent(in)    :: io_config              ! 'r' = Read; 'w' = Write
+   character(*),      intent(in)    :: filename               ! I/O filename
+   integer,           intent(inout) :: nall(num_ob_indexes)
+   integer,           intent(inout) :: nobs
+   real, allocatable, intent(inout) :: obs(:)
 
    integer                         :: svd_unit, dummy
 

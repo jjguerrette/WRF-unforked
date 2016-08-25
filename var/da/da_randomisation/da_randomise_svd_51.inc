@@ -33,21 +33,25 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
 
 #if defined(LAPACK)
 
+   real(wp)                     :: SIG(1:ensdim_svd)
    real(wp)                     :: LAM(1:ensdim_svd)
-   real(wp), allocatable        :: BMAT(:,:)  ! B = Q ^T * A  or  B^T = A^T * Q, where A = R^-1/2 * H * U
-   real(wp), allocatable        :: omega(:,:) ! Gaussian draw
-   real(wp), allocatable        :: nuhat_T(:,:) ! Eigenvectors of A
-   real(wp)                     :: dot_cv
 
-   real(wp), allocatable        :: yhat_obs(:)  ! yhat = A * omega
-   real(wp), allocatable        :: YHAT(:,:)    ! yhat = A * omega
+   real(wp), allocatable   :: BMAT(:,:)  ! B = Q ^T * A  or  B^T = A^T * Q, where A = R^-1/2 * H * U
+   real(wp), allocatable   :: omega(:,:) ! Gaussian draw
+   real(wp), allocatable   :: nuhat_T(:,:) ! Eigenvectors of A
+   real(wp)                :: dot_cv
 
-   real(wp), allocatable        :: qhat_obs(:)  ! orthonormal basis set of A approx= Q * B
-   real(wp), allocatable        :: QHAT(:,:)    ! orthonormal basis set of A approx= Q * B
+   real(wp), allocatable   :: yhat_obs(:)  ! yhat = A * omega
+   real(wp), allocatable   :: YHAT(:,:)    ! yhat = A * omega
 
+   real(wp), allocatable   :: qhat_obs(:)  ! orthonormal basis set of A approx= Q * B
+   real(wp), allocatable   :: QHAT(:,:)    ! orthonormal basis set of A approx= Q * B
 
-   integer, dimension(num_ob_indexes) :: nall
-   integer, allocatable :: nobs(:)
+   type (y_type)                :: jo_grad_y    ! Grad_y(jo)
+   real                         :: grad_jo(cv_size)
+
+   integer                      :: nall(num_ob_indexes)
+   integer, allocatable         :: nobs(:)
 
    integer                      :: neign                         ! Number of non-truncated eigenpairs
    
@@ -143,7 +147,7 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
 #endif
                  )
 
-         call da_tansform_ytoyhat (iv, y, yhat_obs, nall)
+         call da_transform_ytoyhat (iv, y, yhat_obs, nall)
 
          if (allocated(yhat_obs)) then
             if (size(yhat_obs) .ne. sum(nall) .or. sum(nall).le.0) then
@@ -152,8 +156,11 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
             end if
          end if
 
+         allocate(nobs(1))
+         nobs(1) = sum(nall)
          filename = 'yhat_obs.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
-         call da_yhat_io('w', filename, nall, sum(nall), yhat_obs)
+         call da_yhat_io('w', filename, nall, nobs(1), yhat_obs)
+         deallocate(nobs)
 
          if (allocated(yhat_obs)) deallocate(yhat_obs)
 
@@ -185,7 +192,7 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
             if (nobs(iens) .gt. 0) then
                allocate(YHAT(1:nobs(1),nens))
             else
-               deallocate(yhat_obs)
+!               deallocate(yhat_obs)
                exit
             end if
          else
@@ -223,13 +230,17 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
          if (nobs(1) .gt. 0) QHAT(:,iens) = QHAT(:,iens) / beta
       end do
 
+      allocate(qhat_obs(1:nobs(1)))
       ! Write qhat vectors to disk
       do iens = 1, nens
          write(unit=stdout,fmt='("Writing qhat vectors to disk: ",i3)') iens
          write(cens,fmt='(i4.4)') iens
          filename = 'qhat_obs.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
-         call da_yhat_io('w', filename, nall, nobs(1), QHAT(:,iens))
+
+         qhat_obs = QHAT(:,iens)
+         call da_yhat_io('w', filename, nall, nobs(1), qhat_obs)
       end do
+      deallocate(qhat_obs)
 
       if (allocated(YHAT)) deallocate(YHAT)
       if (allocated(QHAT)) deallocate(QHAT)
@@ -248,7 +259,7 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
 
       call da_yhat_io('r', filename, nall, nobs(1), qhat_obs)
 
-      call da_tansform_ytoyhat_adj (iv, qhat_obs, nall, jo_grad_y)
+      call da_transform_ytoyhat_adj (iv, qhat_obs, nall, jo_grad_y)
 
       deallocate(nobs)
       
@@ -290,13 +301,13 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
       call da_cv_io ('r', filename, cv_size, ghat)
 
       !SVD of BMAT
-      call GESVD(BMAT, LAM, VT = nuhat_T, INFO = info)
+      call GESVD(BMAT, SIG, VT = nuhat_T, INFO = info)
 
       neign = ensdim_svd
 
       !Eigenvalues of A^T * A = U^T H^T R^-1 H U are the square of singular values of A
       do i = 1, neign
-         LAM(i) = LAM(i) * LAM(i)
+         LAM(i) = SIG(i) * SIG(i)
       end do
 
       write(cnens,fmt='(I0)') neign

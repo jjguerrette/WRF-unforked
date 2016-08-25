@@ -6,9 +6,9 @@ subroutine da_ytoyhat_chem_surf_adj(iv, qhat, jo_grad_y)
 
    implicit none
 
-   type (iv_type), intent(in)     :: iv          ! Innovation vector.
-   real, dimension(:), intent(in) :: qhat
-   type (y_type),  intent(inout)  :: jo_grad_y   ! Grad_y(Jo)
+   type (iv_type),    intent(in)    :: iv          ! Innovation vector.
+   real, allocatable, intent(inout) :: qhat(:)
+   type (y_type),     intent(inout) :: jo_grad_y   ! Grad_y(Jo)
 
    integer :: n, ichem, iobs
    
@@ -19,7 +19,8 @@ subroutine da_ytoyhat_chem_surf_adj(iv, qhat, jo_grad_y)
       do n=1, iv%info(chem_surf)%nlocal
          do ichem = 1, num_chem_surf-1
             if (iv%chem_surf(n)%chem(ichem)%qc < obs_qc_pointer .OR. &
-                .not.iv%info(chem_surf)%proc_domain(1,n)) qhat(iobs) = 0.0
+                .not.iv%info(chem_surf)%proc_domain(1,n)) &
+               qhat(iobs) = 0.0
 
             jo_grad_y%chem_surf(n)%chem(ichem) = qhat(iobs) / iv%chem_surf(n)%chem(ichem)%error
 
