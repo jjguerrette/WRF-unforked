@@ -92,7 +92,7 @@ module da_wrfvar_top
 #endif
       da_kmat_mul
 #if defined(LAPACK)
-   use da_randomisation, only: da_randomise_svd, da_cv_io
+   use da_randomisation, only: da_randomise_svd, da_randomise_svd_51, da_cv_io
 #endif
    use da_obs, only : da_transform_xtoy_adj 
    use da_obs_io, only : da_write_filtered_obs, da_write_obs, da_final_write_obs , &

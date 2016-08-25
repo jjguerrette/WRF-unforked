@@ -1,0 +1,341 @@
+subroutine da_randomise_svd_51(grid, config_flags,            &
+                           cv_size, xbx, be, iv, cv, &
+                           re, y, xhat, j_cost) !!, eignvec, LAM, neign)
+
+   !-------------------------------------------------------------------------
+   ! Purpose:         Main randomized SVD routine, separated into 2 stages 
+   !
+   ! Here 
+   !    cv   is updated in outer-loop.
+   !    xhat is the control variable in inner-loop.
+   !
+   ! Called from da_solve
+   !
+   ! History: 09/01/2016  Creation (JJ Guerrette)
+   !
+   ! References: Halko et al. (2011); Bousserez and Henze (2016)
+   !
+   !-------------------------------------------------------------------------
+
+   implicit none
+
+   type(domain), intent(inout)       :: grid
+   type(grid_config_rec_type), intent(inout) :: config_flags
+   integer, intent(in)               :: cv_size                       ! Total cv size
+   type (xbx_type),intent(inout)     :: xbx                           ! Header & non-gridded vars.
+   type (be_type), intent(in)        :: be                            ! background error structure.
+   type (iv_type), intent(inout)     :: iv                            ! ob. increment vector.
+   real, intent(inout)               :: cv(1:cv_size)                 ! control variable (local).
+   type (y_type), intent(inout)      :: re                            ! residual (o-a) structure.
+   type (y_type), intent(inout)      :: y                             ! y = H(x_inc) structure.
+   real, intent(out)                 :: xhat(1:cv_size)               ! control variable (local).
+   type (j_type), optional, intent(out) :: j_cost                        ! cost function
+
+#if defined(LAPACK)
+
+   real(wp)                     :: LAM(1:ensdim_svd)
+   real(wp), allocatable        :: BMAT(:,:)  ! B = Q ^T * A  or  B^T = A^T * Q, where A = R^-1/2 * H * U
+   real(wp), allocatable        :: omega(:,:) ! Gaussian draw
+   real(wp), allocatable        :: nuhat_T(:,:) ! Eigenvectors of A
+   real(wp)                     :: dot_cv
+
+   real(wp), allocatable        :: yhat_obs(:)  ! yhat = A * omega
+   real(wp), allocatable        :: YHAT(:,:)    ! yhat = A * omega
+
+   real(wp), allocatable        :: qhat_obs(:)  ! orthonormal basis set of A approx= Q * B
+   real(wp), allocatable        :: QHAT(:,:)    ! orthonormal basis set of A approx= Q * B
+
+
+   integer, dimension(num_ob_indexes) :: nall
+   integer, allocatable :: nobs(:)
+
+   integer                      :: neign                         ! Number of non-truncated eigenpairs
+   
+   integer                      :: iens, jens, nens, i, j, ccount
+#if (WRF_CHEM != 1)
+#ifdef CLOUD_CV
+   integer                      :: mz(11)
+#else
+   integer                      :: mz(7)
+#endif
+#else
+#ifdef CLOUD_CV
+   integer                      :: mz(13)
+#else
+   integer                      :: mz(9)
+#endif
+#endif
+   integer                      :: jp_start, jp_end       ! Start/end indices of Jp.
+   real                         :: ghat(1:cv_size)        ! cv copy.
+   integer                      :: info
+
+   real                         :: gdot, beta
+   real                         :: j0_total
+   character*10                 :: cproc, cens
+   character(len=filename_len)  :: filename
+   character(len=3) :: cnens=""
+  
+   if (trace_use) call da_trace_entry("da_randomise_svd_51")
+
+   write(unit=stdout,fmt='(A)') 'Minimize cost function using randomized SVD method'
+   write(unit=stdout,fmt=*) ' '
+
+   !-------------------------------------------------------------------------
+   ! [1.0] Initialization:
+   !-------------------------------------------------------------------------
+#if (WRF_CHEM != 1)
+#ifdef CLOUD_CV
+   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz,  be%v6%mz, be%v7%mz,  be%v8%mz, be%v9%mz, be%alpha%mz, be % ne /)
+#else
+   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz,be%alpha%mz, be % ne /)
+#endif
+
+#else
+
+#ifdef CLOUD_CV
+   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz,  be%v6%mz, be%v7%mz,  be%v8%mz, be%v9%mz, be%alpha%mz, be%ne, be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
+#else
+   mz =  (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne, be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
+#endif
+#endif
+
+   jp_start   = be % cv % size_jb + be % cv % size_je + 1
+   jp_end     = be % cv % size_jb + be % cv % size_je + be % cv % size_jp
+
+   nens = ensdim_svd
+
+   xhat = 0.D0
+
+   if ( svd_stage .eq. 1 .and. ensmember .gt. 0) then
+      
+      write(cproc,fmt='(i4.4)') myproc
+      write(cens,fmt='(i4.4)') ensmember
+
+      if ( ensmember .eq. nens+1 ) then 
+         ! Calculate grad J for xhat = 0
+         call da_calculate_j(svd_outer, 0, cv_size, be%cv%size_jb, be%cv%size_je, be%cv%size_jp, &
+                             be%cv%size_jl, xbx, be, iv, xhat, cv, re, y, j_cost, ghat, grid, config_flags)
+         j0_total = j_cost%total
+         if (j0_total == 0.0) return
+         ghat = - ghat
+
+         ! Write ghat to file
+         filename = 'ghat.p'//trim(adjustl(cproc))
+         call da_cv_io ('w', filename, cv_size, ghat)
+
+      else if (ensmember .gt. 0 .and. ensmember .le. nens) then
+         ! Generate vectors in Y = A*OMEGA (Halko, Algorithm 4.1), where A = R^-1/2 * H * U 
+         allocate(omega(1:cv_size,1))
+
+         if (read_omega) then
+            ! Read in omega vector from this ensemble on each processor
+            write(unit=stdout,fmt='("Reading omega ensemble member : ",i3)') iens
+            filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+            call da_cv_io ('r', filename, cv_size, omega(1:cv_size,1))
+         else
+            call da_set_randomcv(cv_size, omega(:,1))
+         end if
+
+         call da_transform_vtoy(cv_size, be, grid%ep, omega(1:cv_size,1), iv, grid%vp, &
+                 grid%vv, grid%vp6, grid%vv6, xbx, y, grid, config_flags &
+#if (WRF_CHEM == 1)
+                 , grid%vch &
+#endif
+                 )
+
+         call da_tansform_ytoyhat (iv, y, yhat_obs, nall)
+
+         if (allocated(yhat_obs)) then
+            if (size(yhat_obs) .ne. sum(nall) .or. sum(nall).le.0) then
+               write(unit=stdout,fmt='(A)') 'FATAL ERROR: Incorrect size yhat_obs'
+               CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
+            end if
+         end if
+
+         filename = 'yhat_obs.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+         call da_yhat_io('w', filename, nall, sum(nall), yhat_obs)
+
+         if (allocated(yhat_obs)) deallocate(yhat_obs)
+
+         !Write omega to file
+         filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+         call da_cv_io ('w', filename, cv_size, omega(1:cv_size,1))
+         deallocate(omega)
+
+      else
+         write(unit=stdout,fmt='(A,I4)') 'FATAL ERROR: ensmember should be between 1 and nens+1, not ',ensmember
+         CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
+
+      end if
+
+   else if ( svd_stage .eq. 2 ) then
+
+      allocate(nobs(nens))
+      write(cproc,fmt='(i4.4)') myproc
+
+      ! Read in yhat vector from all ensembles on each processor
+      do iens = 1, nens
+         write(unit=stdout,fmt='("Reading yhat ensemble member : ",i3)') iens
+         write(cens,fmt='(i4.4)') iens
+         filename = 'yhat_obs.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+
+         call da_yhat_io ('r', filename, nall, nobs(iens), yhat_obs)
+
+         if (iens .eq. 1) then
+            if (nobs(iens) .gt. 0) then
+               allocate(YHAT(1:nobs(1),nens))
+            else
+               deallocate(yhat_obs)
+               exit
+            end if
+         else
+            if (nobs(iens) .ne. nobs(iens-1)) then
+               write(unit=stdout,fmt='(A,2I6)') &
+                  'FATAL ERROR: nobs does not match across ensembles',nobs(iens),nobs(iens-1)
+               CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
+
+               !May need to add a test for nall also...
+            end if
+         end if
+
+         YHAT(:,iens) = yhat_obs
+
+         deallocate(yhat_obs)
+
+      end do
+
+!      if (nobs(1) .gt. 0) then
+         allocate(QHAT(1:nobs(1),nens))
+!      end if
+
+      ! Generate qhat basis vectors
+      do iens = 1, nens
+         if (nobs(1) .gt. 0) QHAT(:,iens) = YHAT(:,iens)
+         if (iens .gt. 1) then
+            do jens = iens-1, 1, -1
+               gdot = da_dot_obs(nobs(1), QHAT(:,iens), QHAT(:,jens))
+               
+               if (nobs(1) .gt. 0) QHAT(:,iens) = QHAT(:,iens) - gdot * QHAT(:,jens)
+            end do
+         end if
+
+         beta   = SQRT(da_dot_obs(nobs(1), QHAT(:,iens), QHAT(:,iens)))
+         if (nobs(1) .gt. 0) QHAT(:,iens) = QHAT(:,iens) / beta
+      end do
+
+      ! Write qhat vectors to disk
+      do iens = 1, nens
+         write(unit=stdout,fmt='("Writing qhat vectors to disk: ",i3)') iens
+         write(cens,fmt='(i4.4)') iens
+         filename = 'qhat_obs.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+         call da_yhat_io('w', filename, nall, nobs(1), QHAT(:,iens))
+      end do
+
+      if (allocated(YHAT)) deallocate(YHAT)
+      if (allocated(QHAT)) deallocate(QHAT)
+      deallocate(nobs)
+   else if ( svd_stage .eq. 3 ) then
+
+      call da_allocate_y(iv, jo_grad_y)
+#if (WRF_CHEM == 1)
+      call da_allocate_y_chem(iv, jo_grad_y)
+#endif
+
+      allocate(nobs(1))
+      write(cproc,fmt='(i4.4)') myproc
+      write(cens,fmt='(i4.4)') ensmember
+      filename = 'qhat_obs.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+
+      call da_yhat_io('r', filename, nall, nobs(1), qhat_obs)
+
+      call da_tansform_ytoyhat_adj (iv, qhat_obs, nall, jo_grad_y)
+
+      deallocate(nobs)
+      
+      if (allocated(qhat_obs)) deallocate(qhat_obs)
+
+      call da_transform_vtoy_adj(cv_size, be, grid%ep, grad_jo, iv, &
+              grid%vp, grid%vv, grid%vp6, grid%vv6, &
+              xbx, jo_grad_y, grid, config_flags, .true. &
+#if (WRF_CHEM == 1)
+              , grid%vch &
+#endif
+              )
+      grad_jo = - grad_jo    !! Compensate for sign in calculation of grad_v (Jo)
+
+      ! Write BMAT row to file
+      filename = 'bhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+      call da_cv_io ('w', filename, cv_size, grad_jo)
+
+      call da_deallocate_y(jo_grad_y)
+
+   else if ( svd_stage .eq. 4 ) then
+      ! Eigen decomposition of A (Algorithm 5.1 of Halko)
+
+      allocate(BMAT(nens,1:cv_size))
+      allocate(nuhat_T(nens,1:cv_size))
+
+      write(cproc,fmt='(i4.4)') myproc
+
+      ! Read in BMAT for all rows on each processor, BMAT = (A^T * Q)^T
+      do iens = 1, nens
+         write(unit=stdout,fmt='("Reading BMAT row : ",i3)') iens
+         write(cens,fmt='(i4.4)') iens
+         filename = 'bhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+         call da_cv_io ('r', filename, cv_size, BMAT(iens,1:cv_size))
+      end do
+
+      ! Read gradient
+      filename = 'ghat.p'//trim(adjustl(cproc))
+      call da_cv_io ('r', filename, cv_size, ghat)
+
+      !SVD of BMAT
+      call GESVD(BMAT, LAM, VT = nuhat_T, INFO = info)
+
+      neign = ensdim_svd
+
+      !Eigenvalues of A^T * A = U^T H^T R^-1 H U are the square of singular values of A
+      do i = 1, neign
+         LAM(i) = LAM(i) * LAM(i)
+      end do
+
+      write(cnens,fmt='(I0)') neign
+      write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'Eigenvalues(r): ',LAM(1:ensdim_svd)
+
+      ! Write nuhat vectors to disk
+      do i = 1, neign
+         write(unit=stdout,fmt='("Writing nuhat vectors to disk: ",i3)') i
+         write(cens,fmt='(i4.4)') i
+         filename = 'nuhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+         call da_cv_io ('w', filename, cv_size, nuhat_T(i,1:cv_size))
+      end do
+
+      do i = 1, neign
+         LAM(i) = 1.D0 / ( LAM(i) + 1.D0 )
+      end do
+
+      ! (2) Construct low rank estimate of A^-1 * ghat with leading neign modes of A
+      do i = 1, neign
+         dot_cv = da_dot_cv(cv_size, nuhat_T(i,:), ghat, grid, mz, jp_start, jp_end)
+         write(unit=stdout,fmt='("i, dot_cv = ",I3,D25.16)') i,dot_cv
+
+         xhat = xhat + LAM(i) * nuhat_T(i,:) * dot_cv
+      end do
+
+      deallocate(BMAT)
+      deallocate(nuhat_T)
+
+   else
+      write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: svd_stage should be 0, 1, or 2, not ',svd_stage
+      CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
+   end if
+   if (trace_use) call da_trace_exit("da_randomise_svd_51")
+
+#else
+   call da_error(__FILE__,__LINE__, &
+       (/"Must compile with $LAPACK option for randomised svd"/))
+#endif
+
+end subroutine da_randomise_svd_51
+
+

@@ -958,6 +958,12 @@ module da_define_structures
 #endif
    end type y_type
 
+#if (LAPACK == 1)
+   type vec_type
+      real, allocatable :: vec(:)
+   end type vec_type
+#endif
+
    !--------------------------------------------------------------------------
    ! [4.0] Control variable structure:
    !--------------------------------------------------------------------------

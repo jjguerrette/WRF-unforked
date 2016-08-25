@@ -1,0 +1,35 @@
+subroutine da_ytoyhat_chem_surf_adj(iv, qhat, jo_grad_y)
+
+   !----------------------------------------------------------------------
+   ! Purpose: Applies obs inverse on re-vector
+   !----------------------------------------------------------------------
+
+   implicit none
+
+   type (iv_type), intent(in)     :: iv          ! Innovation vector.
+   real, dimension(:), intent(in) :: qhat
+   type (y_type),  intent(inout)  :: jo_grad_y   ! Grad_y(Jo)
+
+   integer :: n, ichem, iobs
+   
+   if (trace_use) call da_trace_entry("da_ytoyhat_chem_surf_adj")       
+
+   if (allocated(qhat)) then
+      iobs = 1
+      do n=1, iv%info(chem_surf)%nlocal
+         do ichem = 1, num_chem_surf-1
+            if (iv%chem_surf(n)%chem(ichem)%qc < obs_qc_pointer .OR. &
+                .not.iv%info(chem_surf)%proc_domain(1,n)) qhat(iobs) = 0.0
+
+            jo_grad_y%chem_surf(n)%chem(ichem) = qhat(iobs) / iv%chem_surf(n)%chem(ichem)%error
+
+            iobs = iobs + 1
+         end do
+      end do
+   end if
+
+   if (trace_use) call da_trace_exit("da_ytoyhat_chem_surf_adj")  
+     
+end subroutine da_ytoyhat_chem_surf_adj
+
+

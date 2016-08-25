@@ -58,6 +58,7 @@
    character*10                 :: cproc
    character*10                 :: cit
    character(len=filename_len)  :: cvtfile_svd
+   integer                      :: run_hours0
 !   logical                      :: svd_nl
 #endif
 
@@ -783,6 +784,8 @@
             if ( checkpoint_interval .eq. 0 ) call da_model_lbc_off
          endif
 
+         run_hours0 = adtl_run_hours
+
          call nl_set_var4d_run (head_grid%id, .true.)
          if ( checkpoint_interval .gt. 0 &
 #if defined(LAPACK)
@@ -792,6 +795,7 @@
              write_checkpoints = 1
 #if defined(LAPACK)
           else
+             adtl_run_hours = interval_seconds / 3600
              write_checkpoints = 2
 #endif
           end if
@@ -809,6 +813,8 @@
                   call da_write_obs_chem( iv, ob, it )
 #if defined(LAPACK)
                end if
+         else
+            adtl_run_hours = run_hours0
 #endif
          end if
 
@@ -920,11 +926,22 @@
                call da_cv_io ('r', cvtfile_svd, cv_size, cvt(1:cv_size))
             end if
             if (svd_stage .eq. 1 .and. ensmember .eq. ensdim_svd+1) then
-               call da_randomise_svd(grid, config_flags, cv_size, xbx, be, iv, cvt, re, y, xhat, j)
+               select case (svd_type)
+                  case(1)
+                     call da_randomise_svd_51(grid, config_flags, cv_size, xbx, be, iv, cvt, re, y, xhat, j)
+                  case(6)
+                     call da_randomise_svd(grid, config_flags, cv_size, xbx, be, iv, cvt, re, y, xhat, j)
+               end select
             else
-               call da_randomise_svd(grid, config_flags, cv_size, xbx, be, iv, cvt, re, y, xhat)
+               select case (svd_type)
+                  case(1)
+                     call da_randomise_svd_51(grid, config_flags, cv_size, xbx, be, iv, cvt, re, y, xhat)
+                  case(6)
+                     call da_randomise_svd(grid, config_flags, cv_size, xbx, be, iv, cvt, re, y, xhat)
+               end select
             end if
-            if (svd_stage .ne. 2) then
+            if ((svd_type .eq. 1 .and. svd_stage .ne. 4) .or. &
+                (svd_type .eq. 6 .and. svd_stage .ne. 2) ) then
                call da_deallocate_observations (iv)
                call da_deallocate_y (ob)
                if (use_background_errors) call da_deallocate_background_errors (be)

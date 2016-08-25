@@ -144,11 +144,15 @@ subroutine da_randomise_svd(grid, config_flags,            &
 
       else if (ensmember .gt. 0 .and. ensmember .le. nens) then
          allocate(omega(1:cv_size,1))
+         if (read_omega) then
+            ! Read in omega vector from this ensemble on each processor
+            write(unit=stdout,fmt='("Reading omega ensemble member : ",i3)') iens
+            filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+            call da_cv_io ('r', filename, cv_size, omega(1:cv_size,1))
+         else
+            call da_set_randomcv(cv_size, omega(:,1))
+         end if
 
-         call da_set_randomcv(cv_size, omega(:,1))
-
-!         call da_calculate_gradjo(cv_size,be%cv%size_jb,be%cv%size_je,be%cv%size_jp, &
-!                                 be%cv%size_jl, xbx,be,iv,omega(1:cv_size,1),y,yhat(1:cv_size,1),grid,config_flags)
          call da_calculate_gradj(svd_outer, 1, cv_size,be%cv%size_jb,be%cv%size_je,be%cv%size_jp, &
                                  be%cv%size_jl, xbx,be,iv,omega(1:cv_size,1),y,yhat(1:cv_size,1),grid,config_flags)
 

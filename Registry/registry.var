@@ -399,6 +399,8 @@ rconfig   integer   svd_stage               namelist,wrfvar6  1  0        - "svd
 rconfig   integer   ensdim_svd              namelist,wrfvar6  1  0        - "ensdim_svd"               ""  ""
 rconfig   integer   ensmember               namelist,wrfvar6  1  0        - "ensmember"               ""  ""
 rconfig   integer   svd_outer               namelist,wrfvar6  1  0        - "svd_outer"               ""  ""
+rconfig   integer   svd_type                namelist,wrfvar6  1  6        - "svd_type"                ""  ""
+rconfig   logical   read_omega              namelist,wrfvar6  1  .false.  - "read_omega"              ""  ""
 rconfig   integer   svd_amat_type           namelist,wrfvar6  1  0        - "svd_amat_type"           ""  ""
 rconfig   integer   svd_symm_type           namelist,wrfvar6  1  0        - "svd_symm_type"           ""  ""
 rconfig   integer   cv_options              namelist,wrfvar7  1  5        - "cv_options"               ""  ""
