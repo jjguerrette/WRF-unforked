@@ -23,9 +23,6 @@ subroutine da_transform_ytoyhat(iv, y, yhat_obs, nall)
    do itype = 1, num_ob_indexes
       nall(itype) = 0
 
-write(unit=stdout,fmt='(A,2I6)') &
-   'DEBUG_A01',itype,nall(itype)
-
       if ( iv%info(itype)%nlocal .gt. 0 ) then
          select case (itype)
 !            case (sound)
@@ -101,23 +98,15 @@ write(unit=stdout,fmt='(A,2I6)') &
             nall(itype) = size(yhat(itype)%obs)
          end if
       end if
-
-
-write(unit=stdout,fmt='(A,2I6)') &
-   'DEBUG_A02',itype,nall(itype)
-
    end do
 
    if (sum(nall) .gt. 0) then
       allocate( yhat_obs(sum(nall)) )
 
+      yhat_obs(:) = 0.D0
+
       istart = 1
       do itype = 1, num_ob_indexes
-
-write(unit=stdout,fmt='(A,2I6)') &
-   'DEBUG_A03',itype,nall(itype)
-
-
          if ( nall(itype) .gt. 0 .and. allocated(yhat(itype)%obs) ) then
             iend = istart + nall(itype) - 1
 
@@ -125,10 +114,6 @@ write(unit=stdout,fmt='(A,2I6)') &
 
             istart = iend + 1
          end if
-
-write(unit=stdout,fmt='(A,2I6)') &
-   'DEBUG_A04',itype,nall(itype)
-
       end do
    end if
 

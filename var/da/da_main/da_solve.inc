@@ -833,7 +833,7 @@
 #ifdef VAR4D
             if (var4d) call da_finalize_model
 #endif
-            call wrf_message("*** WRF-Var generaed chem_hx successfully ***")
+            call wrf_message("*** WRF-Var generated chem_hx successfully ***")
             if (trace_use) call da_trace_exit("da_wrfvar_main")
             if (trace_use) call da_trace_report
 
@@ -950,7 +950,11 @@
 #ifdef VAR4D
                if (var4d) call da_finalize_model
 #endif
-               call wrf_message("*** Completed Stage 1 of Randomised SVD ***")
+               write(unit=message(1),fmt='(A,I2,A)') &
+                 "***Completed Stage ",svd_stage," of Randomized SVD***"
+!               call wrf_message("*** Completed Stage 1 of Randomised SVD ***")
+               call wrf_message(message(1))
+
                if (trace_use) call da_trace_exit("da_wrfvar_main")
                if (trace_use) call da_trace_report
 

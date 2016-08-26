@@ -21,26 +21,23 @@ subroutine da_ytoyhat_chem_acft(iv, y, yhat)
 
       allocate(yhat( iv%info(chem_acft)%nlocal * (num_chem_acft-1) * num_platform ))
 
-write(unit=stdout,fmt='(A)') &
-   'DEBUG_B01'
-
       yhat(:) = 0.D0
-
-write(unit=stdout,fmt='(A)') &
-   'DEBUG_B02'
 
       iobs = 1
       do n=1, iv%info(chem_acft)%nlocal
          do ichem = 1, num_chem_acft-1
             do iplt = 1, num_platform
-               if (iv%chem_acft(n)%chem(ichem,iplt)%qc < obs_qc_pointer .OR. &
-                   .not.iv%info(chem_acft)%proc_domain(iplt,n)) &
+
+write(unit=stdout,fmt='("DEBUG_01:",3I5,2D25.14)') n,ichem,iplt,y%chem_acft(n)%chem(ichem,iplt),iv%chem_acft(n)%chem(ichem,iplt)%error
+
+!!                   .not.iv%info(chem_acft)%proc_domain(iplt,n)) &
+
+               if (iv%chem_acft(n)%chem(ichem,iplt)%qc < obs_qc_pointer) &
                   y%chem_acft(n)%chem(ichem,iplt) = 0.0
 
                yhat(iobs) = -y%chem_acft(n)%chem(ichem,iplt) / iv%chem_acft(n)%chem(ichem,iplt)%error
 
-write(unit=stdout,fmt='(A,3I6,D21.12)') &
-   'DEBUG_B03',n,ichem,iplt,yhat(iobs)
+write(unit=stdout,fmt='("DEBUG_02:",I5,2D25.14)') iobs, y%chem_acft(n)%chem(ichem,iplt),iv%chem_acft(n)%chem(ichem,iplt)%error, yhat(iobs)
 
                iobs = iobs + 1
             end do

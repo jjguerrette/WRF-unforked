@@ -18,15 +18,17 @@ subroutine da_ytoyhat_chem_surf(iv, y, yhat)
 
    if ((num_chem_surf-1) .gt. 0 ) then
 
-      allocate(yhat( iv%info(chem_acft)%nlocal * (num_chem_surf-1) ))
+      allocate(yhat( iv%info(chem_surf)%nlocal * (num_chem_surf-1) ))
 
       yhat(:) = 0.D0
 
       iobs = 1
       do n=1, iv%info(chem_surf)%nlocal
          do ichem = 1, num_chem_surf-1
-            if (iv%chem_surf(n)%chem(ichem)%qc < obs_qc_pointer .OR. &
-                .not.iv%info(chem_surf)%proc_domain(1,n)) &
+
+!!                .not.iv%info(chem_surf)%proc_domain(1,n)) &
+
+            if (iv%chem_surf(n)%chem(ichem)%qc < obs_qc_pointer) &
                y%chem_surf(n)%chem(ichem) = 0.0
 
             yhat(iobs) = -y%chem_surf(n)%chem(ichem) / iv%chem_surf(n)%chem(ichem)%error
