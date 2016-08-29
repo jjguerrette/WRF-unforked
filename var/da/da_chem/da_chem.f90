@@ -5,7 +5,9 @@ module da_chem
 ! and CVs
 !---------------------------------------------------------------------------
 
+#ifdef DM_PARALLEL
 use module_dm, only : wrf_dm_sum_reals, wrf_dm_sum_real
+#endif
 use module_domain, only : head_grid
 use da_reporting, only : da_message,da_warning,message
 !   use da_wrf_interfaces, only : wrf_debug
@@ -61,6 +63,7 @@ contains
 #include "da_copy_chem_to_model.inc"
 #include "da_retrieve_chem_hx.inc"
 #include "da_write_obs_chem.inc"
+#include "da_read_obs_chem_again.inc"
 #include "da_calculate_chem_forcing_ad.inc"
 #include "da_get_innov_vector_chem_surf.inc"
 #include "da_get_innov_vector_chem_acft.inc"

@@ -11,7 +11,7 @@ subroutine da_transfer_wrftltoy_chem( grid, iv, y )
    type (y_type) , intent(inout) :: y           ! y = h (grid%xa) (linear)
 
    integer :: n, ichem, iplt        ! Loop counters
-   integer :: iloc, jloc
+!   integer :: iloc, jloc
 
    real, allocatable :: model_chem(:)
 
@@ -24,8 +24,8 @@ subroutine da_transfer_wrftltoy_chem( grid, iv, y )
       grid%g_surf_hx(:,:) = 0.D0
       do ichem = 1 ,num_chem_surf-1
          do n=iv%info(chem_surf)%n1,iv%info(chem_surf)%n2
-            iloc = iv%info(chem_surf)%i(iplt,n)
-            jloc = iv%info(chem_surf)%j(iplt,n)
+!            iloc = iv%info(chem_surf)%i(iplt,n)
+!            jloc = iv%info(chem_surf)%j(iplt,n)
             if ( iv%info(chem_surf)%proc_domain(1,n) ) then
                grid%g_surf_hx(n,ichem+1) = model_grid%g_surf_hx(n,ichem+1)
                model_chem(n) = grid%g_surf_hx(n,ichem+1)
@@ -46,12 +46,16 @@ subroutine da_transfer_wrftltoy_chem( grid, iv, y )
          do iplt = 1 ,num_platform
             grid%g_acft_hx(:,iplt,ichem+1) = model_grid%g_acft_hx(:,iplt,ichem+1)
             do n=iv%info(chem_acft)%n1,iv%info(chem_acft)%n2
-               iloc = iv%info(chem_acft)%i(iplt,n)
-               jloc = iv%info(chem_acft)%j(iplt,n)
+!               iloc = iv%info(chem_acft)%i(iplt,n)
+!               jloc = iv%info(chem_acft)%j(iplt,n)
+
+write(unit=stdout,fmt='("DEBUG_A0:",I5,L,2D25.14)') n, iv%info(chem_acft)%proc_domain(iplt,n), model_grid%g_acft_hx(n,iplt,ichem+1), grid%g_acft_hx(n,iplt,ichem+1)
                if ( iv%info(chem_acft)%proc_domain(iplt,n) ) then
                   model_chem(n) = grid%g_acft_hx(n,iplt,ichem+1)
                   y%chem_acft(n)%chem(ichem,iplt) = model_chem(n)
                end if
+write(unit=stdout,fmt='("DEBUG_A1:",I5,2D25.14)') n, model_chem(n), y%chem_acft(n)%chem(ichem,iplt)
+
             end do
          end do
       end do

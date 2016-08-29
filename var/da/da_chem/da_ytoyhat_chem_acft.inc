@@ -37,7 +37,7 @@ write(unit=stdout,fmt='("DEBUG_01:",3I5,2D25.14)') n,ichem,iplt,y%chem_acft(n)%c
 
                yhat(iobs) = -y%chem_acft(n)%chem(ichem,iplt) / iv%chem_acft(n)%chem(ichem,iplt)%error
 
-write(unit=stdout,fmt='("DEBUG_02:",I5,2D25.14)') iobs, y%chem_acft(n)%chem(ichem,iplt),iv%chem_acft(n)%chem(ichem,iplt)%error, yhat(iobs)
+write(unit=stdout,fmt='("DEBUG_02:",I5,3D25.14)') iobs, y%chem_acft(n)%chem(ichem,iplt),iv%chem_acft(n)%chem(ichem,iplt)%error, yhat(iobs)
 
                iobs = iobs + 1
             end do

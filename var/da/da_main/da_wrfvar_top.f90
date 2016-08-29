@@ -48,7 +48,8 @@ module da_wrfvar_top
 #endif
       PARAM_FIRST_SCALAR
 #if (WRF_CHEM == 1)
-   use da_chem, only:  da_retrieve_chem_hx, da_write_obs_chem, da_calculate_chem_forcing_ad
+   use da_chem, only:  da_retrieve_chem_hx, da_write_obs_chem, da_calculate_chem_forcing_ad, &
+      da_read_obs_chem_again
    use da_chem_tools, only: da_hdgn, da_dgn 
 
 !   use da_control, only: use_synopobs, use_shipsobs, use_metarobs, use_soundobs, &

@@ -787,6 +787,9 @@
          run_hours0 = adtl_run_hours
 
          call nl_set_var4d_run (head_grid%id, .true.)
+
+         write_checkpoints = 0
+
          if ( checkpoint_interval .gt. 0 &
 #if defined(LAPACK)
               .and. .not.(use_randomsvd .and. svd_stage.gt.0) &
@@ -795,7 +798,7 @@
              write_checkpoints = 1
 #if defined(LAPACK)
           else
-             adtl_run_hours = interval_seconds / 3600
+             if (quick_svd) adtl_run_hours = interval_seconds / 3600
              write_checkpoints = 2
 #endif
           end if
@@ -814,6 +817,12 @@
 #if defined(LAPACK)
                end if
          else
+            if (quick_svd) then
+            if (write_checkpoints.eq.2 .and. use_randomsvd) then
+               call da_read_obs_chem_again( iv, ob, svd_outer, model_grid)
+            end if
+            end if
+
             adtl_run_hours = run_hours0
 #endif
          end if

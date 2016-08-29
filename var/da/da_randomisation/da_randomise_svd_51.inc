@@ -131,13 +131,15 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
          ! Generate vectors in Y = A*OMEGA (Halko, Algorithm 4.1), where A = R^-1/2 * H * U 
          allocate(omega(1:cv_size,1))
 
+!         omega(:,1) = 0.D0
+
          if (read_omega) then
             ! Read in omega vector from this ensemble on each processor
-            write(unit=stdout,fmt='("Reading omega ensemble member : ",i3)') iens
+            write(unit=stdout,fmt='("Reading omega ensemble member : ",i3)') ensmember
             filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
             call da_cv_io ('r', filename, cv_size, omega(1:cv_size,1))
          else
-            write(unit=stdout,fmt='("Generating omega ensemble member : ",i3)') iens
+            write(unit=stdout,fmt='("Generating omega ensemble member : ",i3)') ensmember
             call da_set_randomcv(cv_size, omega(:,1))
          end if
 

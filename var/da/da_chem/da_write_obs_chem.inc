@@ -20,7 +20,6 @@ subroutine da_write_obs_chem ( iv, ob, it )
 
    character*256         :: surf_file! = "SURFACE_Hx_y.txt"
    character*256         :: acft_file! = "AIRCRAFT_Hx_y.txt"  
-   character*5000        :: hx_out  
 
    character*3         :: dummychar1="", dummychar2=""
 
@@ -117,6 +116,7 @@ subroutine da_write_obs_chem ( iv, ob, it )
                iloc = INT(head_grid%i_acft(itime,iplt) + 0.5D0)
                jloc = INT(head_grid%j_acft(itime,iplt) + 0.5D0)
                kloc = INT(head_grid%k_acft(itime,iplt) + 0.5D0)
+               k_at_p = head_grid%k_acft(itime,iplt)
            
                ilocal = ilocal + 1
 
@@ -129,9 +129,9 @@ subroutine da_write_obs_chem ( iv, ob, it )
                end do
                write(dummychar1,fmt='(I0)') num_chem_acft-1
                write(dummychar2,fmt='(I0)') num_acft_hx-1
-               write(ounit,fmt='(6I6,' // trim(dummychar1) // 'D14.5,' // trim(dummychar1) // 'D23.14,' // trim(dummychar2) // 'D23.14)') &
+               write(ounit,fmt='(3I6,F12.6,3I6,' // trim(dummychar1) // 'D14.5,' // trim(dummychar1) // 'D23.14,' // trim(dummychar2) // 'D23.14)') &
 
-                  iloc, jloc, kloc, itime, iplt, &
+                  iloc, jloc, kloc, k_at_p, itime, iplt, &
                   head_grid%acft_obs_count(itime,iplt), &
                   dummy_acft(1,:), &
                   dummy_acft(2,:), &
