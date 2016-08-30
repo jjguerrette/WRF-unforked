@@ -49,12 +49,11 @@ subroutine da_transfer_wrftltoy_chem( grid, iv, y )
 !               iloc = iv%info(chem_acft)%i(iplt,n)
 !               jloc = iv%info(chem_acft)%j(iplt,n)
 
-write(unit=stdout,fmt='("DEBUG_A0:",I5,L,2D25.14)') n, iv%info(chem_acft)%proc_domain(iplt,n), model_grid%g_acft_hx(n,iplt,ichem+1), grid%g_acft_hx(n,iplt,ichem+1)
                if ( iv%info(chem_acft)%proc_domain(iplt,n) ) then
                   model_chem(n) = grid%g_acft_hx(n,iplt,ichem+1)
                   y%chem_acft(n)%chem(ichem,iplt) = model_chem(n)
+!!write(unit=stdout,fmt='("DEBUG_A1:",I5,2D25.14)') n, model_chem(n), y%chem_acft(n)%chem(ichem,iplt)
                end if
-write(unit=stdout,fmt='("DEBUG_A1:",I5,2D25.14)') n, model_chem(n), y%chem_acft(n)%chem(ichem,iplt)
 
             end do
          end do

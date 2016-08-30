@@ -49,6 +49,23 @@ module da_wrf_interfaces
    end interface
 
    interface
+      subroutine wrf_global_to_patch_real (globbuf,buf,domdesc,stagger, &
+         ordering,&
+         ds1,de1,ds2,de2,ds3,de3,&
+         ms1,me1,ms2,me2,ms3,me3,&
+         ps1,pe1,ps2,pe2,ps3,pe3 )
+
+         integer, intent(in) ::         ds1,de1,ds2,de2,ds3,de3,&
+                                          ms1,me1,ms2,me2,ms3,me3,&
+                                          ps1,pe1,ps2,pe2,ps3,pe3
+         character *(*), intent(in) :: stagger,ordering
+         integer, intent(in) :: domdesc
+         real, intent(in) :: globbuf(*)
+         real, intent(inout) :: buf(*)
+      end subroutine wrf_global_to_patch_real 
+   end interface
+
+   interface
       subroutine wrf_dm_xpose_z2y (domdesc , comms , xpose_id)
          integer, intent(inout) :: domdesc
          integer, intent(inout) :: comms(*)

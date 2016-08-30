@@ -25,9 +25,6 @@ subroutine da_ytoyhat_chem_surf(iv, y, yhat)
       iobs = 1
       do n=1, iv%info(chem_surf)%nlocal
          do ichem = 1, num_chem_surf-1
-
-!!                .not.iv%info(chem_surf)%proc_domain(1,n)) &
-
             if (iv%chem_surf(n)%chem(ichem)%qc < obs_qc_pointer) &
                y%chem_surf(n)%chem(ichem) = 0.0
 

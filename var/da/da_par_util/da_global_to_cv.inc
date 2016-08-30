@@ -1,0 +1,273 @@
+subroutine da_global_to_cv(cv_size, cv_size_global, x, grid, mzs, xg )
+
+
+   !-----------------------------------------------------------------------
+   ! Purpose: Reverse of Gathers local cv-array x into domain cv-array xg(:).  
+   ! Global cv-array xg will only be valid on the "monitor" task.  
+   !
+   ! Must be called by all MPI tasks.  
+   !-----------------------------------------------------------------------
+
+   implicit none
+
+   integer,          intent(in)    :: cv_size        ! Size of local cv-array
+   integer,          intent(in)    :: cv_size_global ! Size of domain cv-array
+   real,             intent(inout) :: x(1:cv_size)   ! local cv-array
+   type(domain),     intent(in)    :: grid
+   integer,          intent(in)    :: mzs(:)  ! mz for each variable
+                                         ! (to identify empty or 2D arrays)
+   real,             intent(in)    :: xg(1:cv_size_global) ! global cv-array
+
+#ifdef DM_PARALLEL
+
+   ! Local declarations
+   type (vp_type) :: vv_x    ! Grdipt/EOF cv_array (local)
+   type (vp_type) :: vv_xg   ! Grdipt/EOF cv_array (global)
+   type (xpose_type) :: xpg  ! global dimensions
+!   type (xpose_type) :: xpl  ! global dimensions
+#if (WRF_CHEM == 1)
+   type (xch_type) :: vvc_x  ! Grdipt/EOF cv_array (local)
+   type (xch_type) :: vvc_xg ! Grdipt/EOF cv_array (global)
+   integer :: ic, mz_ant, mz_bb
+#endif
+!   integer :: ids, ide, jds, jde, kds, &
+!              ims, ime, jms, jme, kms, &
+!              ips, ipe, jps, jpe, kps 
+
+   integer :: n
+
+   if (trace_use) call da_trace_entry("da_global_to_cv")      
+
+   !
+   ! Gather to mimic serial summation order.  
+   !
+
+   ! k?e varies with variable v1 - v5
+!   ids = ids; ide = ide; jds = jds; jde = jde; kds = kds
+!   ims = ims; ime = ime; jms = jms; jme = jme
+   kms = grid%xp%kms
+   ips = grid%xp%ips; ipe = grid%xp%ipe; jps = grid%xp%jps; jpe = grid%xp%jpe; kps = grid%xp%kps
+
+#ifdef CLOUD_CV
+      mz_ant=mzs(14)
+      mz_bb =mzs(15)
+#else
+      mz_ant=mzs(8)
+      mz_bb =mzs(9)
+#endif
+
+   if (rootproc) then
+      ! allocate vv_xg
+      allocate(vv_xg%v1(ids:ide,jds:jde,mzs(1)))
+      allocate(vv_xg%v2(ids:ide,jds:jde,mzs(2)))
+      allocate(vv_xg%v3(ids:ide,jds:jde,mzs(3)))
+      allocate(vv_xg%v4(ids:ide,jds:jde,mzs(4)))
+      allocate(vv_xg%v5(ids:ide,jds:jde,mzs(5)))
+#ifdef CLOUD_CV
+      allocate(vv_xg%v6(ids:ide,jds:jde,mzs(6)))
+      allocate(vv_xg%v7(ids:ide,jds:jde,mzs(7)))
+      allocate(vv_xg%v8(ids:ide,jds:jde,mzs(8)))
+      allocate(vv_xg%v9(ids:ide,jds:jde,mzs(9)))
+      allocate(vv_xg%v10(ids:ide,jds:jde,mzs(10)))
+      allocate(vv_xg%v11(ids:ide,jds:jde,mzs(11)))
+!     allocate(vv_xg%alpha(ids:ide,jds:jde,kds:kde,mzs(13)))
+      allocate(vv_xg%alpha(ids_int:ide_int,jds_int:jde_int,kds_int:kde_int,mzs(13)))
+#else
+!     allocate(vv_xg%alpha(ids:ide,jds:jde,kds:kde,mzs(7)))
+      allocate(vv_xg%alpha(ids_int:ide_int,jds_int:jde_int,kds_int:kde_int,mzs(7)))
+#endif
+#if (WRF_CHEM == 1)
+      allocate(vvc_xg%alpha_ant(ids:ide,jds:jde,mz_ant,num_scaleant))
+      allocate(vvc_xg%alpha_bb(ids:ide,jds:jde,mz_bb,num_scalebb))
+#endif
+   else
+      ! Allocate dummy array for non-monitor process to keep Fortran
+      ! CICO happy...
+      allocate(vv_xg%v1(1,1,1))
+      allocate(vv_xg%v2(1,1,1))
+      allocate(vv_xg%v3(1,1,1))
+      allocate(vv_xg%v4(1,1,1))
+      allocate(vv_xg%v5(1,1,1))
+#ifdef CLOUD_CV
+      allocate(vv_xg%v6(1,1,1))
+      allocate(vv_xg%v7(1,1,1))
+      allocate(vv_xg%v8(1,1,1))
+      allocate(vv_xg%v9(1,1,1))
+      allocate(vv_xg%v10(1,1,1))
+      allocate(vv_xg%v11(1,1,1))
+#endif
+      allocate(vv_xg%alpha(1,1,1,1))
+#if (WRF_CHEM == 1)
+      allocate(vvc_xg%alpha_ant(1,1,1,1))
+      allocate(vvc_xg%alpha_bb(1,1,1,1))
+#endif
+   end if
+
+   if (rootproc) then
+      ! Start by distributing the global 1d cv-array to 3d structures
+      xpg%ids = ids; xpg%ide = ide
+      xpg%ims = ids; xpg%ime = ide
+      xpg%its = ids; xpg%ite = ide
+      xpg%jds = jds; xpg%jde = jde
+      xpg%jms = jds; xpg%jme = jde
+      xpg%jts = jds; xpg%jte = jde
+      xpg%kds = kds; xpg%kde = kde
+      xpg%kms = kds; xpg%kme = kde
+      xpg%kts = kds; xpg%kte = kde
+
+!STILL NEED TO CHANGE TO GLOBAL X and VV
+      call da_cv_to_vv (cv_size_global, xg, mzs, vv_xg &
+#if (WRF_CHEM == 1)
+         , vvc_xg &
+#endif
+         , xpg )
+
+   end if
+
+   ! TOdo:  encapsulate this crap!  
+   ! allocate vv_x
+   allocate(vv_x%v1(ims:ime,jms:jme,mzs(1)))
+   allocate(vv_x%v2(ims:ime,jms:jme,mzs(2)))
+   allocate(vv_x%v3(ims:ime,jms:jme,mzs(3)))
+   allocate(vv_x%v4(ims:ime,jms:jme,mzs(4)))
+   allocate(vv_x%v5(ims:ime,jms:jme,mzs(5)))
+#ifdef CLOUD_CV
+   allocate(vv_x%v6(ims:ime,jms:jme,mzs(6)))
+   allocate(vv_x%v7(ims:ime,jms:jme,mzs(7)))
+   allocate(vv_x%v8(ims:ime,jms:jme,mzs(8)))
+   allocate(vv_x%v9(ims:ime,jms:jme,mzs(9)))
+   allocate(vv_x%v10(ims:ime,jms:jme,mzs(10)))
+   allocate(vv_x%v11(ims:ime,jms:jme,mzs(11)))   
+   allocate(vv_x%alpha(ims_int:ime_int,jms_int:jme_int,kms_int:kme_int,mzs(13)))
+#else
+   allocate(vv_x%alpha(ims_int:ime_int,jms_int:jme_int,kms_int:kme_int,mzs(7)))
+#endif
+#if (WRF_CHEM == 1)
+   allocate(vvc_x%alpha_ant(ims:ime,jms:jme,mz_ant,num_scaleant))
+   allocate(vvc_x%alpha_bb(ims:ime,jms:jme,mz_bb,num_scalebb))
+#endif
+
+   ! TOdo:  encapsulate this crap!  
+   ! scatter to local data structures
+   ! it is possible to scatter straight from a globally-sized cv-array
+   ! TOdo:  add this optimization later
+   call da_global_to_patch(grid, vv_x%v1,    vv_xg%v1,    mzs(1))
+   call da_global_to_patch(grid, vv_x%v2,    vv_xg%v2,    mzs(2))
+   call da_global_to_patch(grid, vv_x%v3,    vv_xg%v3,    mzs(3))
+   call da_global_to_patch(grid, vv_x%v4,    vv_xg%v4,    mzs(4))
+   call da_global_to_patch(grid, vv_x%v5,    vv_xg%v5,    mzs(5))
+#ifdef CLOUD_CV
+   call da_global_to_patch(grid, vv_x%v6,    vv_xg%v6,    mzs(6))
+   call da_global_to_patch(grid, vv_x%v7,    vv_xg%v7,    mzs(7))
+   call da_global_to_patch(grid, vv_x%v8,    vv_xg%v8,    mzs(8))
+   call da_global_to_patch(grid, vv_x%v9,    vv_xg%v9,    mzs(9))
+   call da_global_to_patch(grid, vv_x%v10,    vv_xg%v10,    mzs(10))
+   call da_global_to_patch(grid, vv_x%v11,    vv_xg%v11,    mzs(11))
+#endif
+#if (WRF_CHEM == 1)
+   do ic = PARAM_FIRST_SCALAR, num_scaleant
+      call da_global_to_patch(grid, vvc_x%alpha_ant(:,:,:,ic),    vvc_xg%alpha_ant(:,:,:,ic),    mz_ant)
+   end do
+   do ic = PARAM_FIRST_SCALAR, num_scalebb
+      call da_global_to_patch(grid, vvc_x%alpha_bb(:,:,:,ic),    vvc_xg%alpha_bb(:,:,:,ic),    mz_bb)
+   end do
+#endif
+#ifdef CLOUD_CV
+   if ( mzs(13) > 0 ) then
+      do n = 1, mzs(13) ! Ensemble size
+         if ( anal_type_hybrid_dual_res ) then
+            call da_global_to_patch_dual_res(grid%intermediate_grid, vv_x%alpha(:,:,:,n), vv_xg%alpha(:,:,:,n), mzs(12))
+         else
+            call da_global_to_patch(grid, vv_x%alpha(:,:,:,n), vv_xg%alpha(:,:,:,n), mzs(12))
+         endif
+      end do
+   end if
+#else
+   if ( mzs(7) > 0 ) then
+      do n = 1, mzs(7) ! Ensemble size
+         if ( anal_type_hybrid_dual_res ) then
+            call da_global_to_patch_dual_res(grid%intermediate_grid, vv_x%alpha(:,:,:,n), vv_xg%alpha(:,:,:,n), mzs(10))
+         else
+            call da_global_to_patch(grid, vv_x%alpha(:,:,:,n), vv_xg%alpha(:,:,:,n), mzs(6))
+         endif
+      end do
+   end if
+#endif
+#ifdef CLOUD_CV
+   ! deallocate vv_xg
+   deallocate(vv_xg%v1, vv_xg%v2, vv_xg%v3, vv_xg%v4, vv_xg%v5, vv_xg%v6, vv_xg%v7,vv_xg%v8,vv_xg%v9, vv_xg%v10, vv_xg%v11, vv_xg%alpha)
+#else
+   ! deallocate vv_xg
+   deallocate(vv_xg%v1, vv_xg%v2, vv_xg%v3, vv_xg%v4, vv_xg%v5, vv_xg%alpha)
+#endif
+#if (WRF_CHEM == 1)
+   ! deallocate vvc_xg
+   deallocate (vvc_xg%alpha_ant, vvc_xg%alpha_bb)
+#endif
+
+write(unit=stdout,fmt='(A,8I8)')'DEBUG_10',ims,ime,jms,jme,mz_ant,mz_bb,num_scaleant,num_scalebb
+write(unit=stdout,fmt='(A,4I8)')'DEBUG_11',ips,ipe,jps,jpe
+
+write(unit=stdout,fmt='(A,3I8)')'DEBUG_12',size(vvc_x%alpha_ant,1), size(vvc_x%alpha_ant,2), size(vvc_x%alpha_ant,3)
+write(unit=stdout,fmt='(A,3I8)')'DEBUG_12',size(vvc_x%alpha_bb,1), size(vvc_x%alpha_bb,2), size(vvc_x%alpha_bb,3)
+!
+!
+!write(unit=stdout,fmt='(A,3I8)')'DEBUG_12',size(vvc_x%alpha_ant,1), size(vvc_x%alpha_ant,2), size(vvc_x%alpha_ant,3)
+!write(unit=stdout,fmt='(A,3I8)')'DEBUG_12',size(vvc_x%alpha_bb,1), size(vvc_x%alpha_bb,2), size(vvc_x%alpha_bb,3)
+
+   ! finally, collapse data back into a locally-sized cv-array
+!   xpl%ids = ids; xpl%ide = ide
+!   xpl%ims = ims; xpl%ime = ime
+!   xpl%its = its; xpl%ite = ite
+!   xpl%jds = jds; xpl%jde = jde
+!   xpl%jms = jms; xpl%jme = jme
+!   xpl%jts = jts; xpl%jte = jte
+!   xpl%kds = kds; xpl%kde = kde
+!   xpl%kms = kms; xpl%kme = kme
+!   xpl%kts = kts; xpl%kte = kte
+!
+!write(unit=stdout,fmt='(A,2I8)')'DEBUG_13', xpl%ids, xpl%ide
+!write(unit=stdout,fmt='(A,2I8)')'DEBUG_13', xpl%ims, xpl%ime
+!write(unit=stdout,fmt='(A,2I8)')'DEBUG_13', xpl%its, xpl%ite
+!write(unit=stdout,fmt='(A,2I8)')'DEBUG_13', xpl%jds, xpl%jde
+!write(unit=stdout,fmt='(A,2I8)')'DEBUG_13', xpl%jms, xpl%jme
+!write(unit=stdout,fmt='(A,2I8)')'DEBUG_13', xpl%jts, xpl%jte
+!write(unit=stdout,fmt='(A,2I8)')'DEBUG_13', xpl%kds, xpl%kde
+!write(unit=stdout,fmt='(A,2I8)')'DEBUG_13', xpl%kms, xpl%kme
+!write(unit=stdout,fmt='(A,2I8)')'DEBUG_13', xpl%kts, xpl%kte
+
+
+write(unit=stdout,fmt='(A,2I8)')'DEBUG_14', grid%xp%ids, grid%xp%ide
+write(unit=stdout,fmt='(A,2I8)')'DEBUG_14', grid%xp%ims, grid%xp%ime
+write(unit=stdout,fmt='(A,2I8)')'DEBUG_14', grid%xp%its, grid%xp%ite
+write(unit=stdout,fmt='(A,2I8)')'DEBUG_14', grid%xp%jds, grid%xp%jde
+write(unit=stdout,fmt='(A,2I8)')'DEBUG_14', grid%xp%jms, grid%xp%jme
+write(unit=stdout,fmt='(A,2I8)')'DEBUG_14', grid%xp%jts, grid%xp%jte
+write(unit=stdout,fmt='(A,2I8)')'DEBUG_14', grid%xp%kds, grid%xp%kde
+write(unit=stdout,fmt='(A,2I8)')'DEBUG_14', grid%xp%kms, grid%xp%kme
+write(unit=stdout,fmt='(A,2I8)')'DEBUG_14', grid%xp%kts, grid%xp%kte
+
+
+   call da_vv_to_cv(vv_x, grid%xp, mzs, cv_size, x &
+#if (WRF_CHEM == 1)
+      , vvc_x &
+#endif
+             )
+#ifdef CLOUD_CV
+   ! deallocate vv_x
+   deallocate (vv_x%v1, vv_x%v2, vv_x%v3, vv_x%v4, vv_x%v5, vv_x%v6, vv_x%v7, vv_x%v8, vv_x%v9, vv_x%v10, vv_x%v11, vv_x%alpha)
+#else
+   ! deallocate vv_x
+   deallocate (vv_x%v1, vv_x%v2, vv_x%v3, vv_x%v4, vv_x%v5, vv_x%alpha)
+#endif
+#if (WRF_CHEM == 1)
+   ! deallocate vvc_x
+   deallocate (vvc_x%alpha_ant, vvc_x%alpha_bb)
+#endif
+   if (trace_use) call da_trace_exit("da_global_to_cv")    
+
+#endif
+
+end subroutine da_global_to_cv
+
+

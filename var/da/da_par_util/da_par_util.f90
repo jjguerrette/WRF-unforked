@@ -49,7 +49,8 @@ module da_par_util
    use da_tracing, only : da_trace_entry, da_trace_exit
    use da_wrf_interfaces, only : &
       wrf_dm_xpose_z2x, wrf_dm_xpose_x2y, wrf_dm_xpose_y2x, wrf_dm_xpose_x2z, &
-      wrf_dm_xpose_z2y, wrf_dm_xpose_y2z, wrf_patch_to_global_real, wrf_debug
+      wrf_dm_xpose_z2y, wrf_dm_xpose_y2z, wrf_patch_to_global_real, wrf_debug, &
+      wrf_global_to_patch_real
 
    implicit none
 
@@ -63,6 +64,12 @@ module da_par_util
       module procedure da_patch_to_global_2d
       module procedure da_patch_to_global_3d
    end interface
+
+   interface da_global_to_patch
+      module procedure da_global_to_patch_2d
+      module procedure da_global_to_patch_3d
+   end interface
+
 
    contains
 
@@ -83,8 +90,11 @@ module da_par_util
 #include "da_transpose_y2x_v2.inc"
 
 #include "da_cv_to_global.inc"
+#include "da_global_to_cv.inc"
 #include "da_patch_to_global_2d.inc"
 #include "da_patch_to_global_3d.inc"
+#include "da_global_to_patch_2d.inc"
+#include "da_global_to_patch_3d.inc"
 #include "da_generic_methods.inc"
 #include "da_deallocate_global_sonde_sfc.inc"
 #include "da_deallocate_global_sound.inc"
@@ -94,6 +104,7 @@ module da_par_util
 #include "da_system.inc"
 
 #include "da_patch_to_global_dual_res.inc"
+#include "da_global_to_patch_dual_res.inc"
 
 #ifdef DM_PARALLEL
 #include "da_proc_stats_combine.inc"

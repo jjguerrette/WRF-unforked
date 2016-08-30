@@ -65,15 +65,15 @@ subroutine da_randomise_svd(grid, config_flags,            &
    integer                      :: iens, jens, nens, i, j, ccount
 #if (WRF_CHEM != 1)
 #ifdef CLOUD_CV
-   integer                      :: mz(11)
+   integer          :: mz(13)
 #else
-   integer                      :: mz(7)
+   integer          :: mz(7)
 #endif
 #else
 #ifdef CLOUD_CV
-   integer                      :: mz(13)
+   integer          :: mz(15)
 #else
-   integer                      :: mz(9)
+   integer          :: mz(9)
 #endif
 #endif
    integer                      :: jp_start, jp_end       ! Start/end indices of Jp.
@@ -103,20 +103,21 @@ subroutine da_randomise_svd(grid, config_flags,            &
    !-------------------------------------------------------------------------
 #if (WRF_CHEM != 1)
 #ifdef CLOUD_CV
-   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz,  be%v6%mz, be%v7%mz,  be%v8%mz, be%v9%mz, be%alpha%mz, be % ne /)
+   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
+           be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne /)
 #else
-   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz,be%alpha%mz, be % ne /)
+   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne /)
 #endif
-
 #else
-
 #ifdef CLOUD_CV
-   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz,  be%v6%mz, be%v7%mz,  be%v8%mz, be%v9%mz, be%alpha%mz, be%ne, be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
+   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
+           be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne, &
+           be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
 #else
-   mz =  (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne, be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
+   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne, &
+           be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
 #endif
 #endif
-
    jp_start   = be % cv % size_jb + be % cv % size_je + 1
    jp_end     = be % cv % size_jb + be % cv % size_je + be % cv % size_jp
 

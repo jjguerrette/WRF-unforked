@@ -19,8 +19,6 @@ subroutine da_ytoyhat_chem_acft_adj(iv, qhat, jo_grad_y)
       do n=1, iv%info(chem_acft)%nlocal
          do ichem = 1, num_chem_acft-1
             do iplt = 1, num_platform
-!!                   .not.iv%info(chem_acft)%proc_domain(iplt,n)) &
-
                if (iv%chem_acft(n)%chem(ichem,iplt)%qc < obs_qc_pointer) &
                   qhat(iobs) = 0.0
 

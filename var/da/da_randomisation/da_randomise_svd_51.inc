@@ -37,8 +37,12 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
    real(wp)                     :: LAM(1:ensdim_svd)
 
    real(wp), allocatable   :: BMAT(:,:)  ! B = Q ^T * A  or  B^T = A^T * Q, where A = R^-1/2 * H * U
+   real(wp), allocatable   :: BMAT_g(:,:)  ! B = Q ^T * A  or  B^T = A^T * Q, where A = R^-1/2 * H * U
+
    real(wp), allocatable   :: omega(:,:) ! Gaussian draw
    real(wp), allocatable   :: nuhat_T(:,:) ! Eigenvectors of A
+   real(wp), allocatable   :: nuhat_T_g(:,:) ! Eigenvectors of A
+
    real(wp)                :: dot_cv
 
    real(wp), allocatable   :: yhat_obs(:)  ! yhat = A * omega
@@ -46,6 +50,10 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
 
    real(wp), allocatable   :: qhat_obs(:)  ! orthonormal basis set of A approx= Q * B
    real(wp), allocatable   :: QHAT(:,:)    ! orthonormal basis set of A approx= Q * B
+
+   real(wp), allocatable       :: dumcv(:)
+   real(wp), allocatable       :: dumcv_g(:)
+
 
    type (y_type)                :: jo_grad_y    ! Grad_y(jo)
    real                         :: grad_jo(cv_size)
@@ -58,15 +66,15 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
    integer                      :: iens, jens, nens, i, j, ccount
 #if (WRF_CHEM != 1)
 #ifdef CLOUD_CV
-   integer                      :: mz(11)
+   integer          :: mz(13)
 #else
-   integer                      :: mz(7)
+   integer          :: mz(7)
 #endif
 #else
 #ifdef CLOUD_CV
-   integer                      :: mz(13)
+   integer          :: mz(15)
 #else
-   integer                      :: mz(9)
+   integer          :: mz(9)
 #endif
 #endif
    integer                      :: jp_start, jp_end       ! Start/end indices of Jp.
@@ -89,20 +97,21 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
    !-------------------------------------------------------------------------
 #if (WRF_CHEM != 1)
 #ifdef CLOUD_CV
-   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz,  be%v6%mz, be%v7%mz,  be%v8%mz, be%v9%mz, be%alpha%mz, be % ne /)
+   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
+           be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne /)
 #else
-   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz,be%alpha%mz, be % ne /)
+   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne /)
 #endif
-
 #else
-
 #ifdef CLOUD_CV
-   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz,  be%v6%mz, be%v7%mz,  be%v8%mz, be%v9%mz, be%alpha%mz, be%ne, be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
+   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
+           be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne, &
+           be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
 #else
-   mz =  (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne, be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
+   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne, &
+           be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
 #endif
 #endif
-
    jp_start   = be % cv % size_jb + be % cv % size_je + 1
    jp_end     = be % cv % size_jb + be % cv % size_je + be % cv % size_jp
 
@@ -303,10 +312,80 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
       filename = 'ghat.p'//trim(adjustl(cproc))
       call da_cv_io ('r', filename, cv_size, ghat)
 
-      !SVD of BMAT
-      call GESVD(BMAT, SIG, VT = nuhat_T, INFO = info)
+#ifdef DM_PARALLEL
+write(unit=stdout,fmt='(A)')'DEBUG_01'
 
-      neign = ensdim_svd
+      !Perform global SVD of BMAT matrix
+      cv_size_domain = wrf_dm_sum_integer(cv_size)
+      if (rootproc) then
+         allocate(BMAT_g(nens,1:cv_size_domain))
+         allocate(nuhat_T_g(nens,1:cv_size_domain))
+      else
+         allocate(BMAT_g(1:nens,1))
+         allocate(nuhat_T_g(1:nens,1))
+      end if
+write(unit=stdout,fmt='(A)')'DEBUG_02'
+
+      allocate(dumcv(1:cv_size))
+      allocate(dumcv_g(1:cv_size_domain))
+      do iens = 1, nens
+         dumcv = BMAT(iens,1:cv_size)
+write(unit=stdout,fmt='(A)')'DEBUG_02A'
+
+         write(cens,fmt='(i4.4)') iens
+         filename = 'dumcv.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+         call da_cv_io ('w', filename, cv_size, dumcv)
+
+         call da_cv_to_global(cv_size, cv_size_domain, dumcv, grid, mz, dumcv_g)
+write(unit=stdout,fmt='(A)')'DEBUG_02B'
+
+         if(rootproc) BMAT_g(iens,:) = dumcv_g
+write(unit=stdout,fmt='(A)')'DEBUG_02C'
+         call mpi_barrier(comm, ierr)
+
+      end do
+      deallocate(dumcv)
+      deallocate(dumcv_g)
+
+write(unit=stdout,fmt='(A)')'DEBUG_03'
+
+      write(unit=stdout,fmt='(A)') 'Calculate SVD of B = Q^T * R^-1/2 * H * U'
+      if (rootproc) then
+         !SVD of global BMAT on monitor process
+         call GESVD(BMAT_g, SIG, VT = nuhat_T_g, INFO = info)
+      end if
+write(unit=stdout,fmt='(A)')'DEBUG_04'
+
+      deallocate(BMAT_g)
+write(unit=stdout,fmt='(A)')'DEBUG_05'
+
+      call mpi_barrier(comm, ierr)
+write(unit=stdout,fmt='(A)')'DEBUG_06'
+
+      allocate(dumcv(1:cv_size))
+      allocate(dumcv_g(1:cv_size_domain))
+      do iens = 1, nens
+         if(rootproc) dumcv_g = nuhat_T_g(iens,:)
+         call da_global_to_cv(cv_size, cv_size_domain, dumcv, grid, mz, dumcv_g)
+         nuhat_T(iens,:) = dumcv
+      end do
+      deallocate(dumcv)
+      deallocate(dumcv_g)
+
+write(unit=stdout,fmt='(A)')'DEBUG_07'
+
+      deallocate(nuhat_T_g)
+write(unit=stdout,fmt='(A)')'DEBUG_08'
+
+      call wrf_dm_bcast_integer(SIG,nens)
+write(unit=stdout,fmt='(A)')'DEBUG_09'
+
+#else
+      !SVD of global BMAT on monitor process
+      call GESVD(BMAT, SIG, VT = nuhat_T, INFO = info)
+#endif
+
+      neign = nens
 
       !Eigenvalues of A^T * A = U^T H^T R^-1 H U are the square of singular values of A
       do i = 1, neign

@@ -11,7 +11,7 @@ module da_randomisation
    use da_control, only : svd_stage, ensmember, ensdim_svd, svd_outer, &
        myproc, filename_len, test_dm_exact, rootproc, cv_size_domain, &
        stdout, trace_use, svd_amat_type, svd_symm_type, &
-       num_ob_indexes, read_omega, &
+       num_ob_indexes, read_omega, ierr, comm, &
 #if (WRF_CHEM == 1)
        chem_surf, chem_acft, &
 #endif
@@ -29,7 +29,7 @@ module da_randomisation
       da_allocate_y_chem, &
 #endif
       da_allocate_y, da_deallocate_y
-   use da_par_util, only : da_cv_to_global
+   use da_par_util, only : da_cv_to_global, da_global_to_cv
    use da_reporting, only : da_message, da_warning, da_error, message
    use da_tools_serial, only : da_get_unit,da_free_unit
    use da_tools, only: da_set_randomcv

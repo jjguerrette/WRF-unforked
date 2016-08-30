@@ -2,7 +2,7 @@ subroutine da_cv_to_vv (cv_size, rcv, mzs, vv &
 #if (WRF_CHEM == 1)
                         ,vch &
 #endif
-                        )
+                        ,xp )
 
    !---------------------------------------------------------------------------
    ! Purpose: Fill (local) vv arrays from 1D (local) cv array.
@@ -17,7 +17,7 @@ subroutine da_cv_to_vv (cv_size, rcv, mzs, vv &
 #if (WRF_CHEM == 1)
    type (xch_type), optional, intent(inout) :: vch          ! Grdipt/EOF cv_array.
 #endif
-
+   type (xpose_type), optional, intent(in) :: xp          ! Dimensions and xpose buffers.
    integer   :: is,ie       ! Local grid range in y coordinate.
    integer   :: js,je       ! Local grid range in x coordinate.
    integer   :: ix,jy       ! Local grid horizontal dimensions.
@@ -34,10 +34,17 @@ subroutine da_cv_to_vv (cv_size, rcv, mzs, vv &
    if (trace_use) call da_trace_entry("da_cv_to_vv")
 
    if( use_rf )then
-      is = its
-      ie = ite
-      js = jts
-      je = jte
+      if (present(xp)) then
+         is = xp % its
+         ie = xp % ite
+         js = xp % jts
+         je = xp % jte
+      else
+         is = its
+         ie = ite
+         js = jts
+         je = jte
+      end if
    else
       call da_error(__FILE__,__LINE__,(/"This subroutine should not be called for use_rf = .false."/))
    endif
@@ -179,6 +186,9 @@ subroutine da_cv_to_vv (cv_size, rcv, mzs, vv &
          do ic = PARAM_FIRST_SCALAR, num_scaleant
             cv_s = cv_e + 1
             cv_e = cv_s + ijm - 1
+
+write(unit=stdout,fmt='(A,10I8)')'DEBUG_00A',ic,cv_s,cv_e,ijm,ma,is,ie,js,je,size(rcv)
+write(unit=stdout,fmt='(A,3I8)')'DEBUG_00A',size(vch%alpha_ant,1), size(vch%alpha_ant,2), size(vch%alpha_ant,3)
             vch % alpha_ant(is:ie,js:je,1:ma,ic) = RESHAPE(rcv(cv_s:cv_e),(/ix, jy, ma/))
          end do
       end if
@@ -188,6 +198,9 @@ subroutine da_cv_to_vv (cv_size, rcv, mzs, vv &
          do ic = PARAM_FIRST_SCALAR, num_scalebb
             cv_s = cv_e + 1
             cv_e = cv_s + ijm - 1
+
+write(unit=stdout,fmt='(A,10I8)')'DEBUG_00A',ic,cv_s,cv_e,ijm,mb,is,ie,js,je,size(rcv)
+
             vch % alpha_bb(is:ie,js:je,1:mb,ic) = RESHAPE(rcv(cv_s:cv_e),(/ix, jy, mb/))
          end do
       end if

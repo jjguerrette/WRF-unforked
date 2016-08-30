@@ -302,8 +302,8 @@ subroutine da_vv_to_cv(vv, xp, mzs, cv_size, rcv &
       ix = ie-is+1
       jy = je-js+1
 #ifdef CLOUD_CV
-      ma = mzs(12)
-      mb = mzs(13)
+      ma = mzs(14)
+      mb = mzs(15)
 #else
       ma = mzs(8)
       mb = mzs(9)
@@ -315,6 +315,7 @@ subroutine da_vv_to_cv(vv, xp, mzs, cv_size, rcv &
             cv_e = cv_s + ijm - 1
 #ifdef NORESHAPE
             do k=1,ma
+write(unit=stdout,fmt='(A,12I8)')'DEBUG_98A',i,j,k,ijk,ic,size(rcv),size(vch % alpha_ant), is, ie, js, je, ma
                do j=js,je
                   do i=is,ie
                      ijk = ijk + 1
@@ -335,6 +336,7 @@ subroutine da_vv_to_cv(vv, xp, mzs, cv_size, rcv &
             cv_e = cv_s + ijm - 1
 #ifdef NORESHAPE
             do k=1,mb
+write(unit=stdout,fmt='(A,12I8)')'DEBUG_99A',i,j,k,ijk,ic,size(rcv),size(vch % alpha_bb), is, ie, js, je, mb
                do j=js,je
                   do i=is,ie
                      ijk = ijk + 1

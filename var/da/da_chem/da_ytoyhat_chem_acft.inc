@@ -28,16 +28,12 @@ subroutine da_ytoyhat_chem_acft(iv, y, yhat)
          do ichem = 1, num_chem_acft-1
             do iplt = 1, num_platform
 
-write(unit=stdout,fmt='("DEBUG_01:",3I5,2D25.14)') n,ichem,iplt,y%chem_acft(n)%chem(ichem,iplt),iv%chem_acft(n)%chem(ichem,iplt)%error
-
-!!                   .not.iv%info(chem_acft)%proc_domain(iplt,n)) &
+!!write(unit=stdout,fmt='("DEBUG_01:",3I5,2D25.14)') n,ichem,iplt,y%chem_acft(n)%chem(ichem,iplt),iv%chem_acft(n)%chem(ichem,iplt)%error
 
                if (iv%chem_acft(n)%chem(ichem,iplt)%qc < obs_qc_pointer) &
                   y%chem_acft(n)%chem(ichem,iplt) = 0.0
 
                yhat(iobs) = -y%chem_acft(n)%chem(ichem,iplt) / iv%chem_acft(n)%chem(ichem,iplt)%error
-
-write(unit=stdout,fmt='("DEBUG_02:",I5,3D25.14)') iobs, y%chem_acft(n)%chem(ichem,iplt),iv%chem_acft(n)%chem(ichem,iplt)%error, yhat(iobs)
 
                iobs = iobs + 1
             end do

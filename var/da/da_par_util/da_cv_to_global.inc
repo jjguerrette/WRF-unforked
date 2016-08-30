@@ -29,9 +29,9 @@ subroutine da_cv_to_global(cv_size, cv_size_global, x, grid, mzs, xg )
    type (xch_type) :: vvc_xg ! Grdipt/EOF cv_array (global)
    integer :: ic, mz_ant, mz_bb
 #endif
-   integer :: ids, ide, jds, jde, kds, &
-              ims, ime, jms, jme, kms, &
-              ips, ipe, jps, jpe, kps 
+!   integer :: ids, ide, jds, jde, kds, &
+!              ims, ime, jms, jme, kms, &
+!              ips, ipe, jps, jpe, kps 
 
    integer :: n
 
@@ -42,8 +42,9 @@ subroutine da_cv_to_global(cv_size, cv_size_global, x, grid, mzs, xg )
    !
 
    ! k?e varies with variable v1 - v5
-   ids = ids; ide = ide; jds = jds; jde = jde; kds = kds
-   ims = ims; ime = ime; jms = jms; jme = jme; kms = grid%xp%kms
+!   ids = ids; ide = ide; jds = jds; jde = jde; kds = kds
+!   ims = ims; ime = ime; jms = jms; jme = jme; kms = grid%xp%kms
+   kms = grid%xp%kms
    ips = grid%xp%ips; ipe = grid%xp%ipe; jps = grid%xp%jps; jpe = grid%xp%jpe; kps = grid%xp%kps
 
    ! TOdo:  encapsulate this crap!  
@@ -70,12 +71,34 @@ subroutine da_cv_to_global(cv_size, cv_size_global, x, grid, mzs, xg )
 #if (WRF_CHEM == 1)
    mz_ant=mzs(8)
    mz_bb =mzs(9)
-   allocate(vvc_x%alpha_ant(ims:ime,jms:jme,mz_ant,num_scaleant))
-   allocate(vvc_x%alpha_bb(ims:ime,jms:jme,mz_bb,num_scalebb))
 #endif
 #endif
 
-   call da_cv_to_vv (cv_size, x, mzs, vv_x )
+#if (WRF_CHEM == 1)
+
+!!write(unit=stdout,fmt='(A,L)')'DEBUG_ant', allocated(vvc_x%alpha_ant)
+!!write(unit=stdout,fmt='(A,L)')'DEBUG_bb', allocated(vvc_x%alpha_bb)
+!
+!write(unit=stdout,fmt='(A,8I8)')'DEBUG_10',ims,ime,jms,jme,mz_ant,mz_bb,num_scaleant,num_scalebb
+!write(unit=stdout,fmt='(A,4I8)')'DEBUG_11',ips,ipe,jps,jpe
+!
+!write(unit=stdout,fmt='(A,3I8)')'DEBUG_12',size(vvc_x%alpha_ant,1), size(vvc_x%alpha_ant,2), size(vvc_x%alpha_ant,3)
+!write(unit=stdout,fmt='(A,3I8)')'DEBUG_12',size(vvc_x%alpha_bb,1), size(vvc_x%alpha_bb,2), size(vvc_x%alpha_bb,3)
+!
+
+   allocate(vvc_x%alpha_ant(ims:ime,jms:jme,mz_ant,num_scaleant))
+   allocate(vvc_x%alpha_bb(ims:ime,jms:jme,mz_bb,num_scalebb))
+
+!
+!write(unit=stdout,fmt='(A,3I8)')'DEBUG_12',size(vvc_x%alpha_ant,1), size(vvc_x%alpha_ant,2), size(vvc_x%alpha_ant,3)
+!write(unit=stdout,fmt='(A,3I8)')'DEBUG_12',size(vvc_x%alpha_bb,1), size(vvc_x%alpha_bb,2), size(vvc_x%alpha_bb,3)
+#endif
+
+   call da_cv_to_vv (cv_size, x, mzs, vv_x &
+#if (WRF_CHEM == 1)
+      , vvc_x &
+#endif
+      )
 
    if (rootproc) then
       ! allocate vv_xg
@@ -146,7 +169,7 @@ subroutine da_cv_to_global(cv_size, cv_size_global, x, grid, mzs, xg )
       call da_patch_to_global(grid, vvc_x%alpha_ant(:,:,:,ic),    vvc_xg%alpha_ant(:,:,:,ic),    mz_ant)
    end do
    do ic = PARAM_FIRST_SCALAR, num_scalebb
-      call da_patch_to_global(grid, vvc_x%alpha_ant(:,:,:,ic),    vvc_xg%alpha_ant(:,:,:,ic),    mz_bb)
+      call da_patch_to_global(grid, vvc_x%alpha_bb(:,:,:,ic),    vvc_xg%alpha_bb(:,:,:,ic),    mz_bb)
    end do
 #endif
 #ifdef CLOUD_CV
