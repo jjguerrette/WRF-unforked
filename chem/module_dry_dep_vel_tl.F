@@ -142,7 +142,9 @@ CONTAINS
 !
       !CALL WRF_DEBUG(15, 'DOING DRY DEP VELOCITIES WITH WESELY METHOD')
       IF (config_flags%chem_opt .EQ. gocart_simple .OR. &
-                config_flags%chem_opt .EQ. gocart_bcco) THEN
+                config_flags%chem_opt .EQ. gocart_bcco .OR. &
+                config_flags%chem_opt .EQ. gocart_bc) THEN
+
 
         CALL G_WESELY_DRIVER(id, ktau, dtstep, config_flags, &
 &                       current_month, gmt, julday, t_phy, g_t_phy, moist&

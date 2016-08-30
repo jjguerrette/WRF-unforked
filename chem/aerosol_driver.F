@@ -209,6 +209,7 @@
    CASE (GOCART_SIMPLE,GOCARTRACM_KPP,GOCARTRADM2,MOZCART_KPP &
 #if ( WRFPLUS == 1 )
          , GOCART_BCCO &
+         , GOCART_BC &
 #endif  
         )
       call gocart_aerosols_driver(ktauc,dtstepc,config_flags,t_phy,moist,  &

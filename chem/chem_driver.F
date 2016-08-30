@@ -505,7 +505,7 @@
        CALL wrf_debug(15,'calling only gocart aerosols from chem_driver')
        haveaer = .false.
 #if ( WRFPLUS == 1 )
-     CASE (GOCART_BCCO)
+     CASE (GOCART_BCCO, GOCART_BC)
        CALL wrf_debug(15,'calling only black carbon aerosols from chem_driver')
        haveaer = .false.
 #endif

@@ -59,7 +59,7 @@ SUBROUTINE g_aerosols_driver(id, curr_secs, ktau, dtstep, ktauc, &
   INTEGER :: ii, jj, kk
   SELECT CASE  (config_flags%chem_opt) 
   CASE (GOCART_SIMPLE, GOCARTRACM_KPP, GOCARTRADM2, &
-&  MOZCART_KPP, GOCART_BCCO) 
+&  MOZCART_KPP, GOCART_BCCO, GOCART_BC) 
     CALL WRF_DEBUG(15, 'g_aerosols_driver: calling g_gocart_aerosols_driver')
     CALL G_GOCART_AEROSOLS_DRIVER(ktauc, dtstepc, config_flags, t_phy, &
 &                            moist, chem, g_chem, rho_phy, dz8w, p8w, dx&

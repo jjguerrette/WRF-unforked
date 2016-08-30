@@ -384,7 +384,7 @@ CONTAINS
     ksub = 0
     SELECT CASE  (config_flags%biomass_burn_opt) 
     CASE (BIOMASSB, BIOMASSB_MOZC, BIOMASSB_MOZ, BIOMASSB_GHG, &
-&    ADTLBB, ADTLBB_BCCO) 
+&    ADTLBB, ADTLBB_BCCO, ADTLBB_BC) 
       CALL PUSHCONTROL1B(0)
     CASE DEFAULT
       CALL PUSHCONTROL1B(1)
@@ -760,7 +760,7 @@ CONTAINS
           END DO
         END DO
       END IF
-    CASE (GOCART_BCCO) 
+    CASE (GOCART_BCCO, GOCART_BC) 
       IF (config_flags%emiss_opt .LE. 5) THEN
         DO j=jts,jte
           DO i=its,ite
@@ -793,7 +793,9 @@ CONTAINS
       ELSE
         CALL PUSHCONTROL1B(1)
       END IF
-      IF (config_flags%emiss_opt .EQ. ADTLANT_BCCO) THEN
+      IF(config_flags%emiss_opt == ADTLANT_BCCO .OR. &
+         config_flags%emiss_opt == ADTLANT_BC &
+       ) THEN
         DO j=jts,jte
           DO i=its,ite
             IF (config_flags%kemit .GT. kte - ksub) THEN
@@ -809,32 +811,47 @@ CONTAINS
           DO i=ite,its,-1
             CALL POPINTEGER4(ad_to2)
             DO k=ad_to2,kts,-1
-              temp49b1 = emis_ant(i, k, j, p_e_co)*a_chem(i, k, j, p_co)
-              a_conv = scaleant(i, iant, j, p_scant_co)*temp49b1
+              IF (config_flags%emiss_opt .EQ. ADTLANT_BCCO) THEN
+                temp49b1 = emis_ant(i, k, j, p_e_co)*a_chem(i, k, j, p_co)
+                a_conv = scaleant(i, iant, j, p_scant_co)*temp49b1
 
-              temp48 = 60.*rho_phy(i, k, j)
-              temp47 = temp48*dz8w(i, k, j)
-              temp47b0 = -(dtstep*4.828e-4*a_conv/temp47**2)
-              temp52 = dz8w(i, k, j)
-              temp49 = alt(i, k, j)/temp52
-              temp51 = emis_ant(i, k, j, p_e_ecj)
-              temp50 = emis_ant(i, k, j, p_e_eci)
-              temp49b0 = dtstep*a_chem(i, k, j, p_bc1)
-              temp49b = (temp50*scaleant(i, iant, j, p_scant_bc)+&
-&                temp51*scaleant(i, iant, j, p_scant_bc))*temp49b0/&
-&                temp52
-              a_alt(i, k, j) = a_alt(i, k, j) + temp49b
-              a_dz8w(i, k, j) = a_dz8w(i, k, j) + temp48*temp47b0&
-&                 -  temp49*temp49b 
-              a_scaleant(i, iant, j, p_scant_bc) = a_scaleant(i, iant, j&
-&                , p_scant_bc) + (temp49*temp51+temp49*temp50)*temp49b0
-              conv = 4.828e-4/rho_phy(i, k, j)*dtstep/(dz8w(i, k, j)*60.&
-&                )
-              a_scaleant(i, iant, j, p_scant_co) = a_scaleant(i, iant, j, p_scant_co) + &
-&                conv*temp49b1
+                temp48 = 60.*rho_phy(i, k, j)
+                temp47 = temp48*dz8w(i, k, j)
+                temp47b0 = -(dtstep*4.828e-4*a_conv/temp47**2)
+                temp52 = dz8w(i, k, j)
+                temp49 = alt(i, k, j)/temp52
+                temp51 = emis_ant(i, k, j, p_e_ecj)
+                temp50 = emis_ant(i, k, j, p_e_eci)
+                temp49b0 = dtstep*a_chem(i, k, j, p_bc1)
+                temp49b = (temp50*scaleant(i, iant, j, p_scant_bc)+&
+  &                temp51*scaleant(i, iant, j, p_scant_bc))*temp49b0/&
+  &                temp52
+                a_alt(i, k, j) = a_alt(i, k, j) + temp49b
+                a_dz8w(i, k, j) = a_dz8w(i, k, j) + temp48*temp47b0&
+  &                 -  temp49*temp49b 
+                a_scaleant(i, iant, j, p_scant_bc) = a_scaleant(i, iant, j&
+  &                , p_scant_bc) + (temp49*temp51+temp49*temp50)*temp49b0
+                conv = 4.828e-4/rho_phy(i, k, j)*dtstep/(dz8w(i, k, j)*60.&
+  &                )
+                a_scaleant(i, iant, j, p_scant_co) = a_scaleant(i, iant, j, p_scant_co) + &
+  &                conv*temp49b1
 
-              a_rho_phy(i, k, j) = a_rho_phy(i, k, j) + dz8w(i, k, j)*&
-&                60.*temp47b0
+                a_rho_phy(i, k, j) = a_rho_phy(i, k, j) + dz8w(i, k, j)*&
+  &                60.*temp47b0
+              ELSE IF (config_flags%emiss_opt .EQ. ADTLANT_BC) THEN
+                temp52 = dz8w(i, k, j)
+                temp49 = alt(i, k, j)/temp52
+                temp51 = emis_ant(i, k, j, p_e_ecj)
+                temp50 = emis_ant(i, k, j, p_e_eci)
+                temp49b0 = dtstep*a_chem(i, k, j, p_bc1)
+                temp49b = (temp50*scaleant(i, iant, j, p_scant_bc)+&
+&                  temp51*scaleant(i, iant, j, p_scant_bc))*temp49b0/&
+&                  temp52
+                a_alt(i, k, j) = a_alt(i, k, j) + temp49b
+                a_dz8w(i, k, j) = a_dz8w(i, k, j) -  temp49*temp49b
+                a_scaleant(i, iant, j, p_scant_bc) = a_scaleant(i, iant, j&
+&                  , p_scant_bc) + (temp49*temp51+temp49*temp50)*temp49b0
+              END IF
             END DO
           END DO
         END DO

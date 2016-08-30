@@ -655,6 +655,7 @@ CONTAINS
 #if ( WRFPLUS == 1 )
            .OR. config_flags%biomass_burn_opt == ADTLBB &
            .OR. config_flags%biomass_burn_opt == ADTLBB_BCCO &
+           .OR. config_flags%biomass_burn_opt == ADTLBB_BC &
 #endif
             ) then
         IF ( ktau==1 ) then
@@ -875,7 +876,7 @@ CONTAINS
     fire_select:  SELECT CASE(config_flags%biomass_burn_opt)
      CASE (BIOMASSB,BIOMASSB_MOZC,BIOMASSB_MOZ,BIOMASSB_GHG &
 #if ( WRFPLUS == 1 )
-           ,ADTLBB, ADTLBB_BCCO &
+           ,ADTLBB, ADTLBB_BCCO, ADTLBB_BC &
 #endif
            )
 !      if( do_plumerisefire )then
@@ -1709,7 +1710,7 @@ CONTAINS
        endif
 #endif
 
-    CASE (GOCART_BCCO)
+    CASE (GOCART_BCCO, GOCART_BC)
 !
 ! simple fix for now
 !
@@ -1775,6 +1776,27 @@ CONTAINS
                          *scaleant(i,iant,j,p_scant_co) &
 #endif
                          *conv
+             end do
+          end do
+       end do
+       endif
+
+
+       if(config_flags%emiss_opt == ADTLANT_BC) then
+       do j=jts,jte  
+          do i=its,ite  
+             do k=kts,min(config_flags%kemit,kte-ksub)
+                conv = 4.828e-4/rho_phy(i,k,j)*dtstep/(dz8w(i,k,j)*60.)
+                chem(i,k,j,p_bc1)  = chem(i,k,j,p_bc1)                     &
+                     +(emis_ant(i,k,j,p_e_eci) &
+#if ( WRFPLUS == 1 )
+                     *scaleant(i,iant,j,p_scant_bc) &
+#endif
+                     + emis_ant(i,k,j,p_e_ecj) &
+#if ( WRFPLUS == 1 )
+                     *scaleant(i,iant,j,p_scant_bc) &
+#endif
+                     )*alt(i,k,j)*dtstep/dz8w(i,k,j)
              end do
           end do
        end do

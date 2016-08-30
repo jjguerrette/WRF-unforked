@@ -102,6 +102,7 @@ subroutine plumerise_driver (id,ktau,dtstep,                           &
             config_flags%chem_opt /= GOCART_SIMPLE &
 #if ( WRFPLUS == 1 )
             .and. config_flags%chem_opt /= GOCART_BCCO &
+            .and. config_flags%chem_opt /= GOCART_BC &
 #endif
             ) then
           call wrf_error_fatal("Fire emission scaling only supported for MOZART_KPP, MOZCART_KPP chem options")
@@ -209,6 +210,12 @@ subroutine plumerise_driver (id,ktau,dtstep,                           &
          do j=jts,jte
             do i=its,ite
                ebu(i,kts,j,p_ebu_co)  = ebu_in(i,1,j,p_ebu_in_co)
+               ebu(i,kts,j,p_ebu_bc)=ebu_in(i,1,j,p_ebu_in_bc)
+            enddo
+          enddo
+       elseif ( config_flags%biomass_burn_opt == ADTLBB_BC ) then
+         do j=jts,jte
+            do i=its,ite
                ebu(i,kts,j,p_ebu_bc)=ebu_in(i,1,j,p_ebu_in_bc)
             enddo
           enddo
@@ -461,7 +468,25 @@ is_mozcart : &
                   ebu(i,k,j,p_ebu_co)  = ebu(i,k,j,p_ebu_co)*ratio
                   ebu(i,k,j,p_ebu_bc)  = ebu(i,k,j,p_ebu_bc)*ratio
                 end do
+              elseif (config_flags%biomass_burn_opt == ADTLBB_BC) then 
+               
+!-------------------------------------------------------------------
+! we input total emissions instead of smoldering emissions:
+! ratio of smolderling to total
+!-------------------------------------------------------------------
+                sum = 0.
+                do k = kts,kte
+                  sum = sum + ebu(i,k,j,p_ebu_bc)
+                end do
+                if( sum > 0. ) then
+                  ratio = ebu(i,kts,j,p_ebu_bc)/sum
+                else
+                  ratio = 0.
+                endif
 
+                do k = kts,kte
+                  ebu(i,k,j,p_ebu_bc)  = ebu(i,k,j,p_ebu_bc)*ratio
+                end do
 #endif
 
               end if is_mozcart

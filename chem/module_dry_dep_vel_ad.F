@@ -139,7 +139,9 @@ CONTAINS
 !     other (appropriate) routine for aerosols
 !
       IF (config_flags%chem_opt .EQ. gocart_simple .OR. &
-                config_flags%chem_opt .EQ. gocart_bcco) THEN
+                config_flags%chem_opt .EQ. gocart_bcco .OR. &
+                config_flags%chem_opt .EQ. gocart_bc) THEN
+
         CALL PUSHREAL8ARRAY(rmol, (ime-ims+1)*(jme-jms+1))
         CALL WESELY_DRIVER(id, ktau, dtstep, config_flags, current_month&
 &                     , gmt, julday, t_phy, moist, p8w, t8w, raincv, &

@@ -351,7 +351,10 @@ CONTAINS
       i_bdy_method = 5
     ELSE IF (config_flags%chem_opt .EQ. chem_trace2) THEN
       i_bdy_method = 5
-    ELSE IF (config_flags%chem_opt .EQ. gocart_simple .or. config_flags%chem_opt .EQ. gocart_bcco) THEN
+    ELSE IF (config_flags%chem_opt .EQ. gocart_simple &
+      .or. config_flags%chem_opt .EQ. gocart_bcco &
+      .or. config_flags%chem_opt .EQ. gocart_bc &
+     ) THEN
       i_bdy_method = 7
     ELSE IF (config_flags%chem_opt .EQ. dust) THEN
       i_bdy_method = 7

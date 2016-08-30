@@ -512,6 +512,24 @@ CONTAINS
           END DO
         END DO
       END DO
+    CASE (GOCART_BC)
+      DO j=jte,jts,-1
+        DO i=ite,its,-1
+          DO k=kte,kts,-1
+            temp4 = 60.*rho_phy(i, k, j)
+            temp3 = temp4*dz8w(i, k, j)
+            temp12 = rho_phy(i, k, j)*dz8w(i, k, j)
+            temp12b0 = ebu(i, k, j, p_ebu_bc)*r_q*dtstep*a_chem(i, k, &
+&              j, p_bc1)/temp12
+            temp12b = -(scalebb(i, j, p_scbb_bc)*temp12b0/temp12)
+            a_dz8w(i, k, j) = a_dz8w(i, k, j) + rho_phy(i, k, j)*temp12b
+            a_rho_phy(i, k, j) = a_rho_phy(i, k, j) + dz8w(i, k, j)*  &
+&              temp12b
+            a_scalebb(i, j, p_scbb_bc) = a_scalebb(i, j, p_scbb_bc) + &
+&              temp12b0
+          END DO
+        END DO
+      END DO
     CASE (GOCARTRACM_KPP, GOCARTRADM2) 
       DO j=jte,jts,-1
         DO i=ite,its,-1

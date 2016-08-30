@@ -3873,32 +3873,34 @@ package   sc_biomassb_ghg  scale_burn_opt==5          -             scalebb:scbb
 ## 4D-Var chem and nta_chem packages
 #Excluding many species to reduce memory footprint and wall-time of an inversion.
 package   gocart_bcco     chem_opt==304                   -             chem:co,bc1,bc2
-
 package   nta_gocart_bcco     nta_chem_opt==304                   -             a_chem:a_co,a_bc1,a_bc2;g_chem:g_co,g_bc1,g_bc2
-
+package   gocart_bc          chem_opt==305                   -             chem:bc1,bc2
+package   nta_gocart_bc      nta_chem_opt==305                   -             a_chem:a_bc1,a_bc2;g_chem:g_bc1,g_bc2
 
 ##4D-Var ANT options for emissions (emiss_opt) and scaling factors (scale_emiss_opt)
 ### Create new options or add species as necessary.  Each species requires membership in the following 4D arrays: emis_ant, scaleant, g_scaleant, a_scaleant. Modification of these options and creation of new ones requires corresponding code in emission_driver source files. These options should have matching entries in the WRFDA registry.var_chemplus file, with the addition of the alpha_ant array.
 
-#Excluding many anthropogenic species to reduce memory footprint.  
-package   adtlant     emiss_opt==98                  -             emis_ant:e_so2,e_pm25i,e_pm25j,e_eci,e_ecj,e_orgi,e_orgj,e_so4i,e_so4j,e_no3i,e_no3j
-package   adtlant_bcco  emiss_opt==99                  -             emis_ant:e_co,e_eci,e_ecj
+#Excluding many anthropogenic species to reduce memory footprint.
+package   adtlant     emiss_opt==97                  -             emis_ant:e_so2,e_pm25i,e_pm25j,e_eci,e_ecj,e_orgi,e_orgj,e_so4i,e_so4j,e_no3i,e_no3j
+package   adtlant_bcco  emiss_opt==98                  -             emis_ant:e_co,e_eci,e_ecj
+package   adtlant_bc  emiss_opt==99                  -             emis_ant:e_eci,e_ecj
 
-package   sc_adtlant     scale_emiss_opt==98                        -             scaleant:scant_so2,scant_pm_25,scant_bc,scant_oc,scant_sulf,scant_no3;g_scaleant:g_scant_so2,g_scant_pm_25,g_scant_bc,g_scant_oc,g_scant_sulf,g_scant_no3;a_scaleant:a_scant_so2,a_scant_pm_25,a_scant_bc,a_scant_oc,a_scant_sulf,a_scant_no3
-
-package   sc_adtlant_bcco  scale_emiss_opt==99                        -             scaleant:scant_co,scant_bc;g_scaleant:g_scant_co,g_scant_bc;a_scaleant:a_scant_co,a_scant_bc
+package   sc_adtlant     scale_emiss_opt==97                        -             scaleant:scant_so2,scant_pm_25,scant_bc,scant_oc,scant_sulf,scant_no3;g_scaleant:g_scant_so2,g_scant_pm_25,g_scant_bc,g_scant_oc,g_scant_sulf,g_scant_no3;a_scaleant:a_scant_so2,a_scant_pm_25,a_scant_bc,a_scant_oc,a_scant_sulf,a_scant_no3
+package   sc_adtlant_bcco  scale_emiss_opt==98                        -             scaleant:scant_co,scant_bc;g_scaleant:g_scant_co,g_scant_bc;a_scaleant:a_scant_co,a_scant_bc
+package   sc_adtlant_bc  scale_emiss_opt==99                        -             scaleant:scant_bc;g_scaleant:g_scant_bc;a_scaleant:a_scant_bc
 
 
 ##4D-Var BB options for emissions (biomass_burn_opt) and scaling factors (scale_burn_opt)
 ### Create new options or add species as necessary.  Each species requires membership in the following 4D arrays: ebu, ebu_in, scalebb, g_scalebb, a_scalebb. Modification of these options and creation of new ones requires corresponding code in emission_driver source files.  These options should have matching entries in the WRFDA registry.var_chemplus file, with the addition of the alpha_bb array.
 
 #Excluding pm25,pm10,sulf,dms in BB emissions because not present in FINN (they use extra memory and generate extraneous error messages). 
-package   adtlbb      biomass_burn_opt==98             -          state:mean_fct_agtf,mean_fct_agef,mean_fct_agsv,mean_fct_aggr,firesize_agtf,firesize_agef,firesize_agsv,firesize_aggr;ebu:ebu_so2,ebu_oc,ebu_bc;ebu_in:ebu_in_so2,ebu_in_oc,ebu_in_bc
-package   adtlbb_bcco   biomass_burn_opt==99             -          state:mean_fct_agtf,mean_fct_agef,mean_fct_agsv,mean_fct_aggr,firesize_agtf,firesize_agef,firesize_agsv,firesize_aggr;ebu:ebu_co,ebu_bc;ebu_in:ebu_in_co,ebu_in_bc
+package   adtlbb      biomass_burn_opt==97             -          state:mean_fct_agtf,mean_fct_agef,mean_fct_agsv,mean_fct_aggr,firesize_agtf,firesize_agef,firesize_agsv,firesize_aggr;ebu:ebu_so2,ebu_oc,ebu_bc;ebu_in:ebu_in_so2,ebu_in_oc,ebu_in_bc
+package   adtlbb_bcco   biomass_burn_opt==98             -          state:mean_fct_agtf,mean_fct_agef,mean_fct_agsv,mean_fct_aggr,firesize_agtf,firesize_agef,firesize_agsv,firesize_aggr;ebu:ebu_co,ebu_bc;ebu_in:ebu_in_co,ebu_in_bc
+package   adtlbb_bc   biomass_burn_opt==99             -          state:mean_fct_agtf,mean_fct_agef,mean_fct_agsv,mean_fct_aggr,firesize_agtf,firesize_agef,firesize_agsv,firesize_aggr;ebu:ebu_bc;ebu_in:ebu_in_bc
 
-package   sc_adtlbb         scale_burn_opt==98             -          scalebb:scbb_so2,scbb_oc,scbb_bc;g_scalebb:g_scbb_so2,g_scbb_oc,g_scbb_bc;a_scalebb:a_scbb_so2,a_scbb_oc,a_scbb_bc
-
-package   sc_adtlbb_bcco      scale_burn_opt==99             -          scalebb:scbb_co,scbb_bc;g_scalebb:g_scbb_co,g_scbb_bc;a_scalebb:a_scbb_bc,a_scbb_bc
+package   sc_adtlbb         scale_burn_opt==97             -          scalebb:scbb_so2,scbb_oc,scbb_bc;g_scalebb:g_scbb_so2,g_scbb_oc,g_scbb_bc;a_scalebb:a_scbb_so2,a_scbb_oc,a_scbb_bc
+package   sc_adtlbb_bcco      scale_burn_opt==98             -          scalebb:scbb_co,scbb_bc;g_scalebb:g_scbb_co,g_scbb_bc;a_scalebb:a_scbb_bc,a_scbb_bc
+package   sc_adtlbb_bc      scale_burn_opt==99             -          scalebb:scbb_bc;g_scalebb:g_scbb_bc;a_scalebb:a_scbb_bc
 
 #package   adtlbb      biomass_burn_opt==98             -          state:mean_fct_agtf,mean_fct_agef,mean_fct_agsv,mean_fct_aggr,firesize_agtf,firesize_agef,firesize_agsv,firesize_aggr;ebu:ebu_pm25,ebu_pm10,ebu_so2,ebu_oc,ebu_bc,ebu_sulf,ebu_dms;ebu_in:ebu_in_pm25,ebu_in_pm10,ebu_in_so2,ebu_in_oc,ebu_in_bc,ebu_in_sulf,ebu_in_dms
 #package   sc_adtlbb         scale_burn_opt==98             -          scalebb:scbb_pm25,scbb_pm10,scbb_so2,scbb_oc,scbb_bc,scbb_sulf,scbb_dms;g_scalebb:g_scbb_pm25,g_scbb_pm10,g_scbb_so2,g_scbb_oc,g_scbb_bc,g_scbb_sulf,g_scbb_dms;a_scalebb:a_scbb_pm25,a_scbb_pm10,a_scbb_so2,a_scbb_oc,a_scbb_bc,a_scbb_sulf,a_scbb_dms

@@ -518,6 +518,7 @@ real::t1,t2,t3,t4
 #if ( WRFPLUS == 1 ) 
                                          .or. grid%biomass_burn_opt == ADTLBB &
                                          .or. grid%biomass_burn_opt == ADTLBB_BCCO &
+                                         .or. grid%biomass_burn_opt == ADTLBB_BC &
 #endif
                                          ) THEN
                  message = 'READING EMISSIONS DATA OPT 3'
@@ -562,6 +563,7 @@ real::t1,t2,t3,t4
 #if ( WRFPLUS == 1 ) 
                                          .or. grid%biomass_burn_opt == ADTLBB &
                                          .or. grid%biomass_burn_opt == ADTLBB_BCCO &
+                                         .or. grid%biomass_burn_opt == ADTLBB_BC &
 #endif
                                          ) THEN
                  message = 'READING EMISSIONS DATA OPT 3'

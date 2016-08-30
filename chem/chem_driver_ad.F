@@ -270,7 +270,7 @@ SUBROUTINE chem_driver_ad(grid, config_flags &
     CALL WRF_DEBUG(15, &
              'calling only gocart aerosols driver from chem_driver')
     haveaer = .false.
-  CASE (GOCART_BCCO) 
+  CASE (GOCART_BCCO, GOCART_BC) 
     CALL WRF_DEBUG(15, &
              'calling only black carbon aerosols from chem_driver')
     haveaer = .false.

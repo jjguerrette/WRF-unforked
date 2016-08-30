@@ -228,6 +228,7 @@ CONTAINS
            config_flags%chem_opt /= GOCART_SIMPLE  .and.                  &
 #if ( WRFPLUS == 1 )
            config_flags%chem_opt /= GOCART_BCCO .and.                  &
+           config_flags%chem_opt /= GOCART_BC   .and.                  &
 #endif
            config_flags%chem_opt /= GOCARTRACM_KPP )THEN
           call wesely_driver(id,ktau,dtstep,                              &
@@ -320,6 +321,7 @@ CONTAINS
        ELSEIF ( config_flags%chem_opt == GOCART_SIMPLE &
 #if ( WRFPLUS == 1 )
                 .OR. config_flags%chem_opt == GOCART_BCCO &
+                .OR. config_flags%chem_opt == GOCART_BC &
 #endif
               ) then
           call wesely_driver(id,ktau,dtstep,                              &

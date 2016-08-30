@@ -173,7 +173,7 @@ call wrf_message("**************************************************************
    chem_select: SELECT CASE(config_flags%chem_opt)
      CASE (GOCART_SIMPLE)
        CALL wrf_debug(15,'calling only gocart aerosols driver from chem_driver')
-     CASE (GOCART_BCCO)
+     CASE (GOCART_BCCO, GOCART_BC)
        CALL wrf_debug(15,'calling only black carbon aerosols from chem_driver')
      CASE (GOCARTRADM2)
        CALL wrf_debug(15,'calling gocart and radm driver from chem_driver')
@@ -1702,7 +1702,7 @@ ENDIF ghg_block
            enddo
           enddo
 #if ( WRFPLUS == 1 )
-     CASE (GOCART_BCCO)
+     CASE (GOCART_BCCO, GOCART_BC)
        if(config_flags%phot_opt .NE. 0 )then
          call wrf_error_fatal("GOCART simple initialization, phot_opt  MUST BE ZERO")
        endif

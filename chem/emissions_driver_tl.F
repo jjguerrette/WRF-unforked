@@ -198,7 +198,10 @@ CONTAINS
 &        config_flags%biomass_burn_opt .EQ. BIOMASSB_GHG .OR. &
 &        config_flags%biomass_burn_opt .EQ. BIOMASSB .OR. &
 &        config_flags%biomass_burn_opt .EQ. ADTLBB .OR. &
-&        config_flags%biomass_burn_opt .EQ. ADTLBB_BCCO ) THEN
+&        config_flags%biomass_burn_opt .EQ. ADTLBB_BCCO .OR. &
+&        config_flags%biomass_burn_opt .EQ. ADTLBB_BC &
+&      ) THEN
+
       IF (ktau .EQ. 1) THEN
         do_plumerisefire = .true.
       ELSE IF (adapt_step_flag) THEN
@@ -303,7 +306,7 @@ CONTAINS
     ksub = 0
     SELECT CASE  (config_flags%biomass_burn_opt) 
     CASE (BIOMASSB, BIOMASSB_MOZC, BIOMASSB_MOZ, BIOMASSB_GHG, &
-&    ADTLBB, ADTLBB_BCCO)
+&    ADTLBB, ADTLBB_BCCO, ADTLBB_BC)
       CALL WRF_DEBUG(15, 'fire emissions: adding biomassb emissions')
       CALL G_ADD_EMIS_BURN(id, dtstep, ktau, dz8w, g_dz8w, rho_phy, &
 &                     g_rho_phy, chem, g_chem, julday, gmt, xlat, xlong, &
@@ -671,7 +674,7 @@ CONTAINS
           END DO
         END DO
       END IF
-    CASE (GOCART_BCCO) 
+    CASE (GOCART_BCCO, GOCART_BC) 
       IF (config_flags%emiss_opt .LE. 5) THEN
         DO j=jts,jte
           DO i=its,ite
@@ -721,7 +724,9 @@ CONTAINS
           END DO
         END DO
       END IF
-      IF (config_flags%emiss_opt .EQ. ADTLANT_BCCO) THEN
+      IF(config_flags%emiss_opt == ADTLANT_BCCO .OR. &
+         config_flags%emiss_opt == ADTLANT_BC &
+       ) THEN
         DO j=jts,jte
           DO i=its,ite
             IF (config_flags%kemit .GT. kte - ksub) THEN
@@ -750,11 +755,13 @@ CONTAINS
 &                emis_ant(i, k, j, p_e_ecj)*scaleant(i, iant, j, &
 &                p_scant_bc))*alt(i, k, j)*dtstep/dz8w(i, k, j)
 
-              g_chem(i, k, j, p_co) = g_chem(i, k, j, p_co) + emis_ant(i, k&
-    &            , j, p_e_co)*(g_scaleant(i, iant, j, p_scant_co)*conv+scaleant&
-    &            (i, iant, j, p_scant_co)*g_conv)
-              chem(i, k, j, p_co) = chem(i, k, j, p_co) + emis_ant(i, k, j, &
-    &            p_e_co)*scaleant(i, iant, j, p_scant_co)*conv
+              IF (config_flags%emiss_opt .EQ. ADTLANT_BCCO) THEN
+                g_chem(i, k, j, p_co) = g_chem(i, k, j, p_co) + emis_ant(i, k&
+    &              , j, p_e_co)*(g_scaleant(i, iant, j, p_scant_co)*conv+scaleant&
+    &              (i, iant, j, p_scant_co)*g_conv)
+                chem(i, k, j, p_co) = chem(i, k, j, p_co) + emis_ant(i, k, j, &
+    &              p_e_co)*scaleant(i, iant, j, p_scant_co)*conv
+              END IF
             END DO
           END DO
         END DO
