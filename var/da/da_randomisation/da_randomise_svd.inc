@@ -1,6 +1,7 @@
 subroutine da_randomise_svd(grid, config_flags,            &
                            cv_size, xbx, be, iv, cv, &
-                           re, y, xhat, j_cost) !!, eignvec, LAM, neign)
+                           re, y, xhat, j_cost, &
+                           qhat, eignval, eignvec, neign)
 
    !-------------------------------------------------------------------------
    ! Purpose:         Main randomized SVD routine, separated into 2 stages 
@@ -31,37 +32,19 @@ subroutine da_randomise_svd(grid, config_flags,            &
    real, intent(out)                 :: xhat(1:cv_size)               ! control variable (local).
    type (j_type), optional, intent(out) :: j_cost                        ! cost function
 
-!   real, optional, intent(out)       :: qhat(1:cv_size, 1:ensdim_svd) ! orthonormal basis set.
-!   real*8, optional, intent(out)     :: eignvec(ensdim_svd, ensdim_svd)
-!   real*8, optional, intent(out)     :: nuhat(1:cv_size, 1:ensdim_svd)
-!   real*8, optional, intent(out)     :: LAM(1:ensdim_svd)
-!   real*8, optional, intent(out)     :: LAMi(1:ensdim_svd)
-!   real*8, optional, intent(out)     :: eignvec(ensdim_svd, ensdim_svd)
-!!   real*8, optional, intent(out)     :: nuhat(1:cv_size, 1:ensdim_svd)
-!   real*8, optional, intent(out)     :: LAM(1:ensdim_svd)
-!   real*8, optional, intent(out)     :: LAMi(1:ensdim_svd)
-!   integer, optional, intent(out)    :: neign                         ! Number of non-truncated eigenpairs
+   real, optional, intent(out)       :: qhat(1:cv_size, 0:ensdim_svd) ! orthonormal basis set of A = Q * B * Q^T
+   real*8, optional, intent(out)     :: eignvec(ensdim_svd, ensdim_svd)
+   real*8, optional, intent(out)     :: eignval(ensdim_svd)
+   integer, optional, intent(out)    :: neign                         ! Number of non-truncated eigenpairs
 
 #if defined(LAPACK)
 
-   real(wp)                     :: eignvec(ensdim_svd, ensdim_svd)
-   real(wp)                     :: LAM(1:ensdim_svd), LAMi(1:ensdim_svd)
+   real(wp), dimension(1:ensdim_svd) :: LAM, LAMinv
    real(wp), allocatable        :: yhat(:,:)  ! yhat = A * omega
-   real(wp), allocatable        :: qhat(:,:)  ! orthonormal basis set of A = Q * B * Q^T = qhat * BMAT * qhat^T
    real(wp), allocatable        :: omega(:,:) ! Gaussian draw
    real(wp), allocatable        :: nuhat(:,:) ! Eigenvectors of A
    real(wp)                     :: dot_cv
-
-   complex*16, allocatable      :: nuhat_z(:,:) ! Eigenvectors of A
-   complex*16, allocatable      :: qhat_z(:,:)
-   complex*16, allocatable      :: xhat_z(:)   ! complex control variable (local).
-   complex*16, allocatable      :: ghat_z(:)   ! complex control variable (local).
-   complex*16                   :: eignvec_z(ensdim_svd, ensdim_svd)
-   complex*16                   :: LAM_z(1:ensdim_svd)
-   complex*16                   :: dot_cv_z
-
-   integer                      :: neign                         ! Number of non-truncated eigenpairs
-   
+  
    integer                      :: iens, jens, nens, i, j, ccount
 #if (WRF_CHEM != 1)
 #ifdef CLOUD_CV
@@ -82,16 +65,15 @@ subroutine da_randomise_svd(grid, config_flags,            &
    real(wp)                     :: F2(ensdim_svd, ensdim_svd) ! intermediate matrix
    real(wp)                     :: BMAT(ensdim_svd, ensdim_svd)  ! B = Q^T * A * Q
    integer                      :: piv(ensdim_svd)
-!   real                         :: dgewrk(4*nensdim_svd)
-!   real                         :: dummymat(1, ensdim_svd)
-!   integer                      :: ndgewrk, info
    integer                      :: info
 
-   real                         :: gdot, beta
+   real                         :: gdot, beta, temp_l
+   real                         :: temp_e(ensdim_svd)
    real                         :: j0_total
    character*10                 :: cproc, cens
    character(len=filename_len)  :: filename
    character(len=3) :: cnens=""
+   logical          :: swapped
   
    if (trace_use) call da_trace_entry("da_randomise_svd")
 
@@ -176,7 +158,6 @@ subroutine da_randomise_svd(grid, config_flags,            &
    else if ( svd_stage .eq. 2 ) then
       allocate(yhat(1:cv_size,nens))
       allocate(omega(1:cv_size,nens))
-      allocate(qhat(1:cv_size,0:nens)) !! zero first for amat_mul later
       qhat(:,0) = 0.D0
 
       write(cproc,fmt='(i4.4)') myproc
@@ -232,223 +213,158 @@ subroutine da_randomise_svd(grid, config_flags,            &
     !  b = F2(:,iens)
     !  x = BMAT(iens,:)
     !-----------------------------------------------------------
-      write(cnens,fmt='(I0)') ensdim_svd
-      do iens = 1, ensdim_svd
-         write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'F1: ',F1(iens,1:ensdim_svd)
+      write(cnens,fmt='(I0)') nens
+      do iens = 1, nens
+         write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'F1: ',F1(iens,1:nens)
       end do
-      do iens = 1, ensdim_svd
-         write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'F2: ',F2(iens,1:ensdim_svd)
+      do iens = 1, nens
+         write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'F2: ',F2(iens,1:nens)
       end do
 
       info = 0
-!      call GESV(nens, nens, F1, nens, piv, F2, nens, info) !F77
       call GESV(F1, F2, piv, info) !F95
 
-      if (info /=0) write(stdout,*) 'Error in randomised SVD: GESV returned ',info
+      if (info /=0) then
+         write(stdout,*) 'Error in randomised SVD: GESV returned ',info
+         CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
+      end if
 
+      ! GESV returns B^T in F2; force symmetry in B
       do iens = 1, nens
          do jens = 1, nens
-            if (svd_symm_type .eq. 1) then
-               BMAT(iens,jens) = F2(jens,iens)  !BMAT is not necessarily symmetric, and complex eigs can results
-            else
                BMAT(iens,jens) = (F2(jens,iens) + F2(iens,jens)) / 2
-            end if
          end do
       end do
 
-      do iens = 1, ensdim_svd
-         write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'BMAT: ',BMAT(iens,1:ensdim_svd)
+      do iens = 1, nens
+         write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'BMAT: ',BMAT(iens,1:nens)
       end do
 
     ! Determine eigenvalues and eigenvectors of the B matrix
     !---------------------------------------------------------
 !      ndgewrk           = MAX(4*nens-1,1)
       info              = 0
-      if (svd_symm_type .eq. 1) then
-!      call GEEV('N', 'V', nens, BMAT, nens, LAM, LAMi, dummymat, 1, eignvec, nens, &
-!              dgewrk(1:ndgewrk), ndgewrk, info) !F77
-         call GEEV(BMAT, LAM, LAMi, VR = eignvec, INFO = info) !F95
-         if (info /=0) write(stdout,*) 'Error in randomised SVD: GEEV returned ',info
-      else
-         call SYEV(BMAT, LAM, JOBZ = 'V' , INFO = info) !F95
-         do iens = 1, nens
-            do jens = 1, nens 
-               eignvec(iens,jens) = BMAT(iens,jens)
-            end do
-         end do
-         LAMi = 0.D0
-         if (info /=0) write(stdout,*) 'Error in randomised SVD: SYEV returned ',info
+      call SYEV(BMAT, LAM, JOBZ = 'V' , INFO = info) !F95
+
+      if (info /=0) then
+         write(stdout,*) 'Error in randomised SVD: SYEV returned ',info
+         CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
       end if
 
+      do iens = 1, nens
+         do jens = 1, nens 
+            eignvec(iens,jens) = BMAT(iens,jens)
+         end do
+      end do
+      
+      !First sort eigenvalues and eigenvectors in descending order
+      do j = nens-1, 1, -1
+        swapped = .false.
+        do i = 1, j
+          if (LAM(i) .lt. LAM(i+1)) then
+            temp_l = LAM(i)
+            LAM(i) = LAM(i+1)
+            LAM(i+1) = temp_l
+
+            temp_e = eignvec(:,i)
+            eignvec(:,i) = eignvec(:,i+1)
+            eignvec(:,i+1) = temp_e
+
+            swapped = .true.
+          end if
+        end do
+        if (.NOT. swapped) exit
+      end do
 
       neign = nens
+      do iens = 1, nens
+         eignval(iens) = LAM(iens) + 1
+         if (neign .eq. nens .and. LAM(iens) .lt. 0.D0) then
+            if (iens .gt. 1) then
+               neign = iens - 1
+            else
+               write(unit=stdout,fmt='(A)') &
+                  'FATAL ERROR: There need to be some positive eigenvalues of BMAT'
+               CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
+            end if
+         end if
+      end do
 
       ! Print current eigenpairs
       ! ----------------------------------------------
-      write(cnens,fmt='(I0)') ensdim_svd
-      write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'Eigenvalues(r): ',LAM(1:ensdim_svd)
-      write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'Eigenvalues(i): ',LAMi(1:ensdim_svd)
-      do iens = 1, ensdim_svd
-         write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'EIGENVECTOR: ',eignvec(iens,1:ensdim_svd)
+      write(cnens,fmt='(I0)') nens
+      write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'Eigenvalues(r): ',LAM(1:nens)
+      do iens = 1, nens
+         write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'EIGENVECTOR_MATRIX: ',eignvec(iens,1:nens)
       end do
+
+      write(unit=stdout,fmt='(A)') ' '
+      write(unit=stdout,fmt='(A,I5,A,I5,A)') 'Using ', neign, ' of ', nens, ' eigenpairs'
+      write(unit=stdout,fmt='(A)') ' '
+
 
       ! Note: da_amat_mul does not properly handle imaginary eigenpairs,
       !       nor does it perform proper truncation when neign < nens.
       ! Although symmetric real matrices should not have complex eigenvalues or eigenvectors
 
+      ! Eigenvalues of the inverse Hessian (including all background terms)
 
-      if (any(LAMi .gt. 0) .and. svd_amat_type .le. 1) then
-         ccount = 0
-         do jens = 1, max(neign,nens)
-            LAM_z(jens) = (1.D0, 0.D0) / ( dcmplx( LAM(jens) + 1.D0, LAMi(jens) ) )
-            if (LAMi(jens) .gt. 0. .or. LAMi(jens) .lt. 0. ) then
-              ccount = ccount + 1
-              write(unit=stdout,fmt='(A,I5)') 'ccount = ', ccount
-            end if
-            do i = 1, max(neign,nens)
-               if ((LAMi(jens) .gt. 0. .or. LAMi(jens) .lt. 0.)) then
-                  if (mod(ccount,2) .eq. 1) then
-                     eignvec_z(i,jens  ) = dcmplx(eignvec(i,jens),   eignvec(i,jens+1))
-                     eignvec_z(i,jens+1) = dcmplx(eignvec(i,jens), - eignvec(i,jens+1))
-                  end if
-               else
-                  eignvec_z(i,jens) = dcmplx(eignvec(i,jens), 0.D0)
-               end if
-            end do
-         end do
-
-         allocate(qhat_z(1:cv_size,1:nens))
-         allocate(ghat_z(1:cv_size))
-         allocate(xhat_z(1:cv_size))
-
-         qhat_z = dcmplx (qhat, 0.D0)
-         ghat_z = dcmplx (ghat, 0.D0)
-         xhat_z = dcmplx(0.D0, 0.D0)
-
-! LAST CHANGE INCASE OF ERROR
-!         do i = 1, cv_size
-!            xhat_z(i) = dcmplx(0.D0, 0.D0)
-!            ghat_z(i) = dcmplx( ghat(i) , 0.D0 )
-!            do jens = 1, nens
-!               qhat_z(i,jens) = dcmplx( qhat(i,jens) , 0.D0 )
-!            end do
-!         end do
-
-         if (svd_amat_type .eq. 1) then
-            ! Generate eigenvectors of A
-            write(unit=stdout,fmt='(A)') 'Carrying out truncated complex amat_mul'
-            allocate(nuhat_z(cv_size, nens))
-
-            call GEMM(qhat_z, eignvec_z, nuhat_z)
-
-            ! Alternatively, if BLAS isn't available
-!            do jens = 1, nens
-!               do i = 1, cv_size
-!                  nuhat_z(i,jens) = da_dot_z(neign, qhat_z(i,1:neign), eignvec_z(1:neign,jens))
-!               end do
-!            end do
-
-            ! For a symmetric matrix, P = V*D*V^-1 = V*D*V^*, where ^* represents the conjugate transpose
-            do i = 1, neign
-               dot_cv_z = da_dot_cv_z(cv_size, conjg(nuhat_z(:,i)), ghat_z, grid, mz, jp_start, jp_end)
-               write(unit=stdout,fmt='("i, dot_cv = ",I3,D25.16,SP,D25.16,"i")') i, real(dot_cv_z,8),real(imag(dot_cv_z),8)
-               write(unit=stdout,fmt='("i, LAM_z = ",I3,D25.16,SP,D25.16,"i")') i, real(LAM_z(i),8),real(imag(LAM_z(i)),8)
-
-               xhat_z = xhat_z + LAM_z(i) * nuhat_z(:,i) * dot_cv_z
-            end do
-
-            deallocate(nuhat_z)
-
-         else if (svd_amat_type .eq. 0) then
-            ! Copied directly from da_amat_mul, seems to work for complex conjugate eigen pairs
-            write(unit=stdout,fmt='(A)') 'Carrying out full complex amat_mul'
-            do j = 1, neign
-               dot_cv_z = da_dot_cv_z(cv_size, qhat_z(:,j), ghat_z, grid, mz, jp_start, jp_end)
-               write(unit=stdout,fmt='("j, dot_cv = ",I3,D25.16,SP,D25.16,"i")') j, real(dot_cv_z,8),real(imag(dot_cv_z),8)
-               write(unit=stdout,fmt='("j, LAM_z = ",I3,D25.16,SP,D25.16,"i")') j, real(LAM_z(j),8),real(imag(LAM_z(j)),8)
-
-               do i = 1, neign
-                  xhat_z = xhat_z + qhat_z(:,i) * &
-                         SUM(eignvec_z(i,1:neign)*LAM_z(1:neign)*eignvec_z(j,1:neign)) * dot_cv_z
-               end do
-            end do 
-         end if
-
-         ! Since xhat is in real space, the complex parts must cancel.
-         do i = 1, cv_size
-            xhat(i) = REAL( xhat_z(i) ,8)
-            if ( REAL(IMAG( xhat_z(i) ),8) .gt. 1.D-10 ) then
-               write(unit=stdout,fmt='(A,2I2)') &
-                'ERROR: There should be no imaginary component to XHAT',i,cv_size
-            end if
-         end do
-
-         deallocate(qhat_z)
-         deallocate(ghat_z)
-         deallocate(xhat_z)
-
-      else
-         ! Eigenvalues of the inverse Hessian (including all background terms)
-         ccount = 0
+      if (neign .eq. nens .and. .not. adapt_svd) then
          do i = 1, nens
-            LAM(i) = 1.D0 / ( LAM(i) + 1.D0 )
-            if ( LAMi(i) .lt. 0. .or. LAMi(i) .gt. 0. ) then
-               if (ccount .eq. 0) neign = i - 1
-               ccount = ccount + 1
+            LAMinv(i) = 1.D0 / ( LAM(i) + 1.D0 )
+         end do
+         write(unit=stdout,fmt='(A)') 'Carrying out full real amat_mul'
+         call da_amat_mul(be,grid,cv_size,nens,neign,LAMinv,eignvec,qhat,ghat,xhat)
+      else
+         !  Truncate to neign modes Here we use full eigenvec matrix to generate nuhat=qhat*eigenvec,
+         !  then truncate by only using neign of the nuhat vectors 
+
+         write(unit=stdout,fmt='(A)') 'Carrying out truncated amat_mul'
+
+         ! (1) Generate eigenvectors of A
+         allocate(nuhat(1:cv_size, 1:neign))
+         nuhat = 0.D0
+
+! GEMM should also work, because local nuhat members only depend on qhat from local process
+!         call GEMM(qhat(1:cv_size,1:nens), eignvec(1:nens,1:neign), nuhat)
+
+         ! Alternatively, if BLAS isn't available
+         do jens = 1, neign
+            do i = 1, cv_size
+!!               nuhat(i,jens) = da_dot(nens, qhat(i,1:nens), eignvec(1:nens,jens))
+               nuhat(i,jens) = da_dot(nens, qhat(i,1:nens), eignvec(1:nens,jens))
+            end do
+         end do
+
+         ! Write nuhat vectors to disk
+         do i = 1, neign
+            write(unit=stdout,fmt='("Writing nuhat vectors to disk: ",i3)') i
+            write(cens,fmt='(i4.4)') i
+            filename = 'nuhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+            call da_cv_io ('w', filename, cv_size, nuhat(1:cv_size,i))
+         end do
+
+         if (minval(LAM(1:neign)) .lt. 1.D0 .and. adapt_svd) then
+            xhat = ghat
+         end if
+
+         ! (2) Construct low rank estimate of A^-1 * ghat with leading neign modes of A
+         do i = 1, neign
+            dot_cv = da_dot_cv(cv_size, nuhat(:,i), ghat, grid, mz, jp_start, jp_end)
+            write(unit=stdout,fmt='("i, dot_cv = ",I3,D25.16)') i,dot_cv
+
+            if (minval(LAM(1:neign)) .lt. 1.D0 .and. adapt_svd) then
+               xhat = xhat - LAM(i) / (LAM(i) + 1.D0) * nuhat(:,i) * dot_cv
+            else
+               xhat = xhat + 1.D0 / (LAM(i) + 1.D0) * nuhat(:,i) * dot_cv
             end if
          end do
 
-         if (neign .eq. nens) then
-            write(unit=stdout,fmt='(A)') 'Carrying out full real amat_mul'
-            call da_amat_mul(be,grid,cv_size,nens,neign,LAM,eignvec,qhat,ghat,xhat)
-         else
-            !  Truncate to neign modes Here we use full eigenvec matrix to generate nuhat=qhat*eigenvec,
-            !  then truncate by only using neign of the nuhat vectors 
-
-            write(unit=stdout,fmt='(A)') 'Carrying out truncated amat_mul'
-
-            ! (1) Generate eigenvectors of A
-            allocate(nuhat(cv_size, neign))
-            nuhat = 0.D0
-
-            call GEMM(qhat(1:cv_size,1:nens), eignvec(1:nens,1:neign), nuhat)
-
-            ! Alternatively, if BLAS isn't available
-!            do jens = 1, neign
-!               do i = 1, cv_size
-!                  nuhat(i,jens) = da_dot(neign, qhat(i,1:neign), eignvec(1:neign,jens))
-!               end do
-!            end do
-
-            ! Write nuhat vectors to disk
-            do i = 1, neign
-               write(unit=stdout,fmt='("Writing nuhat vectors to disk: ",i3)') i
-               write(cens,fmt='(i4.4)') i
-               filename = 'nuhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
-               call da_cv_io ('w', filename, cv_size, nuhat(1:cv_size,i))
-            end do
-
-
-            ! (2) Construct low rank estimate of A^-1 * ghat with leading neign modes of A
-            do i = 1, neign
-               dot_cv = da_dot_cv(cv_size, nuhat(:,i), ghat, grid, mz, jp_start, jp_end)
-               write(unit=stdout,fmt='("i, dot_cv = ",I3,D25.16)') i,dot_cv
-
-               xhat = xhat + LAM(i) * nuhat(:,i) * dot_cv
-            end do
-
-            deallocate(nuhat)
-         end if
+         deallocate(nuhat)
       end if
-
-      write(unit=stdout,fmt='(A,I5)') 'svd_amat_type = ', svd_amat_type
-      write(unit=stdout,fmt='(A,I5,A,I5)') 'Number of eigenpairs used: ', neign, ' of ', nens
-
 
       deallocate(yhat)
       deallocate(omega)
-      deallocate(qhat)
-
    else
       write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: svd_stage should be 0, 1, or 2, not ',svd_stage
       CALL wrf_error_fatal('Canceling RANDOMIZED SVD')

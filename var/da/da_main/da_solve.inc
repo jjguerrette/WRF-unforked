@@ -613,6 +613,13 @@
          allocate (eignvec(ntmax(it), ntmax(it)))
          allocate (eignval(ntmax(it)))
       end if
+#if defined(LAPACK)
+      if (use_randomsvd) then
+         allocate (qhat(1:cv_size, 0:ensdim_svd))
+         allocate (eignvec(ensdim_svd, ensdim_svd))
+         allocate (eignval(ensdim_svd))
+      end if
+#endif
 
 ! Re-scale the variances and the scale-length for outer-loop > 1:
       if (it > 1 .and. (cv_options == 5 .or. cv_options == 7)) then
@@ -916,7 +923,7 @@
                              be, iv, j_grad_norm_target, xhat, qhat, cvt, re, y, j, eignvec, eignval, neign )
 #if (WRF_CHEM == 1)
             if (calc_aminusb) call da_calculate_aminusb(grid,config_flags,it,cv_size,xbx, &
-                                be,qhat,eignvec,eignval,neign)
+                                be,qhat,eignvec,eignval,neign,ntmax(it))
 #endif
 
          end if
@@ -937,16 +944,32 @@
             if (svd_stage .eq. 1 .and. ensmember .eq. ensdim_svd+1) then
                select case (svd_type)
                   case(1)
-                     call da_randomise_svd_51(grid, config_flags, cv_size, xbx, be, iv, cvt, re, y, xhat, j)
+                     call da_randomise_svd_51( &
+                           grid, config_flags, cv_size, xbx, &
+                           be, iv, cvt, re, y, xhat, j_cost = j)
                   case(6)
-                     call da_randomise_svd(grid, config_flags, cv_size, xbx, be, iv, cvt, re, y, xhat, j)
+                     call da_randomise_svd( &
+                           grid, config_flags, cv_size, xbx, &
+                           be, iv, cvt, re, y, xhat, j_cost = j)
                end select
             else
                select case (svd_type)
                   case(1)
-                     call da_randomise_svd_51(grid, config_flags, cv_size, xbx, be, iv, cvt, re, y, xhat)
+                     call da_randomise_svd_51( &
+                           grid, config_flags, cv_size, xbx, &
+                           be, iv, cvt, re, y, xhat)
                   case(6)
-                     call da_randomise_svd(grid, config_flags, cv_size, xbx, be, iv, cvt, re, y, xhat)
+                     if (svd_stage .eq. 2) then
+                        call da_randomise_svd( &
+                              grid, config_flags, cv_size, xbx, &
+                              be, iv, cvt, re, y, xhat, &
+                              qhat=qhat, eignval=eignval, &
+                              eignvec=eignvec, neign=neign)
+                     else
+                        call da_randomise_svd( &
+                              grid, config_flags, cv_size, xbx, &
+                              be, iv, cvt, re, y, xhat)
+                     end if
                end select
             end if
             if ((svd_type .eq. 1 .and. svd_stage .ne. 4) .or. &
@@ -970,7 +993,11 @@
                call wrfu_finalize
                call wrf_shutdown
                stop
-
+            else
+#if (WRF_CHEM == 1)
+               if (calc_aminusb) call da_calculate_aminusb(grid,config_flags,it,cv_size,xbx, &
+                                   be,qhat,eignvec,eignval,neign,ensdim_svd)
+#endif
             end if
          else
             write(unit=stdout,fmt='("ensdim_svd, svd_outer, it = ",3I4)') &
@@ -1118,7 +1145,13 @@
         deallocate (eignvec)
         deallocate (eignval)
      end if
-
+#if defined(LAPACK)
+     if (use_randomsvd) then
+        deallocate (qhat)
+        deallocate (eignvec)
+        deallocate (eignval)
+     end if
+#endif
 
    end do
 

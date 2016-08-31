@@ -1,6 +1,6 @@
 subroutine da_calculate_aminusb(grid, config_flags,   &
                                 it, cv_size, xbx, be, &
-                                qhat, eignvec, eignval, neign)
+                                qhat, eignvec, eignval, neign,nmodes)
 
    !--------------------------------------------------------------------------------
    ! Purpose:  Calculate and write out difference between prior and posterior
@@ -22,18 +22,21 @@ subroutine da_calculate_aminusb(grid, config_flags,   &
    type(grid_config_rec_type), intent(inout) :: config_flags
    integer, intent(in)               :: it                           ! external iteration.
    integer, intent(in)               :: cv_size                      ! Total cv size
+   integer, intent(in)               :: neign
+   integer, intent(in)               :: nmodes
+
    type (xbx_type),intent(inout)     :: xbx                          ! Header & non-gridded vars.
    type (be_type), intent(in)        :: be                           ! background error structure.
 !   type (iv_type), intent(inout)     :: iv                           ! ob. increment vector.
 !   real, intent(out)                 :: xhat(1:cv_size)              ! Output vector: xhat=K.d
-   real, intent(in)                  :: qhat(1:cv_size, 0:ntmax(it)) ! Ritz vectors
+   real, intent(in)                  :: qhat(1:cv_size, 0:nmodes) ! Ritz vectors
 !   real, intent(in)                  :: cv(1:cv_size)                ! control variable (local).
 !   type (y_type), intent(inout)      :: re                           ! residual (o-a) structure.
 !   type (y_type), intent(inout)      :: y                            ! y = H(x_inc) structure.
 !   type (j_type), intent(out)        :: j_cost                       ! cost function
-   real*8, intent(in)                :: eignvec(ntmax(it), ntmax(it))
-   real*8, intent(in)                :: eignval(ntmax(it))
-   integer, intent(in)               :: neign
+   real*8, intent(in)                :: eignvec(nmodes, nmodes)
+   real*8, intent(in)                :: eignval(nmodes)
+
 
    real*8                            :: nu(1:be%cv%size_jb)          ! Premultiplied eigenvectors, Q_l * e_lj
    real*8                            :: lam                          ! (A-B) eigenvalues
@@ -85,15 +88,15 @@ subroutine da_calculate_aminusb(grid, config_flags,   &
                              , grid%vch &
 #endif
                              )
-#if defined(LAPACK)
-      if (use_randomsvd) then
-         lam = ( eignval(jj) - 1.D0 )
-      else
-#endif
+!#if defined(LAPACK)
+!      if (use_randomsvd) then
+!         lam = ( eignval(jj) - 1.D0 )
+!      else
+!#endif
          lam = ( 1.D0 / eignval(jj)  - 1.D0 )
-#if defined(LAPACK)
-      end if
-#endif
+!#if defined(LAPACK)
+!      end if
+!#endif
 
       ! Store result in corresponding I/O capable variables
 #if (WRF_CHEM == 1)

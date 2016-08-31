@@ -403,17 +403,31 @@ write(unit=stdout,fmt='(A)')'DEBUG_09'
          call da_cv_io ('w', filename, cv_size, nuhat_T(i,1:cv_size))
       end do
 
-      do i = 1, neign
-         LAM(i) = 1.D0 / ( LAM(i) + 1.D0 )
-      end do
 
       ! (2) Construct low rank estimate of A^-1 * ghat with leading neign modes of A
-      do i = 1, neign
-         dot_cv = da_dot_cv(cv_size, nuhat_T(i,:), ghat, grid, mz, jp_start, jp_end)
-         write(unit=stdout,fmt='("i, dot_cv = ",I3,D25.16)') i,dot_cv
+      if (minval(LAM) .lt. 1.D0 .and. adapt_svd) then
+         do i = 1, neign
+            LAM(i) = LAM(i) / ( LAM(i) + 1.D0 )
+         end do
+         xhat = ghat
+         do i = 1, neign
+            dot_cv = da_dot_cv(cv_size, nuhat_T(i,:), ghat, grid, mz, jp_start, jp_end)
+            write(unit=stdout,fmt='("i, dot_cv = ",I3,D25.16)') i,dot_cv
 
-         xhat = xhat + LAM(i) * nuhat_T(i,:) * dot_cv
-      end do
+            xhat = xhat - LAM(i) * nuhat_T(i,:) * dot_cv
+         end do
+      else
+         do i = 1, neign
+            LAM(i) = 1.D0 / ( LAM(i) + 1.D0 )
+         end do
+
+         do i = 1, neign
+            dot_cv = da_dot_cv(cv_size, nuhat_T(i,:), ghat, grid, mz, jp_start, jp_end)
+            write(unit=stdout,fmt='("i, dot_cv = ",I3,D25.16)') i,dot_cv
+
+            xhat = xhat + LAM(i) * nuhat_T(i,:) * dot_cv
+         end do
+      end if
 
       deallocate(BMAT)
       deallocate(nuhat_T)

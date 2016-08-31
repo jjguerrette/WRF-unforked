@@ -10,7 +10,7 @@ module da_randomisation
    use module_state_description, only : PARAM_FIRST_SCALAR      
    use da_control, only : svd_stage, ensmember, ensdim_svd, svd_outer, &
        myproc, filename_len, test_dm_exact, rootproc, cv_size_domain, &
-       stdout, trace_use, svd_amat_type, svd_symm_type, &
+       stdout, trace_use, svd_amat_type, svd_symm_type, adapt_svd, &
        num_ob_indexes, read_omega, ierr, comm, &
 #if (WRF_CHEM == 1)
        chem_surf, chem_acft, &
