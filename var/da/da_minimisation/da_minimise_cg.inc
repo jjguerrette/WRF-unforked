@@ -220,7 +220,7 @@ subroutine da_minimise_cg(grid, config_flags,            &
       endif
 
       write(unit=stdout,fmt=12) " minimize_cg ", it, iter, j_total, rrmnew_norm, step         	 
-      if (rrmnew_norm  < eps(it) * j_grad_norm_target) exit
+      if (rrmnew_norm  < eps(it) * j_grad_norm_target .and. info_stop) exit
 
 12    format(a13,1x,i3,1x,i4,5x,1PD22.15,5x,1PD22.15,5x,1PD22.15)
 

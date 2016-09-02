@@ -55,7 +55,7 @@
    character(len=8) :: cvtfile
    logical :: ex
 #if defined(LAPACK)
-   character*10                 :: cproc
+   character*10                 :: cproc,cmember
    character*10                 :: cit
    character(len=filename_len)  :: cvtfile_svd
    integer                      :: run_hours0
@@ -925,6 +925,21 @@
             if (calc_aminusb) call da_calculate_aminusb(grid,config_flags,it,cv_size,xbx, &
                                 be,qhat,eignvec,eignval,neign,ntmax(it))
 #endif
+#if defined(LAPACK)
+!!!!!DEBUG CODE
+!!         if (write_lanczos) then
+            write(cproc,fmt='(i4.4)') myproc
+            write(cit,fmt='(i2.2)') it
+            do i = 1, neign
+               write(cmember,fmt='(i4.4)') i
+
+               cvtfile_svd = 'qhat.it'//trim(adjustl(cit))//'.e'//trim(adjustl(cmember))//'.p'//trim(adjustl(cproc))
+               call da_cv_io ('w', cvtfile_svd, cv_size, qhat(1:cv_size,i))
+            end do
+!!         end if
+!!!!!DEBUG CODE
+#endif
+
 
          end if
 

@@ -319,48 +319,49 @@ subroutine da_randomise_svd(grid, config_flags,            &
          !  Truncate to neign modes Here we use full eigenvec matrix to generate nuhat=qhat*eigenvec,
          !  then truncate by only using neign of the nuhat vectors 
 
-         write(unit=stdout,fmt='(A)') 'Carrying out truncated amat_mul'
-
-         ! (1) Generate eigenvectors of A
-         allocate(nuhat(1:cv_size, 1:neign))
-         nuhat = 0.D0
-
-! GEMM should also work, because local nuhat members only depend on qhat from local process
-!         call GEMM(qhat(1:cv_size,1:nens), eignvec(1:nens,1:neign), nuhat)
-
-         ! Alternatively, if BLAS isn't available
-         do jens = 1, neign
-            do i = 1, cv_size
-!!               nuhat(i,jens) = da_dot(nens, qhat(i,1:nens), eignvec(1:nens,jens))
-               nuhat(i,jens) = da_dot(nens, qhat(i,1:nens), eignvec(1:nens,jens))
-            end do
-         end do
-
-         ! Write nuhat vectors to disk
-         do i = 1, neign
-            write(unit=stdout,fmt='("Writing nuhat vectors to disk: ",i3)') i
-            write(cens,fmt='(i4.4)') i
-            filename = 'nuhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
-            call da_cv_io ('w', filename, cv_size, nuhat(1:cv_size,i))
-         end do
-
          if (minval(LAM(1:neign)) .lt. 1.D0 .and. adapt_svd) then
+            ! (1) Generate eigenvectors of A
+            allocate(nuhat(1:cv_size, 1:neign))
+            nuhat = 0.D0
+
+            do jens = 1, neign
+               do i = 1, cv_size
+                  nuhat(i,jens) = da_dot(nens, qhat(i,1:nens), eignvec(1:nens,jens))
+               end do
+            end do
+
+            ! Write nuhat vectors to disk
+            do i = 1, neign
+               write(unit=stdout,fmt='("Writing nuhat vectors to disk: ",i3)') i
+               write(cens,fmt='(i4.4)') i
+               filename = 'nuhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+               call da_cv_io ('w', filename, cv_size, nuhat(1:cv_size,i))
+            end do
+
             xhat = ghat
+
+            ! (2) Construct low rank estimate of A^-1 * ghat with leading neign modes of A
+            do i = 1, neign
+               dot_cv = da_dot_cv(cv_size, nuhat(:,i), ghat, grid, mz, jp_start, jp_end)
+               write(unit=stdout,fmt='("i, dot_cv = ",I3,D25.16)') i,dot_cv
+
+!!               if (minval(LAM(1:neign)) .lt. 1.D0 .and. adapt_svd) then
+                  xhat = xhat - LAM(i) / (LAM(i) + 1.D0) * nuhat(:,i) * dot_cv
+!!               else
+!!                  xhat = xhat + 1.D0 / (LAM(i) + 1.D0) * nuhat(:,i) * dot_cv
+!!               end if
+            end do
+
+            deallocate(nuhat)
+         else
+            do i = 1, nens
+               LAMinv(i) = 1.D0 / ( LAM(i) + 1.D0 )
+            end do
+            call da_amat_mul_trunc(be,grid,cv_size,nens,nens,neign,LAMinv,eignvec,qhat,ghat,xhat)
          end if
 
-         ! (2) Construct low rank estimate of A^-1 * ghat with leading neign modes of A
-         do i = 1, neign
-            dot_cv = da_dot_cv(cv_size, nuhat(:,i), ghat, grid, mz, jp_start, jp_end)
-            write(unit=stdout,fmt='("i, dot_cv = ",I3,D25.16)') i,dot_cv
+         write(unit=stdout,fmt='(A)') 'Carrying out truncated amat_mul'
 
-            if (minval(LAM(1:neign)) .lt. 1.D0 .and. adapt_svd) then
-               xhat = xhat - LAM(i) / (LAM(i) + 1.D0) * nuhat(:,i) * dot_cv
-            else
-               xhat = xhat + 1.D0 / (LAM(i) + 1.D0) * nuhat(:,i) * dot_cv
-            end if
-         end do
-
-         deallocate(nuhat)
       end if
 
       deallocate(yhat)

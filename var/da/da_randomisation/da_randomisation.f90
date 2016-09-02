@@ -38,10 +38,10 @@ module da_randomisation
 !#endif
 #if defined(LAPACK)
 !   use mkl95_precision, only: WP => DP
-!   use mkl95_lapack, only: gesv, geev
+!   use mkl95_lapack, only: gesv, syev, gesvd
    use f95_precision, only: WP => DP
-   use lapack95, only: gesv, geev, syev, gesvd
-   use blas95, only: gemm
+   use lapack95, only: gesv, syev, gesvd
+!   use blas95, only: gemm
 
 !   use da_airep, only : da_ytoyhat_airep, da_ytoyhat_airep_adj
 !   use da_airsr , only : da_ytoyhat_airsr, da_ytoyhat_airsr_adj
@@ -98,6 +98,7 @@ contains
 #include "da_transform_ytoyhat.inc"
 #include "da_transform_ytoyhat_adj.inc"
 #endif
+#include "da_amat_mul_trunc.inc"
 #include "da_randomise_svd.inc"
 #include "da_randomise_svd_51.inc"
 

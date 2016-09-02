@@ -381,7 +381,7 @@ write(unit=stdout,fmt='(A)')'DEBUG_08'
 write(unit=stdout,fmt='(A)')'DEBUG_09'
 
 #else
-      !SVD of global BMAT on monitor process
+      !SVD of global BMAT
       call GESVD(BMAT, SIG, VT = nuhat_T, INFO = info)
 #endif
 
