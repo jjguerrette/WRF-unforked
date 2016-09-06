@@ -229,12 +229,21 @@ subroutine da_randomise_svd(grid, config_flags,            &
          CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
       end if
 
-      ! GESV returns B^T in F2; force symmetry in B
+      ! GESV returns B^T in F2
       do iens = 1, nens
          do jens = 1, nens
-               BMAT(iens,jens) = (F2(jens,iens) + F2(iens,jens)) / 2
+               BMAT(iens,jens) = F2(jens,iens)
          end do
       end do
+
+      ! Force symmetry in B
+      do iens = 1, nens
+         do jens = iens+1, nens
+               BMAT(iens,jens) = (BMAT(iens,jens) + BMAT(jens,iens)) / 2.D0
+               BMAT(jens,iens) = BMAT(iens,jens)
+         end do
+      end do
+
 
       do iens = 1, nens
          write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'BMAT: ',BMAT(iens,1:nens)
