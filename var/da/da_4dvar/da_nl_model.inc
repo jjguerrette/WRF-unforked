@@ -120,7 +120,7 @@ subroutine da_nl_model (it)
       call da_copy_chem_to_model( head_grid, it )
 
       !Need a first guess file that includes scaleant and scalebb
-      if ( it == 1 ) then
+      if ( it == 1 .and. .not.(write_checkpoints .eq. 2)) then
          call da_init_model_output
       end if
    end if

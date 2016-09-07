@@ -1,7 +1,8 @@
 subroutine da_minimise_lz(grid, config_flags,            &
                            it, cv_size, xbx, be, iv,     &
                            j_grad_norm_target, xhat, qhat, cv, &
-                           re, y, j_cost, eignvec, eignval, neign)
+                           re, y, j_cost, eignvec, eignval, neign,&
+                           ghat0)
 
    !-------------------------------------------------------------------------
    ! Purpose:         Main Lanczos minimisation routine 
@@ -37,6 +38,9 @@ subroutine da_minimise_lz(grid, config_flags,            &
    real*8, intent(out)               :: eignvec(ntmax(it), ntmax(it))
    real*8, intent(out)               :: eignval(ntmax(it))
    integer, intent(out)              :: neign
+!!!JJG DEBUG
+   real, intent(out)                 :: ghat0(1:cv_size)       ! cv copy.
+!!!JJG DEBUG
    
    integer                           :: i, j, k, n, inst, iter
 #if (WRF_CHEM != 1)
@@ -56,7 +60,7 @@ subroutine da_minimise_lz(grid, config_flags,            &
    integer                           :: jp_start, jp_end       ! Start/end indices of Jp.
    real                              :: fhat(1:cv_size)        ! cv copy.
    real                              :: ghat(1:cv_size)        ! cv copy.
-   real                              :: ghat0(1:cv_size)       ! cv copy.
+!   real                              :: ghat0(1:cv_size)       ! cv copy.
    real                              :: shat(1:cv_size)        ! cv copy.
    real                              :: gdot, rho, mu, bndlm
    real                              :: alpha(ntmax(it)), beta(0:ntmax(it))

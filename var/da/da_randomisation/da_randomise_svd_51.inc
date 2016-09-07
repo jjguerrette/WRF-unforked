@@ -1,6 +1,7 @@
 subroutine da_randomise_svd_51(grid, config_flags,            &
                            cv_size, xbx, be, iv, cv, &
-                           re, y, xhat, j_cost) !!, eignvec, LAM, neign)
+                           re, y, xhat, j_cost, &
+                           qhat, eignval, eignvec, neign)
 
    !-------------------------------------------------------------------------
    ! Purpose:         Main randomized SVD routine, separated into 2 stages 
@@ -31,6 +32,12 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
    real, intent(out)                 :: xhat(1:cv_size)               ! control variable (local).
    type (j_type), optional, intent(out) :: j_cost                        ! cost function
 
+   real, optional, intent(out)       :: qhat(1:cv_size, 0:ensdim_svd) ! orthonormal basis set of A = Q * B * Q^T
+   real*8, optional, intent(out)     :: eignvec(ensdim_svd, ensdim_svd)
+   real*8, optional, intent(out)     :: eignval(ensdim_svd)
+   integer, optional, intent(out)    :: neign                         ! Number of non-truncated eigenpairs
+
+
 #if defined(LAPACK)
 
    real(wp)                     :: SIG(1:ensdim_svd)
@@ -49,7 +56,7 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
    real(wp), allocatable   :: YHAT(:,:)    ! yhat = A * omega
 
    real(wp), allocatable   :: qhat_obs(:)  ! orthonormal basis set of A approx= Q * B
-   real(wp), allocatable   :: QHAT(:,:)    ! orthonormal basis set of A approx= Q * B
+   real(wp), allocatable   :: qhat_ens(:,:)    ! orthonormal basis set of A approx= Q * B
 
    real(wp), allocatable       :: dumcv(:)
    real(wp), allocatable       :: dumcv_g(:)
@@ -60,8 +67,6 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
 
    integer                      :: nall(num_ob_indexes)
    integer, allocatable         :: nobs(:)
-
-   integer                      :: neign                         ! Number of non-truncated eigenpairs
    
    integer                      :: iens, jens, nens, i, j, ccount
 #if (WRF_CHEM != 1)
@@ -176,9 +181,9 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
 
          if (allocated(yhat_obs)) deallocate(yhat_obs)
 
-         !Write omega to file
-         filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
-         call da_cv_io ('w', filename, cv_size, omega(1:cv_size,1))
+!         !Write omega to file (only necessary if same random omega is desired in each outer loop)
+!         filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+!         call da_cv_io ('w', filename, cv_size, omega(1:cv_size,1))
          deallocate(omega)
 
       else
@@ -224,22 +229,22 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
       end do
 
 !      if (nobs(1) .gt. 0) then
-         allocate(QHAT(1:nobs(1),nens))
+         allocate(qhat_ens(1:nobs(1),nens))
 !      end if
 
       ! Generate qhat basis vectors
       do iens = 1, nens
-         if (nobs(1) .gt. 0) QHAT(:,iens) = YHAT(:,iens)
+         if (nobs(1) .gt. 0) qhat_ens(:,iens) = YHAT(:,iens)
          if (iens .gt. 1) then
             do jens = iens-1, 1, -1
-               gdot = da_dot_obs(nobs(1), QHAT(:,iens), QHAT(:,jens))
+               gdot = da_dot_obs(nobs(1), qhat_ens(:,iens), qhat_ens(:,jens))
                
-               if (nobs(1) .gt. 0) QHAT(:,iens) = QHAT(:,iens) - gdot * QHAT(:,jens)
+               if (nobs(1) .gt. 0) qhat_ens(:,iens) = qhat_ens(:,iens) - gdot * qhat_ens(:,jens)
             end do
          end if
 
-         beta   = SQRT(da_dot_obs(nobs(1), QHAT(:,iens), QHAT(:,iens)))
-         if (nobs(1) .gt. 0) QHAT(:,iens) = QHAT(:,iens) / beta
+         beta   = SQRT(da_dot_obs(nobs(1), qhat_ens(:,iens), qhat_ens(:,iens)))
+         if (nobs(1) .gt. 0) qhat_ens(:,iens) = qhat_ens(:,iens) / beta
       end do
 
       allocate(qhat_obs(1:nobs(1)))
@@ -249,13 +254,13 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
          write(cens,fmt='(i4.4)') iens
          filename = 'qhat_obs.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
 
-         qhat_obs = QHAT(:,iens)
+         qhat_obs = qhat_ens(:,iens)
          call da_yhat_io('w', filename, nall, nobs(1), qhat_obs)
       end do
       deallocate(qhat_obs)
 
       if (allocated(YHAT)) deallocate(YHAT)
-      if (allocated(QHAT)) deallocate(QHAT)
+      if (allocated(qhat_ens)) deallocate(qhat_ens)
       deallocate(nobs)
    else if ( svd_stage .eq. 3 ) then
 
@@ -313,7 +318,7 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
       call da_cv_io ('r', filename, cv_size, ghat)
 
 #ifdef DM_PARALLEL
-write(unit=stdout,fmt='(A)')'DEBUG_01'
+!!!JJG - write(unit=stdout,fmt='(A)')'DEBUG_01'
 
       !Perform global SVD of BMAT matrix
       cv_size_domain = wrf_dm_sum_integer(cv_size)
@@ -324,43 +329,43 @@ write(unit=stdout,fmt='(A)')'DEBUG_01'
          allocate(BMAT_g(1:nens,1))
          allocate(nuhat_T_g(1:nens,1))
       end if
-write(unit=stdout,fmt='(A)')'DEBUG_02'
+!!!JJG - write(unit=stdout,fmt='(A)')'DEBUG_02'
 
       allocate(dumcv(1:cv_size))
       allocate(dumcv_g(1:cv_size_domain))
       do iens = 1, nens
          dumcv = BMAT(iens,1:cv_size)
-write(unit=stdout,fmt='(A)')'DEBUG_02A'
+!!!JJG - write(unit=stdout,fmt='(A)')'DEBUG_02A'
 
          write(cens,fmt='(i4.4)') iens
          filename = 'dumcv.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
          call da_cv_io ('w', filename, cv_size, dumcv)
 
          call da_cv_to_global(cv_size, cv_size_domain, dumcv, grid, mz, dumcv_g)
-write(unit=stdout,fmt='(A)')'DEBUG_02B'
+!!!JJG - write(unit=stdout,fmt='(A)')'DEBUG_02B'
 
          if(rootproc) BMAT_g(iens,:) = dumcv_g
-write(unit=stdout,fmt='(A)')'DEBUG_02C'
+!!!JJG - write(unit=stdout,fmt='(A)')'DEBUG_02C'
          call mpi_barrier(comm, ierr)
 
       end do
       deallocate(dumcv)
       deallocate(dumcv_g)
 
-write(unit=stdout,fmt='(A)')'DEBUG_03'
+!!!JJG - write(unit=stdout,fmt='(A)')'DEBUG_03'
 
       write(unit=stdout,fmt='(A)') 'Calculate SVD of B = Q^T * R^-1/2 * H * U'
       if (rootproc) then
          !SVD of global BMAT on monitor process
          call GESVD(BMAT_g, SIG, VT = nuhat_T_g, INFO = info)
       end if
-write(unit=stdout,fmt='(A)')'DEBUG_04'
+!!!JJG - write(unit=stdout,fmt='(A)')'DEBUG_04'
 
       deallocate(BMAT_g)
-write(unit=stdout,fmt='(A)')'DEBUG_05'
+!!!JJG - write(unit=stdout,fmt='(A)')'DEBUG_05'
 
       call mpi_barrier(comm, ierr)
-write(unit=stdout,fmt='(A)')'DEBUG_06'
+!!!JJG - write(unit=stdout,fmt='(A)')'DEBUG_06'
 
       allocate(dumcv(1:cv_size))
       allocate(dumcv_g(1:cv_size_domain))
@@ -372,13 +377,13 @@ write(unit=stdout,fmt='(A)')'DEBUG_06'
       deallocate(dumcv)
       deallocate(dumcv_g)
 
-write(unit=stdout,fmt='(A)')'DEBUG_07'
+!!!JJG - write(unit=stdout,fmt='(A)')'DEBUG_07'
 
       deallocate(nuhat_T_g)
-write(unit=stdout,fmt='(A)')'DEBUG_08'
+!!!JJG - write(unit=stdout,fmt='(A)')'DEBUG_08'
 
       call wrf_dm_bcast_integer(SIG,nens)
-write(unit=stdout,fmt='(A)')'DEBUG_09'
+!!!JJG - write(unit=stdout,fmt='(A)')'DEBUG_09'
 
 #else
       !SVD of global BMAT
@@ -402,6 +407,22 @@ write(unit=stdout,fmt='(A)')'DEBUG_09'
          filename = 'nuhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
          call da_cv_io ('w', filename, cv_size, nuhat_T(i,1:cv_size))
       end do
+
+      ! Store output vectors
+      eignvec(:,:) = 0.D0
+!      qhat(:,:) = 0.D0
+      do i = 1, neign
+         eignvec(i,i) = 1.D0
+         eignval = LAM(i) + 1.D0
+
+!         qhat(1:cv_size,i) = TRANSPOSE(nuhat_T(i,1:cv_size))
+
+!         do j = 1, cv_size
+!            qhat(j,i) = nuhat_T(i,j)
+!         end do
+
+      end do
+      qhat(:,1:nens) = TRANSPOSE(nuhat_T)
 
 
       ! (2) Construct low rank estimate of A^-1 * ghat with leading neign modes of A

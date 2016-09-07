@@ -52,7 +52,6 @@ subroutine da_transfer_wrftltoy_chem( grid, iv, y )
                if ( iv%info(chem_acft)%proc_domain(iplt,n) ) then
                   model_chem(n) = grid%g_acft_hx(n,iplt,ichem+1)
                   y%chem_acft(n)%chem(ichem,iplt) = model_chem(n)
-!!write(unit=stdout,fmt='("DEBUG_A1:",I5,2D25.14)') n, model_chem(n), y%chem_acft(n)%chem(ichem,iplt)
                end if
 
             end do

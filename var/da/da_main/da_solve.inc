@@ -60,6 +60,7 @@
    character(len=filename_len)  :: cvtfile_svd
    integer                      :: run_hours0
 !   logical                      :: svd_nl
+   real, allocatable            :: ghat0(:)      ! Control variable structure.
 #endif
 
 #if (WRF_CHEM == 1)
@@ -619,6 +620,7 @@
          allocate (eignvec(ensdim_svd, ensdim_svd))
          allocate (eignval(ensdim_svd))
       end if
+      allocate (ghat0(1:cv_size))
 #endif
 
 ! Re-scale the variances and the scale-length for outer-loop > 1:
@@ -920,7 +922,7 @@
 
          else
             call da_minimise_lz(grid, config_flags, it, cv_size, xbx,& 
-                             be, iv, j_grad_norm_target, xhat, qhat, cvt, re, y, j, eignvec, eignval, neign )
+                             be, iv, j_grad_norm_target, xhat, qhat, cvt, re, y, j, eignvec, eignval, neign, ghat0)
 #if (WRF_CHEM == 1)
             if (calc_aminusb) call da_calculate_aminusb(grid,config_flags,it,cv_size,xbx, &
                                 be,qhat,eignvec,eignval,neign,ntmax(it))
@@ -939,6 +941,18 @@
 !!         end if
 !!!!!DEBUG CODE
 #endif
+!!!JJG
+#if defined(LAPACK)
+!!!!!DEBUG CODE
+            write(cproc,fmt='(i4.4)') myproc
+            write(cit,fmt='(i2.2)') it
+
+            cvtfile_svd = 'ghat_lz.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
+            ghat0 = -ghat0
+            call da_cv_io ('w', cvtfile_svd, cv_size, ghat0)
+!!!!!DEBUG CODE
+#endif
+!!!JJG
 
 
          end if
@@ -970,9 +984,17 @@
             else
                select case (svd_type)
                   case(1)
-                     call da_randomise_svd_51( &
-                           grid, config_flags, cv_size, xbx, &
-                           be, iv, cvt, re, y, xhat)
+                     if (svd_stage .eq. 4) then
+                        call da_randomise_svd_51( &
+                              grid, config_flags, cv_size, xbx, &
+                              be, iv, cvt, re, y, xhat, &
+                              qhat=qhat, eignval=eignval, &
+                              eignvec=eignvec, neign=neign)
+                     else
+                        call da_randomise_svd_51( &
+                              grid, config_flags, cv_size, xbx, &
+                              be, iv, cvt, re, y, xhat)
+                     end if
                   case(6)
                      if (svd_stage .eq. 2) then
                         call da_randomise_svd( &
@@ -1008,10 +1030,10 @@
                call wrfu_finalize
                call wrf_shutdown
                stop
-            else
 #if (WRF_CHEM == 1)
-               if (calc_aminusb) call da_calculate_aminusb(grid,config_flags,it,cv_size,xbx, &
-                                   be,qhat,eignvec,eignval,neign,ensdim_svd)
+            else if (calc_aminusb) then
+               call da_calculate_aminusb(grid,config_flags,it,cv_size,xbx, &
+                                         be,qhat,eignvec,eignval,neign,ensdim_svd)
 #endif
             end if
          else

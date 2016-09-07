@@ -76,22 +76,22 @@ subroutine da_cv_to_global(cv_size, cv_size_global, x, grid, mzs, xg )
 
 #if (WRF_CHEM == 1)
 
-!!write(unit=stdout,fmt='(A,L)')'DEBUG_ant', allocated(vvc_x%alpha_ant)
-!!write(unit=stdout,fmt='(A,L)')'DEBUG_bb', allocated(vvc_x%alpha_bb)
-!
-!write(unit=stdout,fmt='(A,8I8)')'DEBUG_10',ims,ime,jms,jme,mz_ant,mz_bb,num_scaleant,num_scalebb
-!write(unit=stdout,fmt='(A,4I8)')'DEBUG_11',ips,ipe,jps,jpe
-!
-!write(unit=stdout,fmt='(A,3I8)')'DEBUG_12',size(vvc_x%alpha_ant,1), size(vvc_x%alpha_ant,2), size(vvc_x%alpha_ant,3)
-!write(unit=stdout,fmt='(A,3I8)')'DEBUG_12',size(vvc_x%alpha_bb,1), size(vvc_x%alpha_bb,2), size(vvc_x%alpha_bb,3)
-!
-
+!!!JJG - !!write(unit=stdout,fmt='(A,L)')'DEBUG_ant', allocated(vvc_x%alpha_ant)
+!!!JJG - !!write(unit=stdout,fmt='(A,L)')'DEBUG_bb', allocated(vvc_x%alpha_bb)
+!!!JJG - !
+!!!JJG - !write(unit=stdout,fmt='(A,8I8)')'DEBUG_10',ims,ime,jms,jme,mz_ant,mz_bb,num_scaleant,num_scalebb
+!!!JJG - !write(unit=stdout,fmt='(A,4I8)')'DEBUG_11',ips,ipe,jps,jpe
+!!!JJG - !
+!!!JJG - !write(unit=stdout,fmt='(A,3I8)')'DEBUG_12',size(vvc_x%alpha_ant,1), size(vvc_x%alpha_ant,2), size(vvc_x%alpha_ant,3)
+!!!JJG - !write(unit=stdout,fmt='(A,3I8)')'DEBUG_12',size(vvc_x%alpha_bb,1), size(vvc_x%alpha_bb,2), size(vvc_x%alpha_bb,3)
+!!!JJG - !
+!!!JJG - 
    allocate(vvc_x%alpha_ant(ims:ime,jms:jme,mz_ant,num_scaleant))
    allocate(vvc_x%alpha_bb(ims:ime,jms:jme,mz_bb,num_scalebb))
 
-!
-!write(unit=stdout,fmt='(A,3I8)')'DEBUG_12',size(vvc_x%alpha_ant,1), size(vvc_x%alpha_ant,2), size(vvc_x%alpha_ant,3)
-!write(unit=stdout,fmt='(A,3I8)')'DEBUG_12',size(vvc_x%alpha_bb,1), size(vvc_x%alpha_bb,2), size(vvc_x%alpha_bb,3)
+!!!JJG - !
+!!!JJG - !write(unit=stdout,fmt='(A,3I8)')'DEBUG_12',size(vvc_x%alpha_ant,1), size(vvc_x%alpha_ant,2), size(vvc_x%alpha_ant,3)
+!!!JJG - !write(unit=stdout,fmt='(A,3I8)')'DEBUG_12',size(vvc_x%alpha_bb,1), size(vvc_x%alpha_bb,2), size(vvc_x%alpha_bb,3)
 #endif
 
    call da_cv_to_vv (cv_size, x, mzs, vv_x &
