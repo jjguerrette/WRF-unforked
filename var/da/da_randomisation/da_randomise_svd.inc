@@ -249,8 +249,8 @@ subroutine da_randomise_svd(grid, config_flags,            &
          write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'BMAT: ',BMAT(iens,1:nens)
       end do
 
-    ! Determine eigenvalues and eigenvectors of the B matrix
-    !---------------------------------------------------------
+    ! Determine eigenvalues and eigenvectors of the symmetric B matrix
+    !-----------------------------------------------------------------
 !      ndgewrk           = MAX(4*nens-1,1)
       info              = 0
       call SYEV(BMAT, LAM, JOBZ = 'V' , INFO = info) !F95

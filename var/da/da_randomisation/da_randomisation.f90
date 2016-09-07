@@ -93,6 +93,7 @@ contains
 #include "da_dot_cv_z.inc"
 #include "da_dot_obs.inc"
 #include "da_cv_io.inc"
+#include "da_cv_io_int.inc"
 #include "da_yhat_io.inc"
 #if defined(LAPACK)
 #include "da_transform_ytoyhat.inc"

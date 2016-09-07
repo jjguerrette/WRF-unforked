@@ -105,6 +105,7 @@ module da_par_util
 
 #include "da_patch_to_global_dual_res.inc"
 #include "da_global_to_patch_dual_res.inc"
+#include "da_cv_indices.inc"
 
 #ifdef DM_PARALLEL
 #include "da_proc_stats_combine.inc"

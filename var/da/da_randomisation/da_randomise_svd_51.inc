@@ -413,7 +413,7 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
 !      qhat(:,:) = 0.D0
       do i = 1, neign
          eignvec(i,i) = 1.D0
-         eignval = LAM(i) + 1.D0
+         eignval(i) = LAM(i) + 1.D0
 
 !         qhat(1:cv_size,i) = TRANSPOSE(nuhat_T(i,1:cv_size))
 
@@ -422,7 +422,7 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
 !         end do
 
       end do
-      qhat(:,1:nens) = TRANSPOSE(nuhat_T)
+      qhat(1:cv_size,1:nens) = TRANSPOSE(nuhat_T)
 
 
       ! (2) Construct low rank estimate of A^-1 * ghat with leading neign modes of A

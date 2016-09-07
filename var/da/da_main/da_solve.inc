@@ -61,6 +61,24 @@
    integer                      :: run_hours0
 !   logical                      :: svd_nl
    real, allocatable            :: ghat0(:)      ! Control variable structure.
+   integer, allocatable         :: icv(:)
+   integer, allocatable         :: jcv(:)
+   integer, allocatable         :: kcv(:)
+
+#if (WRF_CHEM != 1)
+#ifdef CLOUD_CV
+   integer                           :: mz(13), info, nsstwrk
+#else
+   integer                           :: mz(7), info, nsstwrk
+#endif
+#else
+#ifdef CLOUD_CV
+   integer                           :: mz(15), info, nsstwrk
+#else
+   integer                           :: mz(9), info, nsstwrk
+#endif
+#endif
+
 #endif
 
 #if (WRF_CHEM == 1)
@@ -835,6 +853,52 @@
             adtl_run_hours = run_hours0
 #endif
          end if
+!!!JJG
+#if defined(LAPACK)
+!!!!!DEBUG CODE
+
+            allocate (icv(1:cv_size))
+            allocate (jcv(1:cv_size))
+            allocate (kcv(1:cv_size))
+
+#if (WRF_CHEM != 1)
+#ifdef CLOUD_CV
+            mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
+                    be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne /)
+#else
+            mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne /)
+#endif
+#else
+#ifdef CLOUD_CV
+            mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
+                    be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne, &
+                    be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
+#else
+            mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne, &
+                    be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
+#endif
+#endif
+
+            call da_cv_indices(grid%xp, mz, cv_size, icv, jcv, kcv &
+#if (WRF_CHEM == 1)
+                        , grid%vch &
+#endif
+                        )
+            write(cproc,fmt='(i4.4)') myproc
+            cvtfile_svd = 'icv.p'//trim(adjustl(cproc))
+            call da_cv_io_int ('w', cvtfile_svd, cv_size, icv)
+            cvtfile_svd = 'jcv.p'//trim(adjustl(cproc))
+            call da_cv_io_int ('w', cvtfile_svd, cv_size, jcv)
+            cvtfile_svd = 'kcv.p'//trim(adjustl(cproc))
+            call da_cv_io_int ('w', cvtfile_svd, cv_size, kcv)
+
+            deallocate (icv)
+            deallocate (jcv)
+            deallocate (kcv)
+!!!!!DEBUG CODE
+#endif
+!!!JJG
+
 
          ! Use this to exit after writing chem hx values
          ! or after stage 1 of randomised svd
@@ -950,6 +1014,8 @@
             cvtfile_svd = 'ghat_lz.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
             ghat0 = -ghat0
             call da_cv_io ('w', cvtfile_svd, cv_size, ghat0)
+            deallocate(ghat0) 
+
 !!!!!DEBUG CODE
 #endif
 !!!JJG

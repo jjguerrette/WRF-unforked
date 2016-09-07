@@ -93,7 +93,7 @@ module da_wrfvar_top
 #endif
       da_kmat_mul
 #if defined(LAPACK)
-   use da_randomisation, only: da_randomise_svd, da_randomise_svd_51, da_cv_io
+   use da_randomisation, only: da_randomise_svd, da_randomise_svd_51, da_cv_io, da_cv_io_int
 #endif
    use da_obs, only : da_transform_xtoy_adj 
    use da_obs_io, only : da_write_filtered_obs, da_write_obs, da_final_write_obs , &
@@ -101,7 +101,7 @@ module da_wrfvar_top
       da_read_obs_chem, &
 #endif
       da_write_obs_etkf, da_write_modified_filtered_obs
-   use da_par_util, only : da_system,da_copy_tile_dims,da_copy_dims
+   use da_par_util, only : da_system,da_copy_tile_dims,da_copy_dims, da_cv_indices
    use da_physics, only : da_uvprho_to_w_lin
 #if defined (CRTM) || defined (RTTOV)
    use da_radiance, only : da_deallocate_radiance
