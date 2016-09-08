@@ -45,7 +45,7 @@ subroutine da_randomise_svd(grid, config_flags,            &
    real(wp), allocatable        :: nuhat(:,:) ! Eigenvectors of A
    real(wp)                     :: dot_cv
   
-   integer                      :: iens, jens, nens, i, j, ccount
+   integer                      :: iens, jens, nens, i, j, ccount, p
 #if (WRF_CHEM != 1)
 #ifdef CLOUD_CV
    integer          :: mz(13)
@@ -63,6 +63,12 @@ subroutine da_randomise_svd(grid, config_flags,            &
    real                         :: ghat(1:cv_size)        ! cv copy.
    real(wp)                     :: F1(ensdim_svd, ensdim_svd) ! intermediate matrix
    real(wp)                     :: F2(ensdim_svd, ensdim_svd) ! intermediate matrix
+   real(wp)                     :: U(ensdim_svd, ensdim_svd)
+   real(wp)                     :: VT(ensdim_svd, ensdim_svd)
+   real(wp)                     :: SIG(ensdim_svd)
+   real(wp), allocatable        :: TEMP1(:,:), TEMP2(:,:)
+
+
    real(wp)                     :: BMAT(ensdim_svd, ensdim_svd)  ! B = Q^T * A * Q
    integer                      :: piv(ensdim_svd)
    integer                      :: info
@@ -181,7 +187,7 @@ subroutine da_randomise_svd(grid, config_flags,            &
       do iens = 1, nens
          qhat(:,iens) = yhat(:,iens)
          if (iens .gt. 1) then
-            do jens = iens-1, 1, -1
+            do jens = 1, iens-1
                gdot = da_dot_cv(cv_size, qhat(:,iens), qhat(:,jens), grid, mz, jp_start, jp_end)
                qhat(:,iens) = qhat(:,iens) - gdot * qhat(:,jens)
             end do
@@ -222,20 +228,45 @@ subroutine da_randomise_svd(grid, config_flags,            &
       end do
 
       info = 0
-      call GESV(F1, F2, piv, info) !F95
+      p = svd_p
+      if (p .eq. 0) then
+         call GESV(F1, F2, piv, info) !F95
 
+         ! GESV returns B^T in F2
+         do iens = 1, nens
+            do jens = 1, nens
+               BMAT(iens,jens) = F2(jens,iens)
+            end do
+         end do
+      else
+         call GESVD(F1(1:nens,1:nens-p), &
+                    SIG(1:nens-p), &
+                    U = U(1:nens,1:nens-p), &
+                    VT = VT(1:nens-p,1:nens-p), &
+                    INFO = info)
+
+         allocate(TEMP1(1:nens-p,1:nens-p))
+         allocate(TEMP2(1:nens-p,1:nens-p))
+         do iens = 1, nens-p
+            TEMP2(iens,:) = (1.D0 / SIG(iens)) * VT(iens,:)
+            do jens = 1, nens-p
+               TEMP1(jens,iens) = sum(F2(1:nens,iens) * U(1:nens,jens))
+            end do
+         end do
+
+
+         do iens = 1, nens-p
+            do jens = 1, nens-p
+                  BMAT(iens,jens) = sum(TEMP1(:,iens) * TEMP2(:,jens))
+            end do
+         end do
+         deallocate(TEMP1)
+         deallocate(TEMP2)
+      end if
       if (info /=0) then
          write(stdout,*) 'Error in randomised SVD: GESV returned ',info
          CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
       end if
-
-      ! GESV returns B^T in F2
-      do iens = 1, nens
-         do jens = 1, nens
-               BMAT(iens,jens) = F2(jens,iens)
-         end do
-      end do
-
       ! Force symmetry in B
       do iens = 1, nens
          do jens = iens+1, nens

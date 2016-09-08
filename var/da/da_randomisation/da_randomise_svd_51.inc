@@ -228,6 +228,8 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
 
       end do
 
+      call mpi_barrier(comm, ierr)
+
 !      if (nobs(1) .gt. 0) then
          allocate(qhat_ens(1:nobs(1),nens))
 !      end if
@@ -236,7 +238,7 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
       do iens = 1, nens
          if (nobs(1) .gt. 0) qhat_ens(:,iens) = YHAT(:,iens)
          if (iens .gt. 1) then
-            do jens = iens-1, 1, -1
+            do jens = 1, iens-1
                gdot = da_dot_obs(nobs(1), qhat_ens(:,iens), qhat_ens(:,jens))
                
                if (nobs(1) .gt. 0) qhat_ens(:,iens) = qhat_ens(:,iens) - gdot * qhat_ens(:,jens)
@@ -302,6 +304,7 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
 
       allocate(BMAT(nens,1:cv_size))
       allocate(nuhat_T(nens,1:cv_size))
+      nuhat_T = 0.D0
 
       write(cproc,fmt='(i4.4)') myproc
 
@@ -318,8 +321,6 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
       call da_cv_io ('r', filename, cv_size, ghat)
 
 #ifdef DM_PARALLEL
-!!!JJG - write(unit=stdout,fmt='(A)')'DEBUG_01'
-
       !Perform global SVD of BMAT matrix
       cv_size_domain = wrf_dm_sum_integer(cv_size)
       if (rootproc) then
@@ -329,62 +330,55 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
          allocate(BMAT_g(1:nens,1))
          allocate(nuhat_T_g(1:nens,1))
       end if
-!!!JJG - write(unit=stdout,fmt='(A)')'DEBUG_02'
-
       allocate(dumcv(1:cv_size))
       allocate(dumcv_g(1:cv_size_domain))
       do iens = 1, nens
          dumcv = BMAT(iens,1:cv_size)
-!!!JJG - write(unit=stdout,fmt='(A)')'DEBUG_02A'
 
          write(cens,fmt='(i4.4)') iens
          filename = 'dumcv.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
          call da_cv_io ('w', filename, cv_size, dumcv)
 
          call da_cv_to_global(cv_size, cv_size_domain, dumcv, grid, mz, dumcv_g)
-!!!JJG - write(unit=stdout,fmt='(A)')'DEBUG_02B'
 
          if(rootproc) BMAT_g(iens,:) = dumcv_g
-!!!JJG - write(unit=stdout,fmt='(A)')'DEBUG_02C'
-         call mpi_barrier(comm, ierr)
 
+         call mpi_barrier(comm, ierr)
       end do
       deallocate(dumcv)
       deallocate(dumcv_g)
-
-!!!JJG - write(unit=stdout,fmt='(A)')'DEBUG_03'
 
       write(unit=stdout,fmt='(A)') 'Calculate SVD of B = Q^T * R^-1/2 * H * U'
       if (rootproc) then
          !SVD of global BMAT on monitor process
          call GESVD(BMAT_g, SIG, VT = nuhat_T_g, INFO = info)
+      else
+         SIG = 0.D0
       end if
-!!!JJG - write(unit=stdout,fmt='(A)')'DEBUG_04'
-
       deallocate(BMAT_g)
-!!!JJG - write(unit=stdout,fmt='(A)')'DEBUG_05'
 
       call mpi_barrier(comm, ierr)
-!!!JJG - write(unit=stdout,fmt='(A)')'DEBUG_06'
+
+      call wrf_dm_bcast_integer(SIG,nens)
 
       allocate(dumcv(1:cv_size))
       allocate(dumcv_g(1:cv_size_domain))
       do iens = 1, nens
-         if(rootproc) dumcv_g = nuhat_T_g(iens,:)
+         if(rootproc) then
+            dumcv_g = nuhat_T_g(iens,:)
+         else
+            dumcv_g = 0.D0
+         end if
+         dumcv = 0.D0
+
          call da_global_to_cv(cv_size, cv_size_domain, dumcv, grid, mz, dumcv_g)
          nuhat_T(iens,:) = dumcv
+
+         call mpi_barrier(comm, ierr)
       end do
       deallocate(dumcv)
       deallocate(dumcv_g)
-
-!!!JJG - write(unit=stdout,fmt='(A)')'DEBUG_07'
-
       deallocate(nuhat_T_g)
-!!!JJG - write(unit=stdout,fmt='(A)')'DEBUG_08'
-
-      call wrf_dm_bcast_integer(SIG,nens)
-!!!JJG - write(unit=stdout,fmt='(A)')'DEBUG_09'
-
 #else
       !SVD of global BMAT
       call GESVD(BMAT, SIG, VT = nuhat_T, INFO = info)
@@ -443,10 +437,10 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
          end do
 
          do i = 1, neign
-            dot_cv = da_dot_cv(cv_size, nuhat_T(i,:), ghat, grid, mz, jp_start, jp_end)
+            dot_cv = da_dot_cv(cv_size, nuhat_T(i,1:cv_size), ghat(1:cv_size), grid, mz, jp_start, jp_end)
             write(unit=stdout,fmt='("i, dot_cv = ",I3,D25.16)') i,dot_cv
 
-            xhat = xhat + LAM(i) * nuhat_T(i,:) * dot_cv
+            xhat(1:cv_size) = xhat(1:cv_size) + LAM(i) * nuhat_T(i,1:cv_size) * dot_cv
          end do
       end if
 
