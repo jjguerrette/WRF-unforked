@@ -359,7 +359,7 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
 
       call mpi_barrier(comm, ierr)
 
-      call wrf_dm_bcast_integer(SIG,nens)
+      call wrf_dm_bcast_real(SIG,nens)
 
       allocate(dumcv(1:cv_size))
       allocate(dumcv_g(1:cv_size_domain))
@@ -384,12 +384,17 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
       call GESVD(BMAT, SIG, VT = nuhat_T, INFO = info)
 #endif
 
-      neign = nens
+      if (info /=0) then
+         write(stdout,*) 'Error in randomised SVD: GESVD returned ',info
+         CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
+      end if
 
       !Eigenvalues of A^T * A = U^T H^T R^-1 H U are the square of singular values of A
-      do i = 1, neign
+      do i = 1, nens
          LAM(i) = SIG(i) * SIG(i)
       end do
+
+      neign = nens
 
       write(cnens,fmt='(I0)') neign
       write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'Eigenvalues(r): ',LAM(1:ensdim_svd)
