@@ -856,7 +856,7 @@
 !!!JJG
 #if defined(LAPACK)
 !!!!!DEBUG CODE
-
+         if (.not.use_randomsvd .or. svd_stage .le. 0) then
             allocate (icv(1:cv_size))
             allocate (jcv(1:cv_size))
             allocate (kcv(1:cv_size))
@@ -895,6 +895,7 @@
             deallocate (icv)
             deallocate (jcv)
             deallocate (kcv)
+        end if
 !!!!!DEBUG CODE
 #endif
 !!!JJG
