@@ -1047,6 +1047,10 @@
                      call da_randomise_svd( &
                            grid, config_flags, cv_size, xbx, &
                            be, iv, cvt, re, y, xhat, j_cost = j)
+                  case(2)
+                     call da_calculate_hessian( &
+                           grid, config_flags, cv_size, xbx, &
+                           be, iv, cvt, re, y, xhat, j_cost = j)
                end select
             else
                select case (svd_type)
@@ -1074,10 +1078,25 @@
                               grid, config_flags, cv_size, xbx, &
                               be, iv, cvt, re, y, xhat)
                      end if
+                  case(2)
+                     if (svd_stage .eq. 2) then
+                        call da_calculate_hessian( &
+                              grid, config_flags, cv_size, xbx, &
+                              be, iv, cvt, re, y, xhat, &
+                              qhat=qhat, eignval=eignval, &
+                              eignvec=eignvec, neign=neign)
+                     else
+                        call da_calculate_hessian( &
+                              grid, config_flags, cv_size, xbx, &
+                              be, iv, cvt, re, y, xhat)
+                     end if
+
                end select
             end if
             if ((svd_type .eq. 1 .and. svd_stage .ne. 4) .or. &
-                (svd_type .eq. 6 .and. svd_stage .ne. 2) ) then
+                (svd_type .eq. 6 .and. svd_stage .ne. 2) .or. &
+                (svd_type .eq. 2 .and. svd_stage .ne. 2) ) then
+
                call da_deallocate_observations (iv)
                call da_deallocate_y (ob)
                if (use_background_errors) call da_deallocate_background_errors (be)

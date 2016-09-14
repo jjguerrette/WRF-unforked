@@ -57,7 +57,7 @@ subroutine da_yhat_io (io_config, filename, nall, nobs, obs)
       if (nobs .gt. 0) then
          if (allocated(obs)) deallocate(obs)
          allocate(obs(1:nobs))
-         read(unit=svd_unit,fmt='(D25.16)') obs(1:nobs)
+         read(unit=svd_unit,fmt='(E27.16E3)') obs(1:nobs)
          read(unit=svd_unit,fmt='(I10)') nall
       else
          nall(:) = 0
@@ -69,7 +69,7 @@ subroutine da_yhat_io (io_config, filename, nall, nobs, obs)
       write(unit=svd_unit,fmt='(I10)') nobs
       if (nobs .gt. 0 .and. allocated(obs) ) then
          if (size(obs) .eq. nobs) then
-            write(unit=svd_unit,fmt='(D25.16)') obs(1:nobs)
+            write(unit=svd_unit,fmt='(E27.16E3)') obs(1:nobs)
             write(unit=svd_unit,fmt='(I10)') nall
          else
             write(*,*) 'da_yhat_io: obs vector is wrong size', size(obs), nobs

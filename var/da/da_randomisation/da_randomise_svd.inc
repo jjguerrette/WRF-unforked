@@ -183,13 +183,15 @@ subroutine da_randomise_svd(grid, config_flags,            &
       filename = 'ghat.p'//trim(adjustl(cproc))
       call da_cv_io ('r', filename, cv_size, ghat)
 
-      ! Generate qhat basis vectors
+      ! Generate qhat basis vectors by Modified Gram-Schmidt orthonormalization
       do iens = 1, nens
          qhat(:,iens) = yhat(:,iens)
          if (iens .gt. 1) then
+            do i = 1,2 !Second iteration improves orthogonalization for numerical precision
             do jens = 1, iens-1
                gdot = da_dot_cv(cv_size, qhat(:,iens), qhat(:,jens), grid, mz, jp_start, jp_end)
                qhat(:,iens) = qhat(:,iens) - gdot * qhat(:,jens)
+            end do
             end do
          end if
 
@@ -220,12 +222,12 @@ subroutine da_randomise_svd(grid, config_flags,            &
     !  x = BMAT(iens,:)
     !-----------------------------------------------------------
       write(cnens,fmt='(I0)') nens
-      do iens = 1, nens
-         write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'F1: ',F1(iens,1:nens)
-      end do
-      do iens = 1, nens
-         write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'F2: ',F2(iens,1:nens)
-      end do
+!      do iens = 1, nens
+!         write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'F1: ',F1(iens,1:nens)
+!      end do
+!      do iens = 1, nens
+!         write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'F2: ',F2(iens,1:nens)
+!      end do
 
       info = 0
       p = svd_p
@@ -275,9 +277,8 @@ subroutine da_randomise_svd(grid, config_flags,            &
          end do
       end do
 
-
       do iens = 1, nens
-         write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'BMAT: ',BMAT(iens,1:nens)
+         write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'BMAT: ',BMAT(iens,1:nens)
       end do
 
     ! Determine eigenvalues and eigenvectors of the symmetric B matrix

@@ -234,14 +234,16 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
          allocate(qhat_ens(1:nobs(1),nens))
 !      end if
 
-      ! Generate qhat basis vectors
+      ! Generate qhat basis vectors by Modified Gram-Schmidt orthonormalization
       do iens = 1, nens
          if (nobs(1) .gt. 0) qhat_ens(:,iens) = YHAT(:,iens)
          if (iens .gt. 1) then
+            do i = 1,2 !Second iteration improves orthogonalization for numerical precision
             do jens = 1, iens-1
                gdot = da_dot_obs(nobs(1), qhat_ens(:,iens), qhat_ens(:,jens))
                
                if (nobs(1) .gt. 0) qhat_ens(:,iens) = qhat_ens(:,iens) - gdot * qhat_ens(:,jens)
+            end do
             end do
          end if
 
@@ -361,6 +363,8 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
 
       call wrf_dm_bcast_real(SIG,nens)
 
+      call wrf_dm_bcast_integer(info,1)
+
       allocate(dumcv(1:cv_size))
       allocate(dumcv_g(1:cv_size_domain))
       do iens = 1, nens
@@ -397,7 +401,7 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
       neign = nens
 
       write(cnens,fmt='(I0)') neign
-      write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'Eigenvalues(r): ',LAM(1:ensdim_svd)
+      write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'Eigenvalues(r): ',LAM(1:ensdim_svd)
 
       ! Write nuhat vectors to disk
       do i = 1, neign

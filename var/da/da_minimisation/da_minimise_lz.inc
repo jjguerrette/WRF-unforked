@@ -147,9 +147,11 @@ subroutine da_minimise_lz(grid, config_flags,            &
             ghat = ghat - gdot * qhat(:,i)
          end do
       else
+         do j = 1, 2
          do i = 1, iter
             gdot = da_dot_cv(cv_size, ghat, qhat(:,i), grid, mz, jp_start, jp_end)
             ghat = ghat - gdot * qhat(:,i)
+         end do
          end do
       end if
 
@@ -211,9 +213,9 @@ subroutine da_minimise_lz(grid, config_flags,            &
     ! ----------------------------------------------
       write(unit=stdout,fmt='(A,2I5)') 'it, iter = ',it,iter
       write(dummychar,fmt='(I0)') iter
-      write(unit=stdout,fmt='(A,'//trim(dummychar)//'D25.16)') 'Ritz eigenvalues: ',eignval(1:iter)     
+      write(unit=stdout,fmt='(A,'//trim(dummychar)//'E27.16E3)') 'Ritz eigenvalues: ',eignval(1:iter)     
       do ii = 1,iter
-         write(unit=stdout,fmt='(A,I3,A,'//trim(dummychar)//'D25.16)') 'EIGENVECTOR',ii,': ',eignvec(ii,1:iter) 
+         write(unit=stdout,fmt='(A,I3,A,'//trim(dummychar)//'E27.16E3)') 'EIGENVECTOR',ii,': ',eignvec(ii,1:iter) 
       end do
       write(unit=stdout,fmt='(A,I5)') 'Number of converged eigenpairs: ', neign
 

@@ -80,6 +80,9 @@ contains
 #include "da_ytoyhat_chem_acft.inc"
 #include "da_ytoyhat_chem_surf_adj.inc"
 #include "da_ytoyhat_chem_acft_adj.inc"
+#include "da_force_grad_chem_surf.inc"
+#include "da_force_grad_chem_acft.inc"
+
 #endif
 
 #endif

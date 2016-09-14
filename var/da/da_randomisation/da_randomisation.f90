@@ -72,7 +72,9 @@ module da_randomisation
 !   use da_synop, only : da_ytoyhat_synop, da_ytoyhat_synop_adj
 #if (WRF_CHEM == 1)
    use da_chem, only: da_ytoyhat_chem_surf, da_ytoyhat_chem_surf_adj, &
-      da_ytoyhat_chem_acft, da_ytoyhat_chem_acft_adj
+      da_ytoyhat_chem_acft, da_ytoyhat_chem_acft_adj, &
+      da_force_grad_chem_acft, da_force_grad_chem_surf
+
 #endif
 
 #endif
@@ -102,5 +104,7 @@ contains
 #include "da_amat_mul_trunc.inc"
 #include "da_randomise_svd.inc"
 #include "da_randomise_svd_51.inc"
+#include "da_force_grad_hess.inc"
+#include "da_calculate_hessian.inc"
 
 end module da_randomisation
