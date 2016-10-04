@@ -1118,7 +1118,7 @@
                stop
 #if (WRF_CHEM == 1)
             else if (calc_aminusb) then
-               call da_calculate_aminusb(grid,config_flags,it,cv_size,xbx, &
+               call da_calculate_aminusb(grid,config_flags,svd_outer,cv_size,xbx, &
                                          be,qhat,eignvec,eignval,neign,ensdim_svd)
 #endif
             end if
