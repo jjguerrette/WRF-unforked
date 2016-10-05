@@ -131,8 +131,11 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
 
       if ( ensmember .eq. nens+1 ) then 
          ! Calculate grad J for xhat = 0
+         use_randomsvd = .false.
          call da_calculate_j(svd_outer, 0, cv_size, be%cv%size_jb, be%cv%size_je, be%cv%size_jp, &
                              be%cv%size_jl, xbx, be, iv, xhat, cv, re, y, j_cost, ghat, grid, config_flags)
+         use_randomsvd = .true.
+
          j0_total = j_cost%total
          if (j0_total == 0.0) return
          ghat = - ghat

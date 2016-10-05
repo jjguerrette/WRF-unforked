@@ -12,6 +12,7 @@ module da_randomisation
        myproc, filename_len, test_dm_exact, rootproc, cv_size_domain, &
        stdout, trace_use, svd_amat_type, svd_symm_type, adapt_svd, &
        num_ob_indexes, read_omega, svd_p, ierr, comm, &
+       use_randomsvd, &
 #if (WRF_CHEM == 1)
        chem_surf, chem_acft, &
 #endif
