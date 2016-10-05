@@ -1031,7 +1031,7 @@
 #if defined(LAPACK)
       else if ( use_randomsvd) then
          if ( ensdim_svd .gt. 0  .and.  svd_outer .gt. 0  .and.  it .eq. 1 ) then
-            if (svd_outer .gt. 1) then
+            if (svd_outer .gt. 1 .and. svd_minimise) then
                write(cproc,fmt='(i4.4)') myproc
                write(cit,fmt='(i2.2)') svd_outer-1
                cvtfile_svd = 'cvt.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
