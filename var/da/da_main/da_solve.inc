@@ -905,7 +905,7 @@
          ! or after stage 1 of randomised svd
          if( config_flags%calc_hx_only &
 #if defined(LAPACK)
-            .or. (use_randomsvd .and. svd_stage.le.0) &
+            .or. (use_randomsvd .and. svd_type.ne.11 .and. svd_stage.le.0) &
 #endif
             ) then
             call da_deallocate_observations (iv)
@@ -1078,6 +1078,24 @@
                               grid, config_flags, cv_size, xbx, &
                               be, iv, cvt, re, y, xhat)
                      end if
+                  case(10)
+                     if (svd_stage .eq. 2) then
+                        call da_randomise_svd_B( &
+                              grid, config_flags, cv_size, xbx, &
+                              be, iv, cvt, re, y, xhat, &
+                              qhat=qhat, eignval=eignval, &
+                              eignvec=eignvec, neign=neign)
+                     else
+                        call da_randomise_svd_B( &
+                              grid, config_flags, cv_size, xbx, &
+                              be, iv, cvt, re, y, xhat)
+                     end if
+                  case(11)
+                        call da_randomise_svd_B11( &
+                              grid, config_flags, cv_size, xbx, &
+                              be, iv, cvt, re, y, xhat, &
+                              qhat=qhat, eignval=eignval, &
+                              eignvec=eignvec, neign=neign)
                   case(2)
                      if (svd_stage .eq. 2) then
                         call da_calculate_hessian( &
@@ -1095,7 +1113,9 @@
             end if
             if ((svd_type .eq. 1 .and. svd_stage .ne. 4) .or. &
                 (svd_type .eq. 6 .and. svd_stage .ne. 2) .or. &
-                (svd_type .eq. 2 .and. svd_stage .ne. 2) ) then
+                (svd_type .eq. 2 .and. svd_stage .ne. 2) .or. &
+                (svd_type .eq. 10) .or. &
+                (svd_type .eq. 11)) then
 
                call da_deallocate_observations (iv)
                call da_deallocate_y (ob)

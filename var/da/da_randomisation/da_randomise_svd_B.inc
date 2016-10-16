@@ -1,10 +1,10 @@
-subroutine da_randomise_svd(grid, config_flags,            &
+subroutine da_randomise_svd_B(grid, config_flags,            &
                            cv_size, xbx, be, iv, cv, &
                            re, y, xhat, j_cost, &
                            qhat, eignval, eignvec, neign)
 
    !-------------------------------------------------------------------------
-   ! Purpose:         Main randomized SVD routine, separated into 2 stages 
+   ! Purpose:         Main randomized SVD routine, separated into 2 stages (B only)
    !
    ! Here 
    !    cv   is updated in outer-loop.
@@ -81,7 +81,7 @@ subroutine da_randomise_svd(grid, config_flags,            &
    character(len=3) :: cnens=""
    logical          :: swapped
   
-   if (trace_use) call da_trace_entry("da_randomise_svd")
+   if (trace_use) call da_trace_entry("da_randomise_svd_B")
 
    write(unit=stdout,fmt='(A)') 'Minimize cost function using randomized SVD method'
    write(unit=stdout,fmt=*) ' '
@@ -145,8 +145,25 @@ subroutine da_randomise_svd(grid, config_flags,            &
             call da_set_randomcv(cv_size, omega(:,1))
          end if
 
-         call da_calculate_gradj(svd_outer, 1, cv_size,be%cv%size_jb,be%cv%size_je,be%cv%size_jp, &
-                                 be%cv%size_jl, xbx,be,iv,omega(1:cv_size,1),y,yhat(1:cv_size,1),grid,config_flags)
+#if (WRF_CHEM == 1)
+         call da_transform_vtox(grid, be%cv%size_jb, xbx, be, grid%ep, &
+                                omega(1:be%cv%size_jb,1), grid%vv, grid%vp, grid%vch)
+#else
+         call da_transform_vtox(grid, be%cv%size_jb, xbx, be, grid%ep, &
+                                omega(1:be%cv%size_jb,1), grid%vv, grid%vp)
+#endif
+         yhat(1:cv_size,1) = 0.D0
+#if (WRF_CHEM == 1)
+         call da_transform_vtox_adj(grid, be%cv%size_jb, xbx, be, grid%ep, grid%vp, grid%vv, &
+                                yhat(1:be%cv%size_jb,1), grid%vch)
+#else
+         call da_transform_vtox_adj(grid, be%cv%size_jb, xbx, be, grid%ep, grid%vp, grid%vv, &
+                                yhat(1:be%cv%size_jb,1))
+#endif
+
+
+!         call da_calculate_gradj(svd_outer, 1, cv_size,be%cv%size_jb,be%cv%size_je,be%cv%size_jp, &
+!                                 be%cv%size_jl, xbx,be,iv,omega(1:cv_size,1),y,yhat(1:cv_size,1),grid,config_flags)
 
          !Write omega to file
          filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
@@ -182,9 +199,9 @@ subroutine da_randomise_svd(grid, config_flags,            &
          call da_cv_io ('r', filename, cv_size, omega(1:cv_size,iens))
       end do
 
-      ! Read gradient
-      filename = 'ghat.p'//trim(adjustl(cproc))
-      call da_cv_io ('r', filename, cv_size, ghat)
+!      ! Read gradient
+!      filename = 'ghat.p'//trim(adjustl(cproc))
+!      call da_cv_io ('r', filename, cv_size, ghat)
 
       ! Generate qhat basis vectors by Modified Gram-Schmidt orthonormalization
       do iens = 1, nens
@@ -224,7 +241,7 @@ subroutine da_randomise_svd(grid, config_flags,            &
     !  b = F2(:,iens)
     !  x = KMAT(iens,:)
     !-----------------------------------------------------------
-      write(cnens,fmt='(I0)') nens
+!      write(cnens,fmt='(I0)') nens
 !      do iens = 1, nens
 !         write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'F1: ',F1(iens,1:nens)
 !      end do
@@ -345,73 +362,8 @@ subroutine da_randomise_svd(grid, config_flags,            &
       end do
 
       write(unit=stdout,fmt='(A)') ' '
-      write(unit=stdout,fmt='(A,I5,A,I5,A)') 'Using ', neign, ' of ', nens, ' eigenpairs'
+      write(unit=stdout,fmt='(A,I5,A,I5,A)') 'Showing ', neign, ' of ', nens, ' eigenpairs'
       write(unit=stdout,fmt='(A)') ' '
-
-
-      ! Note: da_amat_mul does not properly handle imaginary eigenpairs,
-      !       nor does it perform proper truncation when neign < nens.
-      ! Although symmetric real matrices should not have complex eigenvalues or eigenvectors
-
-      ! Eigenvalues of the inverse Hessian (including all background terms)
-
-      if (neign .eq. nens .and. .not. adapt_svd) then
-         do i = 1, nens
-            LAMinv(i) = 1.D0 / ( LAM(i) + 1.D0 )
-         end do
-         write(unit=stdout,fmt='(A)') 'Carrying out RIOT-56 full real amat_mul'
-         call da_amat_mul(be,grid,cv_size,nens,neign,LAMinv,eignvec,qhat,ghat,xhat)
-      else
-         !  Truncate to neign modes Here we use full eigenvec matrix to generate nuhat=qhat*eigenvec,
-         !  then truncate by only using neign of the nuhat vectors 
-
-         if (minval(LAM(1:neign)) .lt. 1.D0 .and. adapt_svd) then
-            ! (1) Generate eigenvectors of A
-            allocate(nuhat(1:cv_size, 1:neign))
-            nuhat = 0.D0
-
-            do jens = 1, neign
-               do i = 1, cv_size
-                  nuhat(i,jens) = da_dot(nens, qhat(i,1:nens), eignvec(1:nens,jens))
-               end do
-            end do
-
-            ! Write nuhat vectors to disk
-            do i = 1, neign
-               write(unit=stdout,fmt='("Writing nuhat vectors to disk: ",i3)') i
-               write(cens,fmt='(i4.4)') i
-               filename = 'nuhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
-               call da_cv_io ('w', filename, cv_size, nuhat(1:cv_size,i))
-            end do
-
-            xhat = ghat
-
-            ! (2) Construct low rank estimate of A^-1 * ghat with leading neign modes of A
-            do i = 1, neign
-               dot_cv = da_dot_cv(cv_size, nuhat(:,i), ghat, grid, mz, jp_start, jp_end)
-               write(unit=stdout,fmt='("i, dot_cv = ",I3,D25.16)') i,dot_cv
-
-!!               if (minval(LAM(1:neign)) .lt. 1.D0 .and. adapt_svd) then
-                  xhat = xhat - LAM(i) / (LAM(i) + 1.D0) * nuhat(:,i) * dot_cv
-!!               else
-!!                  xhat = xhat + 1.D0 / (LAM(i) + 1.D0) * nuhat(:,i) * dot_cv
-!!               end if
-            end do
-
-            deallocate(nuhat)
-
-            write(unit=stdout,fmt='(A)') 'Carrying out RIOT-56 truncated amat_mul, adaptive'
-         else
-            do i = 1, nens
-               LAMinv(i) = 1.D0 / ( LAM(i) + 1.D0 )
-            end do
-            call da_amat_mul_trunc(be,grid,cv_size,nens,nens,neign,LAMinv,eignvec,qhat,ghat,xhat)
-
-            write(unit=stdout,fmt='(A)') 'Carrying out RIOT-56 truncated amat_mul'
-         end if
-
-
-      end if
 
       deallocate(yhat)
       deallocate(omega)
@@ -419,13 +371,13 @@ subroutine da_randomise_svd(grid, config_flags,            &
       write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: svd_stage should be 0, 1, or 2, not ',svd_stage
       CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
    end if
-   if (trace_use) call da_trace_exit("da_randomise_svd")
+   if (trace_use) call da_trace_exit("da_randomise_svd_B")
 
 #else
    call da_error(__FILE__,__LINE__, &
        (/"Must compile with $LAPACK option for randomised svd"/))
 #endif
 
-end subroutine da_randomise_svd
+end subroutine da_randomise_svd_B
 
 

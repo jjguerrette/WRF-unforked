@@ -22,6 +22,7 @@ module da_randomisation
    use da_minimisation, only: da_transform_vtoy, da_transform_vtoy_adj, &
        da_calculate_grady, da_calculate_j, da_calculate_gradj, &
        da_amat_mul
+   use da_vtox_transforms, only : da_transform_vtox, da_transform_vtox_adj
    use da_define_structures, only : iv_type, y_type, j_type, be_type, xbx_type, &
 #if defined(LAPACK)
        yhat_type, &
@@ -107,5 +108,8 @@ contains
 #include "da_randomise_svd_51.inc"
 #include "da_force_grad_hess.inc"
 #include "da_calculate_hessian.inc"
+#include "da_randomise_svd_B.inc"
+#include "da_randomise_svd_B11.inc"
+
 
 end module da_randomisation

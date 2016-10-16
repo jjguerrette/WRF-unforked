@@ -43,8 +43,8 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
    real(wp)                     :: SIG(1:ensdim_svd)
    real(wp)                     :: LAM(1:ensdim_svd)
 
-   real(wp), allocatable   :: BMAT(:,:)  ! B = Q ^T * A  or  B^T = A^T * Q, where A = R^-1/2 * H * U
-   real(wp), allocatable   :: BMAT_g(:,:)  ! B = Q ^T * A  or  B^T = A^T * Q, where A = R^-1/2 * H * U
+   real(wp), allocatable   :: KMAT(:,:)  ! B = Q ^T * A  or  B^T = A^T * Q, where A = R^-1/2 * H * U
+   real(wp), allocatable   :: KMAT_g(:,:)  ! B = Q ^T * A  or  B^T = A^T * Q, where A = R^-1/2 * H * U
 
    real(wp), allocatable   :: omega(:,:) ! Gaussian draw
    real(wp), allocatable   :: nuhat_T(:,:) ! Eigenvectors of A
@@ -241,7 +241,7 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
       do iens = 1, nens
          if (nobs(1) .gt. 0) qhat_ens(:,iens) = YHAT(:,iens)
          if (iens .gt. 1) then
-            do i = 1,2 !Second iteration improves orthogonalization for numerical precision
+            do i = 1,2 !Second iteration improves orthogonalization for numerical precision (Bjorck, 1994)
             do jens = 1, iens-1
                gdot = da_dot_obs(nobs(1), qhat_ens(:,iens), qhat_ens(:,jens))
                
@@ -298,7 +298,7 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
               )
       grad_jo = - grad_jo    !! Compensate for sign in calculation of grad_v (Jo)
 
-      ! Write BMAT row to file
+      ! Write KMAT row to file
       filename = 'bhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
       call da_cv_io ('w', filename, cv_size, grad_jo)
 
@@ -307,18 +307,18 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
    else if ( svd_stage .eq. 4 ) then
       ! Eigen decomposition of A (Algorithm 5.1 of Halko)
 
-      allocate(BMAT(nens,1:cv_size))
+      allocate(KMAT(nens,1:cv_size))
       allocate(nuhat_T(nens,1:cv_size))
       nuhat_T = 0.D0
 
       write(cproc,fmt='(i4.4)') myproc
 
-      ! Read in BMAT for all rows on each processor, BMAT = (A^T * Q)^T
+      ! Read in KMAT for all rows on each processor, KMAT = (A^T * Q)^T
       do iens = 1, nens
-         write(unit=stdout,fmt='("Reading BMAT row : ",i3)') iens
+         write(unit=stdout,fmt='("Reading KMAT row : ",i3)') iens
          write(cens,fmt='(i4.4)') iens
          filename = 'bhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
-         call da_cv_io ('r', filename, cv_size, BMAT(iens,1:cv_size))
+         call da_cv_io ('r', filename, cv_size, KMAT(iens,1:cv_size))
       end do
 
       ! Read gradient
@@ -326,19 +326,19 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
       call da_cv_io ('r', filename, cv_size, ghat)
 
 #ifdef DM_PARALLEL
-      !Perform global SVD of BMAT matrix
+      !Perform global SVD of KMAT matrix
       cv_size_domain = wrf_dm_sum_integer(cv_size)
       if (rootproc) then
-         allocate(BMAT_g(nens,1:cv_size_domain))
+         allocate(KMAT_g(nens,1:cv_size_domain))
          allocate(nuhat_T_g(nens,1:cv_size_domain))
       else
-         allocate(BMAT_g(1:nens,1))
+         allocate(KMAT_g(1:nens,1))
          allocate(nuhat_T_g(1:nens,1))
       end if
       allocate(dumcv(1:cv_size))
       allocate(dumcv_g(1:cv_size_domain))
       do iens = 1, nens
-         dumcv = BMAT(iens,1:cv_size)
+         dumcv = KMAT(iens,1:cv_size)
 
          write(cens,fmt='(i4.4)') iens
          filename = 'dumcv.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
@@ -346,7 +346,7 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
 
          call da_cv_to_global(cv_size, cv_size_domain, dumcv, grid, mz, dumcv_g)
 
-         if(rootproc) BMAT_g(iens,:) = dumcv_g
+         if(rootproc) KMAT_g(iens,:) = dumcv_g
 
          call mpi_barrier(comm, ierr)
       end do
@@ -355,12 +355,12 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
 
       write(unit=stdout,fmt='(A)') 'Calculate SVD of B = Q^T * R^-1/2 * H * U'
       if (rootproc) then
-         !SVD of global BMAT on monitor process
-         call GESVD(BMAT_g, SIG, VT = nuhat_T_g, INFO = info)
+         !SVD of global KMAT on monitor process
+         call GESVD(KMAT_g, SIG, VT = nuhat_T_g, INFO = info)
       else
          SIG = 0.D0
       end if
-      deallocate(BMAT_g)
+      deallocate(KMAT_g)
 
       call mpi_barrier(comm, ierr)
 
@@ -387,8 +387,8 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
       deallocate(dumcv_g)
       deallocate(nuhat_T_g)
 #else
-      !SVD of global BMAT
-      call GESVD(BMAT, SIG, VT = nuhat_T, INFO = info)
+      !SVD of global KMAT
+      call GESVD(KMAT, SIG, VT = nuhat_T, INFO = info)
 #endif
 
       if (info /=0) then
@@ -443,6 +443,8 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
 
             xhat = xhat - LAM(i) * nuhat_T(i,:) * dot_cv
          end do
+
+         write(unit=stdout,fmt='(A)') 'Carrying out RIOT-51 amat_mul, adaptive'
       else
          do i = 1, neign
             LAM(i) = 1.D0 / ( LAM(i) + 1.D0 )
@@ -454,9 +456,11 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
 
             xhat(1:cv_size) = xhat(1:cv_size) + LAM(i) * nuhat_T(i,1:cv_size) * dot_cv
          end do
+
+         write(unit=stdout,fmt='(A)') 'Carrying out RIOT-51 amat_mul'
       end if
 
-      deallocate(BMAT)
+      deallocate(KMAT)
       deallocate(nuhat_T)
 
    else

@@ -147,7 +147,7 @@ subroutine da_minimise_lz(grid, config_flags,            &
             ghat = ghat - gdot * qhat(:,i)
          end do
       else
-         do j = 1, 2
+         do j = 1,2 !Second iteration improves orthogonalization for numerical precision (Bjorck, 1994)
          do i = 1, iter
             gdot = da_dot_cv(cv_size, ghat, qhat(:,i), grid, mz, jp_start, jp_end)
             ghat = ghat - gdot * qhat(:,i)
