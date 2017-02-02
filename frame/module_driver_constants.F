@@ -82,6 +82,11 @@ MODULE module_driver_constants
 
    INTEGER , PARAMETER :: max_instruments =   30
 
+   !  The maximum number of aircraft platforms (for chemical DA)
+#if (WRF_CHEM == 1)
+   INTEGER , PARAMETER :: max_plat =   100
+#endif
+
    !  The maximum number of obs indexes (for conventional DA obs) 
 
 #if (WRF_CHEM == 1)

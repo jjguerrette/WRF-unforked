@@ -28,6 +28,7 @@ module da_obs
       bogus, buoy, qscat, tamdar, tamdar_sfc, pseudo, num_ob_indexes, its,ite,jds,jts,jte,ids, &
 #if (WRF_CHEM == 1)
       num_platform, chem_surf, chem_acft, &
+      use_chem_surfobs, use_chem_acftobs, &
 #endif
       write_mod_filtered_obs, radiance, use_varbc, obs_names
    ! use_crtm_kmatrix,use_crtm_kmatrix_fast

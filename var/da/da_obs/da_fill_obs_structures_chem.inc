@@ -36,7 +36,7 @@ subroutine da_fill_obs_structures_chem(iv, ob)
 
    ! [2.20] Transfer chem obs:
 
-   if (iv%info(chem_surf)%nlocal > 0) then
+   if (iv%info(chem_surf)%nlocal > 0 .and. use_chem_surfobs) then
       do n = 1, iv%info(chem_surf)%nlocal
          do k = 1, num_chem_surf-1
             ob % chem_surf(n) % chem(k) = iv % chem_surf(n) % chem(k) % inv
@@ -44,7 +44,7 @@ subroutine da_fill_obs_structures_chem(iv, ob)
       end do
    end if
 
-   if (iv%info(chem_acft)%nlocal > 0) then
+   if (iv%info(chem_acft)%nlocal > 0 .and. use_chem_acftobs) then
       do n = 1, iv%info(chem_acft)%nlocal
          do k = 1, num_chem_acft-1
             do iplt = 1, num_platform

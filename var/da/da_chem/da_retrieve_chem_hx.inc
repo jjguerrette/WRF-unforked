@@ -40,7 +40,7 @@ subroutine da_retrieve_chem_hx( model_grid, iv )
    end if
 
    do iplt = 1, num_platform
-      if (num_acft_obs > 0) then
+      if (num_acft_obs(iplt) > 0) then
          do ichem = PARAM_FIRST_SCALAR, num_acft_hx
 #ifdef DM_PARALLEL
             dummy_ina(:) = 0.D0

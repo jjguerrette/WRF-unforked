@@ -23,7 +23,7 @@ module da_setup_structures
       max_fgat_time, num_fgat_time, dt_cloud_model, &
       use_ssmiretrievalobs,use_radarobs,use_ssmitbobs,use_qscatobs, num_procs, use_rainobs, &
 #if (WRF_CHEM == 1)
-      num_surf_obs, num_acft_obs, num_ts, &
+      num_surf_obs, num_acft_obs, num_ts, num_platform, &
       use_chem_surfobs, use_chem_acftobs, chem_surf, chem_acft, &
       num_ant_steps, num_bb_steps, &
       rf_lengthscale_ant, rf_lengthscale_bb, &
@@ -89,7 +89,7 @@ module da_setup_structures
    use da_obs_io, only : da_read_obs_bufr,da_read_obs_radar, &
       da_scan_obs_radar,da_scan_obs_ascii,da_read_obs_ascii, &
 #if (WRF_CHEM == 1)
-      da_read_obs_chem, &
+      da_read_obs_chem, da_read_obs_chem_multiplat, &
 #endif
       da_read_obs_bufrgpsro, da_scan_obs_rain, da_read_obs_rain
    use da_par_util1, only : da_proc_sum_real, da_proc_sum_int, da_proc_sum_ints

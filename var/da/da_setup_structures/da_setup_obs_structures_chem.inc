@@ -27,11 +27,11 @@ subroutine da_setup_obs_structures_chem(grid, ob, iv)
    iv%info(chem_surf)%ntotal = num_surf_obs
    iv%info(chem_surf)%nlocal = num_surf_obs
 
-!   if (num_acft_obs <= 0) then
+!   if (num_acft_obs(1) <= 0) then
 !      num_ts = 0
 !   end if
 
-   if (num_acft_obs <= 0) then
+   if (num_acft_obs(1) <= 0) then
       iv%info(chem_acft)%ntotal = 0
       iv%info(chem_acft)%nlocal = 0
    else
@@ -48,7 +48,11 @@ subroutine da_setup_obs_structures_chem(grid, ob, iv)
    !--------------------------------------------------------------------------
    ! [2.0] Read data
    !--------------------------------------------------------------------------
-   call da_read_obs_chem(grid, iv)
+   if (num_platform .gt. 1 .and. sum(num_acft_obs) .gt. num_acft_obs(1)) then
+      call da_read_obs_chem_multiplat(grid, iv)
+   else
+      call da_read_obs_chem(grid, iv)
+   end if
 
    !--------------------------------------------------------------------------
    ! [3.0] Calculate innovation vector (O-B) and create (smaller) ob structure:

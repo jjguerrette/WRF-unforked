@@ -82,6 +82,7 @@ contains
 #include "da_read_obs_rain.inc"
 #if (WRF_CHEM == 1)
 #include "da_read_obs_chem.inc"
+#include "da_read_obs_chem_multiplat.inc"
 #endif
 #include "da_read_errfac.inc"
 #include "da_use_obs_errfac.inc"

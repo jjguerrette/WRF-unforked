@@ -86,7 +86,7 @@ subroutine da_write_obs_chem ( iv, ob, it )
    call mpi_barrier(comm, ierr)
 #endif
 
-   if (num_acft_obs > 0) then  
+   if (num_acft_obs(1) > 0) then  
       write(acft_file,'("AIRCRAFT_Hx_y_i",I2.2,".txt")') it
 
       if(rootproc) then

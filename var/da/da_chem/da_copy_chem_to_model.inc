@@ -25,7 +25,7 @@ subroutine da_copy_chem_to_model( wrfplus_grid, it )
       end do
    end if
 
-   if (num_acft_obs > 0) then
+   if (num_acft_obs(1) > 0) then
       wrfplus_grid%k_acft(:,:) = 0.D0
       do iplt = 1, num_platform
       do iobs = 1, num_ts

@@ -93,7 +93,7 @@ subroutine da_read_obs_chem_again ( iv, ob, it, model_grid )
    call mpi_barrier(comm, ierr)
 #endif
 
-   if (num_acft_obs > 0) then  
+   if (num_acft_obs(1) > 0) then  
       write(acft_file,'("AIRCRAFT_Hx_y_i",I2.2,".txt")') it
 
       if(rootproc) then

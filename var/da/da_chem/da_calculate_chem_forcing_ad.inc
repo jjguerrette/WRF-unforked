@@ -62,7 +62,7 @@ subroutine da_calculate_chem_forcing_ad( it, model_grid, iv )
    end if
 
    do iplt = 1, num_platform
-      if (num_acft_obs > 0) then
+      if (num_acft_obs(iplt) > 0) then
          model_grid%a_acft_hx(:,iplt,:) = 0.D0
          ilocal = 0
          do itime = 1, num_ts

@@ -8,7 +8,7 @@ module da_control
                                        max_outer_iterations, max_instruments, max_plevs, &
                                        max_zlevs, &
 #if (WRF_CHEM == 1)
-                                       max_trackchem, &
+                                       max_trackchem, max_plat, &
 #endif
                                        max_ocean, num_ob_indexes
 
