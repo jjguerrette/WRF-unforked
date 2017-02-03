@@ -1754,9 +1754,11 @@ CONTAINS
 
 
 !Simple emissions scaling from NEI MADE/SORGAM to GOCART
-       if(config_flags%emiss_opt == ADTLANT_BCCO) then
-       do j=jts,jte  
-          do i=its,ite  
+       if(config_flags%emiss_opt == ADTLANT_BCCO .OR. &
+          config_flags%emiss_opt == ADTLANT_BC &
+        ) then
+       do j=jts,jte
+          do i=its,ite
              do k=kts,min(config_flags%kemit,kte-ksub)
                 conv = 4.828e-4/rho_phy(i,k,j)*dtstep/(dz8w(i,k,j)*60.)
                 chem(i,k,j,p_bc1)  = chem(i,k,j,p_bc1)                     &
@@ -1770,33 +1772,14 @@ CONTAINS
 #endif
                      )*alt(i,k,j)*dtstep/dz8w(i,k,j)
 
-                chem(i,k,j,p_co)  = chem(i,k,j,p_co)                       &
-                         +emis_ant(i,k,j,p_e_co) &
+                if(config_flags%emiss_opt == ADTLANT_BCCO) then
+                   chem(i,k,j,p_co)  = chem(i,k,j,p_co)                       &
+                            +emis_ant(i,k,j,p_e_co) &
 #if ( WRFPLUS == 1 )
-                         *scaleant(i,iant,j,p_scant_co) &
+                            *scaleant(i,iant,j,p_scant_co) &
 #endif
-                         *conv
-             end do
-          end do
-       end do
-       endif
-
-
-       if(config_flags%emiss_opt == ADTLANT_BC) then
-       do j=jts,jte  
-          do i=its,ite  
-             do k=kts,min(config_flags%kemit,kte-ksub)
-                conv = 4.828e-4/rho_phy(i,k,j)*dtstep/(dz8w(i,k,j)*60.)
-                chem(i,k,j,p_bc1)  = chem(i,k,j,p_bc1)                     &
-                     +(emis_ant(i,k,j,p_e_eci) &
-#if ( WRFPLUS == 1 )
-                     *scaleant(i,iant,j,p_scant_bc) &
-#endif
-                     + emis_ant(i,k,j,p_e_ecj) &
-#if ( WRFPLUS == 1 )
-                     *scaleant(i,iant,j,p_scant_bc) &
-#endif
-                     )*alt(i,k,j)*dtstep/dz8w(i,k,j)
+                            *conv
+                end if
              end do
           end do
        end do

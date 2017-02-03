@@ -7,7 +7,7 @@
 dimspec ant      2                 namelist=num_ant_steps    z   anthro_emiss_scale_size
 dimspec bb       2                 namelist=num_bb_steps     z   burn_emiss_scale_size
 dimspec nsurf    -                 namelist=num_surf_obs     c   num_surf_obs
-dimspec nacft    -                 namelist=num_acft_obs     c   num_acft_obs
+#dimspec nacft    -                 namelist=num_acft_obs     c   num_acft_obs
 dimspec ntim     -                 namelist=num_ts           c   num_ts
 dimspec nplt     -                 namelist=num_platform     c   num_platform
 
@@ -15,7 +15,7 @@ rconfig integer  num_ant_steps     namelist,chem     1           1   rh  "num_sc
 rconfig integer  num_bb_steps      namelist,chem     1           1   rh  "num_scale_bb"   ""   ""
 
 rconfig integer  num_surf_obs      namelist,chem     1           0   rh  "num_surf_obs"   ""   ""
-rconfig integer  num_acft_obs      namelist,chem     1           0   rh  "num_acft_obs"   ""   ""
+rconfig integer  num_acft_obs      namelist,chem     max_plat    0   rh  "num_acft_obs"   ""   ""
 rconfig integer  num_ts            namelist,chem     1           0   rh  "num_ts"   ""   ""
 rconfig integer  num_platform      namelist,chem     1           1   rh  "num_platform"   ""   ""
 

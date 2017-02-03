@@ -301,7 +301,8 @@ CONTAINS
 !&        config_flags%biomass_burn_opt .EQ. BIOMASSB_GHG .OR. &
 !&        config_flags%biomass_burn_opt .EQ. BIOMASSB .OR. &
 !&        config_flags%biomass_burn_opt .EQ. ADTLBB .OR. &
-!&        config_flags%biomass_burn_opt .EQ. ADTLBB_BCCO ) THEN
+!&        config_flags%biomass_burn_opt .EQ. ADTLBB_BCCO .OR. &
+!&        config_flags%biomass_burn_opt .EQ. ADTLBB_BC ) THEN
 !      IF (ktau .EQ. 1) THEN
 !        do_plumerisefire = .true.
 !      ELSE IF (adapt_step_flag) THEN
