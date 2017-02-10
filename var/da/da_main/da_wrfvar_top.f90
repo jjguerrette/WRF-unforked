@@ -17,7 +17,7 @@ module da_wrfvar_top
 #ifdef VAR4D
    use da_4dvar, only : da_nl_model, model_grid, u6_2, v6_2, w6_2, t6_2, ph6_2, p6, &
 #if (WRF_CHEM == 1)
-      da_ad_model, da_init_model_input, &
+      da_ad_model, da_init_model_input, da_init_model_output, &
 #endif
       mu6_2, psfc6, moist6, kj_swap, da_finalize_model, da_model_lbc_off
    !use da_wrfvar_io, only : da_med_initialdata_output_lbc
@@ -50,7 +50,7 @@ module da_wrfvar_top
 #if (WRF_CHEM == 1)
    use da_chem, only:  da_retrieve_chem_hx, da_write_obs_chem, da_calculate_chem_forcing_ad, &
       da_read_obs_chem_again
-   use da_chem_tools, only: da_hdgn, da_dgn 
+   use da_chem_tools, only: da_hdgn, da_dgn, da_setup_osse_chem
 
 !   use da_control, only: use_synopobs, use_shipsobs, use_metarobs, use_soundobs, &
 !              use_mtgirsobs, use_tamdarobs, use_bogusobs, use_pilotobs, &

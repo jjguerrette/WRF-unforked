@@ -616,6 +616,51 @@
 #endif
       end if
 
+#ifdef VAR4D
+#if (WRF_CHEM == 1)
+   !---------------------------------------------------------------------------
+   ! [7.1] Setup CHEM OSSE w/ existing observation locations:
+   !---------------------------------------------------------------------------
+
+   if (osse_chem) then
+      if ( checkpoint_interval .gt. 0 ) then
+         write_checkpoints = 1
+         if(adtl_run_hours .gt. run_hours) then
+            CALL wrf_error_fatal('adtl_run_hours must be <= run_hours')
+         end if
+         if(mod(60*adtl_run_hours,checkpoint_interval) .ne. 0) then
+            CALL wrf_error_fatal('mod(60*adtl_run_hours,checkpoint_interval) must be zero.')
+         end if
+      end if
+
+      call da_nl_model(0)
+
+      write_checkpoints = 0
+
+      call da_retrieve_chem_hx( model_grid, iv )
+
+      ! Re-read model inputs from fgc file, then overwrite scaling factors.
+      call da_init_model_input
+
+      ! Overwrite ob and head_grid scaling factors with perturbed values
+      call da_setup_osse_chem (grid, ob, iv, be, xbx)
+
+      call da_transfer_wrftoxb_chem(grid)
+
+      do i = PARAM_FIRST_SCALAR, num_scaleant
+         call kj_swap (grid%scaleant(:,:,:,i), model_grid%scaleant(:,:,:,i), &
+                       grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, 1, num_ant_steps)
+      enddo
+      do i = PARAM_FIRST_SCALAR, num_scalebb
+         call kj_swap (grid%scalebb(:,:,:,i), model_grid%scalebb(:,:,:,i), &
+                       grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, 1, num_bb_steps)
+      enddo
+
+      call da_init_model_output(filename = "fgc_pert")
+
+   end if
+#endif
+#endif
    !---------------------------------------------------------------------------
    ! [8] Outerloop and chem Sensitivity
    !---------------------------------------------------------------------------

@@ -16,7 +16,7 @@ use da_reporting, only : da_message,da_warning,message
 use da_control, only : rootproc,ierr,comm,num_surf_obs,num_acft_obs,num_ts, &
       fails_error_max, trace_use, &
       num_platform, chem_surf, chem_acft, &
-      obs_qc_pointer,missing_r, qcstat_conv_unit, &
+      obs_qc_pointer, qcstat_conv_unit, &
       check_max_iv_print, check_max_iv, missing, rootproc, &
       max_error_chem_surf, max_error_chem_acft, &
       sigma_r_surf, sigma_r_acft, sigma_c_surf, sigma_c_acft, &
@@ -29,7 +29,8 @@ use da_control, only : rootproc,ierr,comm,num_surf_obs,num_acft_obs,num_ts, &
       ims, ime, jms, jme, kms, kme, &
       ids, ide, jds, jde, kds, kde
 
-use da_define_structures, only : da_allocate_observations_chem
+use da_define_structures, only : &
+      da_allocate_observations_chem
 use da_obs, only: da_fill_obs_structures_chem
 
 use module_state_description, only : num_surf_hx, num_acft_hx, &
@@ -43,7 +44,6 @@ use da_define_structures, only : iv_type, y_type, jo_type, &
 use da_tools_serial, only : da_get_unit,da_free_unit
 use da_tracing, only: da_trace_entry, da_trace_exit
 use da_tools, only : da_max_error_qc, da_residual
-
 !   use da_wrf_interfaces, only: da_wrf_get_dm_communicator
 
 !#ifdef VAR4D

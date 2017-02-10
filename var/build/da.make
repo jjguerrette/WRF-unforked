@@ -489,7 +489,7 @@ da_minimisation.o :
 	  $(FC) -c $(FCFLAGS) $(PROMOTION) $(CRTM_SRC) $(RTTOV_SRC) $(WRFPLUS_INC) $(HDF5_INC) $*.f ; \
         fi
 
-da_randomisation.o :
+da_randomisation.o da_chem_tools.o :
 	$(RM) $@
 	$(SED_FTN) $*.f90 > $*.b
 	$(CPP) $(CPPFLAGS) $(OMPCPP) $(FPPFLAGS) $*.b  > $*.f

@@ -125,7 +125,7 @@ subroutine da_write_obs_chem ( iv, ob, it )
                           ob%chem_acft(itime)%chem(ichem,iplt)
 !                          iv%chem_acft(itime)%chem(ichem,iplt)%inv
                   dummy_acft(2,ichem) = &
-                          ( iv%chem_acft(itime)%chem(ichem,iplt)%error ) ** 2
+                          ( iv%chem_acft(itime)%chem(ichem,iplt)%error ) !!** 2
                end do
                write(dummychar1,fmt='(I0)') num_chem_acft-1
                write(dummychar2,fmt='(I0)') num_acft_hx-1

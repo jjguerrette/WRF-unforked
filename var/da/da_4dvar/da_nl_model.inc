@@ -17,7 +17,11 @@ subroutine da_nl_model (it)
 
    if (trace_use_dull) call da_trace_entry("da_nl_model")
 
+#if (WRF_CHEM != 1)
    if ( it == 1 ) then
+#else
+   if ( (it == 1 .and. .not.osse_chem ) .or. it == 0 ) then
+#endif
 #ifdef _OPENMP
       call setfeenv()
 #endif
@@ -120,8 +124,8 @@ subroutine da_nl_model (it)
       call da_copy_chem_to_model( head_grid, it )
 
       !Need a first guess file that includes scaleant and scalebb
-      if ( it == 1 .and. .not.(write_checkpoints .eq. 2)) then
-         call da_init_model_output
+      if ( ((it == 1 .and. .not.osse_chem ) .or. it == 0) .and. .not.(write_checkpoints .eq. 2)) then
+         call da_init_model_output()
       end if
    end if
 #endif

@@ -183,6 +183,21 @@ subroutine da_deallocate_y(y)
       deallocate (y % airsr)
    end if
 
+#if (WRF_CHEM == 1)
+   if (y % nlocal(chem_surf) > 0) then
+      do n = 1, y % nlocal(chem_surf)
+         deallocate (y % chem_surf(n)%chem )
+      end do
+      deallocate (y % chem_surf)
+   end if
+   if (y % nlocal(chem_acft) > 0) then
+      do n = 1, y % nlocal(chem_acft)
+         deallocate (y % chem_acft(n)%chem )
+      end do
+      deallocate (y % chem_acft)
+   end if
+#endif
+
    if (trace_use) call da_trace_exit("da_deallocate_y")
 
 end subroutine da_deallocate_y
