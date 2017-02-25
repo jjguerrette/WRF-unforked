@@ -349,10 +349,17 @@ subroutine da_calculate_j(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size_jp,
          write(unit=grad_unit,fmt='(a)')'Iter             Iter                            '
       end if
 
-      write(unit=cost_unit,fmt='(2x,i2,1x,e10.3,2x,i4,9(1x,f10.3))') &
+      write(unit=cost_unit,fmt='(2x,i2,1x,e10.3,2x,i4,9(1x,f13.3))') &
          it, EPS(it), iter, j % total, j % jb, j % jo % total, j % jc, j % je, j % jd, j % jp, j%js, j%jl
    end if
-         
+
+#if defined(LAPACK)
+   if ( use_randomsvd ) then
+      write(unit=stdout,fmt='("Outer SVD iteration : ",i3)') it
+      write(unit=stdout,fmt='("Starting cost function: ",1PD15.3)') j%total
+   end if
+#endif
+
    !-------------------------------------------------------------------------
    ! [9.0] Calculate Gradient:
    !-------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-subroutine da_read_obs_chem_multiplat(grid, iv) 
+subroutine da_read_obs_chem_multiplat(grid, iv, io_config) 
    !-------------------------------------------------------------------------
    ! Purpose:        Read surface and aircraft chem observation files
    !
@@ -8,10 +8,11 @@ subroutine da_read_obs_chem_multiplat(grid, iv)
 
    implicit none
 
-   type (domain), intent(inout)     :: grid
-   type (iv_type),    intent(inout) :: iv
+   type (domain),  intent(inout) :: grid
+   type (iv_type), intent(inout) :: iv
+   character,      intent(in)    :: io_config     ! 'r' = Read; 'w' = Write
 
-   integer                                    :: iobs, jobs, itime, ichem, iplt, iunit, dummyi, &
+   integer                           :: iobs, jobs, itime, ichem, iplt, iunit, dummyi, &
                                                  nsurf, nacft, iostat, nrepeat, &
                                                  ilocal
    integer, dimension(num_surf_obs)  :: repeat_obs
@@ -36,25 +37,19 @@ subroutine da_read_obs_chem_multiplat(grid, iv)
    !   files can be concatenated. -JJG
    character*256         :: surf_file = "SURFACE_DATA.txt"
    character*256         :: acft_file != "AIRCRAFT_DATA.txt"  
-!   character*256         :: acft_var_file = "AIRCRAFT_MODEL_VARIANCE.txt"  
+   character*256         :: acft_var_file != "AIRCRAFT_MODEL_VARIANCE.txt"  
 
    if (trace_use) call da_trace_entry("da_read_obs_chem_multiplat")
+
+!======================================
+!   SURFACE
+!======================================
 
    nsurf = num_surf_obs
 
    if (nsurf .gt. 0 .and. use_chem_surfobs) then
+   if (io_config == 'r') then
       call da_message((/"Reading in chem SURFACE observations"/))
-
-!      do iobs=1,nsurf
-!         allocate ( iv%chem_surf(iobs)%chem (num_chem_surf-1) )
-!         allocate ( iv%chem_surf(iobs)%weight (num_chem_surf-1) )
-!
-!         do ichem = 1,num_chem_surf-1
-!            iv%chem_surf(iobs)%chem(ichem)%inv = -5.D0
-!            iv%chem_surf(iobs)%chem(ichem)%error = -5.D0
-!            iv%chem_surf(iobs)%weight(ichem) = -5.D0
-!         end do
-!      end do
 
       tis(:) = 0.D0
       tfs(:) = 0.D0
@@ -83,7 +78,7 @@ subroutine da_read_obs_chem_multiplat(grid, iv)
             iostat =  iostat,     &
             STATUS = 'OLD')
    
-         if (iostat /= 0) then
+         if (iostat .ne. 0) then
             write(unit=message(1),fmt='(A,I5)') "Error message: ",iostat
             call da_warning(__FILE__,__LINE__,message(1:1))
             call da_wrf_error_fatal('Error opening surface chem obs file')
@@ -115,7 +110,7 @@ subroutine da_read_obs_chem_multiplat(grid, iv)
                end do
             end if
 
-            if (iostat /= 0 .OR. dummyi < 0) then
+            if (iostat .ne. 0 .OR. dummyi < 0) then
                write(unit=message(1),fmt='(A,I5)') "Error message: ",iostat
                call da_warning(__FILE__,__LINE__,message(1:1))
                call da_wrf_error_fatal('Error reading surface chem obs')
@@ -243,10 +238,15 @@ subroutine da_read_obs_chem_multiplat(grid, iv)
 
       deallocate( chem_s )
       deallocate( chem_VARs )
-
+   end if
    end if
 
+!======================================
+!   AIRCRAFT
+!======================================
+
    if (num_acft_obs(1) .gt. 0 .and. use_chem_acftobs) then
+   if (io_config == 'r') then
       call da_message((/"Reading in chem AIRCRAFT observations"/))
 
       do itime=1,num_ts
@@ -254,236 +254,377 @@ subroutine da_read_obs_chem_multiplat(grid, iv)
          allocate ( iv%chem_acft(itime)%weight (num_chem_acft-1,num_platform) )
       end do
 
-   do iplt = 1, num_platform
-      nacft = num_acft_obs(iplt)
+      do iplt = 1, num_platform
+         nacft = num_acft_obs(iplt)
 
-      allocate( tia( num_acft_obs(iplt) ) )
-      allocate( tfa( num_acft_obs(iplt) ) )
-      allocate( iia( num_acft_obs(iplt) ) )
-      allocate( jja( num_acft_obs(iplt) ) )
-      allocate( kka( num_acft_obs(iplt) ) )
-      allocate( ppa( num_acft_obs(iplt) ) )
-      allocate( dummy_outa( num_acft_obs(iplt) ) )
+         allocate( tia( num_acft_obs(iplt) ) )
+         allocate( tfa( num_acft_obs(iplt) ) )
+         allocate( iia( num_acft_obs(iplt) ) )
+         allocate( jja( num_acft_obs(iplt) ) )
+         allocate( kka( num_acft_obs(iplt) ) )
+         allocate( ppa( num_acft_obs(iplt) ) )
+         allocate( dummy_outa( num_acft_obs(iplt) ) )
 
-      tia(:) = 0.D0
-      tfa(:) = 0.D0
-      iia(:) = 0.D0
-      jja(:) = 0.D0
-      kka(:) = 0.D0
-      ppa(:) = 0.D0
+         tia(:) = 0.D0
+         tfa(:) = 0.D0
+         iia(:) = 0.D0
+         jja(:) = 0.D0
+         kka(:) = 0.D0
+         ppa(:) = 0.D0
 
-      allocate( chem_a (num_acft_obs(iplt),num_chem_acft-1) )
-      chem_a(:,:) = 0.D0
+         allocate( chem_a (num_acft_obs(iplt),num_chem_acft-1) )
+         chem_a(:,:) = 0.D0
 
-      write(acft_file,'("AIRCRAFT_DATA_",I2.2,".txt")') iplt
+         write(acft_file,'("AIRCRAFT_DATA_",I2.2,".txt")') iplt
 
-      if(rootproc) then
-      ! =========   
-      ! open file
-      ! =========   
-         call da_get_unit(iunit)  
-         open(unit   = iunit,     &
-            FILE   = trim(acft_file), &
-            FORM   = 'FORMATTED',  &
-            ACCESS = 'SEQUENTIAL', &
-            iostat =  iostat,     &
-            STATUS = 'OLD')
-   
-         if (iostat /= 0) then
-            write(unit=message(1),fmt='(A,I5)') "Error message: ",iostat
-            call da_warning(__FILE__,__LINE__,message(1:1))
-            call da_wrf_error_fatal('Error opening aircraft chem obs file')
-         end if   
-
-         write(dummychar,fmt='(I0)') num_chem_acft-1
-         do iobs=1,nacft
-            read (iunit, fmt = '(I5,2(F10.3),3(F17.12),F20.12,' // trim(dummychar) // 'D10.3)', iostat = iostat) &
-              dummyi, &
-              tia(iobs), &
-              tfa(iobs), &
-              iia(iobs), &
-              jja(iobs), &
-              kka(iobs), &
-              ppa(iobs), &
-              chem_a(iobs,:)
-            if (iostat /= 0 .OR. dummyi < 0) then
+         if(rootproc) then
+         ! =========   
+         ! open file
+         ! =========   
+            call da_get_unit(iunit)  
+            open(unit   = iunit,     &
+               FILE   = trim(acft_file), &
+               FORM   = 'FORMATTED',  &
+               ACCESS = 'SEQUENTIAL', &
+               iostat =  iostat,     &
+               STATUS = 'OLD')
+      
+            if (iostat .ne. 0) then
                write(unit=message(1),fmt='(A,I5)') "Error message: ",iostat
                call da_warning(__FILE__,__LINE__,message(1:1))
-               call da_wrf_error_fatal('Error reading aircraft chem obs')
-            end if 
-         end do
-         close(iunit)
-         call da_free_unit(iunit)
-      end if
+               call da_wrf_error_fatal('Error opening aircraft chem obs file')
+            end if   
+
+            write(dummychar,fmt='(I0)') num_chem_acft-1
+            do iobs=1,nacft
+               read (iunit, fmt = '(I5,2(F10.3),3(F17.12),F20.12,' // trim(dummychar) // 'D10.3)', iostat = iostat) &
+                 dummyi, &
+                 tia(iobs), &
+                 tfa(iobs), &
+                 iia(iobs), &
+                 jja(iobs), &
+                 kka(iobs), &
+                 ppa(iobs), &
+                 chem_a(iobs,:)
+               if (iostat .ne. 0 .OR. dummyi < 0) then
+                  write(unit=message(1),fmt='(A,I5)') "Error message: ",iostat
+                  call da_warning(__FILE__,__LINE__,message(1:1))
+                  call da_wrf_error_fatal('Error reading aircraft chem obs')
+               end if 
+            end do
+            close(iunit)
+            call da_free_unit(iunit)
+         end if
 
 #ifdef DM_PARALLEL
-      call mpi_barrier(comm, ierr)
-      call wrf_dm_sum_reals(tia,  dummy_outa)
-      tia = dummy_outa
-!      grid%ti_acft = dummy_outa
-
-      call mpi_barrier(comm, ierr)
-      call wrf_dm_sum_reals(tfa,  dummy_outa)
-      tfa = dummy_outa
-!      grid%tf_acft = dummy_outa
-
-      call mpi_barrier(comm, ierr)
-      call wrf_dm_sum_reals(iia,  dummy_outa)
-      iia = dummy_outa
-!      grid%i_acft = dummy_outa
-
-      call mpi_barrier(comm, ierr)
-      call wrf_dm_sum_reals(jja,  dummy_outa)
-      jja = dummy_outa
-!      grid%j_acft = dummy_outa
-
-      call mpi_barrier(comm, ierr)
-      call wrf_dm_sum_reals(kka,  dummy_outa)
-      kka = dummy_outa
-!      grid%k_acft = dummy_outa
-
-      call mpi_barrier(comm, ierr)
-      call wrf_dm_sum_reals(ppa,  dummy_outa)
-      ppa = dummy_outa
-!      grid%p_acft = dummy_outa
-
-      do ichem = 1, num_chem_acft-1
          call mpi_barrier(comm, ierr)
-         call wrf_dm_sum_reals(chem_a(:,ichem),  dummy_outa)
-         chem_a(:,ichem) = dummy_outa
-      end do
+         call wrf_dm_sum_reals(tia,  dummy_outa)
+         tia = dummy_outa
+
+         call mpi_barrier(comm, ierr)
+         call wrf_dm_sum_reals(tfa,  dummy_outa)
+         tfa = dummy_outa
+
+         call mpi_barrier(comm, ierr)
+         call wrf_dm_sum_reals(iia,  dummy_outa)
+         iia = dummy_outa
+
+         call mpi_barrier(comm, ierr)
+         call wrf_dm_sum_reals(jja,  dummy_outa)
+         jja = dummy_outa
+
+         call mpi_barrier(comm, ierr)
+         call wrf_dm_sum_reals(kka,  dummy_outa)
+         kka = dummy_outa
+
+         call mpi_barrier(comm, ierr)
+         call wrf_dm_sum_reals(ppa,  dummy_outa)
+         ppa = dummy_outa
+
+         do ichem = 1, num_chem_acft-1
+            call mpi_barrier(comm, ierr)
+            call wrf_dm_sum_reals(chem_a(:,ichem),  dummy_outa)
+            chem_a(:,ichem) = dummy_outa
+         end do
 
 #endif
 
 
-      grid%i_acft(:,iplt) = 0.D0
-      grid%j_acft(:,iplt) = 0.D0
-      grid%k_acft(:,iplt) = 0.D0
-      grid%p_acft(:,iplt) = 0.D0
+         grid%i_acft(:,iplt) = 0.D0
+         grid%j_acft(:,iplt) = 0.D0
+         grid%k_acft(:,iplt) = 0.D0
+         grid%p_acft(:,iplt) = 0.D0
 
-      allocate( chem_a_avg (num_ts,num_chem_acft-1) )
-      chem_a_avg(:,:) = 0.D0
+         allocate( chem_a_avg (num_ts,num_chem_acft-1) )
+         chem_a_avg(:,:) = 0.D0
 
-      grid%acft_obs_count(:,iplt) = 0
+         grid%acft_obs_count(:,iplt) = 0
 
-      do iobs = 1,nacft
-         itime = INT( tia(iobs) + 0.5D0 )
-         if (itime >= 1 .AND. itime <=num_ts) THEN
-            grid%i_acft(itime,iplt) = grid%i_acft(itime,iplt) + iia(iobs)
-            grid%j_acft(itime,iplt) = grid%j_acft(itime,iplt) + jja(iobs)
-            grid%k_acft(itime,iplt) = grid%k_acft(itime,iplt) + kka(iobs)
-            grid%p_acft(itime,iplt) = grid%p_acft(itime,iplt) + ppa(iobs)
-            do ichem = 1, num_chem_acft-1
-               chem_a_avg(itime,ichem) = chem_a_avg(itime,ichem) + chem_a(iobs,ichem)
-            end do
-            grid%acft_obs_count(itime,iplt) = grid%acft_obs_count(itime,iplt) + 1
+         do iobs = 1,nacft
+            itime = INT( tia(iobs) + 0.5D0 )
+            if (itime >= 1 .AND. itime <=num_ts) THEN
+               grid%i_acft(itime,iplt) = grid%i_acft(itime,iplt) + iia(iobs)
+               grid%j_acft(itime,iplt) = grid%j_acft(itime,iplt) + jja(iobs)
+               grid%k_acft(itime,iplt) = grid%k_acft(itime,iplt) + kka(iobs)
+               grid%p_acft(itime,iplt) = grid%p_acft(itime,iplt) + ppa(iobs)
+               do ichem = 1, num_chem_acft-1
+                  chem_a_avg(itime,ichem) = chem_a_avg(itime,ichem) + chem_a(iobs,ichem)
+               end do
+               grid%acft_obs_count(itime,iplt) = grid%acft_obs_count(itime,iplt) + 1
+            end if
+         end do
+
+         do itime = 1,num_ts
+            if( grid%acft_obs_count(itime,iplt) > 0 ) then
+               grid%i_acft(itime,iplt) = grid%i_acft(itime,iplt) / REAL(grid%acft_obs_count(itime,iplt),8)
+               grid%j_acft(itime,iplt) = grid%j_acft(itime,iplt) / REAL(grid%acft_obs_count(itime,iplt),8)
+               grid%k_acft(itime,iplt) = grid%k_acft(itime,iplt) / REAL(grid%acft_obs_count(itime,iplt),8)
+               grid%p_acft(itime,iplt) = grid%p_acft(itime,iplt) / REAL(grid%acft_obs_count(itime,iplt),8)
+               do ichem = 1, num_chem_acft-1
+                  chem_a_avg(itime,ichem) = chem_a_avg(itime,ichem) / REAL(grid%acft_obs_count(itime,iplt),8)
+               end do
+            end if
+         end do
+
+         call da_message((/"Reading in chem AIRCRAFT obs. variance"/))
+
+         allocate( chem_VARa (num_ts,num_chem_acft-1) )
+         chem_VARa(:,:) = 0.D0
+
+         write(acft_var_file,'("AIRCRAFT_MODEL_VARIANCE_",I2.2,".txt")') iplt
+
+         if(rootproc) then
+         ! =========   
+         ! open file
+         ! =========   
+            call da_get_unit(iunit)  
+            open(unit   = iunit,     &
+               FILE   = trim(acft_var_file), &
+               FORM   = 'FORMATTED',  &
+               ACCESS = 'SEQUENTIAL', &
+               iostat =  iostat,     &
+               STATUS = 'OLD')
+      
+            if (iostat .ne. 0) then
+               write(unit=message(1),fmt='(A)') "Assuming constant variance, sigma = 0.01."
+               call da_warning(__FILE__,__LINE__,message(1:1))
+               chem_VARa(:,:) = 0.01D0**2
+            else
+               write(dummychar,fmt='(I0)') num_chem_acft-1
+               do itime=1,num_ts
+                  read (iunit, fmt = '(I5,' // trim(dummychar) // 'D10.3)', iostat = iostat) &
+                    dummyi, &
+                    chem_VARa(itime,:)
+                  if (iostat .ne. 0 .OR. dummyi < 0) then
+                     write(unit=message(1),fmt='(A,I5)') "Error message: ",iostat
+                     call da_warning(__FILE__,__LINE__,message(1:1))
+                     call da_wrf_error_fatal('Error reading aircraft chem obs variance')
+                  end if 
+               end do
+               close(iunit)
+            end if   
+            call da_free_unit(iunit)
          end if
-      end do
 
-      do itime = 1,num_ts
-         if( grid%acft_obs_count(itime,iplt) > 0 ) then
-            grid%i_acft(itime,iplt) = grid%i_acft(itime,iplt) / REAL(grid%acft_obs_count(itime,iplt),8)
-            grid%j_acft(itime,iplt) = grid%j_acft(itime,iplt) / REAL(grid%acft_obs_count(itime,iplt),8)
-            grid%k_acft(itime,iplt) = grid%k_acft(itime,iplt) / REAL(grid%acft_obs_count(itime,iplt),8)
-            grid%p_acft(itime,iplt) = grid%p_acft(itime,iplt) / REAL(grid%acft_obs_count(itime,iplt),8)
-            do ichem = 1, num_chem_acft-1
-               chem_a_avg(itime,ichem) = chem_a_avg(itime,ichem) / REAL(grid%acft_obs_count(itime,iplt),8)
+#ifdef DM_PARALLEL
+         do ichem = 1, num_chem_acft-1
+            call mpi_barrier(comm, ierr)
+            call wrf_dm_sum_reals(chem_VARa(:,ichem),  dummy_outaa)
+            chem_VARa(:,ichem) = dummy_outaa
+         end do
+#endif
+
+         ilocal = 0
+         do itime=1,num_ts
+            if ( grid%acft_obs_count(itime,iplt) > 0 ) THEN
+               ilocal = ilocal + 1
+               iv%info(chem_acft)%i(iplt,itime) = INT( grid%i_acft(itime,iplt) + 0.5D0 )
+               iv%info(chem_acft)%j(iplt,itime) = INT( grid%j_acft(itime,iplt) + 0.5D0 )
+               iv%chem_acft(itime)%ti = REAL((itime-1) * time_step, 8) / 3600.0
+               iv%chem_acft(itime)%tf = REAL(itime * time_step, 8) / 3600.0
+               do ichem = 1, num_chem_acft-1
+                  iv%chem_acft(itime)%chem(ichem,iplt)%inv = chem_a_avg(itime,ichem)
+                  iv%chem_acft(itime)%chem(ichem,iplt)%error = sqrt( chem_VARa(itime,ichem) )
+!!               iv%chem_acft(itime)%chem(ichem,iplt)%error = 0.3
+                  iv%chem_acft(itime)%chem(ichem,iplt)%qc = 0
+                  iv%chem_acft(itime)%weight(ichem,iplt) = 1.D0
+               end do
+            else
+               iv%info(chem_acft)%i(iplt,itime) = missing
+               iv%info(chem_acft)%j(iplt,itime) = missing
+               iv%chem_acft(iobs)%ti = missing_r
+               iv%chem_acft(iobs)%tf = missing_r
+               do ichem = 1, num_chem_acft-1
+                  iv%chem_acft(itime)%chem(ichem,iplt)%inv = missing_r
+                  iv%chem_acft(itime)%chem(ichem,iplt)%error = missing_r
+                  iv%chem_acft(itime)%chem(ichem,iplt)%qc = -77
+                  iv%chem_acft(itime)%weight(ichem,iplt) = missing_r
+               end do           
+            end if
+         end do
+         iv%info(chem_acft)%n1 = 1
+         iv%info(chem_acft)%n2 = num_ts
+
+         deallocate ( chem_a )
+         deallocate ( chem_a_avg )
+         deallocate ( chem_VARa )
+
+         deallocate(tia)
+         deallocate(tfa)
+         deallocate(iia)
+         deallocate(jja)
+         deallocate(kka)
+         deallocate(ppa)
+         deallocate(dummy_outa)
+
+      end do ! loop over platforms
+   end if ! end reading
+
+
+   if (io_config == 'w') then
+      call da_message((/"Writing out chem AIRCRAFT observations"/))
+
+      do iplt = 1, num_platform
+         nacft = num_ts
+
+         if(rootproc) then
+            allocate( tia( num_ts ) )
+            allocate( tfa( num_ts ) )
+            allocate( iia( num_ts ) )
+            allocate( jja( num_ts ) )
+            allocate( kka( num_ts ) )
+            allocate( ppa( num_ts ) )
+
+            tia(:) = 0.D0
+            tfa(:) = 0.D0
+            iia(:) = 0.D0
+            jja(:) = 0.D0
+            kka(:) = 0.D0
+            ppa(:) = 0.D0
+
+            allocate( chem_a (num_ts,num_chem_acft-1) )
+            chem_a(:,:) = 0.D0
+
+
+            do itime = 1,nacft
+               tia(itime) = REAL(itime,8)
+               tfa(itime) = REAL(itime,8)
+               iia(itime) = grid%i_acft(itime,iplt)
+               jja(itime) = grid%j_acft(itime,iplt)
+               kka(itime) = grid%k_acft(itime,iplt)
+               ppa(itime) = grid%p_acft(itime,iplt)
+               do ichem = 1, num_chem_acft-1
+                  chem_a(itime,ichem) = iv%chem_acft(itime)%chem(ichem,iplt)%inv
+               end do
             end do
-         end if
-      end do
 
-      call da_message((/"Reading in chem AIRCRAFT obs. variance"/))
 
-      allocate( chem_VARa (num_ts,num_chem_acft-1) )
-      chem_VARa(:,:) = 0.D0
+            write(acft_file,'("AIRCRAFT_DATA_",I2.2,".txt")') iplt
 
-!      if(rootproc) then
-!      ! =========   
-!      ! open file
-!      ! =========   
-!         call da_get_unit(iunit)  
-!         open(unit   = iunit,     &
-!            FILE   = trim(acft_var_file), &
-!            FORM   = 'FORMATTED',  &
-!            ACCESS = 'SEQUENTIAL', &
-!            iostat =  iostat,     &
-!            STATUS = 'OLD')
-!   
-!         if (iostat /= 0) then
-!            write(unit=message(1),fmt='(A,I5)') "Error message: ",iostat
-!            call da_warning(__FILE__,__LINE__,message(1:1))
-!            call da_wrf_error_fatal('Error opening aircraft chem obs variance file')
-!         end if   
-!
-!         write(dummychar,fmt='(I0)') num_chem_acft-1
-!         do itime=1,num_ts
-!            read (iunit, fmt = '(I5,' // trim(dummychar) // 'D10.3)', iostat = iostat) &
-!              dummyi, &
-!              chem_VARa(itime,:)
-!            if (iostat /= 0 .OR. dummyi < 0) then
-!               write(unit=message(1),fmt='(A,I5)') "Error message: ",iostat
-!               call da_warning(__FILE__,__LINE__,message(1:1))
-!               call da_wrf_error_fatal('Error reading aircraft chem obs variance')
-!            end if 
-!         end do
-!         close(iunit)
-!         call da_free_unit(iunit)
-!      end if
-!
-!#ifdef DM_PARALLEL
-!
-!      do ichem = 1, num_chem_acft-1
-!         call mpi_barrier(comm, ierr)
-!         call wrf_dm_sum_reals(chem_VARa(:,ichem),  dummy_outaa)
-!         chem_VARa(:,ichem) = dummy_outaa
-!      end do
-!#endif
+         ! =========   
+         ! open file
+         ! =========   
+            call da_get_unit(iunit)  
+            open(unit   = iunit,     &
+               FILE   = trim(acft_file), &
+               FORM   = 'FORMATTED',  &
+               ACCESS = 'SEQUENTIAL', &
+               iostat =  iostat,     &
+               STATUS = 'REPLACE')
+      
+            if (iostat .ne. 0) then
+               write(unit=message(1),fmt='(A,I5)') "Error message: ",iostat
+               call da_warning(__FILE__,__LINE__,message(1:1))
+               call da_wrf_error_fatal('Error opening aircraft chem obs file')
+            end if   
 
-      ilocal = 0
-      do itime=1,num_ts
-         if ( grid%acft_obs_count(itime,iplt) > 0 ) THEN
-            ilocal = ilocal + 1
-            iv%info(chem_acft)%i(iplt,itime) = INT( grid%i_acft(itime,iplt) + 0.5D0 )
-            iv%info(chem_acft)%j(iplt,itime) = INT( grid%j_acft(itime,iplt) + 0.5D0 )
-            iv%chem_acft(itime)%ti = REAL((itime-1) * time_step, 8) / 3600.0
-            iv%chem_acft(itime)%tf = REAL(itime * time_step, 8) / 3600.0
-            do ichem = 1, num_chem_acft-1
-               iv%chem_acft(itime)%chem(ichem,iplt)%inv = chem_a_avg(itime,ichem)
-!!               iv%chem_acft(itime)%chem(ichem,iplt)%error = sqrt( chem_VARa(itime,ichem) )
-               iv%chem_acft(itime)%chem(ichem,iplt)%error = 0.3
-
-               iv%chem_acft(itime)%chem(ichem,iplt)%qc = 0
-               iv%chem_acft(itime)%weight(ichem,iplt) = 1.D0
+            write(dummychar,fmt='(I0)') num_chem_acft-1
+            do itime=1,nacft
+               if ( grid%acft_obs_count(itime,iplt) .gt. 0 ) then
+                  write (iunit, fmt = '(I5,2(F10.3),3(F17.12),F20.12,' // trim(dummychar) // 'D10.3)', iostat = iostat) &
+                    itime, &
+                    tia(itime), &
+                    tfa(itime), &
+                    iia(itime), &
+                    jja(itime), &
+                    kka(itime), &
+                    ppa(itime), &
+                    chem_a(itime,:)
+               end if
+               if (iostat .ne. 0) then
+                  write(unit=message(1),fmt='(A,I5)') "Error message: ",iostat
+                  call da_warning(__FILE__,__LINE__,message(1:1))
+                  call da_wrf_error_fatal('Error writing aircraft chem obs')
+               end if 
             end do
-         else
-            iv%info(chem_acft)%i(iplt,itime) = missing
-            iv%info(chem_acft)%j(iplt,itime) = missing
-            iv%chem_acft(iobs)%ti = missing_r
-            iv%chem_acft(iobs)%tf = missing_r
-            do ichem = 1, num_chem_acft-1
-               iv%chem_acft(itime)%chem(ichem,iplt)%inv = missing_r
-               iv%chem_acft(itime)%chem(ichem,iplt)%error = missing_r
-               iv%chem_acft(itime)%chem(ichem,iplt)%qc = -77
-               iv%chem_acft(itime)%weight(ichem,iplt) = missing_r
-            end do           
+            close(iunit)
+            call da_free_unit(iunit)
+            deallocate(tia)
+            deallocate(tfa)
+            deallocate(iia)
+            deallocate(jja)
+            deallocate(kka)
+            deallocate(ppa)
+
+            deallocate ( chem_a )
          end if
-      end do
-      iv%info(chem_acft)%n1 = 1
-      iv%info(chem_acft)%n2 = num_ts
+#ifdef DM_PARALLEL
+         call mpi_barrier(comm, ierr)
+#endif
 
-      deallocate ( chem_a )
-      deallocate ( chem_a_avg )
-      deallocate ( chem_VARa )
+         call da_message((/"Writing out chem AIRCRAFT obs. variance"/))
 
-      deallocate(tia)
-      deallocate(tfa)
-      deallocate(iia)
-      deallocate(jja)
-      deallocate(kka)
-      deallocate(ppa)
-      deallocate(dummy_outa)
+         if(rootproc) then
+            allocate( chem_VARa (num_ts,num_chem_acft-1) )
+            chem_VARa(:,:) = 0.D0
 
-   end do
+            write(acft_var_file,'("AIRCRAFT_MODEL_VARIANCE_",I2.2,".txt")') iplt
+            do itime = 1,nacft
+               do ichem = 1, num_chem_acft-1
+                  chem_VARa(itime,ichem) = iv%chem_acft(itime)%chem(ichem,iplt)%error ** 2
+               end do
+            end do
+
+         ! =========   
+         ! open file
+         ! =========   
+            call da_get_unit(iunit)  
+            open(unit   = iunit,     &
+               FILE   = trim(acft_var_file), &
+               FORM   = 'FORMATTED',  &
+               ACCESS = 'SEQUENTIAL', &
+               iostat =  iostat,     &
+               STATUS = 'REPLACE')
+
+            if (iostat .ne. 0) then
+               write(unit=message(1),fmt='(A,I5)') "Error message: ",iostat
+               call da_warning(__FILE__,__LINE__,message(1:1))
+               call da_wrf_error_fatal('Error opening aircraft chem obs variance file')
+            end if   
+  
+            write(dummychar,fmt='(I0)') num_chem_acft-1
+            do itime=1,num_ts
+               write (iunit, fmt = '(I5,' // trim(dummychar) // 'D10.3)', iostat = iostat) &
+                 itime, &
+                 chem_VARa(itime,:)
+               if (iostat .ne. 0) then
+                  write(unit=message(1),fmt='(A,I5)') "Error message: ",iostat
+                  call da_warning(__FILE__,__LINE__,message(1:1))
+                  call da_wrf_error_fatal('Error writing aircraft chem obs variance')
+               end if 
+            end do
+            close(iunit)
+            call da_free_unit(iunit)
+
+            deallocate ( chem_VARa )
+         end if
+#ifdef DM_PARALLEL
+         call mpi_barrier(comm, ierr)
+#endif
+
+      end do ! loop over platforms
+   end if !end writing
+
    end if
 
    if (trace_use) call da_trace_exit("da_read_obs_chem_multiplat")

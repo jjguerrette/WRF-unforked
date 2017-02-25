@@ -41,8 +41,11 @@ subroutine da_read_obs_chem(grid, iv)
 
    if (trace_use) call da_trace_entry("da_read_obs_chem")
 
+!======================================
+!   SURFACE
+!======================================
+
    nsurf = num_surf_obs
-   nacft = num_acft_obs(1)
 
    if (nsurf .gt. 0 .and. use_chem_surfobs) then
       call da_message((/"Reading in chem SURFACE observations"/))
@@ -247,6 +250,11 @@ subroutine da_read_obs_chem(grid, iv)
       deallocate( chem_VARs )
 
    end if
+
+!======================================
+!   AIRCRAFT
+!======================================
+   nacft = num_acft_obs(1)
 
    if (nacft .gt. 0 .and. use_chem_acftobs) then
       call da_message((/"Reading in chem AIRCRAFT observations"/))

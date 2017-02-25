@@ -401,6 +401,7 @@ rconfig   logical   quick_svd               namelist,wrfvar6  1  .false.  - "qui
 rconfig   logical   adapt_svd               namelist,wrfvar6  1  .false.  - "adapt_svd"                ""  ""
 rconfig   integer   svd_stage               namelist,wrfvar6  1  0        - "svd_stage"                ""  ""
 rconfig   integer   ensdim_svd              namelist,wrfvar6  1  0        - "ensdim_svd"               ""  ""
+rconfig   integer   nens_compare            namelist,wrfvar6  1  0        - "nens_compare"             ""  ""
 rconfig   integer   ensmember               namelist,wrfvar6  1  0        - "ensmember"                ""  ""
 rconfig   integer   svd_p                   namelist,wrfvar6  1  0        - "svd_p"                    ""  ""
 rconfig   integer   svd_outer               namelist,wrfvar6  1  0        - "svd_outer"                ""  ""

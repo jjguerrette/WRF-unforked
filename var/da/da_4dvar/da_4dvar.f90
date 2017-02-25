@@ -5,7 +5,7 @@ use da_reporting, only : da_error
 use da_control, only : comm, var4d_bin, var4d_lbc, trace_use_dull, num_fgat_time, multi_inc, &
                        run_hours, run_days, adtl_run_hours, &
 #if (WRF_CHEM == 1)
-                       osse_chem, calc_hx_only, &
+                       init_osse_chem, calc_hx_only, &
 #endif
                        checkpoint_interval, write_checkpoints, cycle_interval
 

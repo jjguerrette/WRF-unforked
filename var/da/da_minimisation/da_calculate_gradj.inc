@@ -135,14 +135,14 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
       
    call da_deallocate_y(jo_grad_y)
 
-#if defined(LAPACK)
-   if ( .not. use_randomsvd ) then
-#endif
-
    !-------------------------------------------------------------------------
    ! [2.0] calculate grad_v (jb):
    !-------------------------------------------------------------------------
    if (cv_size_jb > 0) grad_jb(1:cv_size_jb) = jb_factor * cv(1:cv_size_jb)
+
+#if defined(LAPACK)
+   if ( .not. use_randomsvd ) then
+#endif
 
    !-------------------------------------------------------------------------
    ! [3.0] calculate grad_v (je):

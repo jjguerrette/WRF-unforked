@@ -46,6 +46,7 @@ module da_transfer_model
 #if (WRF_CHEM == 1)
       chem_surf, chem_acft, num_platform, num_ant_steps, num_bb_steps, &
       init_scale, num_ts, crossval_chem_surfobs, crossval_chem_acftobs, &
+      osse_chem, &
 #if defined(LAPACK)
       use_randomsvd, svd_outer, &
 #endif

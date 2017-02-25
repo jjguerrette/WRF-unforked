@@ -49,7 +49,7 @@ subroutine da_setup_obs_structures_chem(grid, ob, iv)
    ! [2.0] Read data
    !--------------------------------------------------------------------------
    if (num_platform .gt. 1 .and. sum(num_acft_obs) .gt. num_acft_obs(1)) then
-      call da_read_obs_chem_multiplat(grid, iv)
+      call da_read_obs_chem_multiplat(grid, iv, 'r')
    else
       call da_read_obs_chem(grid, iv)
    end if

@@ -110,8 +110,6 @@ subroutine da_setup_osse_chem( grid, ob, iv, be, xbx)
    ! [6] Calculate uncertainty and perturbed observation   
    icount = 0
    do itime = 1, num_ts
-!!      allocate ( iv_pert%chem_acft(itime)%chem (num_chem_acft-1,num_platform) )
-!!      allocate ( iv_pert%chem_acft(itime)%weight (num_chem_acft-1,num_platform) )
       do iplt = 1,num_platform
          do ichem = 1, num_chem_acft-1
             if ( grid%acft_obs_count(itime,iplt) .gt. 0 ) then
@@ -121,11 +119,11 @@ subroutine da_setup_osse_chem( grid, ob, iv, be, xbx)
                iv%chem_acft(itime)%chem(ichem,iplt)%inv = max(chemval + sigmaval * o_error(icount), osse_chem_abs)
                iv%chem_acft(itime)%chem(ichem,iplt)%error = sigmaval
                iv%chem_acft(itime)%chem(ichem,iplt)%qc = 0
-!!            else
-!!               iv%chem_acft(itime)%chem(ichem,iplt)%inv = missing_r
-!!               iv%chem_acft(itime)%chem(ichem,iplt)%error = missing_r
-!!               iv%chem_acft(itime)%chem(ichem,iplt)%qc = -77
-!!               iv%chem_acft(itime)%weight(ichem,iplt) = missing_r
+            else
+               iv%chem_acft(itime)%chem(ichem,iplt)%inv = missing_r
+               iv%chem_acft(itime)%chem(ichem,iplt)%error = 0
+               iv%chem_acft(itime)%chem(ichem,iplt)%qc = -77
+               iv%chem_acft(itime)%weight(ichem,iplt) = missing_r
             end if
          end do
       end do
@@ -133,18 +131,20 @@ subroutine da_setup_osse_chem( grid, ob, iv, be, xbx)
 
    deallocate( o_error )
 
-   ! [7] Transfer perturbed iv to ob structure
-   call da_deallocate_y(ob)
-   call da_allocate_y(iv, ob)
+!   ! [7] Transfer perturbed iv to ob structure
+!   call da_deallocate_y(ob)
+!   call da_allocate_y(iv, ob)
+!   call da_allocate_y_chem(iv, ob)
+!
+!   call da_fill_obs_structures_chem(iv, ob)
 
-   call da_fill_obs_structures_chem(iv, ob)
+   ! Write perturbed observations and assoc. variances
+   call da_read_obs_chem_multiplat(grid, iv, 'w')
 
 
 !================================================================================
 !================================================================================
 !NEXT FOR EMISSIONS
-!NEED  da_cv_io
-
    write(cproc,fmt='(i4.4)') myproc
    if (read_omega) then
       ! Read in omega vector portion for each processor

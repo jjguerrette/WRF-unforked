@@ -622,19 +622,17 @@
    ! [7.1] Setup CHEM OSSE w/ existing observation locations:
    !---------------------------------------------------------------------------
 
-   if (osse_chem) then
-      if ( checkpoint_interval .gt. 0 ) then
-         write_checkpoints = 1
-         if(adtl_run_hours .gt. run_hours) then
-            CALL wrf_error_fatal('adtl_run_hours must be <= run_hours')
-         end if
-         if(mod(60*adtl_run_hours,checkpoint_interval) .ne. 0) then
-            CALL wrf_error_fatal('mod(60*adtl_run_hours,checkpoint_interval) must be zero.')
-         end if
-      end if
+   if (init_osse_chem) then
+      !Generate perturbed first guess and perturbed "true" observations
+#if defined(LAPACK)
+      if (.not.use_randomsvd .or. (svd_stage.eq.0 .and. svd_outer.eq.1) ) then
+#endif
+      !Turn off all trajectory writing
+      write_checkpoints = 3
 
       call da_nl_model(0)
 
+      !Restore default trajectory setting
       write_checkpoints = 0
 
       call da_retrieve_chem_hx( model_grid, iv )
@@ -642,10 +640,11 @@
       ! Re-read model inputs from fgc file, then overwrite scaling factors.
       call da_init_model_input
 
-      ! Overwrite ob and head_grid scaling factors with perturbed values
+      ! Write out pseudo obs and perturb head_grid scaling factors
       call da_setup_osse_chem (grid, ob, iv, be, xbx)
 
-      call da_transfer_wrftoxb_chem(grid)
+!     !Update xbch
+!      call da_transfer_wrftoxb_chem(grid) !Not necessary if not performing inversion in this execution
 
       do i = PARAM_FIRST_SCALAR, num_scaleant
          call kj_swap (grid%scaleant(:,:,:,i), model_grid%scaleant(:,:,:,i), &
@@ -656,9 +655,29 @@
                        grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, 1, num_bb_steps)
       enddo
 
-      call da_init_model_output(filename = "fgc_pert")
+      ! Write perturbed state vector from model_grid
+      call da_init_model_output(filename = "fg_pert")
 
-   end if
+      !Clean up and close WRFDA
+      call da_deallocate_observations (iv)
+      call da_deallocate_y (ob)
+      if (use_background_errors) call da_deallocate_background_errors (be)
+
+      call da_wrfvar_finalize
+#ifdef VAR4D
+      if (var4d) call da_finalize_model
+#endif
+      call wrf_message("*** WRF-Var initialized OSSE successfully ***")
+      if (trace_use) call da_trace_exit("da_wrfvar_main")
+      if (trace_use) call da_trace_report
+
+      call wrfu_finalize
+      call wrf_shutdown
+      stop
+#if defined(LAPACK)
+      end if
+#endif
+   end if !end osse_chem
 #endif
 #endif
    !---------------------------------------------------------------------------
@@ -764,12 +783,15 @@
 #endif
 
 #if (WRF_CHEM == 1)
-            ! Transferring chem from grid to model_grid gives same result as da_init_model_input, unless
-            ! chem is added as a control variable.
+            ! Transferring chem from grid to model_grid 
+            ! --> Gives same result as da_init_model_input, unless chem is included
+            !      as a control variable, in which case the code below is correct.
             do i = PARAM_FIRST_SCALAR, num_chem
                call kj_swap (grid%chem(:,:,:,i), model_grid%chem(:,:,:,i), &
                              grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, grid%xp%kms, grid%xp%kme)
             enddo
+
+            ! Transfer updated scaling factors to model_grid
             do i = PARAM_FIRST_SCALAR, num_scaleant
                call kj_swap (grid%scaleant(:,:,:,i), model_grid%scaleant(:,:,:,i), &
                              grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, 1, num_ant_steps)
@@ -860,6 +882,7 @@
 
          call nl_set_var4d_run (head_grid%id, .true.)
 
+         !Restore default trajectory setting
          write_checkpoints = 0
 
          if ( checkpoint_interval .gt. 0 &
@@ -971,6 +994,8 @@
 
          end if
 #endif
+
+         !Restore default trajectory setting
          write_checkpoints = 0
 
 

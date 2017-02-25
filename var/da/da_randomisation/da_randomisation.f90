@@ -7,18 +7,26 @@ module da_randomisation
    use module_configure, only : grid_config_rec_type
    use module_dm, only : wrf_dm_sum_real, wrf_dm_sum_integer
    use module_domain, only : domain !&
-   use module_state_description, only : PARAM_FIRST_SCALAR      
+   use module_state_description, only : &
+#if (WRF_CHEM == 1)
+      num_scaleant, num_scalebb, &
+#endif
+      PARAM_FIRST_SCALAR
+
    use da_control, only : svd_stage, ensmember, ensdim_svd, svd_outer, &
        myproc, filename_len, test_dm_exact, rootproc, cv_size_domain, &
        stdout, trace_use, svd_amat_type, svd_symm_type, adapt_svd, &
        num_ob_indexes, read_omega, svd_p, ierr, comm, &
-       use_randomsvd, &
+       use_randomsvd, nens_compare, &
 #if (WRF_CHEM == 1)
        chem_surf, chem_acft, &
+       num_ant_steps, num_bb_steps, &
 #endif
        sound, mtgirs, sonde_sfc, synop, profiler, gpsref, gpspw, polaramv, geoamv, ships, metar, &
        satem, radar, ssmi_rv, ssmi_tb, ssmt1, ssmt2, airsr, pilot, airep,tamdar, tamdar_sfc, rain, &
-       bogus, buoy, qscat, pseudo, radiance
+       bogus, buoy, qscat, pseudo, radiance, &
+       its, ite, jts, jte
+
    use da_minimisation, only: da_transform_vtoy, da_transform_vtoy_adj, &
        da_calculate_grady, da_calculate_j, da_calculate_gradj, &
        da_amat_mul
@@ -31,13 +39,14 @@ module da_randomisation
       da_allocate_y_chem, &
 #endif
       da_allocate_y, da_deallocate_y
-   use da_par_util, only : da_cv_to_global, da_global_to_cv
+   use da_par_util, only : da_cv_to_global, da_global_to_cv, da_cv_to_vv, da_vv_to_cv
    use da_reporting, only : da_message, da_warning, da_error, message
    use da_tools_serial, only : da_get_unit,da_free_unit
    use da_tools, only: da_set_randomcv
    use da_tracing, only : da_trace_entry, da_trace_exit,da_trace
 !#ifdef VAR4D
 !#endif
+   use da_lapack, only : dsteqr
 #if defined(LAPACK)
 !   use mkl95_precision, only: WP => DP
 !   use mkl95_lapack, only: gesv, syev, gesvd
@@ -107,9 +116,18 @@ contains
 #include "da_randomise_svd.inc"
 #include "da_randomise_svd_51.inc"
 #include "da_force_grad_hess.inc"
+#include "da_gram_schmidt.inc"
+#include "da_rsvd56.inc"
+
 #include "da_calculate_hessian.inc"
+#include "da_compare_decomp_methods.inc"
+#include "da_evaluate_decomp.inc"
+#include "da_evaluate_decomp_init.inc"
+#include "da_write_norms.inc"
+
 #include "da_randomise_svd_B.inc"
 #include "da_randomise_svd_B11.inc"
+
 
 
 end module da_randomisation

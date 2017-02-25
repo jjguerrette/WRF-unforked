@@ -20,7 +20,7 @@ subroutine da_nl_model (it)
 #if (WRF_CHEM != 1)
    if ( it == 1 ) then
 #else
-   if ( (it == 1 .and. .not.osse_chem ) .or. it == 0 ) then
+   if ( it == 1 .or. init_osse_chem ) then
 #endif
 #ifdef _OPENMP
       call setfeenv()
@@ -87,6 +87,11 @@ subroutine da_nl_model (it)
       end_hour0 = model_config_rec%end_hour(head_grid%id)
 
       call da_set_run_hours ()
+
+   else if ( write_checkpoints .eq. 3 ) then
+      !Turn off xtraj writing
+      call nl_set_auxhist6_interval_s ( head_grid%id, 0 )
+
    else
       ! Turn off gocart_bg field reading
       call nl_get_io_form_auxinput8(head_grid%id, ioform8)
@@ -124,7 +129,7 @@ subroutine da_nl_model (it)
       call da_copy_chem_to_model( head_grid, it )
 
       !Need a first guess file that includes scaleant and scalebb
-      if ( ((it == 1 .and. .not.osse_chem ) .or. it == 0) .and. .not.(write_checkpoints .eq. 2)) then
+      if ( (it == 1 .and. .not.(write_checkpoints .eq. 2)) .or. init_osse_chem ) then
          call da_init_model_output()
       end if
    end if

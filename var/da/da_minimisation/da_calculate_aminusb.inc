@@ -1,6 +1,6 @@
 subroutine da_calculate_aminusb(grid, config_flags,   &
                                 it, cv_size, xbx, be, &
-                                qhat, eignvec, eignval, neign,nmodes)
+                                qhat, eignvec, eignval, neign,nmodes, lcin)
 
    !--------------------------------------------------------------------------------
    ! Purpose:  Calculate and write out difference between prior and posterior
@@ -36,19 +36,34 @@ subroutine da_calculate_aminusb(grid, config_flags,   &
 !   type (j_type), intent(out)        :: j_cost                       ! cost function
    real*8, intent(in)                :: eignvec(nmodes, nmodes)
    real*8, intent(in)                :: eignval(nmodes)
+   character(len=3), intent(in), optional :: lcin
 
 
-   real*8                            :: nu(1:be%cv%size_jb)          ! Premultiplied eigenvectors, Q_l * e_lj
+   real*8                            :: nu(1:be%cv%size_jb)  ! Premultiplied eigenvectors, Q_l * e_lj
+#if (WRF_CHEM == 1)
+   real*8, allocatable               :: Pa_ant(:,:,:,:), Pa_bb(:,:,:,:)  ! Posterior Variance
+#endif
+
    real*8                            :: lam                          ! (A-B) eigenvalues
    integer :: jj,ii,i,j,k,ic, ij
 
-#if (WRF_CHEM == 1)
    character(len=2) :: itc
-#endif
+   character(len=3) :: kc
+   character(len=3) :: lc
 
    if (trace_use) call da_trace_entry("da_calculate_aminusb")
 
    write(*,*) 'Computing Analysis Variance Reduction: v = A-B = (B^-1+H^T.R^-1.H)^-1' !!! ~ SUM(lam^-1 - 1)(U*nu)(U*nu)^T'
+
+   WRITE(unit=itc,fmt='(I2.2)') it
+   if (present(lcin)) then
+      lc = lcin
+   else
+      WRITE(unit=lc,fmt='(I3.3)') neign
+   end if
+
+   allocate(Pa_ant(its:ite,jts:jte,1:num_ant_steps,1:num_scaleant))
+   allocate(Pa_bb(its:ite,jts:jte,1:num_bb_steps,1:num_scalebb))
 
    ! Initialize Variance Reduction to zero.
    !$OMP PARALLEL DO &
@@ -56,6 +71,7 @@ subroutine da_calculate_aminusb(grid, config_flags,   &
    do ij = 1 , grid%num_tiles
       do ic = PARAM_FIRST_SCALAR, num_scaleant
          grid%g_scaleant(its:ite,jts:jte,:,ic) = 0.D0
+         Pa_ant(its:ite,jts:jte,:,ic) = 0.D0
       end do
    end do
    !$OMP END PARALLEL DO
@@ -65,9 +81,11 @@ subroutine da_calculate_aminusb(grid, config_flags,   &
    do ij = 1 , grid%num_tiles
       do ic = PARAM_FIRST_SCALAR, num_scalebb
          grid%g_scalebb(its:ite,jts:jte,:,ic) = 0.D0
+         Pa_bb(its:ite,jts:jte,:,ic) = 0.D0
       end do
    end do
    !$OMP END PARALLEL DO
+
 
    ! Calculate Variance Reduction
    do jj = 1, neign
@@ -98,13 +116,13 @@ subroutine da_calculate_aminusb(grid, config_flags,   &
 !      end if
 !#endif
 
-      ! Store result in corresponding I/O capable variables
 #if (WRF_CHEM == 1)
+      ! Store Uv in corresponding I/O capable variables
       do ic = PARAM_FIRST_SCALAR, num_scaleant
          do k = 1, num_ant_steps
             do j=jts,jte
                do i=its,ite
-                     grid%g_scaleant(i,j,k,ic) = grid%g_scaleant(i,j,k,ic) + lam * grid%xach%alpha_ant(i,j,k,ic) ** 2
+                     grid%g_scaleant(i,j,k,ic) = grid%xach%alpha_ant(i,j,k,ic)
                end do
             end do
          end do
@@ -114,7 +132,36 @@ subroutine da_calculate_aminusb(grid, config_flags,   &
          do k = 1, num_bb_steps
             do j=jts,jte
                do i=its,ite
-                     grid%g_scalebb(i,j,k,ic) = grid%g_scalebb(i,j,k,ic) + lam * grid%xach%alpha_bb(i,j,k,ic) ** 2
+                     grid%g_scalebb(i,j,k,ic) = grid%xach%alpha_bb(i,j,k,ic)
+               end do
+            end do
+         end do
+      end do
+
+      WRITE(unit=kc,fmt='(I3.3)') jj
+
+      config_flags%auxhist18_outname = "Uv_k"//kc//"_l"//lc//"_it"//itc
+      config_flags%io_form_auxhist18 = 2
+      CALL nl_set_io_form_auxhist18 ( grid%id, 2 )
+      config_flags%frames_per_auxhist18 = 1
+      CALL  med_hist_out ( grid , AUXHIST18_ALARM , config_flags )
+
+      ! Store variances in Pa arrays
+      do ic = PARAM_FIRST_SCALAR, num_scaleant
+         do k = 1, num_ant_steps
+            do j=jts,jte
+               do i=its,ite
+                  Pa_ant(i,j,k,ic) = Pa_ant(i,j,k,ic) + lam * grid%xach%alpha_ant(i,j,k,ic) ** 2
+               end do
+            end do
+         end do
+      end do
+
+      do ic = PARAM_FIRST_SCALAR, num_scalebb
+         do k = 1, num_bb_steps
+            do j=jts,jte
+               do i=its,ite
+                  Pa_bb(i,j,k,ic) = Pa_bb(i,j,k,ic) + lam * grid%xach%alpha_bb(i,j,k,ic) ** 2
                end do
             end do
          end do
@@ -122,18 +169,41 @@ subroutine da_calculate_aminusb(grid, config_flags,   &
 #endif
    end do
 
-
 #if (WRF_CHEM == 1)
+   ! Store result in corresponding I/O capable variables
+   do ic = PARAM_FIRST_SCALAR, num_scaleant
+      do k = 1, num_ant_steps
+         do j=jts,jte
+            do i=its,ite
+                  grid%g_scaleant(i,j,k,ic) = Pa_ant(i,j,k,ic)
+            end do
+         end do
+      end do
+   end do
 
-   WRITE(unit=itc,fmt='(I2.2)') it
+   do ic = PARAM_FIRST_SCALAR, num_scalebb
+      do k = 1, num_bb_steps
+         do j=jts,jte
+            do i=its,ite
+                  grid%g_scalebb(i,j,k,ic) = Pa_bb(i,j,k,ic)
+            end do
+         end do
+      end do
+   end do
+
+   deallocate(Pa_ant)
+   deallocate(Pa_bb)
+
    config_flags%auxhist18_outname = "AminusB_diag_it"//itc
    config_flags%io_form_auxhist18 = 2
    CALL nl_set_io_form_auxhist18 ( grid%id, 2 )
    config_flags%frames_per_auxhist18 = 1
    CALL  med_hist_out ( grid , AUXHIST18_ALARM , config_flags )
+#endif
+
    CALL nl_set_io_form_auxhist18 ( grid%id, 0 )
    config_flags%auxhist18_outname = "auxhist18_d<domain>_<date>"
-#endif
+
 
    if (trace_use) call da_trace_exit ("da_calculate_aminusb")
 

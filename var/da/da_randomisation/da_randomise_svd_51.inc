@@ -50,8 +50,6 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
    real(wp), allocatable   :: nuhat_T(:,:) ! Eigenvectors of A
    real(wp), allocatable   :: nuhat_T_g(:,:) ! Eigenvectors of A
 
-   real(wp)                :: dot_cv
-
    real(wp), allocatable   :: yhat_obs(:)  ! yhat = A * omega
    real(wp), allocatable   :: YHAT(:,:)    ! yhat = A * omega
 
@@ -86,8 +84,8 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
    real                         :: ghat(1:cv_size)        ! cv copy.
    integer                      :: info
 
-   real                         :: gdot, beta
-   real                         :: j0_total
+   real*8                       :: gdot, beta
+   real*8                       :: j0_total
    character*10                 :: cproc, cens
    character(len=filename_len)  :: filename
    character(len=3) :: cnens=""
@@ -138,6 +136,13 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
 
          j0_total = j_cost%total
          if (j0_total == 0.0) return
+
+         beta = SQRT(da_dot_cv(cv_size, ghat, ghat, grid, mz, jp_start, jp_end))
+
+         write(unit=stdout,fmt='("Starting outer iteration : ",i3)') svd_outer
+         write(unit=stdout,fmt=11) j0_total, beta
+11       format('Starting cost function: ' ,1PD15.8,', Gradient: ',1PD15.8)
+
          ghat = - ghat
 
          ! Write ghat to file
@@ -416,49 +421,32 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
 
       ! Store output vectors
       eignvec(:,:) = 0.D0
-!      qhat(:,:) = 0.D0
       do i = 1, neign
          eignvec(i,i) = 1.D0
          eignval(i) = LAM(i) + 1.D0
-
-!         qhat(1:cv_size,i) = TRANSPOSE(nuhat_T(i,1:cv_size))
-
-!         do j = 1, cv_size
-!            qhat(j,i) = nuhat_T(i,j)
-!         end do
-
       end do
       qhat(1:cv_size,1:nens) = TRANSPOSE(nuhat_T)
 
-
       ! (2) Construct low rank estimate of A^-1 * ghat with leading neign modes of A
-      if (minval(LAM) .lt. 1.D0 .and. adapt_svd) then
+      if (minval(eignval(1:neign)) .lt. 2.D0 .and. adapt_svd) then
          do i = 1, neign
-            LAM(i) = LAM(i) / ( LAM(i) + 1.D0 )
+            LAM(i) = - (eignval(i) - 1.D0) / eignval(i)
          end do
          xhat = ghat
-         do i = 1, neign
-            dot_cv = da_dot_cv(cv_size, nuhat_T(i,:), ghat, grid, mz, jp_start, jp_end)
-            write(unit=stdout,fmt='("i, dot_cv = ",I3,D25.16)') i,dot_cv
 
-            xhat = xhat - LAM(i) * nuhat_T(i,:) * dot_cv
-         end do
-
-         write(unit=stdout,fmt='(A)') 'Carrying out RIOT-51 amat_mul, adaptive'
+         write(unit=stdout,fmt='(A)') 'Carrying out RIOT-51 LRU'
       else
          do i = 1, neign
-            LAM(i) = 1.D0 / ( LAM(i) + 1.D0 )
+            LAM(i) = 1.D0 / eignval(i)
          end do
 
-         do i = 1, neign
-            dot_cv = da_dot_cv(cv_size, nuhat_T(i,1:cv_size), ghat(1:cv_size), grid, mz, jp_start, jp_end)
-            write(unit=stdout,fmt='("i, dot_cv = ",I3,D25.16)') i,dot_cv
-
-            xhat(1:cv_size) = xhat(1:cv_size) + LAM(i) * nuhat_T(i,1:cv_size) * dot_cv
-         end do
-
-         write(unit=stdout,fmt='(A)') 'Carrying out RIOT-51 amat_mul'
+         write(unit=stdout,fmt='(A)') 'Carrying out RIOT-51 LRA'
       end if
+
+      call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
+                             nens,nens,neign, &
+                             LAM,eignvec,qhat, &
+                             ghat,xhat)
 
       deallocate(KMAT)
       deallocate(nuhat_T)

@@ -18,7 +18,7 @@ module da_chem_tools
          checkpoint_interval, write_checkpoints, num_qcstat_conv, &
          test_dm_exact, jb_factor, rootproc, ierr, comm, cv_size_domain, &
          num_ant_steps, num_bb_steps, use_nonchemobs, &
-         osse_chem, osse_chem_rel, osse_chem_abs, &
+         osse_chem_rel, osse_chem_abs, &
          myproc, filename_len, read_omega, &
          num_ant_steps, num_bb_steps, &
          missing_r, &
@@ -35,7 +35,8 @@ module da_chem_tools
          iv_type, y_type, j_type, be_type, xbx_type, &
          da_allocate_y, da_allocate_y_chem, da_deallocate_y, &
          da_gauss_noise, da_random_seed
-   use da_obs, only: da_fill_obs_structures_chem
+!   use da_obs, only: da_fill_obs_structures_chem
+   use da_obs_io, only: da_read_obs_chem_multiplat
 #endif
    use da_tools_serial, only : da_get_unit,da_free_unit
    use da_tools, only : da_set_randomcv

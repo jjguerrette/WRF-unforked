@@ -1,12 +1,11 @@
-subroutine da_calculate_hessian(grid, config_flags,            &
-                           cv_size, xbx, be, iv, cv, &
-                           re, y, xhat, j_cost, &
-                           qhat, eignval, eignvec, neign)
+subroutine da_calculate_hessian(grid, config_flags, &
+                                cv_size, xbx, be, iv, cv, &
+                                re, y, xhat, j_cost, &
+                                qhat, eignval, eignvec, neign)
 
    !-------------------------------------------------------------------------
-   ! Purpose:         Randomized SVD check by direct Hessian calculation, 
-   !                    separated into 2 stages 
-   !
+   ! Purpose: Direct Hessian calculation, separated into 2 stages 
+   !          + Comparisons of alternative Hessian decomps and increments
    ! Here 
    !    cv   is updated in outer-loop.
    !    xhat is the control variable in inner-loop.
@@ -51,8 +50,6 @@ subroutine da_calculate_hessian(grid, config_flags,            &
    real(wp), allocatable   :: nuhat(:,:) ! Eigenvectors of A
    real(wp), allocatable   :: nuhat_g(:,:) ! Eigenvectors of A
 
-   real(wp)                :: dot_cv
-
    real(wp), allocatable       :: dumcv(:)
    real(wp), allocatable       :: dumcv_g(:)
 
@@ -80,8 +77,8 @@ subroutine da_calculate_hessian(grid, config_flags,            &
    real                         :: ghat(1:cv_size)        ! cv copy.
    integer                      :: info
 
-   real                         :: gdot, beta
-   real                         :: j0_total
+   real*8                       :: beta
+   real*8                       :: j0_total
    character*10                 :: cproc, cens
    character(len=filename_len)  :: filename
    character(len=3) :: cnyobs=""
@@ -131,6 +128,13 @@ subroutine da_calculate_hessian(grid, config_flags,            &
 
          j0_total = j_cost%total
          if (j0_total == 0.0) return
+
+         beta = SQRT(da_dot_cv(cv_size, ghat, ghat, grid, mz, jp_start, jp_end))
+
+         write(unit=stdout,fmt='("Starting outer iteration : ",i3)') svd_outer
+         write(unit=stdout,fmt=11) j0_total, beta
+11       format('Starting cost function: ' ,1PD15.8,', Gradient: ',1PD15.8)
+
          ghat = - ghat
 
          ! Write ghat to file
@@ -284,35 +288,38 @@ subroutine da_calculate_hessian(grid, config_flags,            &
          eignvec(i,i) = 1.D0
          eignval(i) = LAM(i) + 1.D0
       end do
+      qhat(:,0) = 0.D0
       qhat(1:cv_size,1:nyobs) = nuhat
 
       ! (2) Construct low rank estimate of A^-1 * ghat with leading neign modes of A
-      if (minval(LAM) .lt. 1.D0 .and. adapt_svd) then
+      if (minval(eignval(1:neign)) .lt. 2.D0 .and. adapt_svd) then
          do i = 1, neign
-            LAM(i) = LAM(i) / ( LAM(i) + 1.D0 )
+            LAM(i) = -(eignval(i) - 1.D0) / eignval(i)
          end do
          xhat = ghat
-         do i = 1, neign
-            dot_cv = da_dot_cv(cv_size, nuhat(:,i), ghat, grid, mz, jp_start, jp_end)
-            write(unit=stdout,fmt='("i, dot_cv = ",I3,D25.16)') i,dot_cv
 
-            xhat = xhat - LAM(i) * nuhat(:,i) * dot_cv
-         end do
+         write(unit=stdout,fmt='(A)') 'Carrying out Full-SVD LRU'
       else
          do i = 1, neign
-            LAM(i) = 1.D0 / ( LAM(i) + 1.D0 )
+            LAM(i) = 1.D0 / eignval(i)
          end do
 
-         do i = 1, neign
-            dot_cv = da_dot_cv(cv_size, nuhat(1:cv_size,i), ghat(1:cv_size), grid, mz, jp_start, jp_end)
-            write(unit=stdout,fmt='("i, dot_cv = ",I3,D25.16)') i,dot_cv
-
-            xhat(1:cv_size) = xhat(1:cv_size) + LAM(i) * nuhat(1:cv_size,i) * dot_cv
-         end do
+         write(unit=stdout,fmt='(A)') 'Carrying out Full-SVD LRA'
       end if
+
+      call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
+                             neign,neign,neign,&
+                             LAM,eignvec,qhat,&
+                             ghat,xhat)
 
       deallocate(AMAT)
       deallocate(nuhat)
+
+      if (nens_compare .gt. 0) then
+         call da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
+                                          neign, eignval, eignvec, qhat, &
+                                          ghat, xhat)
+      end if
 
    else
       write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: svd_stage should be 0, 1, or 2, not ',svd_stage
@@ -322,7 +329,7 @@ subroutine da_calculate_hessian(grid, config_flags,            &
 
 #else
    call da_error(__FILE__,__LINE__, &
-       (/"Must compile with $LAPACK option for randomised svd"/))
+       (/"Must compile with $LAPACK option for full Hessian Calculation"/))
 #endif
 
 end subroutine da_calculate_hessian
