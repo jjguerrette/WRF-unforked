@@ -18,12 +18,12 @@ subroutine da_calculate_j(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size_jp,
    type (xbx_type),intent(inout)      :: xbx    ! For header & non-grid arrays.
    type (be_type), intent(in)         :: be     ! background error structure.
    type (iv_type), intent(inout)      :: iv     ! innovation vector (o-b).
-   real, intent(in)                   :: xhat(1:cv_size) ! control variables.
-   real, intent(in)                   :: cv(1:cv_size)   ! control variables.
+   real*8, intent(in)                   :: xhat(1:cv_size) ! control variables.
+   real*8, intent(in)                   :: cv(1:cv_size)   ! control variables.
    type (y_type) , intent(inout)      :: re     ! residual vector (o-a).
    type (y_type) , intent(inout)      :: y      ! y = H(x_inc).
    type (j_type) , intent(out)        :: j      ! cost function j
-   real, intent(out)                  :: grad(cv_size)        ! gradient of cost function
+   real*8, intent(out)                  :: grad(cv_size)        ! gradient of cost function
 
    type(domain), intent(inout)  :: grid
    type(grid_config_rec_type), intent(inout) :: config_flags
@@ -354,7 +354,7 @@ subroutine da_calculate_j(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size_jp,
    end if
 
 #if defined(LAPACK)
-   if ( use_randomsvd ) then
+   if ( use_randomsvd .or. svd_stage.eq.1 .or. osse_chem) then
       write(unit=stdout,fmt='("Outer SVD iteration : ",i3)') it
       write(unit=stdout,fmt='("Starting cost function: ",1PD15.3)') j%total
    end if

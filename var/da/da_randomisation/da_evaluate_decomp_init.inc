@@ -1,7 +1,10 @@
 #if defined(LAPACK)
 subroutine da_evaluate_decomp_init(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
                                    rank_rsvd_Pa, rankA,  &
-                                   omega_Pav, yhat_Pav, yhat_Pa, &
+                                   omega_Pav, &
+                                   yhat_Pav_LRU, yhat_Pav_LRA, &
+                                   yhat_Pa_LRU, yhat_Pa_LRA, &
+                                   yhat_LaPaLa_LRU, yhat_LaPaLa_LRA, yhat_LaPaLa_half, &
                                    eignval_hess, eignvec_hess, qhat_hess)
 
    !-------------------------------------------------------------------------
@@ -28,154 +31,421 @@ subroutine da_evaluate_decomp_init(grid, xbx, be, mz, jp_start, jp_end, cv_size,
    integer, intent(in)        :: jp_start, jp_end
    integer, intent(in)        :: mz(:)
 
-   real(wp), allocatable, intent(out)        :: yhat_Pav(:,:)  ! yhat = Pav * omega_Pa
    real(wp), allocatable, intent(out)        :: omega_Pav(:,:) ! Gaussian draw
-   real(wp), allocatable, intent(out)        :: yhat_Pa(:,:)  ! yhat = Pa * omega_Pa
 
+   real(wp), allocatable, intent(out)        :: yhat_Pav_LRU(:,:)  ! yhat = Pav * omega_Pa
+   real(wp), allocatable, intent(out)        :: yhat_Pav_LRA(:,:)  ! yhat = Pav * omega_Pa
+   real(wp), allocatable, intent(out)        :: yhat_Pa_LRU(:,:)  ! yhat = Pa * omega_Pa
+   real(wp), allocatable, intent(out)        :: yhat_Pa_LRA(:,:)  ! yhat = Pa * omega_Pa
+   real(wp), allocatable, intent(out)        :: yhat_LaPaLa_LRU(:,:)  ! yhat = La^-1 * Pa * La^-1 * omega_Pa
+   real(wp), allocatable, intent(out)        :: yhat_LaPaLa_LRA(:,:)  ! yhat = La^-1 * Pa * La^-1 * omega_Pa
+   real(wp), allocatable, intent(out)        :: yhat_LaPaLa_half(:,:)  ! yhat = La^-1 * omega_Pa
+
+
+   real(wp), allocatable        :: omega_g(:,:) ! Global Gaussian draw
+   real(wp), allocatable        :: omega1d(:) ! Gaussian draw
+   real(wp), allocatable        :: dumcv(:)
+   real(wp), allocatable        :: dumcv_g(:)
+   real(wp), allocatable        :: yhat_Pav(:,:)
+   real(wp), allocatable        :: yhat_Pa(:,:)
+   real(wp), allocatable        :: yhat_LaPaLa(:,:)
+ 
    real(wp)        :: UTomega(1:cv_size)
    real(wp)        :: LAM_hess(1:rankA)
-   integer         :: iens, jens, nens, neign, i, j, k, ij, ic
+   integer         :: iens, jens, nens, neign, i, j, k, ij, ic, cv_s, cv_f, itype
 
    if (trace_use) call da_trace_entry("da_evaluate_decomp_init")
    write(unit=stdout,fmt='(A)') 'Initialize Comparison'
 
+   write(unit=stdout,fmt='(A)') 'Initialize OMEGA_Pa'
    allocate(omega_Pav(1:cv_size,1:rank_rsvd_Pa))
+
+! Should make this into a subroutine --> inputs: cv_size, nens; outputs: omega
+#ifdef DM_PARALLEL
+   ! Generate global random omega matrix
+   ! Sequence from single global seed (non-repeating)
+   cv_size_domain = wrf_dm_sum_integer(cv_size)
+   if (rootproc) then
+      allocate(omega_g(1:cv_size_domain,rank_rsvd_Pa))
+      allocate(omega1d(1:cv_size_domain*rank_rsvd_Pa))
+      call da_set_randomcv(cv_size_domain*rank_rsvd_Pa, omega1d)
+      cv_s = 1
+      do iens = 1,rank_rsvd_Pa
+         cv_f = cv_s + cv_size_domain-1
+         omega_g(:,iens) = omega1d(cv_s:cv_f)
+         cv_s = cv_f+1
+      end do
+      deallocate(omega1d)
+   else
+      allocate(omega_g(1,1:rank_rsvd_Pa))
+   end if
+
+   call mpi_barrier(comm, ierr)
+
+   !Transfer to local omega
+   allocate(dumcv(1:cv_size))
+   allocate(dumcv_g(1:cv_size_domain))
    do iens = 1, rank_rsvd_Pa
-      call da_set_randomcv(cv_size, omega_Pav(:,iens))
+      if(rootproc) then
+         dumcv_g = omega_g(:,iens)
+      else
+         dumcv_g = 0.D0
+      end if
+      dumcv = 0.D0
+
+      call da_global_to_cv(cv_size, cv_size_domain, dumcv, grid, mz, dumcv_g)
+      omega_Pav(:,iens) = dumcv
+
+      call mpi_barrier(comm, ierr)
    end do
+   deallocate(dumcv)
+   deallocate(dumcv_g)
+   deallocate(omega_g)
+#else
+   ! Generate local=global omega
+   ! Single seed
+   allocate(omega1d(1:cv_size*rank_rsvd_Pa))
+   call da_set_randomcv(cv_size*rank_rsvd_Pa, omega1d)
+   cv_s = 1
+   do iens = 1,rank_rsvd_Pa
+      cv_f = cv_s + cv_size-1
+      omega_Pav(:,iens) = omega1d(cv_s:cv_f)
+      cv_s = cv_f+1
+   end do
+   deallocate(omega1d)
+#endif
+
+!   do iens = 1, rank_rsvd_Pa
+!      write(unit=stdout,fmt='(A,I5,A,I5)') 'Initialize OMEGA_i, i = ', iens ,' of ',rank_rsvd_Pa
+!      call da_set_randomcv(cv_size, omega_Pav(:,iens))
+!   end do
 
    !!!Generate yhat_v and yhat_x for true inverse Hessian (use LRU)
    !Same LAM_hess for both
-   do i = 1, rankA
-      LAM_hess(i) = - (eignval_hess(i) - 1.D0) / eignval_hess(i)
-   end do
 
    !! Initialize Pav comparison
-   allocate(yhat_Pav(1:cv_size,1:rank_rsvd_Pa))
-   yhat_Pav = 0.D0
-   do iens = 1, rank_rsvd_Pa
-!      !Skipping this step, will cancel between yhat_Pav_ and yhat_Pav
-!      yhat_Pav(:,iens) = omega_Pav(:,iens)
-      call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
-                             rankA,rankA,rankA, &
-                             LAM_hess,eignvec_hess,qhat_hess, &
-                             omega_Pav(:,iens),yhat_Pav(:,iens))
+   do itype = 1, 2
+      if (itype .eq. 1) then
+         if (.not.hess_comp_Pav_LRA) cycle
+
+         allocate(yhat_Pav_LRA(1:cv_size,1:rank_rsvd_Pa))
+         do i = 1, rankA
+            LAM_hess(i) = 1.D0 / eignval_hess(i)
+         end do
+      end if
+
+      if (itype .eq. 2) then
+         if (.not.hess_comp_Pav_LRU) cycle
+
+         allocate(yhat_Pav_LRU(1:cv_size,1:rank_rsvd_Pa))
+         do i = 1, rankA
+            LAM_hess(i) = - (eignval_hess(i) - 1.D0) / eignval_hess(i)
+         end do
+      end if
+
+      allocate(yhat_Pav(1:cv_size,1:rank_rsvd_Pa))
+
+      yhat_Pav = 0.D0
+
+      do iens = 1, rank_rsvd_Pa
+         write(unit=stdout,fmt='(A,I5,A,I5)') 'Initialize Pav*OMEGA_i, i = ', iens ,' of ',rank_rsvd_Pa
+
+   !      !Skipping this step, will cancel between yhat_Pav_ and yhat_Pav
+   !      yhat_Pav(:,iens) = omega_Pav(:,iens)
+         call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
+                                rankA,rankA,rankA, &
+                                LAM_hess,eignvec_hess,qhat_hess, &
+                                omega_Pav(:,iens),yhat_Pav(:,iens),.true.)
+
+         if (itype .eq. 1) yhat_Pav_LRA(:,iens) = yhat_Pav(:,iens)
+         if (itype .eq. 2) yhat_Pav_LRU(:,iens) = yhat_Pav(:,iens)
+      end do
+      deallocate( yhat_Pav )
    end do
 
 
-   !! Initialize Pa comparison
-   !Assumes 1-to-1 size between, e.g., scaleant+scalebb and xhat (SQUARE U)
-   allocate(yhat_Pa(1:cv_size,1:rank_rsvd_Pa))
-   do iens = 1, rank_rsvd_Pa
-      !Transfer random cv vector to vv and vch
-      call da_cv_to_vv(cv_size, omega_Pav(1:be%cv%size_jb, iens), &
-                       mz, grid%vv, &
-#if (WRF_CHEM == 1)
-                       grid%vch  &
-#endif
-                       )
 
-      ! Transfer vch (and vv later) to xach (and xa later)
-#if (WRF_CHEM == 1)
-      !$OMP PARALLEL DO &
-      !$OMP PRIVATE ( ij, ic, k, j, i)
-      do ij = 1 , grid%num_tiles
-         do ic = PARAM_FIRST_SCALAR, num_scaleant
-            grid%xach%alpha_ant(its:ite,jts:jte,:,ic) = 0.D0
-            do k = 1, num_ant_steps    !LEVELS
-               do j = jts, jte
-                  do i = its, ite
-                      grid%xach%alpha_ant (i,j,k,ic) = grid%vch%alpha_ant (i,j,k,ic)
-                  end do
-               end do
-            end do
+!   !! Initialize Pa comparison
+!   !Assumes 1-to-1 size between, e.g., scaleant+scalebb and xhat (SQUARE U)
+   do itype = 1, 2
+      if (itype .eq. 1) then
+         if (.not.hess_comp_Pa_LRA) cycle
+
+         allocate(yhat_Pa_LRA(1:cv_size,1:rank_rsvd_Pa))
+         do i = 1, rankA
+            LAM_hess(i) = 1.D0 / eignval_hess(i)
          end do
-      end do
-      !$OMP END PARALLEL DO
+      end if
 
-      !$OMP PARALLEL DO &
-      !$OMP PRIVATE ( ij, ic, k, j, i)
-      do ij = 1 , grid%num_tiles
-         do ic = PARAM_FIRST_SCALAR, num_scalebb
-            grid%xach%alpha_bb(its:ite,jts:jte,:,ic) = 0.D0
-            do k = 1, num_bb_steps    !LEVELS
-               do j = jts, jte
-                  do i = its, ite
-                      grid%xach%alpha_bb (i,j,k,ic) = grid%vch%alpha_bb (i,j,k,ic)
-                  end do
-               end do
-            end do
+      if (itype .eq. 2) then
+         if (.not.hess_comp_Pa_LRU) cycle
+
+         allocate(yhat_Pa_LRU(1:cv_size,1:rank_rsvd_Pa))
+         do i = 1, rankA
+            LAM_hess(i) = - (eignval_hess(i) - 1.D0) / eignval_hess(i)
          end do
-      end do
-      !$OMP END PARALLEL DO
-#endif
+      end if
 
-      ! Calculate U^T * omega (inputs: xa and xach; output: UTomega)
-      UTomega = 0.D0
-      call da_transform_vtox_adj(grid, be%cv%size_jb, xbx, be, grid%ep, grid%vp, grid%vv, &
-                                UTomega(1:be%cv%size_jb), &
-#if (WRF_CHEM == 1)
-                                grid%vch &
-#endif
-                                )
-
-      !yhat_v = Pav * U^T * omega
-      call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
-                             rankA,rankA,rankA, &
-                             LAM_hess,eignvec_hess,qhat_hess, &
-                             UTomega,yhat_Pa(:,iens))
-
-      !Pa * omega = U * Pav * U^T * omega
-      ! outputs: xa, xach
-      yhat_Pa = 0.D0
-      call da_transform_vtox(grid, be%cv%size_jb, xbx, be, grid%ep, &
-                             yhat_Pa(1:be%cv%size_jb,iens), grid%vv, grid%vp, grid%vch)
+      allocate(yhat_Pa(1:cv_size,1:rank_rsvd_Pa))
 
       yhat_Pa = 0.D0
-      ! Transfer vch (and vv later) from xach (and xa later)
+
+      do iens = 1, rank_rsvd_Pa
+         write(unit=stdout,fmt='(A,I5,A,I5)') 'Initialize Pa*OMEGA_i, i = ', iens ,' of ',rank_rsvd_Pa
+
+         !Transfer random cv vector to vv and vch
+         call da_cv_to_vv(cv_size, omega_Pav(1:be%cv%size_jb, iens), &
+                          mz, grid%vv, &
 #if (WRF_CHEM == 1)
-      !$OMP PARALLEL DO &
-      !$OMP PRIVATE ( ij, ic, k, j, i)
-      do ij = 1 , grid%num_tiles
-         do ic = PARAM_FIRST_SCALAR, num_scaleant
-            grid%vch%alpha_ant(its:ite,jts:jte,:,ic) = 0.D0
-            do k = 1, num_ant_steps    !LEVELS
-               do j = jts, jte
-                  do i = its, ite
-                      grid%vch%alpha_ant (i,j,k,ic) = grid%xach%alpha_ant (i,j,k,ic)
+                          grid%vch  &
+#endif
+                          )
+
+         ! Transfer vch (and vv later) to xach (and xa later)
+#if (WRF_CHEM == 1)
+         !$OMP PARALLEL DO &
+         !$OMP PRIVATE ( ij, ic, k, j, i)
+         do ij = 1 , grid%num_tiles
+            do ic = PARAM_FIRST_SCALAR, num_scaleant
+               grid%xach%alpha_ant(its:ite,jts:jte,:,ic) = 0.D0
+               do k = 1, num_ant_steps    !LEVELS
+                  do j = jts, jte
+                     do i = its, ite
+                         grid%xach%alpha_ant (i,j,k,ic) = grid%vch%alpha_ant (i,j,k,ic)
+                     end do
                   end do
                end do
             end do
          end do
-      end do
-      !$OMP END PARALLEL DO
+         !$OMP END PARALLEL DO
 
-      !$OMP PARALLEL DO &
-      !$OMP PRIVATE ( ij, ic, k, j, i)
-      do ij = 1 , grid%num_tiles
-         do ic = PARAM_FIRST_SCALAR, num_scalebb
-            grid%vch%alpha_bb(its:ite,jts:jte,:,ic) = 0.D0
-            do k = 1, num_bb_steps    !LEVELS
-               do j = jts, jte
-                  do i = its, ite
-                      grid%vch%alpha_bb (i,j,k,ic) = grid%xach%alpha_bb (i,j,k,ic)
+         !$OMP PARALLEL DO &
+         !$OMP PRIVATE ( ij, ic, k, j, i)
+         do ij = 1 , grid%num_tiles
+            do ic = PARAM_FIRST_SCALAR, num_scalebb
+               grid%xach%alpha_bb(its:ite,jts:jte,:,ic) = 0.D0
+               do k = 1, num_bb_steps    !LEVELS
+                  do j = jts, jte
+                     do i = its, ite
+                         grid%xach%alpha_bb (i,j,k,ic) = grid%vch%alpha_bb (i,j,k,ic)
+                     end do
                   end do
                end do
             end do
          end do
-      end do
-      !$OMP END PARALLEL DO
+         !$OMP END PARALLEL DO
 #endif
 
-      !Transfer vch (and later vv) to yhat_Pa
-      call da_vv_to_cv(grid%vv, grid%xp, mz, cv_size, &
-                       yhat_Pa(1:be%cv%size_jb, iens) &
+         ! Calculate U^T * omega (inputs: xa and xach; output: UTomega)
+         UTomega = 0.D0
+         call da_transform_vtox_adj(grid, be%cv%size_jb, xbx, be, grid%ep, grid%vp, grid%vv, &
+                                   UTomega(1:be%cv%size_jb), &
 #if (WRF_CHEM == 1)
-                       , grid%vch &
+                                   grid%vch &
 #endif
-                        )
+                                   )
 
+         yhat_Pa(:,iens) = 0.D0
+         !yhat_v = Pav * U^T * omega
+         call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
+                                rankA,rankA,rankA, &
+                                LAM_hess,eignvec_hess,qhat_hess, &
+                                UTomega,yhat_Pa(:,iens),.true.)
+
+         !Pa * omega = U * Pav * U^T * omega
+         ! outputs: xa, xach
+         call da_transform_vtox(grid, be%cv%size_jb, xbx, be, grid%ep, &
+                                yhat_Pa(1:be%cv%size_jb,iens), grid%vv, grid%vp, grid%vch)
+
+         yhat_Pa(:,iens) = 0.D0
+         ! Transfer vch (and vv later) from xach (and xa later)
+#if (WRF_CHEM == 1)
+         !$OMP PARALLEL DO &
+         !$OMP PRIVATE ( ij, ic, k, j, i)
+         do ij = 1 , grid%num_tiles
+            do ic = PARAM_FIRST_SCALAR, num_scaleant
+               grid%vch%alpha_ant(its:ite,jts:jte,:,ic) = 0.D0
+               do k = 1, num_ant_steps    !LEVELS
+                  do j = jts, jte
+                     do i = its, ite
+                         grid%vch%alpha_ant (i,j,k,ic) = grid%xach%alpha_ant (i,j,k,ic)
+                     end do
+                  end do
+               end do
+            end do
+         end do
+         !$OMP END PARALLEL DO
+
+         !$OMP PARALLEL DO &
+         !$OMP PRIVATE ( ij, ic, k, j, i)
+         do ij = 1 , grid%num_tiles
+            do ic = PARAM_FIRST_SCALAR, num_scalebb
+               grid%vch%alpha_bb(its:ite,jts:jte,:,ic) = 0.D0
+               do k = 1, num_bb_steps    !LEVELS
+                  do j = jts, jte
+                     do i = its, ite
+                         grid%vch%alpha_bb (i,j,k,ic) = grid%xach%alpha_bb (i,j,k,ic)
+                     end do
+                  end do
+               end do
+            end do
+         end do
+         !$OMP END PARALLEL DO
+#endif
+
+         !Transfer vch (and later vv) to yhat_Pa
+         call da_vv_to_cv(grid%vv, grid%xp, mz, cv_size, &
+                          yhat_Pa(1:be%cv%size_jb, iens) &
+#if (WRF_CHEM == 1)
+                          , grid%vch &
+#endif
+                           )
+
+         if (itype .eq. 1) yhat_Pa_LRA(:,iens) = yhat_Pa(:,iens)
+         if (itype .eq. 2) yhat_Pa_LRU(:,iens) = yhat_Pa(:,iens)
+      end do
+
+      deallocate( yhat_Pa )
    end do
+
+   !! Initialize Pa - Pa-norm comparison
+   do itype = 1, 2
+      if (itype .eq. 1) then
+         if (.not.hess_comp_PaPa_LRA) cycle
+
+         allocate(yhat_LaPaLa_LRA(1:cv_size,1:rank_rsvd_Pa))
+         do i = 1, rankA
+            LAM_hess(i) = 1.D0
+         end do
+      end if
+
+      if (itype .eq. 2) then
+         if (.not.hess_comp_PaPa_LRU) cycle
+
+         allocate(yhat_LaPaLa_LRU(1:cv_size,1:rank_rsvd_Pa))
+         do i = 1, rankA
+            LAM_hess(i) = - (eignval_hess(i) - 1.D0)
+         end do
+      end if
+
+      allocate(yhat_LaPaLa(1:cv_size,1:rank_rsvd_Pa))
+
+      yhat_LaPaLa = 0.D0
+
+      do iens = 1, rank_rsvd_Pa
+         write(unit=stdout,fmt='(A,I5,A,I5)') 'Initialize La^-1 * Pa * La^-1 * OMEGA_i, i = ', iens ,' of ',rank_rsvd_Pa
+
+         call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
+                                rankA,rankA,rankA, &
+                                LAM_hess,eignvec_hess,qhat_hess, &
+                                omega_Pav(:,iens),yhat_LaPaLa(:,iens),.true.)
+
+         if (itype .eq. 1) yhat_LaPaLa_LRA(:,iens) = yhat_LaPaLa(:,iens)
+         if (itype .eq. 2) yhat_LaPaLa_LRU(:,iens) = yhat_LaPaLa(:,iens)
+      end do
+      deallocate( yhat_LaPaLa )
+
+      if (.not.allocated(yhat_LaPaLa_half)) then
+         allocate(yhat_LaPaLa_half(1:cv_size,1:rank_rsvd_Pa))
+         yhat_LaPaLa_half = 0.D0
+
+         !Vm * (Im + LAM_m)^1/2 * Vm^T * OMEGA
+         do i = 1, rankA
+            LAM_hess(i) = sqrt(eignval_hess(i))
+         end do
+         do iens = 1, rank_rsvd_Pa
+            write(unit=stdout,fmt='(A,I5,A,I5)') 'Initialize La^-1 * OMEGA_i, i = ', iens ,' of ',rank_rsvd_Pa
+
+            call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
+                                   rankA,rankA,rankA, &
+                                   LAM_hess,eignvec_hess,qhat_hess, &
+                                   omega_Pav(:,iens),yhat_LaPaLa_half(:,iens),.true.)
+         end do
+      end if
+   end do
+
+
+
+!   !! Initialize Pa - Pa-norm comparison (LRU)
+!if (.true. .and. hess_comp_PaPa_LRU) then
+!!Very inefficient, but provides a check
+!   allocate(yhat_LaPaLa_LRU(1:cv_size,1:rank_rsvd_Pa))
+!   yhat_LaPaLa_LRU = 0.D0
+!
+!   !Vm * LAM_m * Vm^T * OMEGA
+!   do i = 1, rankA
+!      LAM_hess(i) = - (eignval_hess(i) - 1.D0)
+!   end do
+!
+!   do iens = 1, rank_rsvd_Pa
+!      write(unit=stdout,fmt='(A,I5,A,I5)') 'Initialize La^-1 * Pa * La^-1 * OMEGA_i, i = ', iens ,' of ',rank_rsvd_Pa
+!
+!      call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
+!                             rankA,rankA,rankA, &
+!                             LAM_hess,eignvec_hess,qhat_hess, &
+!                             omega_Pav(:,iens),yhat_LaPaLa_LRU(:,iens),.true.)
+!   end do
+!
+!   if (.not.allocated(yhat_LaPaLa_half)) then
+!      allocate(yhat_LaPaLa_half(1:cv_size,1:rank_rsvd_Pa))
+!      yhat_LaPaLa_half = 0.D0
+!
+!      !Vm * (Im + LAM_m)^1/2 * Vm^T * OMEGA
+!      do i = 1, rankA
+!         LAM_hess(i) = sqrt(eignval_hess(i))
+!      end do
+!      do iens = 1, rank_rsvd_Pa
+!         write(unit=stdout,fmt='(A,I5,A,I5)') 'Initialize La^-1 * OMEGA_i, i = ', iens ,' of ',rank_rsvd_Pa
+!
+!         call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
+!                                rankA,rankA,rankA, &
+!                                LAM_hess,eignvec_hess,qhat_hess, &
+!                                omega_Pav(:,iens),yhat_LaPaLa_half(:,iens),.true.)
+!      end do
+!   end if
+!
+!end if
+!
+!
+!   !! Initialize Pa - Pa-norm comparison (LRA)
+!if (.true. .and. hess_comp_PaPa_LRA) then
+!!Very inefficient, but provides a check
+!   allocate(yhat_LaPaLa_LRA(1:cv_size,1:rank_rsvd_Pa))
+!   yhat_LaPaLa_LRA = 0.D0
+!
+!
+!   !Vm * LAM_m * Vm^T * OMEGA
+!   do i = 1, rankA
+!      LAM_hess(i) = 1.D0
+!   end do
+!
+!   do iens = 1, rank_rsvd_Pa
+!      write(unit=stdout,fmt='(A,I5,A,I5)') 'Initialize La^-1 * Pa * La^-1 * OMEGA_i, i = ', iens ,' of ',rank_rsvd_Pa
+!
+!      call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
+!                             rankA,rankA,rankA, &
+!                             LAM_hess,eignvec_hess,qhat_hess, &
+!                             omega_Pav(:,iens),yhat_LaPaLa_LRA(:,iens),.true.)
+!   end do
+!   if (.not.allocated(yhat_LaPaLa_half)) then
+!      allocate(yhat_LaPaLa_half(1:cv_size,1:rank_rsvd_Pa))
+!      yhat_LaPaLa_half = 0.D0
+!
+!      !Vm * (Im + LAM_m)^1/2 * Vm^T * OMEGA
+!      do i = 1, rankA
+!         LAM_hess(i) = sqrt(eignval_hess(i))
+!      end do
+!      do iens = 1, rank_rsvd_Pa
+!         write(unit=stdout,fmt='(A,I5,A,I5)') 'Initialize La^-1 * OMEGA_i, i = ', iens ,' of ',rank_rsvd_Pa
+!
+!         call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
+!                                rankA,rankA,rankA, &
+!                                LAM_hess,eignvec_hess,qhat_hess, &
+!                                omega_Pav(:,iens),yhat_LaPaLa_half(:,iens),.true.)
+!      end do
+!   end if
+!
+!end if
 
    if (trace_use) call da_trace_exit("da_evaluate_decomp_init")
 

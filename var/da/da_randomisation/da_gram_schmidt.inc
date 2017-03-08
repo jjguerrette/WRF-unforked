@@ -16,13 +16,15 @@ subroutine da_gram_schmidt(grid,mz,jp_start,jp_end, &
    integer, intent(in)             :: jp_start, jp_end
    integer, intent(in)             :: mz(:)
    integer, intent(in)             :: cv_size, nvec
-   real, intent(in)                :: yhat(1:cv_size,nvec)               ! control variable
-   real, intent(out)               :: qhat(1:cv_size,nvec)               ! control variable
+   real(wp), intent(in)            :: yhat(1:cv_size,nvec)               ! control variable
+   real(wp), intent(out)           :: qhat(1:cv_size,0:nvec)               ! control variable
  
    integer                         :: ivec, jvec, i
-   real*8                          :: gdot, beta
+   real(wp)                        :: gdot, beta
  
    if (trace_use) call da_trace_entry("da_gram_schmidt")
+
+      qhat(:,0) = 0.D0
 
       ! Generate qhat basis vectors by Modified Gram-Schmidt orthonormalization
       do ivec = 1, nvec

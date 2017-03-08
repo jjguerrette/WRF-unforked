@@ -55,8 +55,8 @@ subroutine da_setup_osse_chem( grid, ob, iv, be, xbx)
       ! [3] Calculate obs gaussian error on root node
       if(rootproc) then
          icount = 0
-         do itime = 1, num_ts
-            do iplt = 1,num_platform
+         do iplt = 1,num_platform
+            do itime = 1, num_ts
                do ichem = 1, num_chem_acft-1
                   if ( grid%acft_obs_count(itime,iplt) .gt. 0 ) then
                      icount = icount + 1
@@ -109,8 +109,8 @@ subroutine da_setup_osse_chem( grid, ob, iv, be, xbx)
 
    ! [6] Calculate uncertainty and perturbed observation   
    icount = 0
-   do itime = 1, num_ts
-      do iplt = 1,num_platform
+   do iplt = 1,num_platform
+      do itime = 1, num_ts
          do ichem = 1, num_chem_acft-1
             if ( grid%acft_obs_count(itime,iplt) .gt. 0 ) then
                icount = icount + 1
@@ -121,7 +121,8 @@ subroutine da_setup_osse_chem( grid, ob, iv, be, xbx)
                iv%chem_acft(itime)%chem(ichem,iplt)%qc = 0
             else
                iv%chem_acft(itime)%chem(ichem,iplt)%inv = missing_r
-               iv%chem_acft(itime)%chem(ichem,iplt)%error = 0
+               iv%chem_acft(itime)%chem(ichem,iplt)%error = missing_r
+!               iv%chem_acft(itime)%chem(ichem,iplt)%error = 0
                iv%chem_acft(itime)%chem(ichem,iplt)%qc = -77
                iv%chem_acft(itime)%weight(ichem,iplt) = missing_r
             end if

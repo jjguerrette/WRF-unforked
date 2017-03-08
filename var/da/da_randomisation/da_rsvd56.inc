@@ -45,8 +45,9 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
 
 
    real(wp)                     :: KMAT(nens, nens)  ! B = Q^T * A * Q
+   real(wp)                     :: KMAT_(nens, nens)  ! B = Q^T * A * Q
    integer                      :: piv(nens)
-   integer                      :: info
+   integer                      :: info, cyc
 
    real                         :: gdot, beta, temp_l
    real                         :: temp_e(nens)
@@ -68,6 +69,17 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
          F2(jens,iens) = da_dot_cv(cv_size, qhat(:,iens), yhat(:,jens), grid, mz, jp_start, jp_end)
       end do
    end do
+
+!REMOVE EVENTUALLY or add option
+!   write(cnens,fmt='(I0)') nens
+!   do iens = 1, nens
+!      write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'F1: ',F1(iens,1:nens)
+!   end do
+!   do iens = 1, nens
+!      write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'F2: ',F2(iens,1:nens)
+!   end do
+!
+!REMOVE EVENTUALLY
 
  ! Solve system D * x = b, &
  !  where B * F1^T = F2^T, F1^T = Q^T * OMEGA, F2^T = Q^T * Y
@@ -126,14 +138,17 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
       end do
    end do
 
-   write(cnens,fmt='(I0)') nens
-   do iens = 1, nens
-      write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'KMAT: ',KMAT(iens,1:nens)
-   end do
+!REMOVE EVENTUALLY or add option
+!   write(cnens,fmt='(I0)') nens
+!   do iens = 1, nens
+!      write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'KMAT: ',KMAT(iens,1:nens)
+!   end do
+!REMOVE EVENTUALLY
 
  ! Determine eigenvalues and eigenvectors of the symmetric B matrix
  !-----------------------------------------------------------------
    info              = 0
+   KMAT_ = KMAT
    call SYEV(KMAT, LAM, JOBZ = 'V' , INFO = info) !F95
 
    if (info /=0) then
@@ -146,7 +161,17 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
          eignvec(iens,jens) = KMAT(iens,jens)
       end do
    end do
-   
+
+   if (all(LAM .le. 0.D0)) then
+      write(unit=stdout,fmt='(A)') &
+         'WARNING: Preconditioned Hessian: all(eigs <= 0), setting them positive.'
+      LAM = - LAM
+   else if ( abs(maxval(LAM)) .lt. abs(minval(LAM)) ) then
+      write(unit=stdout,fmt='(A)') &
+         'WARNING: Preconditioned Hessian: ABS(MAX(eigs)) < ABS(MIN(eigs)), setting LAM=-LAM'
+      LAM = - LAM
+   end if
+  
    !First sort eigenvalues and eigenvectors in descending order
    do j = nens-1, 1, -1
      swapped = .false.
@@ -167,18 +192,35 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
    end do
 
    neign = nens
+!   cyc = 0
    do iens = 1, nens
-      eignval(iens) = LAM(iens) + 1
+      eignval(iens) = LAM(iens) + 1.D0
+!      if (cyc .eq. 1) cycle
       if (neign .eq. nens .and. LAM(iens) .lt. 0.D0) then
          if (iens .gt. 1) then
             neign = iens - 1
-         else
-            write(unit=stdout,fmt='(A)') &
-               'FATAL ERROR: There need to be some positive eigenvalues of KMAT'
-            CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
+!         else
+!!NEED TO ADJUST THIS LANGUAGE
+!            write(unit=stdout,fmt='(A)') &
+!               'WARNING: There need to be some positive eigenvalues of KMAT'
+!            cyc = 1
+!
+!!!            CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
          end if
       end if
    end do
+
+
+!REMOVE EVENTUALLY or add option
+!   if (cyc .eq. 1) then
+!      write(cnens,fmt='(I0)') nens
+!      do iens = 1, nens
+!         write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'KMAT: ',KMAT_(iens,1:nens)
+!      end do
+!   end if
+!   write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'Eigenvalues: ',eignval(1:nens)
+!REMOVE EVENTUALLY
+
 
    if (trace_use) call da_trace_exit("da_rsvd56")
 

@@ -30,7 +30,7 @@ subroutine da_jo_and_grady_chem_surf(iv, re, jo, jo_grad_y)
                  .and. .not. crossval_chem_surfobs ) then
                jo % chem_surf = jo % chem_surf - &
                   re%chem_surf(n)%chem(ichem) * jo_grad_y%chem_surf(n)%chem(ichem)
-            else
+            else if ( crossval_chem_surfobs ) then
                jo % chem_surf_cross = jo % chem_surf_cross - &
                   re%chem_surf(n)%chem(ichem) * jo_grad_y%chem_surf(n)%chem(ichem)
             end if

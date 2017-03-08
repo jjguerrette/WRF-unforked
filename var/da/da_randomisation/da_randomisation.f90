@@ -17,7 +17,12 @@ module da_randomisation
        myproc, filename_len, test_dm_exact, rootproc, cv_size_domain, &
        stdout, trace_use, svd_amat_type, svd_symm_type, adapt_svd, &
        num_ob_indexes, read_omega, svd_p, ierr, comm, &
-       use_randomsvd, nens_compare, &
+       use_randomsvd, nens_compare, tsvd_compare, cglz_compare, rsvd_compare, &
+       hess_comp_x, &
+       hess_comp_Pav_LRU, hess_comp_Pav_LRA, &
+       hess_comp_Pa_LRU, hess_comp_Pa_LRA, &
+       hess_comp_PaPa_LRU, hess_comp_PaPa_LRA, &
+       scale_hcheck, &
 #if (WRF_CHEM == 1)
        chem_surf, chem_acft, &
        num_ant_steps, num_bb_steps, &

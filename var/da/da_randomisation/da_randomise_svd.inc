@@ -26,13 +26,13 @@ subroutine da_randomise_svd(grid, config_flags,            &
    type (xbx_type),intent(inout)     :: xbx                           ! Header & non-gridded vars.
    type (be_type), intent(in)        :: be                            ! background error structure.
    type (iv_type), intent(inout)     :: iv                            ! ob. increment vector.
-   real, intent(inout)               :: cv(1:cv_size)                 ! control variable (local).
+   real*8, intent(inout)               :: cv(1:cv_size)                 ! control variable (local).
    type (y_type), intent(inout)      :: re                            ! residual (o-a) structure.
    type (y_type), intent(inout)      :: y                             ! y = H(x_inc) structure.
-   real, intent(out)                 :: xhat(1:cv_size)               ! control variable (local).
+   real*8, intent(out)                 :: xhat(1:cv_size)               ! control variable (local).
    type (j_type), optional, intent(out) :: j_cost                        ! cost function
 
-   real, optional, intent(out)       :: qhat(1:cv_size, 0:ensdim_svd) ! orthonormal basis set of A = Q * B * Q^T
+   real*8, optional, intent(out)       :: qhat(1:cv_size, 0:ensdim_svd) ! orthonormal basis set of A = Q * B * Q^T
    real*8, optional, intent(out)     :: eignvec(ensdim_svd, ensdim_svd)
    real*8, optional, intent(out)     :: eignval(ensdim_svd)
    integer, optional, intent(out)    :: neign                         ! Number of non-truncated eigenpairs
@@ -44,7 +44,7 @@ subroutine da_randomise_svd(grid, config_flags,            &
    real(wp), allocatable        :: omega(:,:) ! Gaussian draw
    real(wp), allocatable        :: nuhat(:,:) ! Eigenvectors of A
   
-   integer                      :: iens, jens, nens, i, j, p
+   integer                      :: iens, jens, nens, i, j, p, itype
 #if (WRF_CHEM != 1)
 #ifdef CLOUD_CV
    integer          :: mz(13)
@@ -59,7 +59,7 @@ subroutine da_randomise_svd(grid, config_flags,            &
 #endif
 #endif
    integer                      :: jp_start, jp_end       ! Start/end indices of Jp.
-   real                         :: ghat(1:cv_size)        ! cv copy.
+   real*8                       :: ghat(1:cv_size)        ! cv copy.
    real(wp)                     :: F1(ensdim_svd, ensdim_svd) ! intermediate matrix
    real(wp)                     :: F2(ensdim_svd, ensdim_svd) ! intermediate matrix
    real(wp)                     :: U(ensdim_svd, ensdim_svd)
@@ -170,7 +170,6 @@ subroutine da_randomise_svd(grid, config_flags,            &
    else if ( svd_stage .eq. 2 ) then
       allocate(yhat(1:cv_size,nens))
       allocate(omega(1:cv_size,nens))
-      qhat(:,0) = 0.D0
 
       write(cproc,fmt='(i4.4)') myproc
 
@@ -220,13 +219,14 @@ subroutine da_randomise_svd(grid, config_flags,            &
          do i = 1, neign
             LAM(i) = - (eignval(i) - 1.D0) / eignval(i)
          end do
-         xhat = ghat
+         itype = 2
 
          write(unit=stdout,fmt='(A)') 'Carrying out RIOT-56 truncated amat_mul, LRU'
       else
          do i = 1, neign
             LAM(i) = 1.D0 / eignval(i)
          end do
+         itype = 1
 
          write(unit=stdout,fmt='(A)') 'Carrying out RIOT-56 truncated amat_mul, LRA'
       end if
@@ -236,10 +236,14 @@ subroutine da_randomise_svd(grid, config_flags,            &
                              LAM,eignvec,qhat, &
                              ghat,xhat)
 
+      if (itype .eq. 2) then !LRU
+         xhat = xhat + ghat
+      end if
+
       deallocate(yhat)
       deallocate(omega)
    else
-      write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: svd_stage should be 0, 1, or 2, not ',svd_stage
+      write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: For RSVD5.6, svd_stage should be 0, 1, or 2, not ',svd_stage
       CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
    end if
    if (trace_use) call da_trace_exit("da_randomise_svd")

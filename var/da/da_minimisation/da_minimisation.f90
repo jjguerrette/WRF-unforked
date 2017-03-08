@@ -55,9 +55,10 @@ module da_minimisation
       chem_surf, chem_acft, num_platform, &
       sigma_r_acft, sigma_c_acft, &
       num_ant_steps, num_bb_steps, &
+      osse_chem, &
 #endif
 #if defined(LAPACK)
-      use_randomsvd, &
+      use_randomsvd, svd_stage, &
 #endif
       info_stop, grm_shmt_order, &
       sound, mtgirs, sonde_sfc, synop, profiler, gpsref, gpspw, polaramv, geoamv, ships, metar, &

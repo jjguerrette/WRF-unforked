@@ -26,13 +26,13 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
    type (xbx_type),intent(inout)     :: xbx                           ! Header & non-gridded vars.
    type (be_type), intent(in)        :: be                            ! background error structure.
    type (iv_type), intent(inout)     :: iv                            ! ob. increment vector.
-   real, intent(inout)               :: cv(1:cv_size)                 ! control variable (local).
+   real*8, intent(inout)               :: cv(1:cv_size)                 ! control variable (local).
    type (y_type), intent(inout)      :: re                            ! residual (o-a) structure.
    type (y_type), intent(inout)      :: y                             ! y = H(x_inc) structure.
-   real, intent(out)                 :: xhat(1:cv_size)               ! control variable (local).
+   real*8, intent(out)                 :: xhat(1:cv_size)               ! control variable (local).
    type (j_type), optional, intent(out) :: j_cost                        ! cost function
 
-   real, optional, intent(out)       :: qhat(1:cv_size, 0:ensdim_svd) ! orthonormal basis set of A = Q * B * Q^T
+   real*8, optional, intent(out)       :: qhat(1:cv_size, 0:ensdim_svd) ! orthonormal basis set of A = Q * B * Q^T
    real*8, optional, intent(out)     :: eignvec(ensdim_svd, ensdim_svd)
    real*8, optional, intent(out)     :: eignval(ensdim_svd)
    integer, optional, intent(out)    :: neign                         ! Number of non-truncated eigenpairs
@@ -61,12 +61,12 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
 
 
    type (y_type)                :: jo_grad_y    ! Grad_y(jo)
-   real                         :: grad_jo(cv_size)
+   real*8                       :: grad_jo(cv_size)
 
    integer                      :: nall(num_ob_indexes)
    integer, allocatable         :: nobs(:)
    
-   integer                      :: iens, jens, nens, i, j, ccount
+   integer                      :: iens, jens, nens, i, j, ccount, itype
 #if (WRF_CHEM != 1)
 #ifdef CLOUD_CV
    integer          :: mz(13)
@@ -432,13 +432,14 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
          do i = 1, neign
             LAM(i) = - (eignval(i) - 1.D0) / eignval(i)
          end do
-         xhat = ghat
+         itype = 2
 
          write(unit=stdout,fmt='(A)') 'Carrying out RIOT-51 LRU'
       else
          do i = 1, neign
             LAM(i) = 1.D0 / eignval(i)
          end do
+         itype = 1
 
          write(unit=stdout,fmt='(A)') 'Carrying out RIOT-51 LRA'
       end if
@@ -446,13 +447,17 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
       call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
                              nens,nens,neign, &
                              LAM,eignvec,qhat, &
-                             ghat,xhat)
+                             ghat,xhat,.true.)
+
+      if (itype .eq. 2) then !LRU
+         xhat = xhat + ghat
+      end if
 
       deallocate(KMAT)
       deallocate(nuhat_T)
 
    else
-      write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: svd_stage should be 0, 1, or 2, not ',svd_stage
+      write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: For RSVD5.1, svd_stage should be 0, 1, 2, 3, or 4, not ',svd_stage
       CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
    end if
    if (trace_use) call da_trace_exit("da_randomise_svd_51")

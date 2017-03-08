@@ -13,10 +13,9 @@ subroutine da_calculate_grady_chem_acft(iv, re, jo_grad_y)
    integer :: n, ichem, iplt
    
    if (trace_use) call da_trace_entry("da_calculate_grady_chem_acft")       
-
-   do n=1, iv%info(chem_acft)%nlocal
-      do ichem = 1, num_chem_acft-1
-         do iplt = 1, num_platform
+   do iplt = 1, num_platform
+      do n=1, iv%info(chem_acft)%nlocal
+         do ichem = 1, num_chem_acft-1
              if (iv%chem_acft(n)%chem(ichem,iplt)%qc < obs_qc_pointer) re%chem_acft(n)%chem(ichem,iplt) = 0.0
              jo_grad_y%chem_acft(n)%chem(ichem,iplt) = &
                -re%chem_acft(n)%chem(ichem,iplt) / (iv%chem_acft(n)%chem(ichem,iplt)%error * iv%chem_acft(n)%chem(ichem,iplt)%error)

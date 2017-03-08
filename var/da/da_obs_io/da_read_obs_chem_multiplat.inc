@@ -13,8 +13,8 @@ subroutine da_read_obs_chem_multiplat(grid, iv, io_config)
    character,      intent(in)    :: io_config     ! 'r' = Read; 'w' = Write
 
    integer                           :: iobs, jobs, itime, ichem, iplt, iunit, dummyi, &
-                                                 nsurf, nacft, iostat, nrepeat, &
-                                                 ilocal
+                                                 nsurf, nacft, iostat, nrepeat !, &
+!                                                 ilocal
    integer, dimension(num_surf_obs)  :: repeat_obs
    real, dimension(num_surf_obs)     :: tis, tfs, iis, jjs, kks
    real, dimension(:,:), allocatable :: chem_s
@@ -198,13 +198,13 @@ subroutine da_read_obs_chem_multiplat(grid, iv, io_config)
 !
 !#endif
 
-      ilocal = 0
+!      ilocal = 0
       do iobs=1,nsurf
          allocate ( iv%chem_surf(iobs)%chem (num_chem_surf-1) )
          allocate ( iv%chem_surf(iobs)%weight (num_chem_surf-1) )
          if (floor(tis(iobs)) .GE. 1 .AND. &
              ceiling(tfs(iobs)) .LE. num_ts) THEN
-            ilocal = ilocal + 1
+!            ilocal = ilocal + 1
             iv%info(chem_surf)%i(:,iobs) = INT( iis(iobs) + 0.5D0 )
             iv%info(chem_surf)%j(:,iobs) = INT( jjs(iobs) + 0.5D0 )
             iv%info(chem_surf)%k(:,iobs) = INT( kks(iobs) + 0.5D0 )
@@ -434,10 +434,10 @@ subroutine da_read_obs_chem_multiplat(grid, iv, io_config)
          end do
 #endif
 
-         ilocal = 0
+!         ilocal = 0
          do itime=1,num_ts
             if ( grid%acft_obs_count(itime,iplt) > 0 ) THEN
-               ilocal = ilocal + 1
+!               ilocal = ilocal + 1
                iv%info(chem_acft)%i(iplt,itime) = INT( grid%i_acft(itime,iplt) + 0.5D0 )
                iv%info(chem_acft)%j(iplt,itime) = INT( grid%j_acft(itime,iplt) + 0.5D0 )
                iv%chem_acft(itime)%ti = REAL((itime-1) * time_step, 8) / 3600.0
@@ -445,7 +445,6 @@ subroutine da_read_obs_chem_multiplat(grid, iv, io_config)
                do ichem = 1, num_chem_acft-1
                   iv%chem_acft(itime)%chem(ichem,iplt)%inv = chem_a_avg(itime,ichem)
                   iv%chem_acft(itime)%chem(ichem,iplt)%error = sqrt( chem_VARa(itime,ichem) )
-!!               iv%chem_acft(itime)%chem(ichem,iplt)%error = 0.3
                   iv%chem_acft(itime)%chem(ichem,iplt)%qc = 0
                   iv%chem_acft(itime)%weight(ichem,iplt) = 1.D0
                end do
@@ -484,8 +483,9 @@ subroutine da_read_obs_chem_multiplat(grid, iv, io_config)
    if (io_config == 'w') then
       call da_message((/"Writing out chem AIRCRAFT observations"/))
 
+      nacft = num_ts
+
       do iplt = 1, num_platform
-         nacft = num_ts
 
          if(rootproc) then
             allocate( tia( num_ts ) )

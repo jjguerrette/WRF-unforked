@@ -15,9 +15,9 @@
 
    type (xbx_type)              :: xbx         ! For header & non-grid arrays.
    type (be_type)               :: be          ! Background error structure.
-   real, allocatable            :: cvt(:)      ! Control variable structure.
-   real, allocatable            :: xhat(:)     ! Control variable structure.
-   real, allocatable            :: qhat(:,:)   ! Control variable structure.
+   real*8, allocatable          :: cvt(:)      ! Control variable structure.
+   real*8, allocatable          :: xhat(:)     ! Control variable structure.
+   real*8, allocatable          :: qhat(:,:)   ! Control variable structure.
    real*8, allocatable          :: eignvec(:,:)
    real*8, allocatable          :: eignval(:)   
 !   real, allocatable            :: full_eignvec(:)   

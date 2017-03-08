@@ -23,8 +23,8 @@ subroutine da_check_max_iv_chem_acft(iv,ob, it, num_qcstat_conv)
    ! [1.0] Perform maximum innovation vector check:
    !---------------------------------------------------------------------------
 
-   do ichem = 1, num_chem_acft-1
    do iplt = 1, num_platform
+   do ichem = 1, num_chem_acft-1
    do n=iv%info(chem_acft)%n1,iv%info(chem_acft)%n2
       failed=.false.
       if ( iv%chem_acft(n)%chem(ichem,iplt)%qc >= obs_qc_pointer ) then 

@@ -22,9 +22,9 @@ subroutine da_residual_chem_acft(iv, y, re, np_missing, np_bad_data, np_obs_used
 
    n_obs_bad % chem_acft % num = number_type(0, 0, 0)
 
-   do n=1, iv%info(chem_acft)%nlocal
-      do ichem = 1, num_chem_acft-1
-         do iplt = 1, num_platform
+   do iplt = 1, num_platform
+      do n=1, iv%info(chem_acft)%nlocal
+         do ichem = 1, num_chem_acft-1
             np_available = np_available + 1
             re%chem_acft(n)%chem(ichem,iplt) = da_residual(n, 0, y%chem_acft(n)%chem(ichem,iplt), iv%chem_acft(n)%chem(ichem,iplt), n_obs_bad % chem_acft) 
          end do

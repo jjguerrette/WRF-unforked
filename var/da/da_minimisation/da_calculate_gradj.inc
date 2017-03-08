@@ -19,9 +19,9 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
    type (xbx_type),intent(inout)      :: xbx    ! For header & non-grid arrays.
    type (be_type), intent(in)         :: be     ! background error structure.
    type (iv_type), intent(inout)      :: iv     ! innovation vector (o-b).
-   real, intent(in)                   :: cv     (1:cv_size)   ! control variables.
+   real*8, intent(in)                 :: cv     (1:cv_size)   ! control variables.
    type (y_type), intent(inout)       :: y
-   real, intent(out)                  :: grad(cv_size)        ! gradient of cost function
+   real*8, intent(out)                :: grad(cv_size)        ! gradient of cost function
    type (y_type), optional, intent(inout) :: re     ! residual vector (o-a).
    
    type(domain), intent(inout)  :: grid
@@ -135,14 +135,14 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
       
    call da_deallocate_y(jo_grad_y)
 
+#if defined(LAPACK)
+   if ( .not. use_randomsvd ) then
+#endif
+
    !-------------------------------------------------------------------------
    ! [2.0] calculate grad_v (jb):
    !-------------------------------------------------------------------------
    if (cv_size_jb > 0) grad_jb(1:cv_size_jb) = jb_factor * cv(1:cv_size_jb)
-
-#if defined(LAPACK)
-   if ( .not. use_randomsvd ) then
-#endif
 
    !-------------------------------------------------------------------------
    ! [3.0] calculate grad_v (je):

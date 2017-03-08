@@ -17,10 +17,9 @@ subroutine da_force_grad_chem_acft(iv, y, jo_grad_y, ensmember, obscount)
    if (trace_use) call da_trace_entry("da_force_grad_chem_acft")       
 
    obscount = 0
-
-   do n=1, iv%info(chem_acft)%nlocal
-      do ichem = 1, num_chem_acft-1
-         do iplt = 1, num_platform
+   do iplt = 1, num_platform
+      do n=1, iv%info(chem_acft)%nlocal
+         do ichem = 1, num_chem_acft-1
              if (iv%chem_acft(n)%chem(ichem,iplt)%qc < obs_qc_pointer) y%chem_acft(n)%chem(ichem,iplt) = 0.0
              if (abs(iv%chem_acft(n)%chem(ichem,iplt)%inv) .gt. 1.D-12) obscount = obscount + 1
              if (obscount .eq. ensmember) jo_grad_y%chem_acft(n)%chem(ichem,iplt) = &

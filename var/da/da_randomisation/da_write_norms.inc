@@ -25,7 +25,6 @@ subroutine da_write_norms(    EUCNORM_x, FROBNORM_Pa, SPECNORM_Pa, &
 
    real*8                       :: vals(2)
    character(len=filename_len)  :: filename
-   character*3                  :: stat
    integer                      :: itype
    integer                      :: ounit, iostat
 
@@ -39,50 +38,55 @@ subroutine da_write_norms(    EUCNORM_x, FROBNORM_Pa, SPECNORM_Pa, &
                filename = "EUCNORM_x_"//trim(suffix)
             case (2)
                vals = EUCNORM_v
-               filename = "EUCNORM_v"//trim(suffix)
+               filename = "EUCNORM_v_"//trim(suffix)
             case (3)
                vals = EUCNORM_xPa
-               filename = "EUCNORM_xPa"//trim(suffix)
+               filename = "EUCNORM_xPa_"//trim(suffix)
             case (4)
                vals = FROBNORM_Pa
-               filename = "FROBNORM_Pa"//trim(suffix)
+               filename = "FROBNORM_Pa_"//trim(suffix)
             case (5)
                vals = FROBNORM_Pav
-               filename = "FROBNORM_Pav"//trim(suffix)
+               filename = "FROBNORM_Pav_"//trim(suffix)
             case (6)
                vals = FROBNORM_PaPa
-               filename = "FROBNORM_PaPa"//trim(suffix)
+               filename = "FROBNORM_PaPa_"//trim(suffix)
             case (7)
                vals = SPECNORM_Pa
-               filename = "SPECNORM_Pa"//trim(suffix)
+               filename = "SPECNORM_Pa_"//trim(suffix)
             case (8)
                vals = SPECNORM_Pav
-               filename = "SPECNORM_Pav"//trim(suffix)
+               filename = "SPECNORM_Pav_"//trim(suffix)
             case (9)
                vals = SPECNORM_PaPa
-               filename = "SPECNORM_PaPa"//trim(suffix)
+               filename = "SPECNORM_PaPa_"//trim(suffix)
          end select
-         if (neign .eq. 1) then
-            stat = 'REPLACE'
-         else
-            stat = 'OLD'
-         end if
          if(rootproc) then
             ! =========
             ! open file
             ! =========
             call da_get_unit(ounit)
-            open(unit   = ounit,     &
-               FILE   = trim(filename), &
-               FORM   = 'FORMATTED',  &
-               ACCESS = 'SEQUENTIAL', &
-               iostat =  iostat,     &
-               STATUS = trim(stat))
+            if (neign .eq. 1) then
+               open(unit   = ounit,     &
+                  FILE   = trim(filename), &
+                  FORM   = 'FORMATTED',  &
+                  ACCESS = 'SEQUENTIAL', &
+                  iostat =  iostat,     &
+                  STATUS = 'REPLACE')
+            else
+               open(unit   = ounit,     &
+                  FILE   = trim(filename), &
+                  FORM   = 'FORMATTED',  &
+                  POSITION = 'APPEND', &
+                  iostat =  iostat,     &
+                  STATUS = 'UNKNOWN')
+
+            end if
 
             if (iostat /= 0) then
-               write(unit=message(1),fmt='(A,I5)') "Error message: ",iostat
+               write(unit=message(1),fmt='(A,I5, I5, A)') "Error message: ",iostat, itype, trim(filename)
                call da_warning(__FILE__,__LINE__,message(1:1))
-               call da_wrf_error_fatal('Error opening surface Hx_y file')
+               call da_wrf_error_fatal('Error opening NORM file')
             end if
             write(ounit,fmt='(I6,2E27.16E3)') neign, vals
 

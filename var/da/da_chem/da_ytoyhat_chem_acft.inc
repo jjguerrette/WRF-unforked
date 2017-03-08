@@ -24,9 +24,9 @@ subroutine da_ytoyhat_chem_acft(iv, y, yhat)
       yhat(:) = 0.D0
 
       iobs = 1
-      do n=1, iv%info(chem_acft)%nlocal
-         do ichem = 1, num_chem_acft-1
-            do iplt = 1, num_platform
+      do iplt = 1, num_platform
+         do n=1, iv%info(chem_acft)%nlocal
+            do ichem = 1, num_chem_acft-1
 
 !!!JJG - !!write(unit=stdout,fmt='("DEBUG_01:",3I5,2D25.14)') n,ichem,iplt,y%chem_acft(n)%chem(ichem,iplt),iv%chem_acft(n)%chem(ichem,iplt)%error
 

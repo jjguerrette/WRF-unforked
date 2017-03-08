@@ -26,13 +26,13 @@ subroutine da_calculate_hessian(grid, config_flags, &
    type (xbx_type),intent(inout)     :: xbx                           ! Header & non-gridded vars.
    type (be_type), intent(in)        :: be                            ! background error structure.
    type (iv_type), intent(inout)     :: iv                            ! ob. increment vector.
-   real, intent(inout)               :: cv(1:cv_size)                 ! control variable (local).
+   real*8, intent(inout)             :: cv(1:cv_size)                 ! control variable (local).
    type (y_type), intent(inout)      :: re                            ! residual (o-a) structure.
    type (y_type), intent(inout)      :: y                             ! y = H(x_inc) structure.
-   real, intent(out)                 :: xhat(1:cv_size)               ! control variable (local).
+   real*8, intent(out)               :: xhat(1:cv_size)               ! control variable (local).
    type (j_type), optional, intent(out) :: j_cost                        ! cost function
 
-   real, optional, intent(out)       :: qhat(1:cv_size, 0:ensdim_svd) ! orthonormal basis set of A = Q * B * Q^T
+   real*8, optional, intent(out)     :: qhat(1:cv_size, 0:ensdim_svd) ! orthonormal basis set of A = Q * B * Q^T
    real*8, optional, intent(out)     :: eignvec(ensdim_svd, ensdim_svd)
    real*8, optional, intent(out)     :: eignval(ensdim_svd)
    integer, optional, intent(out)    :: neign                         ! Number of non-truncated eigenpairs
@@ -54,12 +54,12 @@ subroutine da_calculate_hessian(grid, config_flags, &
    real(wp), allocatable       :: dumcv_g(:)
 
    type (y_type)                :: jo_grad_y    ! Grad_y(jo)
-   real                         :: grad_jo(cv_size)
+   real*8                       :: grad_jo(cv_size)
 
    integer                      :: nall(num_ob_indexes)
    integer, allocatable         :: nobs(:)
    
-   integer                      :: iens, jens, nyobs, i, j, ccount
+   integer                      :: iens, jens, nyobs, i, j, ccount, itype
 #if (WRF_CHEM != 1)
 #ifdef CLOUD_CV
    integer          :: mz(13)
@@ -74,7 +74,7 @@ subroutine da_calculate_hessian(grid, config_flags, &
 #endif
 #endif
    integer                      :: jp_start, jp_end       ! Start/end indices of Jp.
-   real                         :: ghat(1:cv_size)        ! cv copy.
+   real*8                       :: ghat(1:cv_size)        ! cv copy.
    integer                      :: info
 
    real*8                       :: beta
@@ -203,10 +203,11 @@ subroutine da_calculate_hessian(grid, config_flags, &
 !         dumcv = AMAT(iens,1:cv_size)
          dumcv = AMAT(1:cv_size,iens)
 
-
-         write(cens,fmt='(i4.4)') iens
-         filename = 'dumcv.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
-         call da_cv_io ('w', filename, cv_size, dumcv)
+!REMOVE THIS, JUST ADDS TO FOOTPRINT
+!         write(cens,fmt='(i4.4)') iens
+!         filename = 'dumcv.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+!         call da_cv_io ('w', filename, cv_size, dumcv)
+!REMOVE THIS, JUST ADDS TO FOOTPRINT
 
          call da_cv_to_global(cv_size, cv_size_domain, dumcv, grid, mz, dumcv_g)
 
@@ -271,13 +272,16 @@ subroutine da_calculate_hessian(grid, config_flags, &
 
       neign = nyobs
 
-      ! Write nuhat vectors to disk
-      do i = 1, neign
-         write(unit=stdout,fmt='("Writing nuhat vectors to disk: ",i3)') i
-         write(cens,fmt='(i4.4)') i
-         filename = 'nuhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
-         call da_cv_io ('w', filename, cv_size, nuhat(1:cv_size,i))
-      end do
+!REMOVE THIS, JUST ADDS TO FOOTPRINT
+!      ! Write nuhat vectors to disk
+!      do i = 1, neign
+!         write(unit=stdout,fmt='("Writing nuhat vectors to disk: ",i3)') i
+!         write(cens,fmt='(i4.4)') i
+!         filename = 'nuhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+!         call da_cv_io ('w', filename, cv_size, nuhat(1:cv_size,i))
+!      end do
+!REMOVE THIS, JUST ADDS TO FOOTPRINT
+
 
       write(cnyobs,fmt='(I0)') neign
       write(unit=stdout,fmt='(A,'//trim(cnyobs)//'E25.16E3)') 'Eigenvalues(r): ',LAM(1:ensdim_svd)
@@ -296,13 +300,14 @@ subroutine da_calculate_hessian(grid, config_flags, &
          do i = 1, neign
             LAM(i) = -(eignval(i) - 1.D0) / eignval(i)
          end do
-         xhat = ghat
+         itype = 2
 
          write(unit=stdout,fmt='(A)') 'Carrying out Full-SVD LRU'
       else
          do i = 1, neign
             LAM(i) = 1.D0 / eignval(i)
          end do
+         itype = 1
 
          write(unit=stdout,fmt='(A)') 'Carrying out Full-SVD LRA'
       end if
@@ -310,19 +315,23 @@ subroutine da_calculate_hessian(grid, config_flags, &
       call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
                              neign,neign,neign,&
                              LAM,eignvec,qhat,&
-                             ghat,xhat)
+                             ghat,xhat,.true.)
 
-      deallocate(AMAT)
-      deallocate(nuhat)
+      if (itype .eq. 2) then !LRU
+         xhat = xhat + ghat
+      end if
 
       if (nens_compare .gt. 0) then
          call da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
                                           neign, eignval, eignvec, qhat, &
-                                          ghat, xhat)
+                                          ghat, xhat, AMAT)
       end if
 
+      deallocate(AMAT)
+      deallocate(nuhat)
+
    else
-      write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: svd_stage should be 0, 1, or 2, not ',svd_stage
+      write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: For HESS SVD, svd_stage should be 0, 1, or 2, not ',svd_stage
       CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
    end if
    if (trace_use) call da_trace_exit("da_calculate_hessian")

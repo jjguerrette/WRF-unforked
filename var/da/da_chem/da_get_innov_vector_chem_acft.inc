@@ -18,9 +18,9 @@ subroutine da_get_innov_vector_chem_acft( it, num_qcstat_conv, ob, iv)
    if (trace_use) call da_trace_entry("da_get_innov_vector_chem_acft")
 
    if ( it > 1 ) then
-      do n=iv%info(chem_acft)%n1,iv%info(chem_acft)%n2
-         do ichem = 1, num_chem_acft-1
-            do iplt = 1, num_platform
+      do iplt = 1, num_platform
+         do n=iv%info(chem_acft)%n1,iv%info(chem_acft)%n2
+            do ichem = 1, num_chem_acft-1
                if (iv%chem_acft(n)%chem(ichem,iplt)%qc == fails_error_max) iv%chem_acft(n)%chem(ichem,iplt)%qc = 0
             end do
          end do
@@ -30,8 +30,8 @@ subroutine da_get_innov_vector_chem_acft( it, num_qcstat_conv, ob, iv)
    ! [0.0]  Get chem acft conc.
 
    allocate (model_chem(iv%info(chem_acft)%n1:iv%info(chem_acft)%n2))
-   do ichem = 1 ,num_chem_acft-1
-      do iplt = 1, num_platform
+   do iplt = 1, num_platform
+      do ichem = 1 ,num_chem_acft-1
          do n=iv%info(chem_acft)%n1,iv%info(chem_acft)%n2
          
             ! [1.0] Get horizontal interpolation weights: 
