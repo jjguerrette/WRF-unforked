@@ -412,7 +412,7 @@ rconfig   logical   hess_comp_Pa_LRU        namelist,wrfvar6  1  .false.  - "hes
 rconfig   logical   hess_comp_Pa_LRA        namelist,wrfvar6  1  .false.  - "hess_comp_Pa_LRA"         ""  ""
 rconfig   logical   hess_comp_PaPa_LRU      namelist,wrfvar6  1  .false.  - "hess_comp_PaPa_LRU"             ""  ""
 rconfig   logical   hess_comp_PaPa_LRA      namelist,wrfvar6  1  .false.  - "hess_comp_PaPa_LRA"             ""  ""
-rconfig   real      scale_hcheck            namelist,wrfvar6  1  2.0       - "scale_hcheck"                ""  ""
+rconfig   real      scale_hcheck            namelist,wrfvar6  1  1.0       - "scale_hcheck"                ""  ""
 rconfig   integer   ensmember               namelist,wrfvar6  1  0        - "ensmember"                ""  ""
 rconfig   integer   svd_p                   namelist,wrfvar6  1  0        - "svd_p"                    ""  ""
 rconfig   integer   svd_outer               namelist,wrfvar6  1  0        - "svd_outer"                ""  ""

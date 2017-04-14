@@ -129,6 +129,9 @@ contains
 #include "da_evaluate_decomp.inc"
 #include "da_evaluate_decomp_init.inc"
 #include "da_write_norms.inc"
+#include "da_evaluate_increment.inc"
+#include "da_evaluate_hessian.inc"
+#include "da_gen_omega.inc"
 
 #include "da_randomise_svd_B.inc"
 #include "da_randomise_svd_B11.inc"

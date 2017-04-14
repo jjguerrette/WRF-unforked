@@ -82,6 +82,9 @@
 #endif
 
 #if (WRF_CHEM == 1)
+   real*8, allocatable          :: xhat_prev(:)     ! Control variable structure.
+   integer                      :: neign_trunc
+
    character(len=2) :: itc
    integer          :: cv_s, cv_e, cv_s_ant, cv_e_ant, cv_s_bb, cv_e_bb
 #endif
@@ -1247,6 +1250,61 @@
 
 !         cvtfile_svd = 'xhat.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
 !         call da_cv_io ('w', cvtfile_svd, cv_size, xhat(1:cv_size))
+      end if
+#endif
+#if (WRF_CHEM == 1)
+      if (osse_chem) then
+         if((svd_outer.gt.1.and.svd_minimise.and.use_randomsvd) .or. &
+            (it.gt.1.and..not.use_randomsvd)) then
+
+            if(use_randomsvd) then
+               write(cproc,fmt='(i4.4)') myproc
+               write(cit,fmt='(i2.2)') svd_outer-1
+
+               allocate(xhat_prev(1:cv_size))
+               cvtfile_svd = 'xhat.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
+               call da_cv_io ('r', cvtfile_svd, cv_size, xhat_prev(1:cv_size))
+
+               neign = ensdim_svd
+               neign_trunc = ensdim_svd
+            else
+               neign_trunc = neign
+               neign = ntmax(it)
+            end if
+
+            call da_evaluate_increment(grid, xbx, be, mz, cv_size, &
+                                        xhat_prev, xhat)
+
+            deallocate(xhat_prev)
+
+         end if
+         if(svd_minimise.and.use_randomsvd) then
+            write(cproc,fmt='(i4.4)') myproc
+            write(cit,fmt='(i2.2)') svd_outer
+            cvtfile_svd = 'xhat.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
+            call da_cv_io ('w', cvtfile_svd, cv_size, xhat(1:cv_size))
+         else if(it .lt. max_ext_its .and. .not.use_randomsvd) then
+            allocate(xhat_prev(1:cv_size))
+            xhat_prev = xhat
+         end if
+
+! Just do this always, because it's cheap
+!         if((svd_outer.gt.1.and..not.svd_minimise.and.use_randomsvd) .or. &
+!            (it.eq.max_ext_its.and..not.use_randomsvd)) then
+
+            if(use_randomsvd) then
+               neign = ensdim_svd
+               neign_trunc = ensdim_svd
+            else
+               neign_trunc = neign
+               neign = ntmax(it)
+            end if
+
+            call da_evaluate_hessian(grid, xbx, be, mz, cv_size, &
+                                   floor(scale_hcheck*real(neign,8)), &
+                                   neign, neign_trunc, &
+                                   eignval, eignvec, qhat)
+!         end if
       end if
 #endif
 

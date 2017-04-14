@@ -1,0 +1,250 @@
+#if defined(LAPACK)
+subroutine da_evaluate_hessian(grid, xbx, be, mz, cv_size, &
+                              rankA, neign, neign_trunc, &
+                              eignval_all, eignvec_all, qhat)
+
+   !-------------------------------------------------------------------------
+   ! Purpose:   Evaluate inverse Hessian convergence
+   !
+   ! Called from da_main
+   !
+   ! History: 02/22/2017  Creation (JJ Guerrette)
+   !
+   !-------------------------------------------------------------------------
+
+   implicit none
+
+   type (domain),  intent(inout) :: grid
+   type (xbx_type),intent(inout) :: xbx     ! Header & non-gridded vars.
+   type (be_type), intent(in)    :: be      ! background error structure.
+   integer,        intent(in) :: cv_size
+
+   integer, intent(in)        :: mz(:)
+
+   integer, intent(in) :: rankA, neign, neign_trunc
+   real*8,  intent(in) :: eignvec_all(neign, neign)
+   real*8,  intent(in) :: eignval_all(neign)
+   real*8,  intent(in) :: qhat(cv_size, 0:neign)
+
+   !Check Variables
+   real(wp)        :: UTomega(cv_size)
+   real(wp), allocatable  :: omega_Pa(:,:)
+   real(wp), allocatable  :: yhat_Pa(:,:)
+   real(wp), allocatable  :: yhat_Pa_prev(:,:)
+   real(wp), allocatable  :: yhat_Pa_curr(:,:)
+   real(wp), allocatable  :: qhat_Pa(:,:)
+
+   real*8          :: temp
+   real*8          :: eignvec_res(rankA,rankA)
+   real*8          :: eignval_res(rankA)
+   real*8          :: LAM(neign)
+
+   integer         :: iens, i, j, k, ij, ic, itype, dummy, iter
+   real*8          :: FROBNORM_Pa, SPECNORM_Pa
+
+   integer         :: jp_start, jp_end
+
+   if (trace_use) call da_trace_entry("da_evaluate_hessian")
+
+   jp_start   = be % cv % size_jb + be % cv % size_je + 1
+   jp_end     = be % cv % size_jb + be % cv % size_je + be % cv % size_jp
+
+   FROBNORM_Pa=0.D0; SPECNORM_Pa=0.D0
+
+   !=====================================================================
+   ! Compare Pa_approx to Pa_prev
+   !    Pa  - posterior covariance in state x-space
+   !=====================================================================
+
+   !---------------
+   ! ||Pa_ - Pa||
+   !---------------
+   write(unit=stdout,fmt='(A)') 'Initialize OMEGA_Pa'
+
+   call da_gen_omega(omega_Pa, cv_size, rankA, grid, mz)
+
+   allocate(yhat_Pa(cv_size,1:rankA))
+   allocate(yhat_Pa_curr(cv_size,1:rankA))
+   allocate(yhat_Pa_prev(cv_size,1:rankA))
+
+
+!!DIFFERENT FROM HERE ON
+
+   write(unit=stdout,fmt='(A)') 'Perform RSVD on the error residual (Pa_ - Pa)'
+!   do itype = 1, 2
+   do itype = 2, 2
+      if (itype .eq. 1) then !LRA
+         write(unit=stdout,fmt='(A)') 'LRA'
+         do i = 1, neign
+            LAM(i) = 1.D0 / eignval_all(i)
+         end do
+
+      end if
+
+      if (itype .eq. 2) then !LRU
+         write(unit=stdout,fmt='(A)') 'LRU'
+         do i = 1, neign
+            LAM(i) = - (eignval_all(i) - 1.D0) / eignval_all(i)
+         end do
+      end if
+
+      write(unit=stdout,fmt='(A)') ' iter    SPECNORM_Pa    FROBNORM_Pa'
+
+      do iter = 1, neign
+         if (iter .gt. 1) then
+            do iens = 1, rankA
+               yhat_Pa_prev(:,iens) = yhat_Pa_curr(:,iens)
+            end do
+         end if
+
+         !Generate yhat for current rank (iter)
+         yhat_Pa_curr = 0.D0
+
+         !Assumes 1-to-1 size between, e.g., scaleant+scalebb and xhat (SQUARE U)
+         do iens = 1, rankA
+            !Transfer random cv vector to vv and vch
+            call da_cv_to_vv(cv_size, omega_Pa(1:be%cv%size_jb, iens), &
+                             mz, grid%vv, &
+#if (WRF_CHEM == 1)
+                             grid%vch  &
+#endif
+                             )
+
+            ! Transfer vch (and vv later) to xach (and xa later)
+#if (WRF_CHEM == 1)
+            !$OMP PARALLEL DO &
+            !$OMP PRIVATE ( ij, ic, k, j, i)
+            do ij = 1 , grid%num_tiles
+               do ic = PARAM_FIRST_SCALAR, num_scaleant
+                  grid%xach%alpha_ant(its:ite,jts:jte,:,ic) = 0.D0
+                  do k = 1, num_ant_steps    !LEVELS
+                     do j = jts, jte
+                        do i = its, ite
+                            grid%xach%alpha_ant (i,j,k,ic) = grid%vch%alpha_ant (i,j,k,ic)
+                        end do
+                     end do
+                  end do
+               end do
+            end do
+            !$OMP END PARALLEL DO
+
+            !$OMP PARALLEL DO &
+            !$OMP PRIVATE ( ij, ic, k, j, i)
+            do ij = 1 , grid%num_tiles
+               do ic = PARAM_FIRST_SCALAR, num_scalebb
+                  grid%xach%alpha_bb(its:ite,jts:jte,:,ic) = 0.D0
+                  do k = 1, num_bb_steps    !LEVELS
+                     do j = jts, jte
+                        do i = its, ite
+                            grid%xach%alpha_bb (i,j,k,ic) = grid%vch%alpha_bb (i,j,k,ic)
+                        end do
+                     end do
+                  end do
+               end do
+            end do
+            !$OMP END PARALLEL DO
+#endif
+
+            ! Calculate U^T * omega (inputs: xa and xach; output: UTomega)
+            UTomega = 0.D0
+            call da_transform_vtox_adj(grid, be%cv%size_jb, xbx, be, grid%ep, grid%vp, grid%vv, &
+                                      UTomega(1:be%cv%size_jb), &
+#if (WRF_CHEM == 1)
+                                      grid%vch &
+#endif
+                                      )
+
+            yhat_Pa_curr(:,iens) = 0.D0
+            !yhat_v = Pav * U^T * omega
+            call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
+                                   neign,neign_trunc,iter, &
+                                   LAM,eignvec_all,qhat, &
+                                   UTomega,yhat_Pa_curr(:,iens))
+
+            !Pa * omega = U * Pav * U^T * omega
+            ! outputs: xa, xach
+            call da_transform_vtox(grid, be%cv%size_jb, xbx, be, grid%ep, &
+                                   yhat_Pa_curr(1:be%cv%size_jb,iens), grid%vv, grid%vp, grid%vch)
+
+            yhat_Pa_curr(:,iens) = 0.D0
+            ! Transfer vch (and vv later) from xach (and xa later)
+#if (WRF_CHEM == 1)
+            !$OMP PARALLEL DO &
+            !$OMP PRIVATE ( ij, ic, k, j, i)
+            do ij = 1 , grid%num_tiles
+               do ic = PARAM_FIRST_SCALAR, num_scaleant
+                  grid%vch%alpha_ant(its:ite,jts:jte,:,ic) = 0.D0
+                  do k = 1, num_ant_steps    !LEVELS
+                     do j = jts, jte
+                        do i = its, ite
+                            grid%vch%alpha_ant (i,j,k,ic) = grid%xach%alpha_ant (i,j,k,ic)
+                        end do
+                     end do
+                  end do
+               end do
+            end do
+            !$OMP END PARALLEL DO
+
+            !$OMP PARALLEL DO &
+            !$OMP PRIVATE ( ij, ic, k, j, i)
+            do ij = 1 , grid%num_tiles
+               do ic = PARAM_FIRST_SCALAR, num_scalebb
+                  grid%vch%alpha_bb(its:ite,jts:jte,:,ic) = 0.D0
+                  do k = 1, num_bb_steps    !LEVELS
+                     do j = jts, jte
+                        do i = its, ite
+                            grid%vch%alpha_bb (i,j,k,ic) = grid%xach%alpha_bb (i,j,k,ic)
+                        end do
+                     end do
+                  end do
+               end do
+            end do
+            !$OMP END PARALLEL DO
+#endif
+
+            !Transfer vch (and later vv) to yhat_Pa_curr
+            call da_vv_to_cv(grid%vv, grid%xp, mz, cv_size, &
+                             yhat_Pa_curr(1:be%cv%size_jb, iens) &
+#if (WRF_CHEM == 1)
+                             , grid%vch &
+#endif
+                              )
+
+         end do
+
+         if ( iter .gt. 1) then
+            do iens = 1, rankA
+              !Subtract (Pa_i * OMEGA - Pa_i-1 * OMEGA)
+              yhat_Pa(:,iens) = yhat_Pa_curr(:,iens) - yhat_Pa_prev(:,iens)
+            end do
+
+            allocate(qhat_Pa(cv_size,0:rankA))
+
+            call da_gram_schmidt(grid,mz,jp_start,jp_end, &
+                                  yhat_Pa_curr,qhat_Pa,cv_size,rankA)
+
+            call da_rsvd56(grid, mz, jp_start, jp_end, &
+                           omega_Pa, yhat_Pa_curr, qhat_Pa, cv_size, &
+                           eignval_res, eignvec_res, rankA, dummy)
+
+            deallocate(qhat_Pa)
+            eignval_res = eignval_res - 1.D0
+
+            !Evaluate Spectral/Frobenius norms from eigenvalues
+            SPECNORM_Pa = maxval(abs(eignval_res(1:dummy)))
+            FROBNORM_Pa = sqrt(sum(eignval_res(1:dummy)*eignval_res(1:dummy)))
+
+            write(unit=stdout,fmt='(I5,2D15.5)') iter, SPECNORM_Pa, FROBNORM_Pa
+         end if
+      end do
+   end do
+
+   deallocate(omega_Pa)
+   deallocate(yhat_Pa)
+   deallocate(yhat_Pa_prev)
+   deallocate(yhat_Pa_curr)
+
+   if (trace_use) call da_trace_exit("da_evaluate_hessian")
+
+end subroutine da_evaluate_hessian
+#endif

@@ -58,62 +58,64 @@ subroutine da_evaluate_decomp_init(grid, xbx, be, mz, jp_start, jp_end, cv_size,
    write(unit=stdout,fmt='(A)') 'Initialize Comparison'
 
    write(unit=stdout,fmt='(A)') 'Initialize OMEGA_Pa'
-   allocate(omega_Pav(1:cv_size,1:rank_rsvd_Pa))
+   call da_gen_omega(omega_Pav, cv_size, rank_rsvd_Pa, grid, mz)
 
-! Should make this into a subroutine --> inputs: cv_size, nens; outputs: omega
-#ifdef DM_PARALLEL
-   ! Generate global random omega matrix
-   ! Sequence from single global seed (non-repeating)
-   cv_size_domain = wrf_dm_sum_integer(cv_size)
-   if (rootproc) then
-      allocate(omega_g(1:cv_size_domain,rank_rsvd_Pa))
-      allocate(omega1d(1:cv_size_domain*rank_rsvd_Pa))
-      call da_set_randomcv(cv_size_domain*rank_rsvd_Pa, omega1d)
-      cv_s = 1
-      do iens = 1,rank_rsvd_Pa
-         cv_f = cv_s + cv_size_domain-1
-         omega_g(:,iens) = omega1d(cv_s:cv_f)
-         cv_s = cv_f+1
-      end do
-      deallocate(omega1d)
-   else
-      allocate(omega_g(1,1:rank_rsvd_Pa))
-   end if
-
-   call mpi_barrier(comm, ierr)
-
-   !Transfer to local omega
-   allocate(dumcv(1:cv_size))
-   allocate(dumcv_g(1:cv_size_domain))
-   do iens = 1, rank_rsvd_Pa
-      if(rootproc) then
-         dumcv_g = omega_g(:,iens)
-      else
-         dumcv_g = 0.D0
-      end if
-      dumcv = 0.D0
-
-      call da_global_to_cv(cv_size, cv_size_domain, dumcv, grid, mz, dumcv_g)
-      omega_Pav(:,iens) = dumcv
-
-      call mpi_barrier(comm, ierr)
-   end do
-   deallocate(dumcv)
-   deallocate(dumcv_g)
-   deallocate(omega_g)
-#else
-   ! Generate local=global omega
-   ! Single seed
-   allocate(omega1d(1:cv_size*rank_rsvd_Pa))
-   call da_set_randomcv(cv_size*rank_rsvd_Pa, omega1d)
-   cv_s = 1
-   do iens = 1,rank_rsvd_Pa
-      cv_f = cv_s + cv_size-1
-      omega_Pav(:,iens) = omega1d(cv_s:cv_f)
-      cv_s = cv_f+1
-   end do
-   deallocate(omega1d)
-#endif
+!   allocate(omega_Pav(1:cv_size,1:rank_rsvd_Pa))
+!
+!! Should make this into a subroutine --> inputs: cv_size, nens; outputs: omega
+!#ifdef DM_PARALLEL
+!   ! Generate global random omega matrix
+!   ! Sequence from single global seed (non-repeating)
+!   cv_size_domain = wrf_dm_sum_integer(cv_size)
+!   if (rootproc) then
+!      allocate(omega_g(1:cv_size_domain,rank_rsvd_Pa))
+!      allocate(omega1d(1:cv_size_domain*rank_rsvd_Pa))
+!      call da_set_randomcv(cv_size_domain*rank_rsvd_Pa, omega1d)
+!      cv_s = 1
+!      do iens = 1,rank_rsvd_Pa
+!         cv_f = cv_s + cv_size_domain-1
+!         omega_g(:,iens) = omega1d(cv_s:cv_f)
+!         cv_s = cv_f+1
+!      end do
+!      deallocate(omega1d)
+!   else
+!      allocate(omega_g(1,1:rank_rsvd_Pa))
+!   end if
+!
+!   call mpi_barrier(comm, ierr)
+!
+!   !Transfer to local omega
+!   allocate(dumcv(1:cv_size))
+!   allocate(dumcv_g(1:cv_size_domain))
+!   do iens = 1, rank_rsvd_Pa
+!      if(rootproc) then
+!         dumcv_g = omega_g(:,iens)
+!      else
+!         dumcv_g = 0.D0
+!      end if
+!      dumcv = 0.D0
+!
+!      call da_global_to_cv(cv_size, cv_size_domain, dumcv, grid, mz, dumcv_g)
+!      omega_Pav(:,iens) = dumcv
+!
+!      call mpi_barrier(comm, ierr)
+!   end do
+!   deallocate(dumcv)
+!   deallocate(dumcv_g)
+!   deallocate(omega_g)
+!#else
+!   ! Generate local=global omega
+!   ! Single seed
+!   allocate(omega1d(1:cv_size*rank_rsvd_Pa))
+!   call da_set_randomcv(cv_size*rank_rsvd_Pa, omega1d)
+!   cv_s = 1
+!   do iens = 1,rank_rsvd_Pa
+!      cv_f = cv_s + cv_size-1
+!      omega_Pav(:,iens) = omega1d(cv_s:cv_f)
+!      cv_s = cv_f+1
+!   end do
+!   deallocate(omega1d)
+!#endif
 
 !   do iens = 1, rank_rsvd_Pa
 !      write(unit=stdout,fmt='(A,I5,A,I5)') 'Initialize OMEGA_i, i = ', iens ,' of ',rank_rsvd_Pa
