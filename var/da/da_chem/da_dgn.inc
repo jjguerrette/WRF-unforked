@@ -1,4 +1,4 @@
-subroutine da_dgn( grid, cv_size, xbx, be, iv, xhat, cv, ob, config_flags, ja_total )
+subroutine da_dgn( grid, cv_size, xbx, be, iv, xhat, cv, ob, config_flags, ja_total)!, eta )
 
    !---------------------------------------------------------------------------
    ! Purpose: Scales the cv emission increments to improve convergence.
@@ -15,20 +15,21 @@ subroutine da_dgn( grid, cv_size, xbx, be, iv, xhat, cv, ob, config_flags, ja_to
    type (xbx_type),intent(inout)      :: xbx    ! For header & non-grid arrays.
    type (be_type), intent(in)         :: be     ! background error structure.
    type (iv_type), intent(inout)      :: iv     ! innovation vector (o-b).
-   real, intent(inout)                :: xhat(1:cv_size) ! control variables.
-   real, intent(in)                   :: cv(1:cv_size)   ! control variables.
+   real*8, intent(inout)              :: xhat(1:cv_size) ! control variables.
+   real*8, intent(in)                 :: cv(1:cv_size)   ! control variables.
    type (y_type) , intent(inout)      :: ob          ! Observation structure.
    type(grid_config_rec_type), intent(inout) :: config_flags
    real, intent(in)                   :: ja_total ! Cost function at eta = 0
+!   real*8, intent(out)                :: eta
 
-   real             :: eta, grat, &
+   real*8           :: eta, grat, &
                        eta_a,   eta_b,   eta_c,   eta_d, &
                        ja, jb, jc, jd, jout
                        
    integer          :: cv_s, cv_e, cv_s_ant, cv_e_ant, cv_s_bb, cv_e_bb, &
                        itgold, branch
 
-   real             :: tol = 0.05
+   real*8           :: tol = 0.05
 
    if (trace_use) call da_trace_entry("da_dgn")
 
@@ -98,8 +99,10 @@ subroutine da_dgn( grid, cv_size, xbx, be, iv, xhat, cv, ob, config_flags, ja_to
       else
          jd = jout
       end if
-      write(unit=stdout,fmt='("DGN: i  eta_a eta_b       ja          jb          jc          jd")')
-      write(unit=stdout,fmt='("DGN:",I4,2F6.3,4F11.3)') itgold,eta_a,eta_b,ja,jb,jc,jd
+!!      write(unit=stdout,fmt='("DGN: i  eta_a eta_b       ja          jb          jc          jd")')
+!!      write(unit=stdout,fmt='("DGN:",I4,2F6.3,4F11.3)') itgold,eta_a,eta_b,ja,jb,jc,jd
+      write(unit=stdout,fmt='("DGN: i   eta_a eta_c eta_d eta_b       ja         jc         jd         jb")')
+      write(unit=stdout,fmt='("DGN:",I4,4F6.3,4F11.3)') itgold,eta_a,eta_c,eta_d,eta_b,ja,jc,jd,jb
 
 
       if (jc .lt. jd) then

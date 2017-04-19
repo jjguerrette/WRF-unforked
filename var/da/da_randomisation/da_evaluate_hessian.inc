@@ -34,9 +34,15 @@ subroutine da_evaluate_hessian(grid, xbx, be, mz, cv_size, &
    real(wp), allocatable  :: yhat_Pa_curr(:,:)
    real(wp), allocatable  :: qhat_Pa(:,:)
 
+
+   real*8          :: eignvec_(neign,neign)
+   real*8          :: eignval_(neign)
+   real*8          :: temp_l, temp_e(neign)
+   logical         :: swapped
    real*8          :: temp
    real*8          :: eignvec_res(rankA,rankA)
    real*8          :: eignval_res(rankA)
+
    real*8          :: LAM(neign)
 
    integer         :: iens, i, j, k, ij, ic, itype, dummy, iter
@@ -67,16 +73,34 @@ subroutine da_evaluate_hessian(grid, xbx, be, mz, cv_size, &
    allocate(yhat_Pa_curr(cv_size,1:rankA))
    allocate(yhat_Pa_prev(cv_size,1:rankA))
 
+   !First sort eigenvalues and eigenvectors in descending order
+   eignval_ = eignval_all
+   eignvec_ = eignvec_all
+   do j = neign-1, 1, -1
+     swapped = .false.
+     do i = 1, j
+       if (eignval_(i) .lt. eignval_(i+1)) then
+         temp_l = eignval_(i)
+         eignval_(i) = eignval_(i+1)
+         eignval_(i+1) = temp_l
 
-!!DIFFERENT FROM HERE ON
+         temp_e = eignvec_(:,i)
+         eignvec_(:,i) = eignvec_(:,i+1)
+         eignvec_(:,i+1) = temp_e
 
-   write(unit=stdout,fmt='(A)') 'Perform RSVD on the error residual (Pa_ - Pa)'
+         swapped = .true.
+       end if
+     end do
+     if (.NOT. swapped) exit
+   end do
+
+   write(unit=stdout,fmt='(A)') 'Perform RSVD on the error residual (Pa_j - Pa_j-1)'
 !   do itype = 1, 2
    do itype = 2, 2
       if (itype .eq. 1) then !LRA
          write(unit=stdout,fmt='(A)') 'LRA'
          do i = 1, neign
-            LAM(i) = 1.D0 / eignval_all(i)
+            LAM(i) = 1.D0 / eignval_(i)
          end do
 
       end if
@@ -84,17 +108,19 @@ subroutine da_evaluate_hessian(grid, xbx, be, mz, cv_size, &
       if (itype .eq. 2) then !LRU
          write(unit=stdout,fmt='(A)') 'LRU'
          do i = 1, neign
-            LAM(i) = - (eignval_all(i) - 1.D0) / eignval_all(i)
+            LAM(i) = - (eignval_(i) - 1.D0) / eignval_(i)
          end do
       end if
 
-      write(unit=stdout,fmt='(A)') ' iter    SPECNORM_Pa    FROBNORM_Pa'
+      write(unit=stdout,fmt='(A)') 'HESS:  iter    SPECNORM_Pa    FROBNORM_Pa'
 
-      do iter = 1, neign
+      do iter = 1, neign_trunc
          if (iter .gt. 1) then
             do iens = 1, rankA
                yhat_Pa_prev(:,iens) = yhat_Pa_curr(:,iens)
             end do
+         else
+            yhat_Pa_prev = 0.D0
          end if
 
          !Generate yhat for current rank (iter)
@@ -157,8 +183,8 @@ subroutine da_evaluate_hessian(grid, xbx, be, mz, cv_size, &
             yhat_Pa_curr(:,iens) = 0.D0
             !yhat_v = Pav * U^T * omega
             call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
-                                   neign,neign_trunc,iter, &
-                                   LAM,eignvec_all,qhat, &
+                                   neign,neign,iter, &
+                                   LAM,eignvec_,qhat, &
                                    UTomega,yhat_Pa_curr(:,iens))
 
             !Pa * omega = U * Pav * U^T * omega
@@ -212,7 +238,7 @@ subroutine da_evaluate_hessian(grid, xbx, be, mz, cv_size, &
 
          end do
 
-         if ( iter .gt. 1) then
+!!         if ( iter .gt. 1) then
             do iens = 1, rankA
               !Subtract (Pa_i * OMEGA - Pa_i-1 * OMEGA)
               yhat_Pa(:,iens) = yhat_Pa_curr(:,iens) - yhat_Pa_prev(:,iens)
@@ -221,21 +247,21 @@ subroutine da_evaluate_hessian(grid, xbx, be, mz, cv_size, &
             allocate(qhat_Pa(cv_size,0:rankA))
 
             call da_gram_schmidt(grid,mz,jp_start,jp_end, &
-                                  yhat_Pa_curr,qhat_Pa,cv_size,rankA)
+                                  yhat_Pa,qhat_Pa,cv_size,rankA)
 
             call da_rsvd56(grid, mz, jp_start, jp_end, &
-                           omega_Pa, yhat_Pa_curr, qhat_Pa, cv_size, &
-                           eignval_res, eignvec_res, rankA, dummy)
+                           omega_Pa, yhat_Pa, qhat_Pa, cv_size, &
+                           eignval_res, eignvec_res, rankA, dummy, .false. )
 
             deallocate(qhat_Pa)
-            eignval_res = eignval_res - 1.D0
+!!!            eignval_res = eignval_res - 1.D0
 
             !Evaluate Spectral/Frobenius norms from eigenvalues
             SPECNORM_Pa = maxval(abs(eignval_res(1:dummy)))
             FROBNORM_Pa = sqrt(sum(eignval_res(1:dummy)*eignval_res(1:dummy)))
 
-            write(unit=stdout,fmt='(I5,2D15.5)') iter, SPECNORM_Pa, FROBNORM_Pa
-         end if
+            write(unit=stdout,fmt='(A,I5,2D15.5)') 'HESS: ', iter, SPECNORM_Pa, FROBNORM_Pa
+!!         end if
       end do
    end do
 

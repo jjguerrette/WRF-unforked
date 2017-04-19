@@ -361,6 +361,7 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
                         omega(:,1:neign_p), yhat(:,1:neign_p), qhat(:,0:neign_p), cv_size, &
                         eignval, eignvec, neign_p, dummy)
 
+         eignval = eignval + 1.D0
 
          do isamp = 1, noversamp
 

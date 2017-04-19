@@ -1,6 +1,6 @@
-subroutine da_randomise_svd(grid, config_flags,            &
-                           cv_size, xbx, be, iv, cv, &
-                           re, y, xhat, j_cost, &
+subroutine da_randomise_svd(grid, config_flags,        &
+                           cv_size, xbx, be, iv, cv,   &
+                           re, y, xhat, nens, j_cost,  &
                            qhat, eignval, eignvec, neign)
 
    !-------------------------------------------------------------------------
@@ -22,29 +22,30 @@ subroutine da_randomise_svd(grid, config_flags,            &
 
    type(domain), intent(inout)       :: grid
    type(grid_config_rec_type), intent(inout) :: config_flags
-   integer, intent(in)               :: cv_size                       ! Total cv size
-   type (xbx_type),intent(inout)     :: xbx                           ! Header & non-gridded vars.
-   type (be_type), intent(in)        :: be                            ! background error structure.
-   type (iv_type), intent(inout)     :: iv                            ! ob. increment vector.
-   real*8, intent(inout)               :: cv(1:cv_size)                 ! control variable (local).
-   type (y_type), intent(inout)      :: re                            ! residual (o-a) structure.
-   type (y_type), intent(inout)      :: y                             ! y = H(x_inc) structure.
-   real*8, intent(out)                 :: xhat(1:cv_size)               ! control variable (local).
+   integer, intent(in)               :: cv_size                ! Total cv size
+   type (xbx_type),intent(inout)     :: xbx                    ! Header & non-gridded vars.
+   type (be_type), intent(in)        :: be                     ! background error structure.
+   type (iv_type), intent(inout)     :: iv                     ! ob. increment vector.
+   real*8, intent(inout)             :: cv(1:cv_size)          ! control variable (local).
+   type (y_type), intent(inout)      :: re                     ! residual (o-a) structure.
+   type (y_type), intent(inout)      :: y                      ! y = H(x_inc) structure.
+   real*8, intent(out)               :: xhat(1:cv_size)        ! control variable (local).
+   integer, intent(in)               :: nens                   ! Total number of eigenpairs
    type (j_type), optional, intent(out) :: j_cost                        ! cost function
 
-   real*8, optional, intent(out)       :: qhat(1:cv_size, 0:ensdim_svd) ! orthonormal basis set of A = Q * B * Q^T
-   real*8, optional, intent(out)     :: eignvec(ensdim_svd, ensdim_svd)
-   real*8, optional, intent(out)     :: eignval(ensdim_svd)
+   real*8, optional, intent(out)     :: qhat(1:cv_size, 0:nens) ! orthonormal basis set of A = Q * B * Q^T
+   real*8, optional, intent(out)     :: eignvec(nens, nens)
+   real*8, optional, intent(out)     :: eignval(nens)
    integer, optional, intent(out)    :: neign                         ! Number of non-truncated eigenpairs
+
 
 #if defined(LAPACK)
 
-   real(wp), dimension(1:ensdim_svd) :: LAM
+   real(wp), dimension(1:nens) :: LAM
    real(wp), allocatable        :: yhat(:,:)  ! yhat = A * omega
    real(wp), allocatable        :: omega(:,:) ! Gaussian draw
-   real(wp), allocatable        :: nuhat(:,:) ! Eigenvectors of A
   
-   integer                      :: iens, jens, nens, i, j, p, itype
+   integer                      :: iens, jens, i, j, p, itype
 #if (WRF_CHEM != 1)
 #ifdef CLOUD_CV
    integer          :: mz(13)
@@ -60,15 +61,15 @@ subroutine da_randomise_svd(grid, config_flags,            &
 #endif
    integer                      :: jp_start, jp_end       ! Start/end indices of Jp.
    real*8                       :: ghat(1:cv_size)        ! cv copy.
-   real(wp)                     :: F1(ensdim_svd, ensdim_svd) ! intermediate matrix
-   real(wp)                     :: F2(ensdim_svd, ensdim_svd) ! intermediate matrix
-   real(wp)                     :: U(ensdim_svd, ensdim_svd)
-   real(wp)                     :: VT(ensdim_svd, ensdim_svd)
-   real(wp)                     :: SIG(ensdim_svd)
+   real(wp)                     :: F1(nens, nens) ! intermediate matrix
+   real(wp)                     :: F2(nens, nens) ! intermediate matrix
+   real(wp)                     :: U(nens, nens)
+   real(wp)                     :: VT(nens, nens)
+   real(wp)                     :: SIG(nens)
    real(wp), allocatable        :: TEMP1(:,:), TEMP2(:,:)
 
 
-   real(wp)                     :: KMAT(ensdim_svd, ensdim_svd)  ! B = Q^T * A * Q
+   real(wp)                     :: KMAT(nens, nens)  ! B = Q^T * A * Q
 
    real*8                       :: beta
    real*8                       :: j0_total
@@ -76,7 +77,7 @@ subroutine da_randomise_svd(grid, config_flags,            &
    character(len=filename_len)  :: filename
    character(len=3) :: cnens=""
    logical          :: swapped
-  
+
    if (trace_use) call da_trace_entry("da_randomise_svd")
 
    write(unit=stdout,fmt='(A)') 'Minimize cost function using randomized SVD method'
@@ -104,8 +105,6 @@ subroutine da_randomise_svd(grid, config_flags,            &
 #endif
    jp_start   = be % cv % size_jb + be % cv % size_je + 1
    jp_end     = be % cv % size_jb + be % cv % size_je + be % cv % size_jp
-
-   nens = ensdim_svd
 
    xhat = 0.D0
 
@@ -137,11 +136,14 @@ subroutine da_randomise_svd(grid, config_flags,            &
          filename = 'ghat.p'//trim(adjustl(cproc))
          call da_cv_io ('w', filename, cv_size, ghat)
 
+         if (riot_precon.eq.1 .and. svd_outer.gt.1) &
+            call da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat)
+
       else if (ensmember .gt. 0 .and. ensmember .le. nens) then
          allocate(omega(1:cv_size,1))
          if (read_omega) then
             ! Read in omega vector from this ensemble on each processor
-            write(unit=stdout,fmt='("Reading omega ensemble member : ",i3)') iens
+            write(unit=stdout,fmt='("Reading omega ensemble member ",i3," of ",i3)') iens,nens
             filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
             call da_cv_io ('r', filename, cv_size, omega(1:cv_size,1))
          else
@@ -191,17 +193,22 @@ subroutine da_randomise_svd(grid, config_flags,            &
       call da_gram_schmidt(grid,mz,jp_start,jp_end, &
                             yhat,qhat,cv_size,nens)
 
-      ! Write qhat vectors to disk
-      do iens = 1, nens
-         write(unit=stdout,fmt='("Writing qhat vectors to disk: ",i3)') iens
-         write(cens,fmt='(i4.4)') iens
-         filename = 'qhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
-         call da_cv_io ('w', filename, cv_size, qhat(1:cv_size,iens))
-      end do
+!REMOVE EVENTUALLY or add option
+!      ! Write qhat vectors to disk
+!      do iens = 1, nens
+!         write(unit=stdout,fmt='("Writing qhat vectors to disk: ",i3)') iens
+!         write(cens,fmt='(i4.4)') iens
+!         filename = 'qhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+!         call da_cv_io ('w', filename, cv_size, qhat(1:cv_size,iens))
+!      end do
+!REMOVE EVENTUALLY or add option
 
       call da_rsvd56(grid, mz, jp_start, jp_end, &
                      omega, yhat, qhat, cv_size, &
                      eignval, eignvec, nens, neign)
+
+      ! Add 1.0 to get eigenvalues of full preconditioned Hessian
+      eignval = eignval + 1.D0
 
       ! Print current eigenpairs
       ! ----------------------------------------------
@@ -239,6 +246,13 @@ subroutine da_randomise_svd(grid, config_flags,            &
       if (itype .eq. 2) then !LRU
          xhat = xhat + ghat
       end if
+
+      if (riot_precon.ge.1) &
+         call da_hessian_io('w',cv_size,svd_outer,nens,neign,&
+                            eignvec,eignval,qhat,ghat)
+
+      if (any(riot_precon.eq.(/2,3,4/))) &
+         call da_precon_omega(grid, cv_size, mz, jp_start, jp_end, ntmax(svd_outer+1), ghat)
 
       deallocate(yhat)
       deallocate(omega)

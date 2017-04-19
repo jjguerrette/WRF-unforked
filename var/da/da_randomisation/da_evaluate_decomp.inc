@@ -304,7 +304,7 @@ if (.true.) then
 
       deallocate(qhat_Pav)
 
-      eignval_res = eignval_res - 1.D0
+!!!      eignval_res = eignval_res - 1.D0
 
       !Evaluate Spectral/Frobenius norms from eigenvalues
       SPECNORM_Pav(itype) = maxval(abs(eignval_res(1:dummy)))
@@ -478,7 +478,7 @@ if (.true.) then
 
       deallocate(qhat_Pa)
 
-      eignval_res = eignval_res - 1.D0
+!!!      eignval_res = eignval_res - 1.D0
 
       !Evaluate Spectral/Frobenius norms from eigenvalues
       SPECNORM_Pa(itype) = maxval(abs(eignval_res(1:dummy)))
@@ -571,7 +571,7 @@ if (.true. .and. &
 
       deallocate(qhat_LaPaLa)
 
-      eignval_res = eignval_res - 1.D0
+!!!      eignval_res = eignval_res - 1.D0
 
       !Evaluate Spectral/Frobenius norms from eigenvalues
       SPECNORM_PaPa(itype) = maxval(abs(eignval_res(1:dummy)))

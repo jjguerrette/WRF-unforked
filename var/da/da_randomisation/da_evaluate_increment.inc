@@ -27,8 +27,8 @@ subroutine da_evaluate_increment(grid, xbx, be, mz, cv_size, &
    real*8          :: diffvec(cv_size)
    real*8          :: temp
 
-   integer         :: iens, i, j, k, ij, ic
-   real*8          :: EUCNORM_x
+   integer         :: iens, i, j, k, ij, ic, itype
+   real*8          :: EUCNORM_x(2)
 
    if (trace_use) call da_trace_entry("da_evaluate_increment")
 
@@ -37,45 +37,53 @@ subroutine da_evaluate_increment(grid, xbx, be, mz, cv_size, &
    !=====================================================================
    ! Compare Uxhat to Uxhat_prev (vtox)
    !=====================================================================
-   write(unit=stdout,fmt='(A)') 'Evaluating (xa_i - xa_i-1)'
+   do itype = 1,2
+      if (itype .eq. 1) then
+         write(unit=stdout,fmt='(A)') 'Evaluating (dxa_i - dxa_i-1)'
+         diffvec = xhat_curr - xhat_prev
+      end if
 
-   diffvec = xhat_curr - xhat_prev
+      if (itype .eq. 2) then
+         write(unit=stdout,fmt='(A)') 'Evaluating (xa_i - xa_i-1)'
+         diffvec = xhat_curr
+      end if
 
-   ! ||dxa_i - dxa_i-1||^2
-   call da_transform_vtox(grid, be%cv%size_jb, xbx, be, &
-                          grid%ep, diffvec(1:be%cv%size_jb), &
-                          grid%vv, grid%vp, grid%vch)
+      ! ||dxa_i - dxa_i-1||^2
+      call da_transform_vtox(grid, be%cv%size_jb, xbx, be, &
+                             grid%ep, diffvec(1:be%cv%size_jb), &
+                             grid%vv, grid%vp, grid%vch)
 
-   temp = 0.D0
-   !Only for chem so far
+      temp = 0.D0
+      !Only for chem so far
 #if (WRF_CHEM == 1)
-   do ic = PARAM_FIRST_SCALAR, num_scaleant
-      do k = 1, num_ant_steps
-         do j=jts,jte
-            do i=its,ite
-               temp = temp + grid%xach%alpha_ant(i,j,k,ic)**2
+      do ic = PARAM_FIRST_SCALAR, num_scaleant
+         do k = 1, num_ant_steps
+            do j=jts,jte
+               do i=its,ite
+                  temp = temp + grid%xach%alpha_ant(i,j,k,ic)**2
+               end do
             end do
          end do
       end do
-   end do
 
-   do ic = PARAM_FIRST_SCALAR, num_scalebb
-      do k = 1, num_bb_steps
-         do j=jts,jte
-            do i=its,ite
-               temp = temp + grid%xach%alpha_bb(i,j,k,ic)**2
+      do ic = PARAM_FIRST_SCALAR, num_scalebb
+         do k = 1, num_bb_steps
+            do j=jts,jte
+               do i=its,ite
+                  temp = temp + grid%xach%alpha_bb(i,j,k,ic)**2
+               end do
             end do
          end do
       end do
-   end do
 #endif
 #ifdef DM_PARALLEL
-   EUCNORM_x = wrf_dm_sum_real(temp)
+      EUCNORM_x(itype) = wrf_dm_sum_real(temp)
 #else
-   EUCNORM_x = temp
+      EUCNORM_x(itype) = temp
 #endif
+   end do
 
-   write(unit=stdout,fmt='(A,D20.10)') 'EUCNORM_x = ', EUCNORM_x
+   write(unit=stdout,fmt='(A,2D20.10)') 'EUCNORM_x = ', EUCNORM_x
 
    if (trace_use) call da_trace_exit("da_evaluate_increment")
 

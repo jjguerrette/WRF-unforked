@@ -1,4 +1,4 @@
-subroutine da_hdgn(it, cv_size, be, xhat)
+subroutine da_hdgn(it, cv_size, be, xhat)!, eta)
 
    !---------------------------------------------------------------------------
    ! Purpose: Scales the cv emission increments to improve convergence
@@ -14,9 +14,10 @@ subroutine da_hdgn(it, cv_size, be, xhat)
    integer, intent(in)                :: it     ! external iteration #.
    integer, intent(in)                :: cv_size    ! Total cv size.
    type (be_type), intent(in)         :: be     ! background error structure.
-   real, intent(inout)                :: xhat(1:cv_size) ! control variables.
+   real*8, intent(inout)                :: xhat(1:cv_size) ! control variables.
+!   real*8, intent(out)                  :: eta
 
-   real             :: eta
+   real*8           :: eta
    integer          :: cv_s, cv_e, cv_s_ant, cv_e_ant, cv_s_bb, cv_e_bb
 
    if (trace_use) call da_trace_entry("da_hdgn")

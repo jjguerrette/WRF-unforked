@@ -1,7 +1,7 @@
 #if defined(LAPACK)
 subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
                      omega, yhat, qhat, cv_size, &
-                     eignval, eignvec, nens, neign)
+                     eignval, eignvec, nens, neign, print_messages)
 
    !-------------------------------------------------------------------------
    ! Purpose:         Second stage of RSVD 5.6
@@ -30,7 +30,7 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
    real*8, intent(out)     :: eignvec(nens, nens)
    real*8, intent(out)     :: eignval(nens)
    integer, intent(out)    :: neign                    ! Number of non-truncated eigenpairs
-
+   logical, optional, intent(in) :: print_messages
 
    real(wp), dimension(1:nens) :: LAM
  
@@ -44,8 +44,8 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
    real(wp), allocatable        :: TEMP1(:,:), TEMP2(:,:)
 
 
-   real(wp)                     :: KMAT(nens, nens)  ! B = Q^T * A * Q
-   real(wp)                     :: KMAT_(nens, nens)  ! B = Q^T * A * Q
+   real(wp)                     :: KMAT(nens, nens)  ! KMAT = Q^T * A * Q
+   real(wp)                     :: KMAT_(nens, nens)  ! KMAT = Q^T * A * Q
    integer                      :: piv(nens)
    integer                      :: info, cyc
 
@@ -56,8 +56,8 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
   
    if (trace_use) call da_trace_entry("da_rsvd56")
 
-   write(unit=stdout,fmt='(A)') 'Performing Stage 2 of RSVD5.6'
-   write(unit=stdout,fmt=*) ' '
+   if(.not.present(print_messages)) write(unit=stdout,fmt='(A)') 'Performing Stage 2 of RSVD5.6'
+   if(.not.present(print_messages)) write(unit=stdout,fmt=*) ' '
 
    !-------------------------------------------------------------------------
    ! [1.0] ADD SECTION TITLES:
@@ -82,7 +82,7 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
 !REMOVE EVENTUALLY
 
  ! Solve system D * x = b, &
- !  where B * F1^T = F2^T, F1^T = Q^T * OMEGA, F2^T = Q^T * Y
+ !  where KMAT * F1^T = F2^T, F1^T = Q^T * OMEGA, F2^T = Q^T * Y
  !  D = F1
  !  b = F2(:,iens)
  !  x = KMAT(iens,:)
@@ -94,7 +94,7 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
    if (p .eq. 0) then
       call GESV(F1, F2, piv, info) !F95
 
-      ! GESV returns B^T in F2
+      ! GESV returns KMAT^T in F2
       do iens = 1, nens
          do jens = 1, nens
             KMAT(iens,jens) = F2(jens,iens)
@@ -130,7 +130,7 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
       write(stdout,*) 'Error in randomised SVD: GESV returned ',info
       CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
    end if
-   ! Force symmetry in B
+   ! Force symmetry in KMAT
    do iens = 1, nens
       do jens = min(iens+1,nens), nens
          KMAT(iens,jens) = (KMAT(iens,jens) + KMAT(jens,iens)) / 2.D0
@@ -145,7 +145,7 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
 !   end do
 !REMOVE EVENTUALLY
 
- ! Determine eigenvalues and eigenvectors of the symmetric B matrix
+ ! Determine eigenvalues and eigenvectors of the symmetric KMAT matrix
  !-----------------------------------------------------------------
    info              = 0
    KMAT_ = KMAT
@@ -162,13 +162,21 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
       end do
    end do
 
+   temp_e = 1.D0
    if (all(LAM .le. 0.D0)) then
-      write(unit=stdout,fmt='(A)') &
+      if(.not.present(print_messages)) write(unit=stdout,fmt='(A)') &
          'WARNING: Preconditioned Hessian: all(eigs <= 0), setting them positive.'
       LAM = - LAM
-   else if ( abs(maxval(LAM)) .lt. abs(minval(LAM)) ) then
-      write(unit=stdout,fmt='(A)') &
-         'WARNING: Preconditioned Hessian: ABS(MAX(eigs)) < ABS(MIN(eigs)), setting LAM=-LAM'
+
+! This doesn't really work for Hessian with poor symmetry.  Really want to know how many eigenvalues are positive and how many are negative
+!   else if ( abs(maxval(LAM)) .lt. abs(minval(LAM)) ) then
+!      if(.not.present(print_messages)) write(unit=stdout,fmt='(A)') &
+!         'WARNING: Preconditioned Hessian: ABS(MAX(eigs)) < ABS(MIN(eigs)), setting LAM=-LAM'
+!      LAM = - LAM
+
+   else if ( sum(sign(temp_e,LAM)) .lt. 0.D0 ) then
+      if(.not.present(print_messages)) write(unit=stdout,fmt='(A,F10.1,A)') &
+         'WARNING: Preconditioned Hessian: More negative than positive eigenvalues,', sum(sign(temp_e,LAM)), ', setting LAM=-LAM'
       LAM = - LAM
    end if
   
@@ -193,8 +201,10 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
 
    neign = nens
 !   cyc = 0
+
+   eignval = LAM
    do iens = 1, nens
-      eignval(iens) = LAM(iens) + 1.D0
+!!      eignval(iens) = LAM(iens) !!!+ 1.D0
 !      if (cyc .eq. 1) cycle
       if (neign .eq. nens .and. LAM(iens) .lt. 0.D0) then
          if (iens .gt. 1) then

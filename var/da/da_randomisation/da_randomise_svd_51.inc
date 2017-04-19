@@ -1,6 +1,6 @@
-subroutine da_randomise_svd_51(grid, config_flags,            &
-                           cv_size, xbx, be, iv, cv, &
-                           re, y, xhat, j_cost, &
+subroutine da_randomise_svd_51(grid, config_flags,     &
+                           cv_size, xbx, be, iv, cv,   &
+                           re, y, xhat, nens, j_cost,  &
                            qhat, eignval, eignvec, neign)
 
    !-------------------------------------------------------------------------
@@ -22,26 +22,27 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
 
    type(domain), intent(inout)       :: grid
    type(grid_config_rec_type), intent(inout) :: config_flags
-   integer, intent(in)               :: cv_size                       ! Total cv size
-   type (xbx_type),intent(inout)     :: xbx                           ! Header & non-gridded vars.
-   type (be_type), intent(in)        :: be                            ! background error structure.
-   type (iv_type), intent(inout)     :: iv                            ! ob. increment vector.
-   real*8, intent(inout)               :: cv(1:cv_size)                 ! control variable (local).
-   type (y_type), intent(inout)      :: re                            ! residual (o-a) structure.
-   type (y_type), intent(inout)      :: y                             ! y = H(x_inc) structure.
-   real*8, intent(out)                 :: xhat(1:cv_size)               ! control variable (local).
-   type (j_type), optional, intent(out) :: j_cost                        ! cost function
+   integer, intent(in)               :: cv_size                  ! Total cv size
+   type (xbx_type),intent(inout)     :: xbx                      ! Header & non-gridded vars.
+   type (be_type), intent(in)        :: be                       ! background error structure.
+   type (iv_type), intent(inout)     :: iv                       ! ob. increment vector.
+   real*8, intent(inout)             :: cv(1:cv_size)            ! control variable (local).
+   type (y_type), intent(inout)      :: re                       ! residual (o-a) structure.
+   type (y_type), intent(inout)      :: y                        ! y = H(x_inc) structure.
+   real*8, intent(out)               :: xhat(1:cv_size)          ! control variable (local).
+   integer, intent(in)               :: nens                     ! Total number of eigenpairs
+   type (j_type), optional, intent(out) :: j_cost                ! cost function
 
-   real*8, optional, intent(out)       :: qhat(1:cv_size, 0:ensdim_svd) ! orthonormal basis set of A = Q * B * Q^T
-   real*8, optional, intent(out)     :: eignvec(ensdim_svd, ensdim_svd)
-   real*8, optional, intent(out)     :: eignval(ensdim_svd)
+   real*8, optional, intent(out)       :: qhat(1:cv_size, 0:nens) ! orthonormal basis set of A = Q * B * Q^T
+   real*8, optional, intent(out)     :: eignvec(nens, nens)
+   real*8, optional, intent(out)     :: eignval(nens)
    integer, optional, intent(out)    :: neign                         ! Number of non-truncated eigenpairs
 
 
 #if defined(LAPACK)
 
-   real(wp)                     :: SIG(1:ensdim_svd)
-   real(wp)                     :: LAM(1:ensdim_svd)
+   real(wp)                     :: SIG(1:nens)
+   real(wp)                     :: LAM(1:nens)
 
    real(wp), allocatable   :: KMAT(:,:)  ! B = Q ^T * A  or  B^T = A^T * Q, where A = R^-1/2 * H * U
    real(wp), allocatable   :: KMAT_g(:,:)  ! B = Q ^T * A  or  B^T = A^T * Q, where A = R^-1/2 * H * U
@@ -66,7 +67,7 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
    integer                      :: nall(num_ob_indexes)
    integer, allocatable         :: nobs(:)
    
-   integer                      :: iens, jens, nens, i, j, ccount, itype
+   integer                      :: iens, jens, i, j, ccount, itype
 #if (WRF_CHEM != 1)
 #ifdef CLOUD_CV
    integer          :: mz(13)
@@ -89,7 +90,7 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
    character*10                 :: cproc, cens
    character(len=filename_len)  :: filename
    character(len=3) :: cnens=""
-  
+
    if (trace_use) call da_trace_entry("da_randomise_svd_51")
 
    write(unit=stdout,fmt='(A)') 'Minimize cost function using randomized SVD method'
@@ -117,8 +118,6 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
 #endif
    jp_start   = be % cv % size_jb + be % cv % size_je + 1
    jp_end     = be % cv % size_jb + be % cv % size_je + be % cv % size_jp
-
-   nens = ensdim_svd
 
    xhat = 0.D0
 
@@ -148,6 +147,9 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
          ! Write ghat to file
          filename = 'ghat.p'//trim(adjustl(cproc))
          call da_cv_io ('w', filename, cv_size, ghat)
+
+         if (riot_precon.eq.1 .and. svd_outer.gt.1) &
+            call da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat)
 
       else if (ensmember .gt. 0 .and. ensmember .le. nens) then
          ! Generate vectors in Y = A*OMEGA (Halko, Algorithm 4.1), where A = R^-1/2 * H * U 
@@ -409,7 +411,7 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
       neign = nens
 
       write(cnens,fmt='(I0)') neign
-      write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'Eigenvalues(r): ',LAM(1:ensdim_svd)
+      write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'Eigenvalues(r): ',LAM(1:nens)
 
       ! Write nuhat vectors to disk
       do i = 1, neign
@@ -452,6 +454,13 @@ subroutine da_randomise_svd_51(grid, config_flags,            &
       if (itype .eq. 2) then !LRU
          xhat = xhat + ghat
       end if
+
+      if (riot_precon.ge.1) &
+         call da_hessian_io('w',cv_size,svd_outer,nens,neign,&
+                            eignvec,eignval,qhat,ghat)
+
+      if (any(riot_precon.eq.(/2,3,4/))) &
+         call da_precon_omega(grid, cv_size, mz, jp_start, jp_end, ntmax(svd_outer+1), ghat)
 
       deallocate(KMAT)
       deallocate(nuhat_T)
