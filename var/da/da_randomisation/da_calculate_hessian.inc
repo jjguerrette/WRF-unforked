@@ -1,4 +1,4 @@
-subroutine da_calculate_hessian(grid, config_flags, &
+subroutine da_calculate_hessian(grid, mz, config_flags, &
                                 cv_size, xbx, be, iv, cv, &
                                 re, y, xhat, j_cost, &
                                 qhat, eignval, eignvec, neign)
@@ -21,6 +21,7 @@ subroutine da_calculate_hessian(grid, config_flags, &
    implicit none
 
    type(domain), intent(inout)       :: grid
+   integer, intent(in)               :: mz(:)
    type(grid_config_rec_type), intent(inout) :: config_flags
    integer, intent(in)               :: cv_size                       ! Total cv size
    type (xbx_type),intent(inout)     :: xbx                           ! Header & non-gridded vars.
@@ -60,19 +61,6 @@ subroutine da_calculate_hessian(grid, config_flags, &
    integer, allocatable         :: nobs(:)
    
    integer                      :: iens, jens, nyobs, i, j, ccount, itype
-#if (WRF_CHEM != 1)
-#ifdef CLOUD_CV
-   integer          :: mz(13)
-#else
-   integer          :: mz(7)
-#endif
-#else
-#ifdef CLOUD_CV
-   integer          :: mz(15)
-#else
-   integer          :: mz(9)
-#endif
-#endif
    integer                      :: jp_start, jp_end       ! Start/end indices of Jp.
    real*8                       :: ghat(1:cv_size)        ! cv copy.
    integer                      :: info
@@ -91,23 +79,6 @@ subroutine da_calculate_hessian(grid, config_flags, &
    !-------------------------------------------------------------------------
    ! [1.0] Initialization:
    !-------------------------------------------------------------------------
-#if (WRF_CHEM != 1)
-#ifdef CLOUD_CV
-   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
-           be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne /)
-#else
-   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne /)
-#endif
-#else
-#ifdef CLOUD_CV
-   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
-           be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne, &
-           be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
-#else
-   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne, &
-           be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
-#endif
-#endif
    jp_start   = be % cv % size_jb + be % cv % size_je + 1
    jp_end     = be % cv % size_jb + be % cv % size_je + be % cv % size_jp
 
@@ -139,7 +110,7 @@ subroutine da_calculate_hessian(grid, config_flags, &
 
          ! Write ghat to file
          filename = 'ghat.p'//trim(adjustl(cproc))
-         call da_cv_io ('w', filename, cv_size, ghat)
+         call da_cv_io ('w', filename, cv_size, ghat, grid, mz)
 
       else if (ensmember .gt. 0 .and. ensmember .le. nyobs) then
       
@@ -162,7 +133,7 @@ subroutine da_calculate_hessian(grid, config_flags, &
 
          ! Write AMAT row to file
          filename = 'ahat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
-         call da_cv_io ('w', filename, cv_size, grad_jo)
+         call da_cv_io ('w', filename, cv_size, grad_jo, grid, mz)
 
          call da_deallocate_y(jo_grad_y)
       end if
@@ -180,12 +151,12 @@ subroutine da_calculate_hessian(grid, config_flags, &
          write(unit=stdout,fmt='("Reading AMAT row : ",i3)') iens
          write(cens,fmt='(i4.4)') iens
          filename = 'ahat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
-         call da_cv_io ('r', filename, cv_size, AMAT(1:cv_size,iens))
+         call da_cv_io ('r', filename, cv_size, AMAT(1:cv_size,iens), grid, mz)
       end do
 
       ! Read gradient
       filename = 'ghat.p'//trim(adjustl(cproc))
-      call da_cv_io ('r', filename, cv_size, ghat)
+      call da_cv_io ('r', filename, cv_size, ghat, grid, mz)
 
 #ifdef DM_PARALLEL
       !Perform global SVD of AMAT matrix
@@ -206,7 +177,7 @@ subroutine da_calculate_hessian(grid, config_flags, &
 !REMOVE THIS, JUST ADDS TO FOOTPRINT
 !         write(cens,fmt='(i4.4)') iens
 !         filename = 'dumcv.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
-!         call da_cv_io ('w', filename, cv_size, dumcv)
+!         call da_cv_io ('w', filename, cv_size, dumcv, grid, mz)
 !REMOVE THIS, JUST ADDS TO FOOTPRINT
 
          call da_cv_to_global(cv_size, cv_size_domain, dumcv, grid, mz, dumcv_g)
@@ -278,7 +249,7 @@ subroutine da_calculate_hessian(grid, config_flags, &
 !         write(unit=stdout,fmt='("Writing nuhat vectors to disk: ",i3)') i
 !         write(cens,fmt='(i4.4)') i
 !         filename = 'nuhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
-!         call da_cv_io ('w', filename, cv_size, nuhat(1:cv_size,i))
+!         call da_cv_io ('w', filename, cv_size, nuhat(1:cv_size,i), grid, mz)
 !      end do
 !REMOVE THIS, JUST ADDS TO FOOTPRINT
 

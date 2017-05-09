@@ -1,4 +1,4 @@
-subroutine da_randomise_svd_B11(grid, config_flags,            &
+subroutine da_randomise_svd_B11(grid, mz, config_flags,            &
                            cv_size, xbx, be, iv, cv, &
                            re, y, xhat, j_cost, &
                            qhat, eignval, eignvec, neign)
@@ -21,6 +21,7 @@ subroutine da_randomise_svd_B11(grid, config_flags,            &
    implicit none
 
    type(domain), intent(inout)       :: grid
+   integer, intent(in)               :: mz(:)
    type(grid_config_rec_type), intent(inout) :: config_flags
    integer, intent(in)               :: cv_size                       ! Total cv size
    type (xbx_type),intent(inout)     :: xbx                           ! Header & non-gridded vars.
@@ -46,19 +47,6 @@ subroutine da_randomise_svd_B11(grid, config_flags,            &
    real(wp)                     :: dot_cv
   
    integer                      :: iens, jens, nens, i, j, ccount, p
-#if (WRF_CHEM != 1)
-#ifdef CLOUD_CV
-   integer          :: mz(13)
-#else
-   integer          :: mz(7)
-#endif
-#else
-#ifdef CLOUD_CV
-   integer          :: mz(15)
-#else
-   integer          :: mz(9)
-#endif
-#endif
    integer                      :: jp_start, jp_end       ! Start/end indices of Jp.
    real                         :: ghat(1:cv_size)        ! cv copy.
    real(wp)                     :: F1(ensdim_svd, ensdim_svd) ! intermediate matrix
@@ -93,23 +81,6 @@ subroutine da_randomise_svd_B11(grid, config_flags,            &
    !-------------------------------------------------------------------------
    ! [1.0] Initialization:
    !-------------------------------------------------------------------------
-#if (WRF_CHEM != 1)
-#ifdef CLOUD_CV
-   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
-           be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne /)
-#else
-   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne /)
-#endif
-#else
-#ifdef CLOUD_CV
-   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
-           be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne, &
-           be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
-#else
-   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne, &
-           be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
-#endif
-#endif
    jp_start   = be % cv % size_jb + be % cv % size_je + 1
    jp_end     = be % cv % size_jb + be % cv % size_je + be % cv % size_jp
 

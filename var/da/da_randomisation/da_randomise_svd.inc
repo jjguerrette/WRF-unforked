@@ -1,4 +1,4 @@
-subroutine da_randomise_svd(grid, config_flags,        &
+subroutine da_randomise_svd(grid, mz, config_flags,        &
                            cv_size, xbx, be, iv, cv,   &
                            re, y, xhat, nens, j_cost,  &
                            qhat, eignval, eignvec, neign)
@@ -21,6 +21,7 @@ subroutine da_randomise_svd(grid, config_flags,        &
    implicit none
 
    type(domain), intent(inout)       :: grid
+   integer, intent(in)               :: mz(:)
    type(grid_config_rec_type), intent(inout) :: config_flags
    integer, intent(in)               :: cv_size                ! Total cv size
    type (xbx_type),intent(inout)     :: xbx                    ! Header & non-gridded vars.
@@ -46,19 +47,6 @@ subroutine da_randomise_svd(grid, config_flags,        &
    real(wp), allocatable        :: omega(:,:) ! Gaussian draw
   
    integer                      :: iens, jens, i, j, p, itype
-#if (WRF_CHEM != 1)
-#ifdef CLOUD_CV
-   integer          :: mz(13)
-#else
-   integer          :: mz(7)
-#endif
-#else
-#ifdef CLOUD_CV
-   integer          :: mz(15)
-#else
-   integer          :: mz(9)
-#endif
-#endif
    integer                      :: jp_start, jp_end       ! Start/end indices of Jp.
    real*8                       :: ghat(1:cv_size)        ! cv copy.
    real(wp)                     :: F1(nens, nens) ! intermediate matrix
@@ -86,23 +74,6 @@ subroutine da_randomise_svd(grid, config_flags,        &
    !-------------------------------------------------------------------------
    ! [1.0] Initialization:
    !-------------------------------------------------------------------------
-#if (WRF_CHEM != 1)
-#ifdef CLOUD_CV
-   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
-           be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne /)
-#else
-   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne /)
-#endif
-#else
-#ifdef CLOUD_CV
-   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
-           be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne, &
-           be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
-#else
-   mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne, &
-           be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
-#endif
-#endif
    jp_start   = be % cv % size_jb + be % cv % size_je + 1
    jp_end     = be % cv % size_jb + be % cv % size_je + be % cv % size_jp
 
@@ -134,9 +105,9 @@ subroutine da_randomise_svd(grid, config_flags,        &
 
          ! Write ghat to file
          filename = 'ghat.p'//trim(adjustl(cproc))
-         call da_cv_io ('w', filename, cv_size, ghat)
+         call da_cv_io ('w', filename, cv_size, ghat, grid, mz)
 
-         if (riot_precon.eq.1 .and. svd_outer.gt.1) &
+         if (riot_precon.eq.1 .and. svd_outer.gt.1 .and. sum(ntmax(1:svd_outer-1)).gt.nens) &
             call da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat)
 
       else if (ensmember .gt. 0 .and. ensmember .le. nens) then
@@ -145,7 +116,7 @@ subroutine da_randomise_svd(grid, config_flags,        &
             ! Read in omega vector from this ensemble on each processor
             write(unit=stdout,fmt='("Reading omega ensemble member ",i3," of ",i3)') iens,nens
             filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
-            call da_cv_io ('r', filename, cv_size, omega(1:cv_size,1))
+            call da_cv_io ('r', filename, cv_size, omega(1:cv_size,1), grid, mz)
          else
             call da_set_randomcv(cv_size, omega(:,1))
          end if
@@ -155,12 +126,12 @@ subroutine da_randomise_svd(grid, config_flags,        &
 
          !Write omega to file
          filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
-         call da_cv_io ('w', filename, cv_size, omega(1:cv_size,1))
+         call da_cv_io ('w', filename, cv_size, omega(1:cv_size,1), grid, mz)
          deallocate(omega)
 
          ! Write yhat to file
          filename = 'yhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
-         call da_cv_io ('w', filename, cv_size, yhat(1:cv_size,1))
+         call da_cv_io ('w', filename, cv_size, yhat(1:cv_size,1), grid, mz)
       else
          write(unit=stdout,fmt='(A,I4)') 'FATAL ERROR: ensmember should be between 1 and nens+1, not ',ensmember
          CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
@@ -180,15 +151,15 @@ subroutine da_randomise_svd(grid, config_flags,        &
          write(unit=stdout,fmt='("Reading yhat and omega ensemble member : ",i3)') iens
          write(cens,fmt='(i4.4)') iens
          filename = 'yhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
-         call da_cv_io ('r', filename, cv_size, yhat(1:cv_size,iens))
+         call da_cv_io ('r', filename, cv_size, yhat(1:cv_size,iens), grid, mz)
 
          filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
-         call da_cv_io ('r', filename, cv_size, omega(1:cv_size,iens))
+         call da_cv_io ('r', filename, cv_size, omega(1:cv_size,iens), grid, mz)
       end do
 
       ! Read gradient
       filename = 'ghat.p'//trim(adjustl(cproc))
-      call da_cv_io ('r', filename, cv_size, ghat)
+      call da_cv_io ('r', filename, cv_size, ghat, grid, mz)
 
       call da_gram_schmidt(grid,mz,jp_start,jp_end, &
                             yhat,qhat,cv_size,nens)
@@ -199,7 +170,7 @@ subroutine da_randomise_svd(grid, config_flags,        &
 !         write(unit=stdout,fmt='("Writing qhat vectors to disk: ",i3)') iens
 !         write(cens,fmt='(i4.4)') iens
 !         filename = 'qhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
-!         call da_cv_io ('w', filename, cv_size, qhat(1:cv_size,iens))
+!         call da_cv_io ('w', filename, cv_size, qhat(1:cv_size,iens), grid, mz)
 !      end do
 !REMOVE EVENTUALLY or add option
 
@@ -248,8 +219,10 @@ subroutine da_randomise_svd(grid, config_flags,        &
       end if
 
       if (riot_precon.ge.1) &
-         call da_hessian_io('w',cv_size,svd_outer,nens,neign,&
-                            eignvec,eignval,qhat,ghat)
+         call da_hessian_io ('w',grid, cv_size,svd_outer,nens,neign,&
+                            eignvec,eignval,qhat,mz,ghat)
+
+      if (riot_precon.eq.1 .and. sum(ntmax(1:svd_outer)).lt.ntmax(svd_outer+1)) riot_precon=4
 
       if (any(riot_precon.eq.(/2,3,4/))) &
          call da_precon_omega(grid, cv_size, mz, jp_start, jp_end, ntmax(svd_outer+1), ghat)

@@ -18,7 +18,7 @@ module da_randomisation
        stdout, trace_use, adapt_svd, &
        num_ob_indexes, read_omega, svd_p, ierr, comm, &
        use_randomsvd, nens_compare, tsvd_compare, cglz_compare, rsvd_compare, &
-       riot_precon, ntmax, &
+       use_global_cv_io, riot_precon, ntmax, &
        hess_comp_x, &
        hess_comp_Pav_LRU, hess_comp_Pav_LRA, &
        hess_comp_Pa_LRU, hess_comp_Pa_LRA, &
@@ -139,6 +139,7 @@ contains
 #include "da_randomise_svd_B.inc"
 #include "da_randomise_svd_B11.inc"
 
-
+#include "da_cv_io_global.inc"
+#include "da_hessian_io_global.inc"
 
 end module da_randomisation

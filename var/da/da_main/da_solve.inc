@@ -935,26 +935,28 @@
             adtl_run_hours = run_hours0
 #endif
          end if
+
+#if (WRF_CHEM != 1)
+#ifdef CLOUD_CV
+         mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
+                 be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne /)
+#else
+         mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne /)
+#endif
+#else
+#ifdef CLOUD_CV
+         mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
+                 be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne, &
+                 be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
+#else
+         mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne, &
+                 be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
+#endif
+#endif
+
+
 !!!!JJG
 !#if defined(LAPACK)
-!
-!#if (WRF_CHEM != 1)
-!#ifdef CLOUD_CV
-!            mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
-!                    be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne /)
-!#else
-!            mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne /)
-!#endif
-!#else
-!#ifdef CLOUD_CV
-!            mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
-!                    be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne, &
-!                    be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
-!#else
-!            mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne, &
-!                    be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
-!#endif
-!#endif
 !
 !!!!!!DEBUG CODE
 !         if (.not.use_randomsvd .or. svd_stage .le. 0) then
@@ -1087,7 +1089,7 @@
 !               write(cmember,fmt='(i4.4)') i
 !
 !               cvtfile_svd = 'qhat.it'//trim(adjustl(cit))//'.e'//trim(adjustl(cmember))//'.p'//trim(adjustl(cproc))
-!               call da_cv_io ('w', cvtfile_svd, cv_size, qhat(1:cv_size,i))
+!               call da_cv_io ('w', cvtfile_svd, cv_size, qhat(1:cv_size,i), grid, mz)
 !            end do
 !!!         end if
 !!!!!!DEBUG CODE
@@ -1101,7 +1103,7 @@
 !
 !            cvtfile_svd = 'ghat_lz.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
 !            ghat0 = -ghat0
-!            call da_cv_io ('w', cvtfile_svd, cv_size, ghat0)
+!            call da_cv_io ('w', cvtfile_svd, cv_size, ghat0, grid, mz)
 !            deallocate(ghat0) 
 !
 !!!!!!DEBUG CODE
@@ -1122,22 +1124,22 @@
                write(cproc,fmt='(i4.4)') myproc
                write(cit,fmt='(i2.2)') svd_outer-1
                cvtfile_svd = 'cvt.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
-               call da_cv_io ('r', cvtfile_svd, cv_size, cvt(1:cv_size))
+               call da_cv_io ('r', cvtfile_svd, cv_size, cvt(1:cv_size), grid, mz)
             end if
             if (svd_stage .eq. 1 .and. &
                 (ensmember .eq. nens+1)) then
                select case (svd_type)
                   case(1)
                      call da_randomise_svd_51( &
-                           grid, config_flags, cv_size, xbx, &
+                           grid, mz, config_flags, cv_size, xbx, &
                            be, iv, cvt, re, y, xhat, nens, j_cost = j)
                   case(6)
                      call da_randomise_svd( &
-                           grid, config_flags, cv_size, xbx, &
+                           grid, mz, config_flags, cv_size, xbx, &
                            be, iv, cvt, re, y, xhat, nens, j_cost = j)
                   case(2)
                      call da_calculate_hessian( &
-                           grid, config_flags, cv_size, xbx, &
+                           grid, mz, config_flags, cv_size, xbx, &
                            be, iv, cvt, re, y, xhat, j_cost = j)
                end select
             else
@@ -1145,55 +1147,55 @@
                   case(1)
                      if (svd_stage .eq. 4) then
                         call da_randomise_svd_51( &
-                              grid, config_flags, cv_size, xbx, &
+                              grid, mz, config_flags, cv_size, xbx, &
                               be, iv, cvt, re, y, xhat, nens, &
                               qhat=qhat, eignval=eignval, &
                               eignvec=eignvec, neign=neign)
                      else
                         call da_randomise_svd_51( &
-                              grid, config_flags, cv_size, xbx, &
+                              grid, mz, config_flags, cv_size, xbx, &
                               be, iv, cvt, re, y, xhat, nens)
                      end if
                   case(6)
                      if (svd_stage .eq. 2) then
                         call da_randomise_svd( &
-                              grid, config_flags, cv_size, xbx, &
+                              grid, mz, config_flags, cv_size, xbx, &
                               be, iv, cvt, re, y, xhat, nens, &
                               qhat=qhat, eignval=eignval, &
                               eignvec=eignvec, neign=neign)
                      else
                         call da_randomise_svd( &
-                              grid, config_flags, cv_size, xbx, &
+                              grid, mz, config_flags, cv_size, xbx, &
                               be, iv, cvt, re, y, xhat, nens)
                      end if
                   case(10)
                      if (svd_stage .eq. 2) then
                         call da_randomise_svd_B( &
-                              grid, config_flags, cv_size, xbx, &
+                              grid, mz, config_flags, cv_size, xbx, &
                               be, iv, cvt, re, y, xhat, &
                               qhat=qhat, eignval=eignval, &
                               eignvec=eignvec, neign=neign)
                      else
                         call da_randomise_svd_B( &
-                              grid, config_flags, cv_size, xbx, &
+                              grid, mz, config_flags, cv_size, xbx, &
                               be, iv, cvt, re, y, xhat)
                      end if
                   case(11)
                         call da_randomise_svd_B11( &
-                              grid, config_flags, cv_size, xbx, &
+                              grid, mz, config_flags, cv_size, xbx, &
                               be, iv, cvt, re, y, xhat, &
                               qhat=qhat, eignval=eignval, &
                               eignvec=eignvec, neign=neign)
                   case(2)
                      if (svd_stage .eq. 2) then
                         call da_calculate_hessian( &
-                              grid, config_flags, cv_size, xbx, &
+                              grid, mz, config_flags, cv_size, xbx, &
                               be, iv, cvt, re, y, xhat, &
                               qhat=qhat, eignval=eignval, &
                               eignvec=eignvec, neign=neign)
                      else
                         call da_calculate_hessian( &
-                              grid, config_flags, cv_size, xbx, &
+                              grid, mz, config_flags, cv_size, xbx, &
                               be, iv, cvt, re, y, xhat)
                      end if
 
@@ -1263,28 +1265,10 @@
          write(cproc,fmt='(i4.4)') myproc
          write(cit,fmt='(i2.2)') svd_outer
          cvtfile_svd = 'cvt.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
-         call da_cv_io ('w', cvtfile_svd, cv_size, cvt(1:cv_size))
-
+         call da_cv_io ('w', cvtfile_svd, cv_size, cvt(1:cv_size), grid, mz)
 !         cvtfile_svd = 'xhat.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
-!         call da_cv_io ('w', cvtfile_svd, cv_size, xhat(1:cv_size))
+!         call da_cv_io ('w', cvtfile_svd, cv_size, xhat(1:cv_size), grid, mz)
       end if
-#endif
-#if (WRF_CHEM != 1)
-#ifdef CLOUD_CV
-            mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
-                    be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne /)
-#else
-            mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne /)
-#endif
-#else
-#ifdef CLOUD_CV
-            mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
-                    be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne, &
-                    be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
-#else
-            mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne, &
-                    be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
-#endif
 #endif
 
 #if (WRF_CHEM == 1)
@@ -1298,8 +1282,8 @@
 
                allocate(xhat_prev(1:cv_size))
                cvtfile_svd = 'xhat.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
-               call da_cv_io ('r', cvtfile_svd, cv_size, xhat_prev(1:cv_size))
-            else
+               call da_cv_io ('r', cvtfile_svd, cv_size, xhat_prev(1:cv_size), grid, mz)
+           else
                allocate(xhat_prev(1:cv_size))
                xhat_prev = 0.D0
             end if
@@ -1321,7 +1305,7 @@
             write(cproc,fmt='(i4.4)') myproc
             write(cit,fmt='(i2.2)') svd_outer
             cvtfile_svd = 'xhat.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
-            call da_cv_io ('w', cvtfile_svd, cv_size, xhat(1:cv_size))
+            call da_cv_io ('w', cvtfile_svd, cv_size, xhat(1:cv_size), grid, mz)
             neign = nens
          else if(it .lt. max_ext_its .and. .not.use_randomsvd) then
 #endif

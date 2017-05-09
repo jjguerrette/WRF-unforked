@@ -73,12 +73,12 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
 !         allocate(qhat_prev(cv_size,0:nens_it))
 !
 !         if(eig_count .eq. 0) then !!.and. riot_precon.eq.2) then
-!            call da_hessian_io('r',cv_size,it,nens_it,neign_it,&
-!                               eignvec_prev,eignval_prev,qhat_prev,ghat_prev)
+!            call da_hessian_io ('r',grid, cv_size,it,nens_it,neign_it,&
+!                               eignvec_prev,eignval_prev,qhat_prev,mz,ghat_prev)
 !            gdot_prev = sqrt(da_dot_cv(cv_size, ghat_prev, ghat_prev, grid, mz, jp_start, jp_end))
 !         else
-!            call da_hessian_io('r',cv_size,it,nens_it,neign_it,&
-!                               eignvec_prev,eignval_prev,qhat_prev)
+!            call da_hessian_io ('r',grid, cv_size,it,nens_it,neign_it,&
+!                               eignvec_prev,eignval_prev,qhat_prev,mz)
 !         end if
 !
 !         do iens = 1, neign_it
@@ -151,7 +151,7 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
             nens_it = min(ntmax(it),ensdim_svd)
          end if
 
-         call da_hessian_io('r',cv_size,it,nens_it,neign_it)
+         call da_hessian_io ('r',grid, cv_size,it,nens_it,neign_it)
          eig_total = eig_total + neign_it
       end do
    end if
@@ -168,8 +168,8 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
       allocate(eignval_prev(nens_it))
       allocate(qhat_prev(cv_size,0:nens_it))
 
-      call da_hessian_io('r',cv_size,it,nens_it,neign_it,&
-                         eignvec_prev,eignval_prev,qhat_prev)
+      call da_hessian_io ('r',grid, cv_size,it,nens_it,neign_it,&
+                         eignvec_prev,eignval_prev,qhat_prev,mz)
 
       do iens = 1, neign_it
          do i = 1, cv_size
@@ -209,7 +209,7 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
       deallocate(qhat_prev)
    end do
 
-   if (eig_count .le. nens) then
+   if (eig_count .lt. nens) then
       crit_save(eig_count+1:nens) = 0.D0
 
       nouter_seed = nens-eig_count
@@ -244,7 +244,7 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
       write(cens,fmt='(i4.4)') iens
 
       filename = 'omega_precon.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
-      call da_cv_io ('w', filename, cv_size, omega(1:cv_size,iens))
+      call da_cv_io ('w', filename, cv_size, omega(1:cv_size,iens), grid, mz)
    end do
 
 

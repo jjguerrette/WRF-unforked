@@ -397,6 +397,7 @@ rconfig   integer   grm_shmt_order          namelist,wrfvar6  1  1        - "grm
 rconfig   logical   info_stop               namelist,wrfvar6  1  .true.   -  "info_stop"               ""  ""
 rconfig   logical   use_iter_metrics        namelist,wrfvar6  1  .false.  - "use_iter_metrics"         ""  ""
 rconfig   logical   use_randomsvd           namelist,wrfvar6  1  .false.  - "use_randomsvd"            ""  ""
+rconfig   logical   use_global_cv_io        namelist,wrfvar6  1  .true.   - "use_global_cv_io"         ""  ""
 rconfig   logical   svd_minimise            namelist,wrfvar6  1  .true.  - "svd_minimise"             ""  ""
 rconfig   logical   quick_svd               namelist,wrfvar6  1  .false.  - "quick_svd"                ""  ""
 rconfig   logical   adapt_svd               namelist,wrfvar6  1  .false.  - "adapt_svd"                ""  ""
