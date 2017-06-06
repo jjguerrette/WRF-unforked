@@ -6,6 +6,8 @@ subroutine da_calculate_hessian(grid, mz, config_flags, &
    !-------------------------------------------------------------------------
    ! Purpose: Direct Hessian calculation, separated into 2 stages 
    !          + Comparisons of alternative Hessian decomps and increments
+   !          --> Requires ensdim_svd to be equal to the number of observations
+   !
    ! Here 
    !    cv   is updated in outer-loop.
    !    xhat is the control variable in inner-loop.
@@ -118,6 +120,8 @@ subroutine da_calculate_hessian(grid, mz, config_flags, &
 #if (WRF_CHEM == 1)
          call da_allocate_y_chem(iv, jo_grad_y)
 #endif
+
+!da_force_grad_hess needs non-chem observations before it and da_calculate_hessian are generalizable
          call da_force_grad_hess (iv, y, nall, ensmember, jo_grad_y)
 
          call da_transform_vtoy_adj(cv_size, be, grid%ep, grad_jo, iv, &
@@ -292,6 +296,8 @@ subroutine da_calculate_hessian(grid, mz, config_flags, &
          xhat = xhat + ghat
       end if
 
+      !Used for performance comparison of different increment and Pa estimation methods.
+      !Fully implemented for chem CVs at this time, partially for non-chem
       if (nens_compare .gt. 0) then
          call da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
                                           neign, eignval, eignvec, qhat, &

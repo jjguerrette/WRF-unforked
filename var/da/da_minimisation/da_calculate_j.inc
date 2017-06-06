@@ -354,7 +354,11 @@ subroutine da_calculate_j(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size_jp,
    end if
 
 #if defined(LAPACK)
-   if ( use_randomsvd .or. svd_stage.eq.1 .or. osse_chem) then
+   if ( use_randomsvd .and. (svd_stage.eq.1 &
+#if (WRF_CHEM == 1)
+       .or. osse_chem &
+#endif
+       )) then
       write(unit=stdout,fmt='("Outer SVD iteration : ",i3)') it
       write(unit=stdout,fmt='("Starting cost function: ",1PD15.3)') j%total
    end if

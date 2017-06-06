@@ -26,6 +26,7 @@ subroutine da_force_grad_hess(iv, y, nall, hessmember, jo_grad_y)
    do itype = 1, num_ob_indexes
       if ( iv%info(itype)%nlocal .gt. 0 ) then
          select case (itype)
+!ONLY AVAILABLE FOR CHEM AT THIS TIME
 !            case (sound)
 !               if (sum(nall) .lt. hessmember) &
 !                  call da_force_grad_sound    (iv, y, jo_grad_y, hessmember, nall(itype))

@@ -60,68 +60,6 @@ subroutine da_evaluate_decomp_init(grid, xbx, be, mz, jp_start, jp_end, cv_size,
    write(unit=stdout,fmt='(A)') 'Initialize OMEGA_Pa'
    call da_gen_omega(omega_Pav, cv_size, rank_rsvd_Pa, grid, mz)
 
-!   allocate(omega_Pav(1:cv_size,1:rank_rsvd_Pa))
-!
-!! Should make this into a subroutine --> inputs: cv_size, nens; outputs: omega
-!#ifdef DM_PARALLEL
-!   ! Generate global random omega matrix
-!   ! Sequence from single global seed (non-repeating)
-!   cv_size_domain = wrf_dm_sum_integer(cv_size)
-!   if (rootproc) then
-!      allocate(omega_g(1:cv_size_domain,rank_rsvd_Pa))
-!      allocate(omega1d(1:cv_size_domain*rank_rsvd_Pa))
-!      call da_set_randomcv(cv_size_domain*rank_rsvd_Pa, omega1d)
-!      cv_s = 1
-!      do iens = 1,rank_rsvd_Pa
-!         cv_f = cv_s + cv_size_domain-1
-!         omega_g(:,iens) = omega1d(cv_s:cv_f)
-!         cv_s = cv_f+1
-!      end do
-!      deallocate(omega1d)
-!   else
-!      allocate(omega_g(1,1:rank_rsvd_Pa))
-!   end if
-!
-!   call mpi_barrier(comm, ierr)
-!
-!   !Transfer to local omega
-!   allocate(dumcv(1:cv_size))
-!   allocate(dumcv_g(1:cv_size_domain))
-!   do iens = 1, rank_rsvd_Pa
-!      if(rootproc) then
-!         dumcv_g = omega_g(:,iens)
-!      else
-!         dumcv_g = 0.D0
-!      end if
-!      dumcv = 0.D0
-!
-!      call da_global_to_cv(cv_size, cv_size_domain, dumcv, grid, mz, dumcv_g)
-!      omega_Pav(:,iens) = dumcv
-!
-!      call mpi_barrier(comm, ierr)
-!   end do
-!   deallocate(dumcv)
-!   deallocate(dumcv_g)
-!   deallocate(omega_g)
-!#else
-!   ! Generate local=global omega
-!   ! Single seed
-!   allocate(omega1d(1:cv_size*rank_rsvd_Pa))
-!   call da_set_randomcv(cv_size*rank_rsvd_Pa, omega1d)
-!   cv_s = 1
-!   do iens = 1,rank_rsvd_Pa
-!      cv_f = cv_s + cv_size-1
-!      omega_Pav(:,iens) = omega1d(cv_s:cv_f)
-!      cv_s = cv_f+1
-!   end do
-!   deallocate(omega1d)
-!#endif
-
-!   do iens = 1, rank_rsvd_Pa
-!      write(unit=stdout,fmt='(A,I5,A,I5)') 'Initialize OMEGA_i, i = ', iens ,' of ',rank_rsvd_Pa
-!      call da_set_randomcv(cv_size, omega_Pav(:,iens))
-!   end do
-
    !!!Generate yhat_v and yhat_x for true inverse Hessian (use LRU)
    !Same LAM_hess for both
 
@@ -152,8 +90,6 @@ subroutine da_evaluate_decomp_init(grid, xbx, be, mz, jp_start, jp_end, cv_size,
       do iens = 1, rank_rsvd_Pa
          write(unit=stdout,fmt='(A,I5,A,I5)') 'Initialize Pav*OMEGA_i, i = ', iens ,' of ',rank_rsvd_Pa
 
-   !      !Skipping this step, will cancel between yhat_Pav_ and yhat_Pav
-   !      yhat_Pav(:,iens) = omega_Pav(:,iens)
          call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
                                 rankA,rankA,rankA, &
                                 LAM_hess,eignvec_hess,qhat_hess, &
@@ -168,6 +104,9 @@ subroutine da_evaluate_decomp_init(grid, xbx, be, mz, jp_start, jp_end, cv_size,
 
 
 !   !! Initialize Pa comparison
+      !Only for chem so far
+#if (WRF_CHEM == 1)
+
 !   !Assumes 1-to-1 size between, e.g., scaleant+scalebb and xhat (SQUARE U)
    do itype = 1, 2
       if (itype .eq. 1) then
@@ -197,9 +136,9 @@ subroutine da_evaluate_decomp_init(grid, xbx, be, mz, jp_start, jp_end, cv_size,
 
          !Transfer random cv vector to vv and vch
          call da_cv_to_vv(cv_size, omega_Pav(1:be%cv%size_jb, iens), &
-                          mz, grid%vv, &
+                          mz, grid%vv &
 #if (WRF_CHEM == 1)
-                          grid%vch  &
+                          , grid%vch  &
 #endif
                           )
 
@@ -241,9 +180,9 @@ subroutine da_evaluate_decomp_init(grid, xbx, be, mz, jp_start, jp_end, cv_size,
          ! Calculate U^T * omega (inputs: xa and xach; output: UTomega)
          UTomega = 0.D0
          call da_transform_vtox_adj(grid, be%cv%size_jb, xbx, be, grid%ep, grid%vp, grid%vv, &
-                                   UTomega(1:be%cv%size_jb), &
+                                   UTomega(1:be%cv%size_jb) &
 #if (WRF_CHEM == 1)
-                                   grid%vch &
+                                   , grid%vch &
 #endif
                                    )
 
@@ -257,7 +196,11 @@ subroutine da_evaluate_decomp_init(grid, xbx, be, mz, jp_start, jp_end, cv_size,
          !Pa * omega = U * Pav * U^T * omega
          ! outputs: xa, xach
          call da_transform_vtox(grid, be%cv%size_jb, xbx, be, grid%ep, &
-                                yhat_Pa(1:be%cv%size_jb,iens), grid%vv, grid%vp, grid%vch)
+                                yhat_Pa(1:be%cv%size_jb,iens), grid%vv, grid%vp &
+#if (WRF_CHEM == 1)
+                                , grid%vch &
+#endif
+                                )
 
          yhat_Pa(:,iens) = 0.D0
          ! Transfer vch (and vv later) from xach (and xa later)
@@ -309,6 +252,7 @@ subroutine da_evaluate_decomp_init(grid, xbx, be, mz, jp_start, jp_end, cv_size,
 
       deallocate( yhat_Pa )
    end do
+#endif
 
    !! Initialize Pa - Pa-norm comparison
    do itype = 1, 2
@@ -365,89 +309,6 @@ subroutine da_evaluate_decomp_init(grid, xbx, be, mz, jp_start, jp_end, cv_size,
          end do
       end if
    end do
-
-
-
-!   !! Initialize Pa - Pa-norm comparison (LRU)
-!if (.true. .and. hess_comp_PaPa_LRU) then
-!!Very inefficient, but provides a check
-!   allocate(yhat_LaPaLa_LRU(1:cv_size,1:rank_rsvd_Pa))
-!   yhat_LaPaLa_LRU = 0.D0
-!
-!   !Vm * LAM_m * Vm^T * OMEGA
-!   do i = 1, rankA
-!      LAM_hess(i) = - (eignval_hess(i) - 1.D0)
-!   end do
-!
-!   do iens = 1, rank_rsvd_Pa
-!      write(unit=stdout,fmt='(A,I5,A,I5)') 'Initialize La^-1 * Pa * La^-1 * OMEGA_i, i = ', iens ,' of ',rank_rsvd_Pa
-!
-!      call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
-!                             rankA,rankA,rankA, &
-!                             LAM_hess,eignvec_hess,qhat_hess, &
-!                             omega_Pav(:,iens),yhat_LaPaLa_LRU(:,iens),.true.)
-!   end do
-!
-!   if (.not.allocated(yhat_LaPaLa_half)) then
-!      allocate(yhat_LaPaLa_half(1:cv_size,1:rank_rsvd_Pa))
-!      yhat_LaPaLa_half = 0.D0
-!
-!      !Vm * (Im + LAM_m)^1/2 * Vm^T * OMEGA
-!      do i = 1, rankA
-!         LAM_hess(i) = sqrt(eignval_hess(i))
-!      end do
-!      do iens = 1, rank_rsvd_Pa
-!         write(unit=stdout,fmt='(A,I5,A,I5)') 'Initialize La^-1 * OMEGA_i, i = ', iens ,' of ',rank_rsvd_Pa
-!
-!         call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
-!                                rankA,rankA,rankA, &
-!                                LAM_hess,eignvec_hess,qhat_hess, &
-!                                omega_Pav(:,iens),yhat_LaPaLa_half(:,iens),.true.)
-!      end do
-!   end if
-!
-!end if
-!
-!
-!   !! Initialize Pa - Pa-norm comparison (LRA)
-!if (.true. .and. hess_comp_PaPa_LRA) then
-!!Very inefficient, but provides a check
-!   allocate(yhat_LaPaLa_LRA(1:cv_size,1:rank_rsvd_Pa))
-!   yhat_LaPaLa_LRA = 0.D0
-!
-!
-!   !Vm * LAM_m * Vm^T * OMEGA
-!   do i = 1, rankA
-!      LAM_hess(i) = 1.D0
-!   end do
-!
-!   do iens = 1, rank_rsvd_Pa
-!      write(unit=stdout,fmt='(A,I5,A,I5)') 'Initialize La^-1 * Pa * La^-1 * OMEGA_i, i = ', iens ,' of ',rank_rsvd_Pa
-!
-!      call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
-!                             rankA,rankA,rankA, &
-!                             LAM_hess,eignvec_hess,qhat_hess, &
-!                             omega_Pav(:,iens),yhat_LaPaLa_LRA(:,iens),.true.)
-!   end do
-!   if (.not.allocated(yhat_LaPaLa_half)) then
-!      allocate(yhat_LaPaLa_half(1:cv_size,1:rank_rsvd_Pa))
-!      yhat_LaPaLa_half = 0.D0
-!
-!      !Vm * (Im + LAM_m)^1/2 * Vm^T * OMEGA
-!      do i = 1, rankA
-!         LAM_hess(i) = sqrt(eignval_hess(i))
-!      end do
-!      do iens = 1, rank_rsvd_Pa
-!         write(unit=stdout,fmt='(A,I5,A,I5)') 'Initialize La^-1 * OMEGA_i, i = ', iens ,' of ',rank_rsvd_Pa
-!
-!         call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
-!                                rankA,rankA,rankA, &
-!                                LAM_hess,eignvec_hess,qhat_hess, &
-!                                omega_Pav(:,iens),yhat_LaPaLa_half(:,iens),.true.)
-!      end do
-!   end if
-!
-!end if
 
    if (trace_use) call da_trace_exit("da_evaluate_decomp_init")
 

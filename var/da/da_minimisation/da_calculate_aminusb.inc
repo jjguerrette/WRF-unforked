@@ -8,7 +8,7 @@ subroutine da_calculate_aminusb(grid, config_flags,   &
    !              vectors (qhat)
    !              Note: Process is general for all variable types, but
    !                    netcdf write is only written for exponential 
-   !                    emission scaling factors
+   !                    emission scaling factors --> need non-chem still
    !
    ! Called from da_solve
    !
@@ -62,6 +62,7 @@ subroutine da_calculate_aminusb(grid, config_flags,   &
       WRITE(unit=lc,fmt='(I3.3)') neign
    end if
 
+#if (WRF_CHEM == 1)
    allocate(Pa_ant(its:ite,jts:jte,1:num_ant_steps,1:num_scaleant))
    allocate(Pa_bb(its:ite,jts:jte,1:num_bb_steps,1:num_scalebb))
 
@@ -85,7 +86,7 @@ subroutine da_calculate_aminusb(grid, config_flags,   &
       end do
    end do
    !$OMP END PARALLEL DO
-
+#endif
 
    ! Calculate Variance Reduction
    do jj = 1, neign
@@ -106,15 +107,7 @@ subroutine da_calculate_aminusb(grid, config_flags,   &
                              , grid%vch &
 #endif
                              )
-!#if defined(LAPACK)
-!      if (use_randomsvd) then
-!         lam = ( eignval(jj) - 1.D0 )
-!      else
-!#endif
-         lam = ( 1.D0 / eignval(jj)  - 1.D0 )
-!#if defined(LAPACK)
-!      end if
-!#endif
+      lam = ( 1.D0 / eignval(jj)  - 1.D0 )
 
 #if (WRF_CHEM == 1)
       ! Store Uv in corresponding I/O capable variables

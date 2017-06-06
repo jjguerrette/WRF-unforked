@@ -32,6 +32,7 @@ rconfig   logical   init_osse_chem          namelist,wrfvarchem  1  .false.  -  
 rconfig   logical   osse_chem               namelist,wrfvarchem  1  .false.  -  "osse_chem"              ""   ""
 rconfig   real      osse_chem_rel           namelist,wrfvarchem  1  0.30     - "osse_chem_rel"           ""  ""
 rconfig   real      osse_chem_abs           namelist,wrfvarchem  1  0.02     - "osse_chem_abs"           ""  ""
+rconfig   logical   use_iter_metrics        namelist,wrfvarchem  1     .false.  - "use_iter_metrics"         ""  ""
 rconfig   real      sigma_r_surf            namelist,wrfvarchem  1  0.001    - "sigma_r_surf"            ""  ""
 rconfig   real      sigma_r_acft            namelist,wrfvarchem  1  0.001    - "sigma_r_acft"            ""  ""
 rconfig   real      sigma_c_surf            namelist,wrfvarchem  1  0.001    - "sigma_c_surf"            ""  ""

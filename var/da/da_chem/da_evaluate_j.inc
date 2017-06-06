@@ -112,7 +112,7 @@ subroutine da_evaluate_j(grid, config_flags, cv_size, cv_size_jb, xbx, be, iv, x
 !   end if
 
    ! Transferring chem from grid to model_grid gives same result as da_init_model_input, unless
-   ! chem is added as a control variable.
+   ! chem is added as a control variable. (next four lines are necessary if "chem" is added)
    do i = PARAM_FIRST_SCALAR, num_chem
       call kj_swap (grid%chem(:,:,:,i), model_grid%chem(:,:,:,i), &
                     grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, grid%xp%kms, grid%xp%kme)

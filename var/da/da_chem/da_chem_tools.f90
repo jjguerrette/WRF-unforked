@@ -42,7 +42,9 @@ module da_chem_tools
    use da_tools, only : da_set_randomcv
    use da_tracing, only: da_trace_entry, da_trace_exit
    use da_vtox_transforms, only : da_transform_vtox
+#if (WRF_CHEM == 1)
    use da_transfer_model, only: da_transfer_xatowrf_temp
+#endif
    use da_minimisation, only:   da_get_innov_vector, &
                              da_calculate_residual, da_jo_and_grady
    use da_randomisation, only:   da_cv_io
@@ -51,7 +53,11 @@ module da_chem_tools
 !!WRFPLUS domain type
 !   use module_wrf_top, only: domain
 !WRFPLUS model grid is usable only after da_nl_model(1) has been called
-   use da_4dvar, only: model_grid, kj_swap, da_nl_model, da_init_model_input
+   use da_4dvar, only: &
+#if (WRF_CHEM == 1)
+      da_init_model_input, &
+#endif
+      model_grid, kj_swap, da_nl_model
 !WRFDA domain type
    use module_configure, only : grid_config_rec_type
 
@@ -60,8 +66,9 @@ module da_chem_tools
 #ifdef DM_PARALLEL
     include 'mpif.h'
 #endif
-
+#if (WRF_CHEM == 1)
    private :: da_dot, da_dot_cv
+#endif
 
 contains
 

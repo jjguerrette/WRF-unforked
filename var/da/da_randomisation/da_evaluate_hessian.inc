@@ -4,7 +4,7 @@ subroutine da_evaluate_hessian(grid, xbx, be, mz, cv_size, &
                               eignval_all, eignvec_all, qhat)
 
    !-------------------------------------------------------------------------
-   ! Purpose:   Evaluate inverse Hessian convergence
+   ! Purpose:   Evaluate inverse Hessian convergence (CHEM only)
    !
    ! Called from da_main
    !
@@ -130,9 +130,9 @@ subroutine da_evaluate_hessian(grid, xbx, be, mz, cv_size, &
          do iens = 1, rankA
             !Transfer random cv vector to vv and vch
             call da_cv_to_vv(cv_size, omega_Pa(1:be%cv%size_jb, iens), &
-                             mz, grid%vv, &
+                             mz, grid%vv &
 #if (WRF_CHEM == 1)
-                             grid%vch  &
+                             , grid%vch  &
 #endif
                              )
 
@@ -174,9 +174,9 @@ subroutine da_evaluate_hessian(grid, xbx, be, mz, cv_size, &
             ! Calculate U^T * omega (inputs: xa and xach; output: UTomega)
             UTomega = 0.D0
             call da_transform_vtox_adj(grid, be%cv%size_jb, xbx, be, grid%ep, grid%vp, grid%vv, &
-                                      UTomega(1:be%cv%size_jb), &
+                                      UTomega(1:be%cv%size_jb) &
 #if (WRF_CHEM == 1)
-                                      grid%vch &
+                                      , grid%vch &
 #endif
                                       )
 
@@ -190,7 +190,11 @@ subroutine da_evaluate_hessian(grid, xbx, be, mz, cv_size, &
             !Pa * omega = U * Pav * U^T * omega
             ! outputs: xa, xach
             call da_transform_vtox(grid, be%cv%size_jb, xbx, be, grid%ep, &
-                                   yhat_Pa_curr(1:be%cv%size_jb,iens), grid%vv, grid%vp, grid%vch)
+                                   yhat_Pa_curr(1:be%cv%size_jb,iens), grid%vv, grid%vp &
+#if (WRF_CHEM == 1)
+                                   , grid%vch &
+#endif
+                                   )
 
             yhat_Pa_curr(:,iens) = 0.D0
             ! Transfer vch (and vv later) from xach (and xa later)
@@ -238,30 +242,27 @@ subroutine da_evaluate_hessian(grid, xbx, be, mz, cv_size, &
 
          end do
 
-!!         if ( iter .gt. 1) then
-            do iens = 1, rankA
-              !Subtract (Pa_i * OMEGA - Pa_i-1 * OMEGA)
-              yhat_Pa(:,iens) = yhat_Pa_curr(:,iens) - yhat_Pa_prev(:,iens)
-            end do
+         do iens = 1, rankA
+           !Subtract (Pa_i * OMEGA - Pa_i-1 * OMEGA)
+           yhat_Pa(:,iens) = yhat_Pa_curr(:,iens) - yhat_Pa_prev(:,iens)
+         end do
 
-            allocate(qhat_Pa(cv_size,0:rankA))
+         allocate(qhat_Pa(cv_size,0:rankA))
 
-            call da_gram_schmidt(grid,mz,jp_start,jp_end, &
-                                  yhat_Pa,qhat_Pa,cv_size,rankA)
+         call da_gram_schmidt(grid,mz,jp_start,jp_end, &
+                               yhat_Pa,qhat_Pa,cv_size,rankA)
 
-            call da_rsvd56(grid, mz, jp_start, jp_end, &
-                           omega_Pa, yhat_Pa, qhat_Pa, cv_size, &
-                           eignval_res, eignvec_res, rankA, dummy, .false. )
+         call da_rsvd56(grid, mz, jp_start, jp_end, &
+                        omega_Pa, yhat_Pa, qhat_Pa, cv_size, &
+                        eignval_res, eignvec_res, rankA, dummy, .false. )
 
-            deallocate(qhat_Pa)
-!!!            eignval_res = eignval_res - 1.D0
+         deallocate(qhat_Pa)
 
-            !Evaluate Spectral/Frobenius norms from eigenvalues
-            SPECNORM_Pa = maxval(abs(eignval_res(1:dummy)))
-            FROBNORM_Pa = sqrt(sum(eignval_res(1:dummy)*eignval_res(1:dummy)))
+         !Evaluate Spectral/Frobenius norms from eigenvalues
+         SPECNORM_Pa = maxval(abs(eignval_res(1:dummy)))
+         FROBNORM_Pa = sqrt(sum(eignval_res(1:dummy)*eignval_res(1:dummy)))
 
-            write(unit=stdout,fmt='(A,I5,2D15.5)') 'HESS: ', iter, SPECNORM_Pa, FROBNORM_Pa
-!!         end if
+         write(unit=stdout,fmt='(A,I5,2D15.5)') 'HESS: ', iter, SPECNORM_Pa, FROBNORM_Pa
       end do
    end do
 

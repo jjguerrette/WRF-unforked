@@ -3,7 +3,7 @@ subroutine da_evaluate_increment(grid, xbx, be, mz, cv_size, &
                                  xhat_prev, xhat_curr)
 
    !-------------------------------------------------------------------------
-   ! Purpose:   Evaluate increment convergence
+   ! Purpose:   Evaluate increment convergence (CHEM only)
    !
    ! Called from da_main
    !
@@ -51,7 +51,11 @@ subroutine da_evaluate_increment(grid, xbx, be, mz, cv_size, &
       ! ||dxa_i - dxa_i-1||^2
       call da_transform_vtox(grid, be%cv%size_jb, xbx, be, &
                              grid%ep, diffvec(1:be%cv%size_jb), &
-                             grid%vv, grid%vp, grid%vch)
+                             grid%vv, grid%vp &
+#if (WRF_CHEM == 1)
+                             , grid%vch &
+#endif
+                             )
 
       temp = 0.D0
       !Only for chem so far
