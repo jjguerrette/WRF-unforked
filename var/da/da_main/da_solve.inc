@@ -60,11 +60,7 @@
    character(len=filename_len)  :: cvtfile_svd
    integer                      :: run_hours0
    integer                      :: nens
-!   logical                      :: svd_nl
    real, allocatable            :: ghat0(:)      ! Control variable structure.
-   integer, allocatable         :: icv(:)
-   integer, allocatable         :: jcv(:)
-   integer, allocatable         :: kcv(:)
 
 #if (WRF_CHEM != 1)
 #ifdef CLOUD_CV
@@ -85,7 +81,6 @@
 #if (WRF_CHEM == 1)
    real*8, allocatable          :: xhat_prev(:)     ! Control variable structure.
    integer                      :: neign_trunc
-!   real*8                       :: eta_dgn
 
    character(len=2) :: itc
    integer          :: cv_s, cv_e, cv_s_ant, cv_e_ant, cv_s_bb, cv_e_bb
@@ -702,7 +697,7 @@
          allocate (eignval(ntmax(it)))
       end if
 #if defined(LAPACK)
-      if (use_randomsvd) then
+      if (use_randomsvd .and. .not.use_lanczos) then
          if (riot_precon.ge.1 .and. svd_outer .gt. 1) then
             if (svd_type .eq. 6 .or. svd_type .eq. 1) then
                nens = min(ntmax(svd_outer),ensdim_svd)
@@ -936,64 +931,16 @@
 #endif
          end if
 
-#if (WRF_CHEM != 1)
-#ifdef CLOUD_CV
-         mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
-                 be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne /)
-#else
-         mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne /)
-#endif
-#else
-#ifdef CLOUD_CV
-         mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
-                 be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne, &
-                 be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
-#else
-         mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne, &
-                 be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
-#endif
-#endif
-
-
-!!!!JJG
-!#if defined(LAPACK)
-!
-!!!!!!DEBUG CODE
-!         if (.not.use_randomsvd .or. svd_stage .le. 0) then
-!            allocate (icv(1:cv_size))
-!            allocate (jcv(1:cv_size))
-!            allocate (kcv(1:cv_size))
-!
-!            call da_cv_indices(grid%xp, mz, cv_size, icv, jcv, kcv &
-!#if (WRF_CHEM == 1)
-!                        , grid%vch &
-!#endif
-!                        )
-!            write(cproc,fmt='(i4.4)') myproc
-!            cvtfile_svd = 'icv.p'//trim(adjustl(cproc))
-!            call da_cv_io_int ('w', cvtfile_svd, cv_size, icv)
-!            cvtfile_svd = 'jcv.p'//trim(adjustl(cproc))
-!            call da_cv_io_int ('w', cvtfile_svd, cv_size, jcv)
-!            cvtfile_svd = 'kcv.p'//trim(adjustl(cproc))
-!            call da_cv_io_int ('w', cvtfile_svd, cv_size, kcv)
-!
-!            deallocate (icv)
-!            deallocate (jcv)
-!            deallocate (kcv)
-!        end if
-!!!!!!DEBUG CODE
-!
-!#endif
-!!!!JJG
-
-
          ! Use this to exit after writing chem hx values
          ! or after stage 1 of randomised svd
-         if( config_flags%calc_hx_only &
-#if defined(LAPACK)
-            .or. (use_randomsvd .and. svd_type.ne.11 .and. svd_stage.le.0) &
+         ii=0
+#if (WRF_CHEM == 1)
+         if(config_flags%calc_hx_only) ii = ii + 1
 #endif
-            ) then
+#if defined(LAPACK)
+         if (use_randomsvd .and. svd_type.ne.11 .and. svd_stage.le.0) ii = ii + 1
+#endif
+         if (ii .gt. 0) then
             call da_deallocate_observations (iv)
             call da_deallocate_y (ob)
             if (use_background_errors) call da_deallocate_background_errors (be)
@@ -1063,6 +1010,26 @@
       call da_allocate_y_chem (iv, y)
 #endif
 
+#if (WRF_CHEM != 1)
+#ifdef CLOUD_CV
+         mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
+                 be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne /)
+#else
+         mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne /)
+#endif
+#else
+#ifdef CLOUD_CV
+         mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
+                 be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne, &
+                 be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
+#else
+         mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne, &
+                 be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
+#endif
+#endif
+      !=======================================================
+      ! 3 options (use_lanczos, use_randomsvd, default - cg)
+      !=======================================================
       if (use_lanczos) then
          if (read_lanczos) then
             call da_lanczos_io('r',cv_size,ntmax(it),neign,eignvec,eignval,qhat)
@@ -1080,37 +1047,6 @@
             if (calc_aminusb) call da_calculate_aminusb(grid,config_flags,it,cv_size,xbx, &
                                 be,qhat,eignvec,eignval,neign,ntmax(it))
 #endif
-!#if defined(LAPACK)
-!!!!!!DEBUG CODE
-!!!         if (write_lanczos) then
-!            write(cproc,fmt='(i4.4)') myproc
-!            write(cit,fmt='(i2.2)') it
-!            do i = 1, neign
-!               write(cmember,fmt='(i4.4)') i
-!
-!               cvtfile_svd = 'qhat.it'//trim(adjustl(cit))//'.e'//trim(adjustl(cmember))//'.p'//trim(adjustl(cproc))
-!               call da_cv_io ('w', cvtfile_svd, cv_size, qhat(1:cv_size,i), grid, mz)
-!            end do
-!!!         end if
-!!!!!!DEBUG CODE
-!#endif
-
-!!!!JJG
-!#if defined(LAPACK)
-!!!!!!DEBUG CODE
-!            write(cproc,fmt='(i4.4)') myproc
-!            write(cit,fmt='(i2.2)') it
-!
-!            cvtfile_svd = 'ghat_lz.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
-!            ghat0 = -ghat0
-!            call da_cv_io ('w', cvtfile_svd, cv_size, ghat0, grid, mz)
-!            deallocate(ghat0) 
-!
-!!!!!!DEBUG CODE
-!#endif
-!!!!JJG
-
-
          end if
 
          if (write_lanczos) call da_lanczos_io('w',cv_size,ntmax(it),neign,eignvec,eignval,qhat)
@@ -1129,21 +1065,32 @@
             if (svd_stage .eq. 1 .and. &
                 (ensmember .eq. nens+1)) then
                select case (svd_type)
+#if (WRF_CHEM == 1)
+!Need proper obs handling for non-chem vars still
                   case(1)
                      call da_randomise_svd_51( &
                            grid, mz, config_flags, cv_size, xbx, &
                            be, iv, cvt, re, y, xhat, nens, j_cost = j)
+#endif
                   case(6)
                      call da_randomise_svd( &
                            grid, mz, config_flags, cv_size, xbx, &
                            be, iv, cvt, re, y, xhat, nens, j_cost = j)
+#if (WRF_CHEM == 1)
+!Need proper obs handling for non-chem vars still
                   case(2)
                      call da_calculate_hessian( &
                            grid, mz, config_flags, cv_size, xbx, &
                            be, iv, cvt, re, y, xhat, j_cost = j)
+#endif
+                  case default
+                     write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: Invalid selection for svd_type', svd_type
+                     CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
                end select
             else
                select case (svd_type)
+#if (WRF_CHEM == 1)
+!Need proper obs handling for non-chem vars still
                   case(1)
                      if (svd_stage .eq. 4) then
                         call da_randomise_svd_51( &
@@ -1156,6 +1103,7 @@
                               grid, mz, config_flags, cv_size, xbx, &
                               be, iv, cvt, re, y, xhat, nens)
                      end if
+#endif
                   case(6)
                      if (svd_stage .eq. 2) then
                         call da_randomise_svd( &
@@ -1186,6 +1134,8 @@
                               be, iv, cvt, re, y, xhat, &
                               qhat=qhat, eignval=eignval, &
                               eignvec=eignvec, neign=neign)
+#if (WRF_CHEM == 1)
+!Need proper obs handling for non-chem vars still
                   case(2)
                      if (svd_stage .eq. 2) then
                         call da_calculate_hessian( &
@@ -1198,7 +1148,10 @@
                               grid, mz, config_flags, cv_size, xbx, &
                               be, iv, cvt, re, y, xhat)
                      end if
-
+#endif
+                  case default
+                     write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: Invalid selection for svd_type', svd_type
+                     CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
                end select
             end if
             if ((svd_type .eq. 1 .and. svd_stage .ne. 4) .or. &
@@ -1247,12 +1200,10 @@
 #if (WRF_CHEM == 1)
    if (cv_options .eq. 10) then
       if ( dgn_emiss .eq. 1 .and. eta_emiss .lt. 1.D0 .and. eta_emiss .gt. 0.D0 ) then
-         call da_hdgn(it, cv_size, be, xhat)!, eta_dgn )
+         call da_hdgn(it, cv_size, be, xhat)
 
       else if (dgn_emiss .eq. 2) then
-         call da_dgn(grid, cv_size, xbx, be, iv, xhat, cvt, ob, config_flags, j % total)!, eta_dgn )
-!      else
-!         eta_dgn = 1.D0
+         call da_dgn(grid, cv_size, xbx, be, iv, xhat, cvt, ob, config_flags, j % total)
       end if
    end if
 #endif
@@ -1261,7 +1212,7 @@
       cvt = cvt + xhat
 
 #if defined(LAPACK)
-      if ( use_randomsvd ) then
+      if ( use_randomsvd .and. .not.use_lanczos ) then
          write(cproc,fmt='(i4.4)') myproc
          write(cit,fmt='(i2.2)') svd_outer
          cvtfile_svd = 'cvt.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
@@ -1314,10 +1265,11 @@
 #if defined(LAPACK)
          end if
 #endif
-         call da_evaluate_hessian(grid, xbx, be, mz, cv_size, &
-                                floor(scale_hcheck*real(neign,8)), &
-                                neign, neign_trunc, &
-                                eignval(1:neign), eignvec(1:neign,1:neign), qhat(:,0:neign))
+         if (use_lanczos .or. use_randomsvd) &
+            call da_evaluate_hessian(grid, xbx, be, mz, cv_size, &
+                                   floor(scale_hcheck*real(neign,8)), &
+                                   neign, neign_trunc, &
+                                   eignval(1:neign), eignvec(1:neign,1:neign), qhat(:,0:neign))
       end if
 #endif
 
@@ -1424,19 +1376,15 @@
 
 
    ! Deallocate arrays which depend on ntmax
-     if (use_lanczos) then
-        deallocate (qhat)
-        deallocate (eignvec)
-        deallocate (eignval)
-     end if
+     if (use_lanczos &
 #if defined(LAPACK)
-     if (use_randomsvd) then
+         .or. use_randomsvd &
+#endif
+         ) then
         deallocate (qhat)
         deallocate (eignvec)
         deallocate (eignval)
      end if
-#endif
-
    end do
 
    ! output wrfvar analysis

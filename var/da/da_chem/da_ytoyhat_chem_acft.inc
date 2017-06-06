@@ -27,9 +27,6 @@ subroutine da_ytoyhat_chem_acft(iv, y, yhat)
       do iplt = 1, num_platform
          do n=1, iv%info(chem_acft)%nlocal
             do ichem = 1, num_chem_acft-1
-
-!!!JJG - !!write(unit=stdout,fmt='("DEBUG_01:",3I5,2D25.14)') n,ichem,iplt,y%chem_acft(n)%chem(ichem,iplt),iv%chem_acft(n)%chem(ichem,iplt)%error
-
                if (iv%chem_acft(n)%chem(ichem,iplt)%qc < obs_qc_pointer) &
                   y%chem_acft(n)%chem(ichem,iplt) = 0.0
 

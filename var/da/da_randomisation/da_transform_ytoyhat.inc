@@ -25,6 +25,7 @@ subroutine da_transform_ytoyhat(iv, y, yhat_obs, nall)
 
       if ( iv%info(itype)%nlocal .gt. 0 ) then
          select case (itype)
+!ONLY AVAILABLE FOR CHEM AT THIS TIME
 !            case (sound)
 !               call da_ytoyhat_sound    (iv, y, yhat(itype)%obs)
 !            case (sonde_sfc)
@@ -77,7 +78,6 @@ subroutine da_transform_ytoyhat(iv, y, yhat_obs, nall)
 !               call da_ytoyhat_tamdar_sfc(iv, y, yhat(itype)%obs)
 !            case (rain)
 !               call da_ytoyhat_rain     (iv, y, yhat(itype)%obs)
-!
 !            case (airsr)
 !               call da_ytoyhat_airsr    (iv, y, yhat(itype)%obs)
 

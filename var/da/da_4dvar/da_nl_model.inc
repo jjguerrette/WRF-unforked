@@ -61,22 +61,19 @@ subroutine da_nl_model (it)
    if ( write_checkpoints .eq. 1 ) then
       !Turn off xtraj writing
       call nl_set_auxhist6_interval_s ( head_grid%id, 0 )
-
+      call nl_get_restart_interval_h ( head_grid%id, original_restart_interval)
+#if (WRF_CHEM == 1)
       if( .not. calc_hx_only) then
+#endif
          !Turn on Output for checkpoint files
-         call nl_get_restart_interval_h ( head_grid%id, original_restart_interval)
+         call nl_set_restart_interval_h ( head_grid%id, 0)
          call nl_set_restart_interval_m ( head_grid%id, checkpoint_interval)
          call nl_set_io_form_restart ( head_grid%id, 2 )
          rst_outname = "wrf_checkpoint_d<domain>_<date>"
          call nl_set_rst_outname ( head_grid%id, rst_outname)
-         !call nl_set_restart_begin_m( head_grid%id, checkpoint_interval )
          call nl_set_restart_begin_m( head_grid%id, 0 )
-!         if ( run_hours .gt. adtl_run_hours .and. run_days .eq. 0 .and. &
-!              adtl_run_hours .gt. 0 ) &
-!            call nl_set_restart_end_h( head_grid%id, adtl_run_hours )
-      endif
-
 #if (WRF_CHEM == 1)
+      endif
    else if ( write_checkpoints .eq. 2 ) then
       !Turn off xtraj writing
       call nl_set_auxhist6_interval_s ( head_grid%id, 0 )
@@ -176,6 +173,7 @@ subroutine da_nl_model (it)
 
    if ( write_checkpoints .eq. 1 ) then
       call nl_set_restart_interval_h ( head_grid%id, original_restart_interval)
+      call nl_set_restart_interval_m ( head_grid%id, 0)
       call nl_set_io_form_restart ( head_grid%id, 0 )
       rst_outname = "wrfrst_d<domain>_<date>"
       call nl_set_rst_outname ( head_grid%id, rst_outname)

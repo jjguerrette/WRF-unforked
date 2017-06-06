@@ -93,6 +93,13 @@ subroutine da_evaluate_decomp(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
 
 if (hess_comp_x) then
    !=====================================================================
+   ! Compare xhat_approx to xhat_hess
+   !  (1a)  v - increment in preconditioned v-space
+   !  (1b)  x - increment in state x-space
+   !  (1c)  x _ Pa^-1 - increment in state x-space normalized by Pa
+   !=====================================================================
+
+   !=====================================================================
    ! Compare xhat to xhat_hess and Uxhat to Uxhat_hess (vtox)
    !=====================================================================
    write(unit=stdout,fmt='(A)') 'Evaluating (xa_ - xa)'
@@ -123,17 +130,25 @@ if (hess_comp_x) then
          xhat = xhat + ghat0
       end if
 
+      !----------------------
+      ! (1a) ||dva_ - dva||^2
+      !----------------------
       diffvec = xhat - xhat_hess
       EUCNORM_v(itype) = da_dot_cv(cv_size, diffvec, diffvec, grid, mz, jp_start, jp_end)
 
-      ! ||dxa_ - dxa||^2
+      !----------------------
+      ! (1b) ||dxa_ - dxa||^2
+      !----------------------
       call da_transform_vtox(grid, be%cv%size_jb, xbx, be, &
                              grid%ep, diffvec(1:be%cv%size_jb), &
-                             grid%vv, grid%vp, grid%vch)
-
+                             grid%vv, grid%vp &
+#if (WRF_CHEM == 1)
+                             , grid%vch &
+#endif
+                             )
+#if (WRF_CHEM == 1)
       temp = 0.D0
       !Only for chem so far
-#if (WRF_CHEM == 1)
       do ic = PARAM_FIRST_SCALAR, num_scaleant
          do k = 1, num_ant_steps
             do j=jts,jte
@@ -153,21 +168,17 @@ if (hess_comp_x) then
             end do
          end do
       end do
-#endif
+
 #ifdef DM_PARALLEL
       EUCNORM_x(itype) = wrf_dm_sum_real(temp)
 #else
       EUCNORM_x(itype) = temp
 #endif
-      !Should I really be comparing scaleant/scalebb or log(scaleant) and log(scalebb) across
-      ! the entire grid?  Or should I only compare where emissions are non-zero? 
-      ! Or where emisions are largest?  Above a threshold? Can I use Fischer information?
-      ! Or simply posterior variance reduction?  I suppose that's where ||xa_-xa||^2_Pa^-1
-      ! comes in. Although there can be low posterior variance even in places with zero emissions,
-      ! which is probably arbitrary.
 
-      ! ||dxa_ - dxa||^2_{Pa^-1}
-!This is the simplest way to do it
+#endif
+      !------------------------------
+      ! (1c) ||dxa_ - dxa||^2_{Pa^-1}
+      !------------------------------
       xhat = 0.D0
       !Multiply Pav^-1 * (dva_ - dva)
       call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size,&
@@ -178,77 +189,20 @@ if (hess_comp_x) then
       !Multiply (dva_ - dva)^T * Pav^-1 * (dva_ - dva) = ||dxa_ - dxa||^2_{Pa^-1}
       EUCNORM_xPa(itype) = da_dot_cv(cv_size, diffvec, xhat, grid, mz, jp_start, jp_end)
 
-
-!!This is the less simple way to do it, but gives check to U and U^T multiplication methods below in Pa tests -- actually I don't think there is another way to calculate EUCNORM_xPa
-!         ! Transfer vch (and vv later) from xach (and xa later)
-!#if (WRF_CHEM == 1)
-!         !$OMP PARALLEL DO &
-!         !$OMP PRIVATE ( ij, ic, k, j, i)
-!         do ij = 1 , grid%num_tiles
-!            do ic = PARAM_FIRST_SCALAR, num_scaleant
-!               grid%vch%alpha_ant(its:ite,jts:jte,:,ic) = 0.D0
-!               do k = 1, num_ant_steps    !LEVELS
-!                  do j = jts, jte
-!                     do i = its, ite
-!                         grid%vch%alpha_ant (i,j,k,ic) = grid%xach%alpha_ant (i,j,k,ic)
-!                     end do
-!                  end do
-!               end do
-!            end do
-!         end do
-!         !$OMP END PARALLEL DO
-!
-!         !$OMP PARALLEL DO &
-!         !$OMP PRIVATE ( ij, ic, k, j, i)
-!         do ij = 1 , grid%num_tiles
-!            do ic = PARAM_FIRST_SCALAR, num_scalebb
-!               grid%vch%alpha_bb(its:ite,jts:jte,:,ic) = 0.D0
-!               do k = 1, num_bb_steps    !LEVELS
-!                  do j = jts, jte
-!                     do i = its, ite
-!                         grid%vch%alpha_bb (i,j,k,ic) = grid%xach%alpha_bb (i,j,k,ic)
-!                     end do
-!                  end do
-!               end do
-!            end do
-!         end do
-!         !$OMP END PARALLEL DO
-!#endif
-!
-!         diffvec = 0.D0
-!         !Store (xa_ - xa) = U*(dv_ - dv) in diffvec
-!         !Transfer vch (and later vv) to yhat_Pa_
-!         call da_vv_to_cv(grid%vv, grid%xp, mz, cv_size, &
-!                          diffvec(1:be%cv%size_jb) &
-!#if (WRF_CHEM == 1)
-!                          , grid%vch &
-!#endif
-!                           )
-!
-!         !Multiply U^T * (xa_ - xa)
-!
-!         !Multiply Pav^-1/2 * U^T * (xa_ - xa)
-!
-!         !Multiply Pav^-1/2 * U^T * (xa_ - xa)
-!
-!         !Multiply (Pav^-1/2 * U^T * (xa_ - xa))^T * Pav^-1/2 * U^T * (xa_ - xa)
-
-
       write(unit=stdout,fmt='(A)') '          EUCNORM_v           EUCNORM_x           EUCNORM_xPa'
       write(unit=stdout,fmt='(3D20.10)') EUCNORM_v(itype), EUCNORM_x(itype), EUCNORM_xPa(itype)
-
-      !WHAT ABOUT dx-DIRECTION for DGN/LM nonlinear problems?
    end do
 end if
 
    !=====================================================================
    ! Compare Pa_approx to Pa_hess
-   !    Pav - posterior covariance in preconditioned v-space
-   !    Pa  - posterior covariance in state x-space
+   !  (2a)  Pav - posterior covariance in preconditioned v-space
+   !  (2b)  Pa  - posterior covariance in state x-space
+   !  (2c)  Pa _ Pa^-1 - posterior covariance in state x-space normalized by Pa
    !=====================================================================
 
    !---------------
-   ! ||Pav_ - Pav||
+   ! (2a) ||Pav_ - Pav||
    !---------------
 if (.true.) then
 
@@ -276,8 +230,6 @@ if (.true.) then
          do i = 1, neign
             LAM(i) = - (eignval(i) - 1.D0) / eignval(i)
          end do
-!         !Skipping this step, will cancel between yhat_Pav_ and yhat_Pav 
-!         yhat_Pav_ = omega_Pav
       end if
 
       do iens = 1, rank_rsvd_Pa
@@ -304,8 +256,6 @@ if (.true.) then
 
       deallocate(qhat_Pav)
 
-!!!      eignval_res = eignval_res - 1.D0
-
       !Evaluate Spectral/Frobenius norms from eigenvalues
       SPECNORM_Pav(itype) = maxval(abs(eignval_res(1:dummy)))
       FROBNORM_Pav(itype) = sqrt(sum(eignval_res(1:dummy)*eignval_res(1:dummy)))
@@ -319,9 +269,11 @@ if (.true.) then
 
 end if
 
+#if (WRF_CHEM == 1)
    !---------------
-   ! ||Pa_ - Pa||
+   ! (2b) ||Pa_ - Pa||
    !---------------
+   !Only for chem so far
 if (.true.) then
    allocate(yhat_Pa_(cv_size,1:rank_rsvd_Pa))
 
@@ -347,18 +299,15 @@ if (.true.) then
          do i = 1, neign
             LAM(i) = - (eignval(i) - 1.D0) / eignval(i)
          end do
-!         !Skipping this step, will cancel between yhat_Pa_ and yhat_Pa 
-!         yhat_Pa_ = omega_Pav
-
       end if
 
       !Assumes 1-to-1 size between, e.g., scaleant+scalebb and xhat (SQUARE U)
       do iens = 1, rank_rsvd_Pa
          !Transfer random cv vector to vv and vch
          call da_cv_to_vv(cv_size, omega_Pav(1:be%cv%size_jb, iens), &
-                          mz, grid%vv, &
+                          mz, grid%vv &
 #if (WRF_CHEM == 1)
-                          grid%vch  &
+                          , grid%vch  &
 #endif
                           )
 
@@ -400,9 +349,9 @@ if (.true.) then
          ! Calculate U^T * omega (inputs: xa and xach; output: UTomega)
          UTomega = 0.D0
          call da_transform_vtox_adj(grid, be%cv%size_jb, xbx, be, grid%ep, grid%vp, grid%vv, &
-                                   UTomega(1:be%cv%size_jb), &
+                                   UTomega(1:be%cv%size_jb) &
 #if (WRF_CHEM == 1)
-                                   grid%vch &
+                                   , grid%vch &
 #endif
                                    )
 
@@ -416,7 +365,11 @@ if (.true.) then
          !Pa * omega = U * Pav * U^T * omega
          ! outputs: xa, xach
          call da_transform_vtox(grid, be%cv%size_jb, xbx, be, grid%ep, &
-                                yhat_Pa_(1:be%cv%size_jb,iens), grid%vv, grid%vp, grid%vch)
+                                yhat_Pa_(1:be%cv%size_jb,iens), grid%vv, grid%vp &
+#if (WRF_CHEM == 1)
+                                , grid%vch &
+#endif
+                                )
 
          yhat_Pa_(:,iens) = 0.D0
          ! Transfer vch (and vv later) from xach (and xa later)
@@ -478,8 +431,6 @@ if (.true.) then
 
       deallocate(qhat_Pa)
 
-!!!      eignval_res = eignval_res - 1.D0
-
       !Evaluate Spectral/Frobenius norms from eigenvalues
       SPECNORM_Pa(itype) = maxval(abs(eignval_res(1:dummy)))
       FROBNORM_Pa(itype) = sqrt(sum(eignval_res(1:dummy)*eignval_res(1:dummy)))
@@ -495,7 +446,7 @@ end if
 
 
    !--------------------------------------------------
-   ! ||Pa_ - Pa||_{Pa^-1} = ||La^-1 (Pa_ - Pa) La^-1||
+   ! (2c) ||Pa_ - Pa||_{Pa^-1} = ||La^-1 (Pa_ - Pa) La^-1||
    !--------------------------------------------------
    ! Could do these in reduced space to save time -> good algorithmic test for now
 if (.true. .and. &
@@ -571,8 +522,6 @@ if (.true. .and. &
 
       deallocate(qhat_LaPaLa)
 
-!!!      eignval_res = eignval_res - 1.D0
-
       !Evaluate Spectral/Frobenius norms from eigenvalues
       SPECNORM_PaPa(itype) = maxval(abs(eignval_res(1:dummy)))
       FROBNORM_PaPa(itype) = sqrt(sum(eignval_res(1:dummy)*eignval_res(1:dummy)))
@@ -585,6 +534,7 @@ if (.true. .and. &
    deallocate(yhat_LaPaLa_)
 
 end if
+#endif
 
    ! ||Pa_ - Pa||_{B^-1}
    ! Can not do these in reduced space

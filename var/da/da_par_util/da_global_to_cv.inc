@@ -47,13 +47,14 @@ subroutine da_global_to_cv(cv_size, cv_size_global, x, grid, mzs, xg )
 !   ims = ims; ime = ime; jms = jms; jme = jme
    kms = grid%xp%kms
    ips = grid%xp%ips; ipe = grid%xp%ipe; jps = grid%xp%jps; jpe = grid%xp%jpe; kps = grid%xp%kps
-
+#if (WRF_CHEM == 1)
 #ifdef CLOUD_CV
       mz_ant=mzs(14)
       mz_bb =mzs(15)
 #else
       mz_ant=mzs(8)
       mz_bb =mzs(9)
+#endif
 #endif
 
    if (rootproc) then
@@ -205,16 +206,6 @@ subroutine da_global_to_cv(cv_size, cv_size_global, x, grid, mzs, xg )
    deallocate (vvc_xg%alpha_ant, vvc_xg%alpha_bb)
 #endif
 
-!!!JJG - write(unit=stdout,fmt='(A,8I8)')'DEBUG_10',ims,ime,jms,jme,mz_ant,mz_bb,num_scaleant,num_scalebb
-!!!JJG - write(unit=stdout,fmt='(A,4I8)')'DEBUG_11',ips,ipe,jps,jpe
-
-!!!JJG - write(unit=stdout,fmt='(A,3I8)')'DEBUG_12',size(vvc_x%alpha_ant,1), size(vvc_x%alpha_ant,2), size(vvc_x%alpha_ant,3)
-!!!JJG - write(unit=stdout,fmt='(A,3I8)')'DEBUG_12',size(vvc_x%alpha_bb,1), size(vvc_x%alpha_bb,2), size(vvc_x%alpha_bb,3)
-!
-!
-!!!JJG - !write(unit=stdout,fmt='(A,3I8)')'DEBUG_12',size(vvc_x%alpha_ant,1), size(vvc_x%alpha_ant,2), size(vvc_x%alpha_ant,3)
-!!!JJG - !write(unit=stdout,fmt='(A,3I8)')'DEBUG_12',size(vvc_x%alpha_bb,1), size(vvc_x%alpha_bb,2), size(vvc_x%alpha_bb,3)
-
    ! finally, collapse data back into a locally-sized cv-array
 !   xpl%ids = ids; xpl%ide = ide
 !   xpl%ims = ims; xpl%ime = ime
@@ -225,28 +216,6 @@ subroutine da_global_to_cv(cv_size, cv_size_global, x, grid, mzs, xg )
 !   xpl%kds = kds; xpl%kde = kde
 !   xpl%kms = kms; xpl%kme = kme
 !   xpl%kts = kts; xpl%kte = kte
-!
-!!!JJG - !write(unit=stdout,fmt='(A,2I8)')'DEBUG_13', xpl%ids, xpl%ide
-!!!JJG - !write(unit=stdout,fmt='(A,2I8)')'DEBUG_13', xpl%ims, xpl%ime
-!!!JJG - !write(unit=stdout,fmt='(A,2I8)')'DEBUG_13', xpl%its, xpl%ite
-!!!JJG - !write(unit=stdout,fmt='(A,2I8)')'DEBUG_13', xpl%jds, xpl%jde
-!!!JJG - !write(unit=stdout,fmt='(A,2I8)')'DEBUG_13', xpl%jms, xpl%jme
-!!!JJG - !write(unit=stdout,fmt='(A,2I8)')'DEBUG_13', xpl%jts, xpl%jte
-!!!JJG - !write(unit=stdout,fmt='(A,2I8)')'DEBUG_13', xpl%kds, xpl%kde
-!!!JJG - !write(unit=stdout,fmt='(A,2I8)')'DEBUG_13', xpl%kms, xpl%kme
-!!!JJG - !write(unit=stdout,fmt='(A,2I8)')'DEBUG_13', xpl%kts, xpl%kte
-
-
-!!!JJG - write(unit=stdout,fmt='(A,2I8)')'DEBUG_14', grid%xp%ids, grid%xp%ide
-!!!JJG - write(unit=stdout,fmt='(A,2I8)')'DEBUG_14', grid%xp%ims, grid%xp%ime
-!!!JJG - write(unit=stdout,fmt='(A,2I8)')'DEBUG_14', grid%xp%its, grid%xp%ite
-!!!JJG - write(unit=stdout,fmt='(A,2I8)')'DEBUG_14', grid%xp%jds, grid%xp%jde
-!!!JJG - write(unit=stdout,fmt='(A,2I8)')'DEBUG_14', grid%xp%jms, grid%xp%jme
-!!!JJG - write(unit=stdout,fmt='(A,2I8)')'DEBUG_14', grid%xp%jts, grid%xp%jte
-!!!JJG - write(unit=stdout,fmt='(A,2I8)')'DEBUG_14', grid%xp%kds, grid%xp%kde
-!!!JJG - write(unit=stdout,fmt='(A,2I8)')'DEBUG_14', grid%xp%kms, grid%xp%kme
-!!!JJG - write(unit=stdout,fmt='(A,2I8)')'DEBUG_14', grid%xp%kts, grid%xp%kte
-
 
    call da_vv_to_cv(vv_x, grid%xp, mzs, cv_size, x &
 #if (WRF_CHEM == 1)

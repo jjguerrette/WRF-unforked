@@ -149,18 +149,12 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
       beta(0)   = SQRT(da_dot_cv(cv_size, ghat, ghat, grid, mz, jp_start, jp_end))
       qhat(:,:) = 0.D0
 
-!      LAM_hess = eignval_hess
-
-!Should be much more accurate for high iter
       LAM_hess = eignval_hess - 1.D0
-
 
       do iter=1, nens
          qhat(:,iter) = ghat / beta(iter-1)
 
-         !!!fhat = qhat + AMAT * AMAT^T * qhat (AMAT is sqrt obs HESSIAN, using full eigenval_hess above)
-
-!         fhat = 0.D0
+         !fhat = qhat + AMAT * AMAT^T * qhat (AMAT is sqrt obs HESSIAN)
          fhat = qhat(:,iter)
 
          call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
@@ -240,90 +234,6 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
 
       call da_gen_omega(omega, cv_size, nens, grid, mz)
 
-!      allocate(omega(1:cv_size,1:nens))
-!
-!!da_set_randomcv sometimes uses the same seed for two different draw, giving identical cv's on a particular processor
-!
-!!Either the seed needs to be forced to change between multiple draws or it needs to be the same and only a single draw can be taken for all cv values.
-!
-!!May want to use a similar approach to global below in the first call to da_wrfvar.exe for RIOT.  This may improve LRU result significantly.
-!
-!!! Cheap enough, but numbers are less random due to changing of seed between nens*nproc draws
-!!      do iens = 1, nens
-!!         write(unit=stdout,fmt='(A,I5,A,I5)') 'Initialize OMEGA_i, i = ', iens ,' of ',nens
-!!         do
-!!            call da_set_randomcv(cv_size, omega(:,iens))
-!!
-!!            !Ensures independent draws
-!!            if (iens .eq. 1) then
-!!               exit
-!!            else
-!!               if ( sum(abs(omega(:,iens) - omega(:,iens-1))) .gt. 1.0D-2 ) exit
-!!            end if
-!!         end do
-!!      end do
-!
-!! Should make this into a subroutine --> inputs: cv_size, nens; outputs: omega
-!#ifdef DM_PARALLEL
-!      ! Generate global random omega matrix
-!      ! Sequence from single global seed (non-repeating)
-!      cv_size_domain = wrf_dm_sum_integer(cv_size)
-!      if (rootproc) then
-!         allocate(omega_g(1:cv_size_domain,nens))
-!         allocate(omega1d(1:cv_size_domain*nens))
-!         call da_set_randomcv(cv_size_domain*nens, omega1d)
-!         cv_s = 1
-!         do iens = 1,nens
-!            cv_f = cv_s + cv_size_domain-1
-!            omega_g(:,iens) = omega1d(cv_s:cv_f)
-!            cv_s = cv_f+1
-!         end do
-!         deallocate(omega1d)
-!      else
-!         allocate(omega_g(1,1:nens))
-!      end if
-!
-!      call mpi_barrier(comm, ierr)
-!
-!      !Transfer to local omega
-!      allocate(dumcv(1:cv_size))
-!      allocate(dumcv_g(1:cv_size_domain))
-!      do iens = 1, nens
-!         if(rootproc) then
-!            dumcv_g = omega_g(:,iens)
-!         else
-!            dumcv_g = 0.D0
-!         end if
-!         dumcv = 0.D0
-!
-!         call da_global_to_cv(cv_size, cv_size_domain, dumcv, grid, mz, dumcv_g)
-!         omega(:,iens) = dumcv
-!
-!         call mpi_barrier(comm, ierr)
-!      end do
-!      deallocate(dumcv)
-!      deallocate(dumcv_g)
-!      deallocate(omega_g)
-!#else
-!      ! Generate local=global omega
-!      ! Single seed
-!      allocate(omega1d(1:cv_size*nens))
-!      call da_set_randomcv(cv_size*nens, omega1d)
-!      cv_s = 1
-!      do iens = 1,nens
-!         cv_f = cv_s + cv_size-1
-!         omega(:,iens) = omega1d(cv_s:cv_f)
-!         cv_s = cv_f+1
-!      end do
-!      deallocate(omega1d)
-!#endif
-
-      ! Check if each draw is independent or sometimes repeated
-      do iens = 1, nens
-         write(unit=stdout,fmt='(A,I3,A,5E25.15)') 'omega(1:5,',iens,') = ', omega(1:5,iens)
-      end do
-
-
       !Multiply obs Hessian by omega (Y=A_obs * omega)
       LAM_hess = eignval_hess - 1.D0
 
@@ -340,18 +250,7 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
       call da_gram_schmidt(grid,mz,jp_start,jp_end, &
                             yhat,qhat,cv_size,nens)
 
-!   !Loop over p (oversample values) (NOT VERY EFFICIENT IF NEED TIME SAVINGS)
-!   do isamp = 1, noversamp
-!      p = oversamps(isamp)
-!
-!      ! Perform RSVD for different ranks of the approximate Hessian
-!      do neign_p = 1, nens_compare
-
       do neign_p = 1, nens
-!         neign = neign_p + p
-!         allocate(eignvec(1:neign,1:neign))
-!         allocate(eignval(1:neign))
-
          allocate(eignvec(1:neign_p,1:neign_p))
          allocate(eignval(1:neign_p))
 

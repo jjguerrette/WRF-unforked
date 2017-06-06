@@ -104,6 +104,10 @@ subroutine da_dgn( grid, cv_size, xbx, be, iv, xhat, cv, ob, config_flags, ja_to
       write(unit=stdout,fmt='("DGN: i   eta_a eta_c eta_d eta_b       ja         jc         jd         jb")')
       write(unit=stdout,fmt='("DGN:",I4,4F6.3,4F11.3)') itgold,eta_a,eta_c,eta_d,eta_b,ja,jc,jd,jb
 
+!      if ( jb.lt.jc .and. jb.lt.jd) then
+!         eta = eta_b
+!         exit
+!      end if 
 
       if (jc .lt. jd) then
          eta_b = eta_d
@@ -123,15 +127,18 @@ subroutine da_dgn( grid, cv_size, xbx, be, iv, xhat, cv, ob, config_flags, ja_to
          branch = 2
       end if
 
+      if (ja.gt.1e-6 &
+             .and. abs(jb-ja)/min(ja,jb,jd).lt.0.005 &
+             .and. abs(jb-jd)/min(ja,jb,jd).lt.0.005) exit
 
-      if (eta .gt. (1.d0 - tol)) then
+      if (eta.gt.(1.d0 - tol)) then
+         eta = 1.D0
          exit
       end if
+
    end do
 
-   if (eta .gt. (1.d0 - tol)) then
-      eta = 1.D0
-   else
+   if (eta .lt. 1.d0 ) then
       eta = (eta_a + eta_b) / 2.D0
    end if
 

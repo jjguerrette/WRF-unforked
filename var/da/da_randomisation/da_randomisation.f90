@@ -52,7 +52,7 @@ module da_randomisation
    use da_tracing, only : da_trace_entry, da_trace_exit,da_trace
 !#ifdef VAR4D
 !#endif
-   use da_lapack, only : dsteqr
+   use da_lapack, only : dsteqr !WRFDA-specific version of dsteqr (not MKL)
 #if defined(LAPACK)
 !   use mkl95_precision, only: WP => DP
 !   use mkl95_lapack, only: gesv, syev, gesvd
@@ -112,7 +112,6 @@ contains
 #include "da_dot_cv_z.inc"
 #include "da_dot_obs.inc"
 #include "da_cv_io.inc"
-#include "da_cv_io_int.inc"
 #include "da_yhat_io.inc"
 #include "da_hessian_io.inc"
 #include "da_precon_omega.inc"
@@ -132,8 +131,10 @@ contains
 #include "da_evaluate_decomp.inc"
 #include "da_evaluate_decomp_init.inc"
 #include "da_write_norms.inc"
+#if (WRF_CHEM == 1)
 #include "da_evaluate_increment.inc"
 #include "da_evaluate_hessian.inc"
+#endif
 #include "da_gen_omega.inc"
 
 #include "da_randomise_svd_B.inc"

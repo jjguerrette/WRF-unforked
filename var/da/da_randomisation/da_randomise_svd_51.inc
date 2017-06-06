@@ -4,7 +4,9 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
                            qhat, eignval, eignvec, neign)
 
    !-------------------------------------------------------------------------
-   ! Purpose:         Main randomized SVD routine, separated into 2 stages 
+   ! Purpose:         Main randomized SVD routine, separated into 4 stages 
+   !                  Slightly nore expensive than da_randomise_svd, 
+   !                   but less sensitive to assymetry in AD/TL
    !
    ! Here 
    !    cv   is updated in outer-loop.
@@ -146,6 +148,7 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
 #endif
                  )
 
+!da_transform_ytoyhat needs non-chem observations before it and da_randomise_svd_51 are generalizable
          call da_transform_ytoyhat (iv, y, yhat_obs, nall)
 
          if (allocated(yhat_obs)) then
@@ -262,6 +265,7 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
 
       call da_yhat_io('r', filename, nall, nobs(1), qhat_obs)
 
+!da_transform_ytoyhat_adj needs non-chem observations before it and da_randomise_svd_51 are generalizable
       call da_transform_ytoyhat_adj (iv, qhat_obs, nall, jo_grad_y)
 
       deallocate(nobs)

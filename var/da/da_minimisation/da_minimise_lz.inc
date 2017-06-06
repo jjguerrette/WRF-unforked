@@ -71,10 +71,10 @@ subroutine da_minimise_lz(grid, config_flags,            &
    real                              :: adj_rhs, adj_sum_rhs ! < cv, cv >
    real                              :: j_total, j0_total
    real                              :: dfs, dfsmax
-#if (WRF_CHEM == 1)
-   character(len=2) :: iterc,itc
    character(len=3) :: dummychar=""
    integer          :: ii
+#if (WRF_CHEM == 1)
+   character(len=2) :: iterc,itc
 #endif
 
    if (trace_use) call da_trace_entry("da_minimise_lz")

@@ -24,7 +24,8 @@ subroutine da_gen_omega(omega_mat, vec_len, nvec, grid, mz )
    if(allocated(omega_mat)) deallocate(omega_mat)
    allocate(omega_mat(1:vec_len,1:nvec))
 
-! Should make this into a subroutine --> inputs: vec_len, nvec; outputs: omega
+! Solves this problem: da_set_randomcv sometimes uses the same seed for two different draw, giving identical cv's on a particular processor.  Either the seed needs to be forced to change between multiple draws or it needs to be the same and only a single draw can be taken for all cv values.
+
 #ifdef DM_PARALLEL
    ! Generate global random omega matrix
    ! Sequence from single global seed (non-repeating)

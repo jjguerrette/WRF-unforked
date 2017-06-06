@@ -33,9 +33,10 @@ module da_wrfvar_top
    use module_state_description, only : num_moist, num_a_moist, num_g_moist, &
       num_scalar, num_a_scalar, num_g_scalar, &
       !num_chem, PARAM_FIRST_SCALAR, num_tracer 
-      num_tracer, num_a_tracer, num_g_tracer, &
+      num_tracer, num_chem, &
 #if (WRF_CHEM == 1)
-      num_chem, num_a_chem, num_g_chem, &
+      num_a_tracer, num_g_tracer, &
+      num_a_chem, num_g_chem, &
       num_emis_ant, num_scaleant, num_a_scaleant, num_g_scaleant, &
       num_ebu, num_ebu_in, num_scalebb, num_a_scalebb, num_g_scalebb, &
       num_ext_coef, & !num_a_ext_coef, num_g_ext_coef, &
@@ -93,9 +94,14 @@ module da_wrfvar_top
 #endif
       da_kmat_mul
 #if defined(LAPACK)
-   use da_randomisation, only: da_randomise_svd, da_randomise_svd_51, da_cv_io, da_cv_io_int, &
-      da_calculate_hessian, da_randomise_svd_B, da_randomise_svd_B11, &
-      da_evaluate_increment, da_evaluate_hessian, da_hessian_io
+   use da_randomisation, only: &
+      da_randomise_svd, da_randomise_svd_B, da_randomise_svd_B11, &
+#if (WRF_CHEM == 1)
+      da_randomise_svd_51, da_calculate_hessian, &
+      da_evaluate_increment, da_evaluate_hessian, &
+#endif
+      da_cv_io
+
 #endif
    use da_obs, only : da_transform_xtoy_adj 
    use da_obs_io, only : da_write_filtered_obs, da_write_obs, da_final_write_obs , &
