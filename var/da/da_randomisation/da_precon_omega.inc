@@ -230,7 +230,7 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
 
 !   write(cens,fmt='(I0)') eig_count
    write(unit=stdout,fmt='("crit                    lam")')
-   do iens=1:eig_count
+   do iens = 1, eig_count
       write(unit=stdout,fmt='(2D26.16)') crit(iens), lam_all(iens)
    end do
 

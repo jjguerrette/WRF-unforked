@@ -1217,8 +1217,6 @@
          write(cit,fmt='(i2.2)') svd_outer
          cvtfile_svd = 'cvt.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
          call da_cv_io ('w', cvtfile_svd, cv_size, cvt(1:cv_size), grid, mz)
-!         cvtfile_svd = 'xhat.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
-!         call da_cv_io ('w', cvtfile_svd, cv_size, xhat(1:cv_size), grid, mz)
       end if
 #endif
 
