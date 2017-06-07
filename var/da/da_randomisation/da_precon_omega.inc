@@ -34,6 +34,8 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
 
    real*8, allocatable   :: crit(:)
    real*8, allocatable   :: crit_prev(:)
+   real*8, allocatable   :: lam_all(:)
+
    real*8   :: gdot, gdot_prev
    real*8   :: crit_save(nens)
    integer  :: precon_list(nens)
@@ -157,6 +159,7 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
    end if
 
    allocate(crit(ensdim_svd*nouter_seed))
+   allocate(lam_all(ensdim_svd*nouter_seed))
 
    do it=nouter_seed, 1, -1
       nens_it = ensdim_svd
@@ -188,6 +191,8 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
 
          if (riot_precon .eq. 4) &
             crit(eig_count) = real(eig_total - eig_count + 1,8)
+
+         lam_all(eig_count) = eignval_prev(iens)
 
          if (eig_count .le. nens) then
             crit_save(eig_count) = crit(eig_count)
@@ -223,14 +228,18 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
       deallocate(qhat_prev)
    end if
 
-   write(cens,fmt='(I0)') eig_count
-   write(unit=stdout,fmt='("crit=",'//trim(cens)//'D15.5)') crit(1:eig_count)
+!   write(cens,fmt='(I0)') eig_count
+   write(unit=stdout,fmt='("crit                    lam")')
+   do iens=1:eig_count
+      write(unit=stdout,fmt='(2D26.16)') crit(iens), lam_all(iens)
+   end do
 
    do iens = 1, nens
-      write(unit=stdout,fmt='("iens = ",i3,", ieig = ",i3,", crit(i) = ",D15.5)') iens, precon_list(iens), crit_save(iens)
+      write(unit=stdout,fmt='("iens = ",i3,", ieig = ",i3,", crit(i) = ",D26.16)') iens, precon_list(iens), crit_save(iens)
    end do
 
    deallocate(crit)
+   deallocate(lam_all)
 
 
    !-------------------------------------------------------------------------
