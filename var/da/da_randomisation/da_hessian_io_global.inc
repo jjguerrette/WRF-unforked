@@ -79,8 +79,6 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, it, nens, neign, eign
 
       if (present(eignvec) .and. present(eignval) .and. present(qhat)) then
          do i = 1, nens
-write(unit=stdout,fmt='(A,1I7)') "hess_glob_A",i
-
             if (rootproc) then
                read(unit=ep_unit) temp
                read(unit=ep_unit) tempa
@@ -90,27 +88,18 @@ write(unit=stdout,fmt='(A,1I7)') "hess_glob_A",i
                tempa = 0.D0
                dumcv_g = 0.D0
             end if
-write(unit=stdout,fmt='(A,1I7)') "hess_glob_B",i
-
 #ifdef DM_PARALLEL
             call mpi_barrier(comm, ierr)
             call da_global_to_cv(cv_size, cv_size_domain, dumcv, grid, mz, dumcv_g)
             qhat(1:cv_size,i) = dumcv
-
-write(unit=stdout,fmt='(A,1I7)') "hess_glob_C",i
-
-          
+         
             call wrf_dm_bcast_real(temp,1)
             eignval(i) = temp
-write(unit=stdout,fmt='(A,1I7)') "hess_glob_D",i
-
             call wrf_dm_bcast_real(tempa,nens)
             eignvec(1:nens,i) = tempa
 #else
             qhat(1:cv_size,i) = dumcv_g
 #endif
-write(unit=stdout,fmt='(A,1I7)') "hess_glob_E",i
-
          end do
          if (present(ghat)) then
             if (rootproc) then
@@ -118,16 +107,12 @@ write(unit=stdout,fmt='(A,1I7)') "hess_glob_E",i
             else
                dumcv_g = 0.D0
             end if
-write(unit=stdout,fmt='(A,1I7)') "hess_glob_F",i
-
 #ifdef DM_PARALLEL
             call mpi_barrier(comm, ierr)
             call da_global_to_cv(cv_size, cv_size_domain, ghat, grid, mz, dumcv_g)
 #else
             ghat = dumcv_g
 #endif
-write(unit=stdout,fmt='(A,1I7)') "hess_glob_G",i
-
          end if
       end if
       if (rootproc) close(unit=ep_unit)
