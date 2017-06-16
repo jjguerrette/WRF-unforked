@@ -31,6 +31,8 @@ subroutine da_amat_mul_trunc(grid, mz, jp_start, jp_end, cv_size, &
    logical, intent(in), optional :: nuflag
 
    real*8                     :: nuhat(1:cv_size,1:ntrunc)
+!   real*8                     :: QTs(1:neign)
+!   real*8                     :: ETQTs(1:neign_trunc)
    real*8                     :: gam(ntrunc), gam_(ntrunc), temp_l, temp_e(cv_size)
    integer                    :: i, j, start, fin, step, order(ntrunc), temp_i
    real*8                     :: dot_cv
@@ -41,13 +43,22 @@ subroutine da_amat_mul_trunc(grid, mz, jp_start, jp_end, cv_size, &
    if (present(nuflag)) then
       nuhat = qhat(1:cv_size,1:ntrunc)
    else
+      ! Is this slow due to non-parallel da_dot across cv_size?
       do j = 1, ntrunc
          do i = 1, cv_size
             nuhat(i,j) = da_dot(neign, qhat(i,1:neign), eignvec(1:neign,j))
          end do
       end do
-   end if
 
+!      do i = 1, neign
+!         QTs(i) = da_dot_cv(cv_size, qhat(:,i), shat, grid, mz, jp_start, jp_end)
+!      end do
+!      do i = 1, ntrunc
+!         ETQTs(i) = da_dot(neign,QTs(1:neign),eignvec(1:neign,i)
+!         gam(i) = eignval(i) * ETQTs(i)
+!         order(i) = i
+!      end do
+   end if
 
    !Sort gamma values in descending order to improve mat-vec precision
    do i = 1, ntrunc 

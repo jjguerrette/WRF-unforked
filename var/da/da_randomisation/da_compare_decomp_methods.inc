@@ -58,24 +58,22 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
    real(wp), allocatable        :: yhat_Pav_LRA(:,:)  ! yhat = Pav * omega
    real(wp), allocatable        :: yhat_Pa_LRU(:,:)  ! yhat = Pa * omega
    real(wp), allocatable        :: yhat_Pa_LRA(:,:)  ! yhat = Pa * omega
-   real(wp), allocatable        :: yhat_LaPaLa_LRU(:,:)  ! yhat = La^-1/2 * Pa * La^-1/2 * omega_Pa
-   real(wp), allocatable        :: yhat_LaPaLa_LRA(:,:)  ! yhat = La^-1/2 * Pa * La^-1/2 * omega_Pa
-   real(wp), allocatable        :: yhat_LaPaLa_half(:,:)  ! yhat = La^-1/2 * omega_Pa
+   real(wp), allocatable        :: La_reduced(:,:)  !  La^-1 = U^-1 Vm * (Im + LAM_m)^1/2 * Vm^T
+
 
    real*8, allocatable          :: eignvec(:, :)
    real*8, allocatable          :: eignval(:)
    real(wp), allocatable        :: qhat(:,:)
-   real(wp)                     :: LAM(1:nens_compare+max_oversamp)
    real(wp)                     :: LAM_hess(1:rankA)
-   integer                      :: iens, jens, nens, neign, neign_p, &
+   integer                      :: iens, jens, nens, neign, ntrunc, &
                                    i, j, p, dummy, iter, isamp, cv_s, cv_f
    integer                      :: ounit, iostat
 
    real(wp)                     :: gdot
 
-   real*8        :: EUCNORM_x(2), FROBNORM_Pa(2), SPECNORM_Pa(2)
-   real*8        :: EUCNORM_v(2), FROBNORM_Pav(2), SPECNORM_Pav(2)
-   real*8        :: EUCNORM_xPa(2), FROBNORM_PaPa(2), SPECNORM_PaPa(2)
+   real*8        :: EUCNORM_x(3), FROBNORM_Pa(3), SPECNORM_Pa(3)
+   real*8        :: EUCNORM_v(3), FROBNORM_Pav(3), SPECNORM_Pav(3)
+   real*8        :: EUCNORM_xPa(3), FROBNORM_PaPa(3), SPECNORM_PaPa(3)
 
    character(len=filename_len)  :: filename
    character*3  :: stat
@@ -100,7 +98,7 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
                                    omega_Pav, &
                                    yhat_Pav_LRU, yhat_Pav_LRA, &
                                    yhat_Pa_LRU, yhat_Pa_LRA, &
-                                   yhat_LaPaLa_LRU, yhat_LaPaLa_LRA, yhat_LaPaLa_half, &
+                                   La_reduced, &
                                    eignval_hess, eignvec_hess, qhat_hess)
 
    !-------------------------------------------------------------------------
@@ -120,7 +118,7 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
                                  omega_Pav, &
                                  yhat_Pav_LRU, yhat_Pav_LRA, &
                                  yhat_Pa_LRU, yhat_Pa_LRA, &
-                                 yhat_LaPaLa_LRU, yhat_LaPaLa_LRA, yhat_LaPaLa_half, &
+                                 La_reduced, &
                                  eignval_hess, eignvec_hess, qhat_hess(:,0:rankA), &
                                  eignval_hess, eignvec_hess, qhat_hess, &
                                  EUCNORM_x, FROBNORM_Pa, SPECNORM_Pa, &
@@ -199,7 +197,7 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
                                  omega_Pav, &
                                  yhat_Pav_LRU, yhat_Pav_LRA, &
                                  yhat_Pa_LRU, yhat_Pa_LRA, &
-                                 yhat_LaPaLa_LRU, yhat_LaPaLa_LRA, yhat_LaPaLa_half, &
+                                 La_reduced, &
                                  eignval, eignvec, qhat(:,0:neign), &
                                  eignval_hess, eignvec_hess, qhat_hess, &
                                  EUCNORM_x, FROBNORM_Pa, SPECNORM_Pa, &
@@ -225,6 +223,7 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
    if (rsvd_compare) then
 
       nens = nens_compare + max_oversamp
+!      nens = nens_compare
 
       write(unit=stdout,fmt='(A)') 'Evaluating RSVD5.6 dv, dx, Pav, and Pa'
 
@@ -250,32 +249,32 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
       call da_gram_schmidt(grid,mz,jp_start,jp_end, &
                             yhat,qhat,cv_size,nens)
 
-      do neign_p = 1, nens
-         allocate(eignvec(1:neign_p,1:neign_p))
-         allocate(eignval(1:neign_p))
+      do neign = 1, nens
+         allocate(eignvec(1:neign,1:neign))
+         allocate(eignval(1:neign))
 
       
          ! Eigenvalue decomposition of A (Algorithm 5.6 of Halko)
          call da_rsvd56(grid, mz, jp_start, jp_end, &
-                        omega(:,1:neign_p), yhat(:,1:neign_p), qhat(:,0:neign_p), cv_size, &
-                        eignval, eignvec, neign_p, dummy)
+                        omega(:,1:neign), yhat(:,1:neign), qhat(:,0:neign), cv_size, &
+                        eignval, eignvec, neign, dummy)
 
          eignval = eignval + 1.D0
 
          do isamp = 1, noversamp
 
             p = oversamps(isamp)
-            neign = neign_p - p
-            if  (neign.gt.0 .and. neign.le.nens_compare ) then
+            ntrunc = neign - p
+            if  (ntrunc.gt.0 .and. ntrunc.le.nens_compare ) then
  
                call da_evaluate_decomp(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
-                                       rank_rsvd_Pa, rankA, neign_p, neign, &
+                                       rank_rsvd_Pa, rankA, neign, ntrunc, &
                                        xhat_hess, ghat0, &
                                        omega_Pav, &
                                        yhat_Pav_LRU, yhat_Pav_LRA, &
                                        yhat_Pa_LRU, yhat_Pa_LRA, &
-                                       yhat_LaPaLa_LRU, yhat_LaPaLa_LRA, yhat_LaPaLa_half, &
-                                       eignval, eignvec, qhat(:,0:neign_p), &
+                                       La_reduced, &
+                                       eignval, eignvec, qhat(:,0:neign), &
                                        eignval_hess, eignvec_hess, qhat_hess, &
                                        EUCNORM_x, FROBNORM_Pa, SPECNORM_Pa, &
                                        EUCNORM_v, FROBNORM_Pav, SPECNORM_Pav, &
@@ -288,7 +287,7 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
                call da_write_norms(    EUCNORM_x, FROBNORM_Pa, SPECNORM_Pa, &
                                        EUCNORM_v, FROBNORM_Pav, SPECNORM_Pav, &
                                        EUCNORM_xPa, FROBNORM_PaPa, SPECNORM_PaPa, &
-                                       neign, suffix)
+                                       ntrunc, suffix)
             end if
 
          end do
@@ -312,9 +311,7 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
    if (allocated(yhat_Pa_LRU)) deallocate(yhat_Pa_LRU)
    if (allocated(yhat_Pa_LRA)) deallocate(yhat_Pa_LRA)
 
-   if (allocated(yhat_LaPaLa_LRU)) deallocate(yhat_LaPaLa_LRU)
-   if (allocated(yhat_LaPaLa_LRA)) deallocate(yhat_LaPaLa_LRA)
-   if (allocated(yhat_LaPaLa_half)) deallocate(yhat_LaPaLa_half)
+   if (allocated(La_reduced)) deallocate(La_reduced)
 
    if (trace_use) call da_trace_exit("da_compare_decomp_methods")
 

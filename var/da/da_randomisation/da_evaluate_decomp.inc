@@ -1,11 +1,11 @@
 #if defined(LAPACK)
 subroutine da_evaluate_decomp(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
-                              rank_rsvd_Pa, rankA, neign, neign_trunc, &
+                              rank_rsvd_Pa, rankA, neign, ntrunc, &
                               xhat_hess, ghat0, &
                               omega_Pav, &
                               yhat_Pav_LRU, yhat_Pav_LRA, &
                               yhat_Pa_LRU, yhat_Pa_LRA, &
-                              yhat_LaPaLa_LRU, yhat_LaPaLa_LRA, yhat_LaPaLa_half, &
+                              La_reduced, &
                               eignval, eignvec, qhat, &
                               eignval_hess, eignvec_hess, qhat_hess, &
                               EUCNORM_x, FROBNORM_Pa, SPECNORM_Pa, &
@@ -27,7 +27,7 @@ subroutine da_evaluate_decomp(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
    type (xbx_type),intent(inout) :: xbx     ! Header & non-gridded vars.
    type (be_type), intent(in)    :: be      ! background error structure.
    integer,        intent(in) :: cv_size
-   integer,        intent(in) :: rank_rsvd_Pa, rankA, neign, neign_trunc
+   integer,        intent(in) :: rank_rsvd_Pa, rankA, neign, ntrunc
 
    real*8,         intent(in) :: eignvec(neign, neign)
    real*8,         intent(in) :: eignval(neign)
@@ -43,10 +43,10 @@ subroutine da_evaluate_decomp(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
    integer, intent(in)        :: jp_start, jp_end
    integer, intent(in)        :: mz(:)
 
-   real*8, intent(out)        :: EUCNORM_x(2), FROBNORM_Pa(2), SPECNORM_Pa(2)
-   real*8, intent(out)        :: EUCNORM_v(2), FROBNORM_Pav(2), SPECNORM_Pav(2)
-   real*8, intent(out)        :: EUCNORM_xPa(2), FROBNORM_PaPa(2), SPECNORM_PaPa(2)
-!!   real*8, intent(out)        :: EUCNORM_xB(2), FROBNORM_PaB(2), SPECNORM_PaB(2)
+   real*8, intent(out)        :: EUCNORM_x(3), FROBNORM_Pa(3), SPECNORM_Pa(3)
+   real*8, intent(out)        :: EUCNORM_v(3), FROBNORM_Pav(3), SPECNORM_Pav(3)
+   real*8, intent(out)        :: EUCNORM_xPa(3), FROBNORM_PaPa(3), SPECNORM_PaPa(3)
+!!   real*8, intent(out)        :: EUCNORM_xB(3), FROBNORM_PaB(3), SPECNORM_PaB(3)
 
    !Check Variables
    real(wp), intent(in), allocatable        :: omega_Pav(:,:) ! Gaussian draw
@@ -54,9 +54,7 @@ subroutine da_evaluate_decomp(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
    real(wp), intent(in), allocatable        :: yhat_Pav_LRA(:,:)  ! yhat = Pav * omega_Pa
    real(wp), intent(in), allocatable        :: yhat_Pa_LRU(:,:)  ! yhat = Pa * omega_Pa
    real(wp), intent(in), allocatable        :: yhat_Pa_LRA(:,:)  ! yhat = Pa * omega_Pa
-   real(wp), intent(in), allocatable        :: yhat_LaPaLa_LRU(:,:)  ! yhat = La^-1*Pa*La^-1*omega_Pa
-   real(wp), intent(in), allocatable        :: yhat_LaPaLa_LRA(:,:)  ! yhat = La^-1*Pa*La^-1*omega_Pa
-   real(wp), intent(in), allocatable        :: yhat_LaPaLa_half(:,:)  ! yhat = La^-1*omega_Pa
+   real(wp), intent(in), allocatable        :: La_reduced(:,:)  !  La^-1 = U^-1 Vm * (Im + LAM_m)^1/2 * Vm^T
 
 
    real(wp)        :: UTomega(cv_size)
@@ -69,20 +67,22 @@ subroutine da_evaluate_decomp(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
    real(wp), allocatable  :: qhat_Pa(:,:)
    real(wp), allocatable  :: yhat_Pa_(:,:)
 
-   real(wp), allocatable  :: qhat_LaPaLa(:,:)
-   real(wp), allocatable  :: yhat_LaPaLa_(:,:)
-   real(wp), allocatable  :: yhat_LaPaLa_dummy(:,:)
+   real(wp), allocatable  :: LaQ(:,:)
+   real(wp), allocatable  :: LaVlS(:,:)
+   real(wp), allocatable  :: LaVl(:,:)
+   real(wp), allocatable  :: LaPaLa_reduced(:,:)
+
 
    real*8          :: temp
    real*8          :: eignvec_res(rank_rsvd_Pa, rank_rsvd_Pa)
    real*8          :: eignval_res(rank_rsvd_Pa), LAM(neign)
 
-   integer         :: iens, jens, i, j, k, ij, ic, itype, dummy
+   integer         :: iens, jens, i, j, k, ij, ic, itype, dummy, info, neign_trunc
 
    if (trace_use) call da_trace_entry("da_evaluate_decomp")
 
    write(unit=stdout,fmt=*) ' '
-   write(unit=stdout,fmt='(A,I6,A,I6)') 'Evaluate Norms, k = ', neign_trunc, ', k+p = ', neign
+   write(unit=stdout,fmt='(A,I6,A,I6)') 'Evaluate Norms, k = ', ntrunc, ', k+p = ', neign
 
 
    EUCNORM_x=0.D0; FROBNORM_Pa=0.D0; SPECNORM_Pa=0.D0
@@ -90,6 +90,12 @@ subroutine da_evaluate_decomp(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
    EUCNORM_v=0.D0; FROBNORM_Pav=0.D0; SPECNORM_Pav=0.D0
 
    EUCNORM_xPa=0.D0; FROBNORM_PaPa=0.D0; SPECNORM_PaPa=0.D0
+
+   if (neign .lt. rankA) then
+      neign_trunc = neign
+   else
+      neign_trunc = ntrunc
+   end if
 
 if (hess_comp_x) then
    !=====================================================================
@@ -192,6 +198,17 @@ if (hess_comp_x) then
       write(unit=stdout,fmt='(A)') '          EUCNORM_v           EUCNORM_x           EUCNORM_xPa'
       write(unit=stdout,fmt='(3D20.10)') EUCNORM_v(itype), EUCNORM_x(itype), EUCNORM_xPa(itype)
    end do
+
+   ! Adaptive increment
+   if ( minval(eignval(1:ntrunc)) .lt. 2.D0 ) then
+      EUCNORM_v(3) = EUCNORM_v(2)
+      EUCNORM_x(3) = EUCNORM_x(2)
+      EUCNORM_xPa(3) = EUCNORM_xPa(2)
+   else
+      EUCNORM_v(3) = EUCNORM_v(1)
+      EUCNORM_x(3) = EUCNORM_x(1)
+      EUCNORM_xPa(3) = EUCNORM_xPa(1)
+   end if
 end if
 
    !=====================================================================
@@ -205,8 +222,6 @@ end if
    ! (2a) ||Pav_ - Pav||
    !---------------
 if (.true.) then
-
-   write(unit=stdout,fmt='(A)') 'Perform RSVD on the error residual (Pav_ - Pav)'
 
    allocate(yhat_Pav_(cv_size,1:rank_rsvd_Pa))
 
@@ -231,12 +246,13 @@ if (.true.) then
             LAM(i) = - (eignval(i) - 1.D0) / eignval(i)
          end do
       end if
+      write(unit=stdout,fmt='(A)') 'Perform RSVD on the error residual (Pav_ - Pav)'
 
       do iens = 1, rank_rsvd_Pa
-         call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
-                                neign,neign,neign_trunc, &
-                                LAM,eignvec,qhat, &
-                                omega_Pav(:,iens),yhat_Pav_(:,iens))
+         call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size,&
+                             neign,neign,neign_trunc, &
+                             LAM,eignvec,qhat, &
+                             omega_Pav(:,iens),yhat_Pav_(:,iens))
       end do
 
       !Subtract (Pav_ * OMEGA - Pav * OMEGA)
@@ -267,6 +283,14 @@ if (.true.) then
 
    deallocate(yhat_Pav_)
 
+   ! Adaptive Pa
+   if ( minval(eignval(1:ntrunc)) .lt. 2.D0 ) then
+      FROBNORM_Pav(3) = FROBNORM_Pav(2)
+      SPECNORM_Pav(3) = SPECNORM_Pav(2)
+   else
+      FROBNORM_Pav(3) = FROBNORM_Pav(1)
+      SPECNORM_Pav(3) = SPECNORM_Pav(1)
+   end if
 end if
 
 #if (WRF_CHEM == 1)
@@ -277,7 +301,6 @@ end if
 if (.true.) then
    allocate(yhat_Pa_(cv_size,1:rank_rsvd_Pa))
 
-   write(unit=stdout,fmt='(A)') 'Perform RSVD on the error residual (Pa_ - Pa)'
    do itype = 1, 2
       !Generate yhat for approximate Hessian
       yhat_Pa_ = 0.D0
@@ -300,6 +323,7 @@ if (.true.) then
             LAM(i) = - (eignval(i) - 1.D0) / eignval(i)
          end do
       end if
+      write(unit=stdout,fmt='(A)') 'Perform RSVD on the error residual (Pa_ - Pa)'
 
       !Assumes 1-to-1 size between, e.g., scaleant+scalebb and xhat (SQUARE U)
       do iens = 1, rank_rsvd_Pa
@@ -357,10 +381,10 @@ if (.true.) then
 
          yhat_Pa_(:,iens) = 0.D0
          !yhat_v = Pav * U^T * omega
-         call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
-                                neign,neign,neign_trunc, &
-                                LAM,eignvec,qhat, &
-                                UTomega,yhat_Pa_(:,iens))
+         call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size,&
+                             neign,neign,neign_trunc, &
+                             LAM,eignvec,qhat, &
+                             UTomega,yhat_Pa_(:,iens))
 
          !Pa * omega = U * Pav * U^T * omega
          ! outputs: xa, xach
@@ -442,99 +466,129 @@ if (.true.) then
 
    deallocate(yhat_Pa_)
 
+   ! Adaptive Pa
+   if ( minval(eignval(1:ntrunc)) .lt. 2.D0 ) then
+      FROBNORM_Pa(3) = FROBNORM_Pa(2)
+      SPECNORM_Pa(3) = SPECNORM_Pa(2)
+   else
+      FROBNORM_Pa(3) = FROBNORM_Pa(1)
+      SPECNORM_Pa(3) = SPECNORM_Pa(1)
+   end if
 end if
+#endif
 
 
    !--------------------------------------------------
    ! (2c) ||Pa_ - Pa||_{Pa^-1} = ||La^-1 (Pa_ - Pa) La^-1||
    !--------------------------------------------------
-   ! Could do these in reduced space to save time -> good algorithmic test for now
 if (.true. .and. &
-    allocated(yhat_LaPaLa_half) ) then
+    allocated(La_reduced) ) then
+
+   !! Perform decomp in reduced-dimensional space (much cheaper, equal accuracy)
+   ! LaQ = La_reduced^T * Q
+   allocate(LaQ(rankA,neign_trunc))
+   do iens = 1, rankA
+      do jens = 1, neign_trunc
+         LaQ(iens,jens) = da_dot_cv(cv_size, La_reduced(:,iens), qhat(:,jens), grid, mz, jp_start, jp_end)
+      end do
+   end do
+
+   !LaVl = LaQ * E = La * Vl
+   allocate(LaVl(rankA,neign_trunc))
+   do jens = 1, neign_trunc
+      do iens = 1, rankA
+         LaVl(iens,jens) = da_dot(neign_trunc, LaQ(iens,1:neign_trunc), eignvec(1:neign_trunc,jens))
+      end do
+   end do
+
+!!   !This would need to be used if CG produces neign_trunc Ritz vectors of length = neign
+!!   ! LaQ = La_reduced^T * Q
+!!   allocate(LaQ(rankA,neign))
+!!   do iens = 1, rankA
+!!      do jens = 1, neign
+!!         LaQ(iens,jens) = da_dot_cv(cv_size, La_reduced(:,iens), qhat(:,jens), grid, mz, jp_start, jp_end)
+!!      end do
+!!   end do
+!!
+!!   !LaVl = LaQ * E = La * Vl
+!!   allocate(LaVl(rankA,neign_trunc))
+!!   do jens = 1, neign_trunc
+!!      do iens = 1, rankA
+!!         LaVl(iens,jens) = da_dot(neign, LaQ(iens,1:neign), eignvec(1:neign,jens))
+!!      end do
+!!   end do
+
+
    write(unit=stdout,fmt='(A)') 'Perform RSVD on the error residual Pa^-1/2 * (Pa_ - Pa) * Pa^-1/2'
-
-   allocate(yhat_LaPaLa_(cv_size,1:rank_rsvd_Pa))
-
    do itype = 1, 2
-      !Generate yhat for approximate Hessian
-      yhat_LaPaLa_ = 0.D0
- 
       if (itype .eq. 1) then !LRA
-         if (.not.allocated(yhat_LaPaLa_LRA)) cycle
+         if (.not.hess_comp_PaPa_LRA) cycle
          write(unit=stdout,fmt='(A)') 'LRA'
-
          do i = 1, neign
             LAM(i) = 1.D0 / eignval(i)
          end do
       end if
 
       if (itype .eq. 2) then !LRU
-         if (.not.allocated(yhat_LaPaLa_LRU)) cycle
+         if (.not.hess_comp_PaPa_LRU) cycle
          write(unit=stdout,fmt='(A)') 'LRU'
-
          do i = 1, neign
-            LAM(i) = - (eignval(i) - 1.D0) / eignval(i)
+            LAM(i) = (eignval(i) - 1.D0) / eignval(i)
          end do
       end if
 
-      allocate(yhat_LaPaLa_dummy(cv_size,1:rank_rsvd_Pa))
 
-      !Pa_ * Vm * (Im + LAM_m)^1/2 * Vm^T * OMEGA
-      do iens = 1, rank_rsvd_Pa
-         yhat_LaPaLa_dummy(:,iens) = 0.D0
-         call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
-                                neign,neign,neign_trunc, &
-                                LAM,eignvec,qhat, &
-                                yhat_LaPaLa_half(:,iens),yhat_LaPaLa_dummy(:,iens))
-
+      !LaVlS = LaQ * E * LAM^1/2 = La * Vl * S
+      allocate(LaVlS(rankA,neign_trunc))
+      do jens = 1, neign_trunc
+         LaVlS(:,jens) = LaVl(:,jens) * sqrt(LAM(jens))
       end do
 
-      !Vm * (Im + LAM_m)^1/2 * Vm^T * Pa_ * Vm * (Im + LAM_m)^1/2 * Vm^T * OMEGA
-      do i = 1, rankA
-         LAM(i) = sqrt(eignval_hess(i))
+      !LaPaLa_reduced = LaVlS * LaVlS^T
+      allocate(LaPaLa_reduced(1:rankA,1:rankA))
+      do iens = 1, rankA
+         do jens = 1, rankA
+            LaPaLa_reduced(iens,jens) = da_dot(neign_trunc, LaVlS(iens,1:neign_trunc), LaVlS(jens,1:neign_trunc))
+         end do
       end do
-      do iens = 1, rank_rsvd_Pa
-!            write(unit=stdout,fmt='(A,I5,A,I5)') 'Finalize La^-1 * Pa_ * La^-1 * OMEGA_i, i = ', iens ,' of ',rank_rsvd_Pa
-         yhat_LaPaLa_(:,iens) = 0.D0
-         call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
-                                rankA,rankA,rankA, &
-                                LAM,eignvec_hess,qhat_hess, &
-                                yhat_LaPaLa_dummy(:,iens),yhat_LaPaLa_(:,iens),.true.)
+      deallocate(LaVlS)
 
+      !Subtract truth component before spectral decomp
+      do iens = 1, rankA
+         if (itype .eq. 1) then !LRA
+            LaPaLa_reduced(iens,iens) = LaPaLa_reduced(iens,iens) - 1.D0
+         end if
+         if (itype .eq. 2) then !LRU
+            LaPaLa_reduced(iens,iens) = LaPaLa_reduced(iens,iens) - (eignval_hess(iens) - 1.D0)
+         end if
       end do
 
-      !Subtract (LaPaLa_ * OMEGA - LaPaLa * OMEGA)
-      do iens = 1, rank_rsvd_Pa
-         if (itype .eq. 1) yhat_LaPaLa_(:,iens) = yhat_LaPaLa_(:,iens) - yhat_LaPaLa_LRA(:,iens)
-         if (itype .eq. 2) yhat_LaPaLa_(:,iens) = yhat_LaPaLa_(:,iens) - yhat_LaPaLa_LRU(:,iens)
-      end do
-
-      deallocate(yhat_LaPaLa_dummy)
-
-      allocate(qhat_LaPaLa(cv_size,0:rank_rsvd_Pa))
-
-      call da_gram_schmidt(grid,mz,jp_start,jp_end, &
-                            yhat_LaPaLa_,qhat_LaPaLa,cv_size,rank_rsvd_Pa)
-
-      call da_rsvd56(grid, mz, jp_start, jp_end, &
-                     omega_Pav, yhat_LaPaLa_, qhat_LaPaLa, cv_size, &
-                     eignval_res, eignvec_res, rank_rsvd_Pa, dummy)
-
-      deallocate(qhat_LaPaLa)
+      ! Determine eigenvalues of the symmetric matrix
+      !-----------------------------------------------------------------
+      info = 0
+      call SYEV(LaPaLa_reduced, eignval_res(1:rankA), JOBZ = 'N' , INFO = info) !F95
 
       !Evaluate Spectral/Frobenius norms from eigenvalues
-      SPECNORM_PaPa(itype) = maxval(abs(eignval_res(1:dummy)))
-      FROBNORM_PaPa(itype) = sqrt(sum(eignval_res(1:dummy)*eignval_res(1:dummy)))
+      SPECNORM_PaPa(itype) = maxval(abs(eignval_res(1:rankA)))
+      FROBNORM_PaPa(itype) = sqrt(sum(eignval_res(1:rankA)*eignval_res(1:rankA)))
 
       write(unit=stdout,fmt='(A)') '    SPECNORM_PaPa   FROBNORM_PaPa'
       write(unit=stdout,fmt='(2D15.5)')SPECNORM_PaPa(itype),FROBNORM_PaPa(itype)
 
+      deallocate(LaPaLa_reduced)
    end do
+   deallocate(LaQ)
+   deallocate(LaVl)
 
-   deallocate(yhat_LaPaLa_)
-
+   ! Adaptive Pa
+   if ( minval(eignval(1:ntrunc)) .lt. 2.D0 ) then
+      FROBNORM_PaPa(3) = FROBNORM_PaPa(2)
+      SPECNORM_PaPa(3) = SPECNORM_PaPa(2)
+   else
+      FROBNORM_PaPa(3) = FROBNORM_PaPa(1)
+      SPECNORM_PaPa(3) = SPECNORM_PaPa(1)
+   end if
 end if
-#endif
 
    ! ||Pa_ - Pa||_{B^-1}
    ! Can not do these in reduced space

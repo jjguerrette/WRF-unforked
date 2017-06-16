@@ -4,7 +4,7 @@ subroutine da_evaluate_decomp_init(grid, xbx, be, mz, jp_start, jp_end, cv_size,
                                    omega_Pav, &
                                    yhat_Pav_LRU, yhat_Pav_LRA, &
                                    yhat_Pa_LRU, yhat_Pa_LRA, &
-                                   yhat_LaPaLa_LRU, yhat_LaPaLa_LRA, yhat_LaPaLa_half, &
+                                   La_reduced, &
                                    eignval_hess, eignvec_hess, qhat_hess)
 
    !-------------------------------------------------------------------------
@@ -37,9 +37,8 @@ subroutine da_evaluate_decomp_init(grid, xbx, be, mz, jp_start, jp_end, cv_size,
    real(wp), allocatable, intent(out)        :: yhat_Pav_LRA(:,:)  ! yhat = Pav * omega_Pa
    real(wp), allocatable, intent(out)        :: yhat_Pa_LRU(:,:)  ! yhat = Pa * omega_Pa
    real(wp), allocatable, intent(out)        :: yhat_Pa_LRA(:,:)  ! yhat = Pa * omega_Pa
-   real(wp), allocatable, intent(out)        :: yhat_LaPaLa_LRU(:,:)  ! yhat = La^-1 * Pa * La^-1 * omega_Pa
-   real(wp), allocatable, intent(out)        :: yhat_LaPaLa_LRA(:,:)  ! yhat = La^-1 * Pa * La^-1 * omega_Pa
-   real(wp), allocatable, intent(out)        :: yhat_LaPaLa_half(:,:)  ! yhat = La^-1 * omega_Pa
+
+   real(wp), allocatable, intent(out)        :: La_reduced(:,:)  !  La^-1 = U^-1 Vm * (Im + LAM_m)^1/2 * Vm^T
 
 
    real(wp), allocatable        :: omega_g(:,:) ! Global Gaussian draw
@@ -48,8 +47,7 @@ subroutine da_evaluate_decomp_init(grid, xbx, be, mz, jp_start, jp_end, cv_size,
    real(wp), allocatable        :: dumcv_g(:)
    real(wp), allocatable        :: yhat_Pav(:,:)
    real(wp), allocatable        :: yhat_Pa(:,:)
-   real(wp), allocatable        :: yhat_LaPaLa(:,:)
- 
+
    real(wp)        :: UTomega(1:cv_size)
    real(wp)        :: LAM_hess(1:rankA)
    integer         :: iens, jens, nens, neign, i, j, k, ij, ic, cv_s, cv_f, itype
@@ -258,61 +256,17 @@ subroutine da_evaluate_decomp_init(grid, xbx, be, mz, jp_start, jp_end, cv_size,
    !-------------------------------------
    !  Initialize Pa - Pa-norm comparison
    !-------------------------------------
-   do itype = 1, 2
-      if (itype .eq. 1) then
-         if (.not.hess_comp_PaPa_LRA) cycle
+   if (hess_comp_PaPa_LRA .or. hess_comp_PaPa_LRU) then
+      allocate(La_reduced(cv_size,1:rankA))
 
-         allocate(yhat_LaPaLa_LRA(1:cv_size,1:rank_rsvd_Pa))
-         do i = 1, rankA
-            LAM_hess(i) = 1.D0
+      ! La_reduced = Vm * (Im + LAM_m)^1/2
+      do iens = 1, rankA
+         do i = 1, cv_size
+            La_reduced(i,iens) = da_dot(rankA, qhat_hess(i,1:rankA), eignvec_hess(1:rankA,iens))
          end do
-      end if
-
-      if (itype .eq. 2) then
-         if (.not.hess_comp_PaPa_LRU) cycle
-
-         allocate(yhat_LaPaLa_LRU(1:cv_size,1:rank_rsvd_Pa))
-         do i = 1, rankA
-            LAM_hess(i) = - (eignval_hess(i) - 1.D0)
-         end do
-      end if
-
-      allocate(yhat_LaPaLa(1:cv_size,1:rank_rsvd_Pa))
-
-      yhat_LaPaLa = 0.D0
-
-      do iens = 1, rank_rsvd_Pa
-         write(unit=stdout,fmt='(A,I5,A,I5)') 'Initialize La^-1 * Pa * La^-1 * OMEGA_i, i = ', iens ,' of ',rank_rsvd_Pa
-
-         call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
-                                rankA,rankA,rankA, &
-                                LAM_hess,eignvec_hess,qhat_hess, &
-                                omega_Pav(:,iens),yhat_LaPaLa(:,iens),.true.)
-
-         if (itype .eq. 1) yhat_LaPaLa_LRA(:,iens) = yhat_LaPaLa(:,iens)
-         if (itype .eq. 2) yhat_LaPaLa_LRU(:,iens) = yhat_LaPaLa(:,iens)
+         La_reduced(:,iens) = La_reduced(:,iens) * sqrt(eignval_hess(iens))
       end do
-      deallocate( yhat_LaPaLa )
-
-      if (.not.allocated(yhat_LaPaLa_half)) then
-         allocate(yhat_LaPaLa_half(1:cv_size,1:rank_rsvd_Pa))
-         yhat_LaPaLa_half = 0.D0
-
-         !Vm * (Im + LAM_m)^1/2 * Vm^T * OMEGA
-         do i = 1, rankA
-            LAM_hess(i) = sqrt(eignval_hess(i))
-         end do
-         do iens = 1, rank_rsvd_Pa
-            write(unit=stdout,fmt='(A,I5,A,I5)') 'Initialize La^-1 * OMEGA_i, i = ', iens ,' of ',rank_rsvd_Pa
-
-            call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
-                                   rankA,rankA,rankA, &
-                                   LAM_hess,eignvec_hess,qhat_hess, &
-                                   omega_Pav(:,iens),yhat_LaPaLa_half(:,iens),.true.)
-         end do
-      end if
-   end do
-
+   end if
    if (trace_use) call da_trace_exit("da_evaluate_decomp_init")
 
 end subroutine da_evaluate_decomp_init

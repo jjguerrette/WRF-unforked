@@ -147,7 +147,7 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
 
  ! Determine eigenvalues and eigenvectors of the symmetric KMAT matrix
  !-----------------------------------------------------------------
-   info              = 0
+   info = 0
    KMAT_ = KMAT
    call SYEV(KMAT, LAM, JOBZ = 'V' , INFO = info) !F95
 
