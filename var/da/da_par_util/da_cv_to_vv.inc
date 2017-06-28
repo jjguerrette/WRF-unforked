@@ -186,9 +186,6 @@ subroutine da_cv_to_vv (cv_size, rcv, mzs, vv &
          do ic = PARAM_FIRST_SCALAR, num_scaleant
             cv_s = cv_e + 1
             cv_e = cv_s + ijm - 1
-
-!!!JJG - write(unit=stdout,fmt='(A,10I8)')'DEBUG_00A',ic,cv_s,cv_e,ijm,ma,is,ie,js,je,size(rcv)
-!!!JJG - write(unit=stdout,fmt='(A,3I8)')'DEBUG_00A',size(vch%alpha_ant,1), size(vch%alpha_ant,2), size(vch%alpha_ant,3)
             vch % alpha_ant(is:ie,js:je,1:ma,ic) = RESHAPE(rcv(cv_s:cv_e),(/ix, jy, ma/))
          end do
       end if
@@ -198,9 +195,6 @@ subroutine da_cv_to_vv (cv_size, rcv, mzs, vv &
          do ic = PARAM_FIRST_SCALAR, num_scalebb
             cv_s = cv_e + 1
             cv_e = cv_s + ijm - 1
-
-!!!JJG - write(unit=stdout,fmt='(A,10I8)')'DEBUG_00A',ic,cv_s,cv_e,ijm,mb,is,ie,js,je,size(rcv)
-
             vch % alpha_bb(is:ie,js:je,1:mb,ic) = RESHAPE(rcv(cv_s:cv_e),(/ix, jy, mb/))
          end do
       end if

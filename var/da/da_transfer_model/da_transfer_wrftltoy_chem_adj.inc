@@ -24,10 +24,12 @@ subroutine da_transfer_wrftltoy_chem_adj( grid, iv, jo_grad_y )
       allocate (model_chem(iv%info(chem_surf)%n1:iv%info(chem_surf)%n2))
       do ichem = 1 ,num_chem_surf-1
          do n=iv%info(chem_surf)%n1,iv%info(chem_surf)%n2
-            iloc = iv%info(chem_surf)%i(iplt,n)
-            jloc = iv%info(chem_surf)%j(iplt,n)
+!            iloc = iv%info(chem_surf)%i(iplt,n)
+!            jloc = iv%info(chem_surf)%j(iplt,n)
             if ( iv%info(chem_surf)%proc_domain(1,n) ) then
-               model_chem(n) = jo_grad_y%chem_surf(n)%chem(ichem) * iv%chem_surf(n)%weight(ichem)
+!               model_chem(n) = jo_grad_y%chem_surf(n)%chem(ichem) * iv%chem_surf(n)%weight(ichem)
+               model_chem(n) = jo_grad_y%chem_surf(n)%chem(ichem)
+
                grid%a_surf_hx(n,ichem+1) = model_chem(n)
                model_grid%a_surf_hx(n,ichem+1) = grid%a_surf_hx(n,ichem+1)
             end if
@@ -48,11 +50,13 @@ subroutine da_transfer_wrftltoy_chem_adj( grid, iv, jo_grad_y )
          do ij = 1 , grid%num_tiles
          do iplt = 1 ,num_platform
             do n=iv%info(chem_acft)%n1,iv%info(chem_acft)%n2
-               iloc = iv%info(chem_acft)%i(iplt,n)
-               jloc = iv%info(chem_acft)%j(iplt,n)
+!               iloc = iv%info(chem_acft)%i(iplt,n)
+!               jloc = iv%info(chem_acft)%j(iplt,n)
 
                if ( iv%info(chem_acft)%proc_domain(iplt,n) ) then
-                  model_chem(n) = jo_grad_y%chem_acft(n)%chem(ichem,iplt) * iv%chem_acft(n)%weight(ichem,iplt)
+!                  model_chem(n) = jo_grad_y%chem_acft(n)%chem(ichem,iplt) * iv%chem_acft(n)%weight(ichem,iplt)
+                  model_chem(n) = jo_grad_y%chem_acft(n)%chem(ichem,iplt)
+
                   grid%a_acft_hx(n,iplt,ichem+1) = model_chem(n)
                end if
             end do

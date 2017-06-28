@@ -24,6 +24,7 @@ module da_randomisation
        hess_comp_Pa_LRU, hess_comp_Pa_LRA, &
        hess_comp_PaPa_LRU, hess_comp_PaPa_LRA, &
        scale_hcheck, &
+       check_hess_symm, &
 #if (WRF_CHEM == 1)
        chem_surf, chem_acft, &
        num_ant_steps, num_bb_steps, &
@@ -131,6 +132,7 @@ contains
 #include "da_evaluate_decomp.inc"
 #include "da_evaluate_decomp_init.inc"
 #include "da_write_norms.inc"
+#include "da_check_hess_symm.inc"
 #if (WRF_CHEM == 1)
 #include "da_evaluate_increment.inc"
 #include "da_evaluate_hessian.inc"

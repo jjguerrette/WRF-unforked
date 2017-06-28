@@ -94,6 +94,7 @@ subroutine da_tl_model ()
    head_grid%g_rqvften = 0.0
    head_grid%g_rthcuten = 0.0
    head_grid%g_rqvcuten = 0.0
+   head_grid%g_rthraten = 0.0
    head_grid%g_muts = 0.0
    head_grid%g_mudf = 0.0
    head_grid%g_ru_m = 0.0
@@ -113,6 +114,47 @@ subroutine da_tl_model ()
    head_grid%g_raincv = 0.0
    head_grid%g_pratec = 0.0
 
+#if (WRF_CHEM == 1)
+   if (cv_options .eq. 10) then
+      ! Added these 6-30-2017, need to remove if chem ICs/BCs are control variables
+      head_grid%g_chem = 0.0
+      head_grid%g_chem_bxs = 0.0; head_grid%g_chem_bxe = 0.0; head_grid%g_chem_bys = 0.0; head_grid%g_chem_bye = 0.0
+      head_grid%g_chem_btxs = 0.0; head_grid%g_chem_btxe = 0.0; head_grid%g_chem_btys = 0.0; head_grid%g_chem_btye = 0.0
+
+
+      ! Likewise remove these if simultaneous physical/chemical DA
+      head_grid%g_u_2 = 0.0
+      head_grid%g_v_2 = 0.0
+      head_grid%g_w_2 = 0.0
+      head_grid%g_t_2 = 0.0
+      head_grid%g_ph_2 = 0.0
+      head_grid%g_p = 0.0
+      head_grid%g_mu_2 = 0.0
+      head_grid%g_moist = 0.0
+      head_grid%g_tracer = 0.0
+
+      head_grid%g_u_bxs = 0.0; head_grid%g_u_bxe = 0.0; head_grid%g_u_bys = 0.0; head_grid%g_u_bye = 0.0
+      head_grid%g_v_bxs = 0.0; head_grid%g_v_bxe = 0.0; head_grid%g_v_bys = 0.0; head_grid%g_v_bye = 0.0
+      head_grid%g_w_bxs = 0.0; head_grid%g_w_bxe = 0.0; head_grid%g_w_bys = 0.0; head_grid%g_w_bye = 0.0
+      head_grid%g_ph_bxs = 0.0; head_grid%g_ph_bxe = 0.0; head_grid%g_ph_bys = 0.0; head_grid%g_ph_bye = 0.0
+      head_grid%g_t_bxs = 0.0; head_grid%g_t_bxe = 0.0; head_grid%g_t_bys = 0.0; head_grid%g_t_bye = 0.0
+      head_grid%g_mu_bxs = 0.0; head_grid%g_mu_bxe = 0.0; head_grid%g_mu_bys = 0.0; head_grid%g_mu_bye = 0.0
+      head_grid%g_moist_bxs = 0.0; head_grid%g_moist_bxe = 0.0; head_grid%g_moist_bys = 0.0; head_grid%g_moist_bye = 0.0
+      head_grid%g_scalar_bxs = 0.0; head_grid%g_scalar_bxe = 0.0; head_grid%g_scalar_bys = 0.0; head_grid%g_scalar_bye = 0.0
+      head_grid%g_tracer_bxs = 0.0; head_grid%g_tracer_bxe = 0.0; head_grid%g_tracer_bys = 0.0; head_grid%g_tracer_bye = 0.0
+
+      head_grid%g_u_btxs = 0.0; head_grid%g_u_btxe = 0.0; head_grid%g_u_btys = 0.0; head_grid%g_u_btye = 0.0
+      head_grid%g_v_btxs = 0.0; head_grid%g_v_btxe = 0.0; head_grid%g_v_btys = 0.0; head_grid%g_v_btye = 0.0
+      head_grid%g_w_btxs = 0.0; head_grid%g_w_btxe = 0.0; head_grid%g_w_btys = 0.0; head_grid%g_w_btye = 0.0
+      head_grid%g_ph_btxs = 0.0; head_grid%g_ph_btxe = 0.0; head_grid%g_ph_btys = 0.0; head_grid%g_ph_btye = 0.0
+      head_grid%g_t_btxs = 0.0; head_grid%g_t_btxe = 0.0; head_grid%g_t_btys = 0.0; head_grid%g_t_btye = 0.0
+      head_grid%g_mu_btxs = 0.0; head_grid%g_mu_btxe = 0.0; head_grid%g_mu_btys = 0.0; head_grid%g_mu_btye = 0.0
+      head_grid%g_moist_btxs = 0.0; head_grid%g_moist_btxe = 0.0; head_grid%g_moist_btys = 0.0; head_grid%g_moist_btye = 0.0
+      head_grid%g_scalar_btxs = 0.0; head_grid%g_scalar_btxe = 0.0; head_grid%g_scalar_btys = 0.0; head_grid%g_scalar_btye = 0.0
+      head_grid%g_tracer_btxs = 0.0; head_grid%g_tracer_btxe = 0.0; head_grid%g_tracer_btys = 0.0; head_grid%g_tracer_btye = 0.0
+
+   end if
+#endif
 
    ! Set the physics options to what they are in TL and AD
    if (original_mp_physics .NE. 0 .and. original_mp_physics .NE. 98 .and. original_mp_physics .NE. 99) &

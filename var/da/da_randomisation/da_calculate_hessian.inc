@@ -165,13 +165,14 @@ subroutine da_calculate_hessian(grid, mz, config_flags, &
 #ifdef DM_PARALLEL
       !Perform global SVD of AMAT matrix
       cv_size_domain = wrf_dm_sum_integer(cv_size)
-      if (rootproc) then
+      if (.not.rootproc) cv_size_domain = 1
+!      if (rootproc) then
          allocate(AMAT_g(1:cv_size_domain,nyobs))
          allocate(nuhat_g(1:cv_size_domain,nyobs))
-      else
-         allocate(AMAT_g(1,1:nyobs))
-         allocate(nuhat_g(1,1:nyobs))
-      end if
+!      else
+!         allocate(AMAT_g(1,1:nyobs))
+!         allocate(nuhat_g(1,1:nyobs))
+!      end if
       allocate(dumcv(1:cv_size))
       allocate(dumcv_g(1:cv_size_domain))
       do iens = 1, nyobs
@@ -302,6 +303,13 @@ subroutine da_calculate_hessian(grid, mz, config_flags, &
          call da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
                                           neign, eignval, eignvec, qhat, &
                                           ghat, xhat, AMAT)
+
+         if (check_hess_symm) &
+            call da_check_hess_symm(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
+                                      config_flags, iv, re, y, &
+                                      neign, eignval, eignvec, qhat, AMAT)
+
+
       end if
 
       deallocate(AMAT)

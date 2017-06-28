@@ -1,8 +1,7 @@
 subroutine da_minimise_lz(grid, config_flags,            &
                            it, cv_size, xbx, be, iv,     &
                            j_grad_norm_target, xhat, qhat, cv, &
-                           re, y, j_cost, eignvec, eignval, neign,&
-                           ghat0)
+                           re, y, j_cost, eignvec, eignval, neign, j0_total)
 
    !-------------------------------------------------------------------------
    ! Purpose:         Main Lanczos minimisation routine 
@@ -38,10 +37,8 @@ subroutine da_minimise_lz(grid, config_flags,            &
    real*8, intent(out)               :: eignvec(ntmax(it), ntmax(it))
    real*8, intent(out)               :: eignval(ntmax(it))
    integer, intent(out)              :: neign
-!!!JJG DEBUG
-   real, intent(out)                 :: ghat0(1:cv_size)       ! cv copy.
-!!!JJG DEBUG
-   
+   real, intent(out)                 :: j0_total
+  
    integer                           :: i, j, k, n, inst, iter
 #if (WRF_CHEM != 1)
 #ifdef CLOUD_CV
@@ -60,7 +57,7 @@ subroutine da_minimise_lz(grid, config_flags,            &
    integer                           :: jp_start, jp_end       ! Start/end indices of Jp.
    real*8                              :: fhat(1:cv_size)        ! cv copy.
    real*8                              :: ghat(1:cv_size)        ! cv copy.
-!   real*8                              :: ghat0(1:cv_size)       ! cv copy.
+   real*8                              :: ghat0(1:cv_size)       ! cv copy.
    real*8                              :: shat(1:cv_size)        ! cv copy.
    real*8                              :: gdot, rho, mu, bndlm
    real*8                              :: alpha(ntmax(it)), beta(0:ntmax(it))
@@ -69,7 +66,7 @@ subroutine da_minimise_lz(grid, config_flags,            &
    real*8                            :: sstwrk(2*ntmax(it)-2)
    real                              :: bnds(ntmax(it))
    real                              :: adj_rhs, adj_sum_rhs ! < cv, cv >
-   real                              :: j_total, j0_total
+   real                              :: j_total
    real                              :: dfs, dfsmax
    character(len=3) :: dummychar=""
    integer          :: ii

@@ -315,7 +315,6 @@ subroutine da_vv_to_cv(vv, xp, mzs, cv_size, rcv &
             cv_e = cv_s + ijm - 1
 #ifdef NORESHAPE
             do k=1,ma
-!!!JJG - write(unit=stdout,fmt='(A,12I8)')'DEBUG_98A',i,j,k,ijk,ic,size(rcv),size(vch % alpha_ant), is, ie, js, je, ma
                do j=js,je
                   do i=is,ie
                      ijk = ijk + 1
@@ -336,7 +335,6 @@ subroutine da_vv_to_cv(vv, xp, mzs, cv_size, rcv &
             cv_e = cv_s + ijm - 1
 #ifdef NORESHAPE
             do k=1,mb
-!!!JJG - write(unit=stdout,fmt='(A,12I8)')'DEBUG_99A',i,j,k,ijk,ic,size(rcv),size(vch % alpha_bb), is, ie, js, je, mb
                do j=js,je
                   do i=is,ie
                      ijk = ijk + 1

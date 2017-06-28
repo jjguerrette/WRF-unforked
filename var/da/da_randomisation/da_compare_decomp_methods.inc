@@ -287,7 +287,7 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
                call da_write_norms(    EUCNORM_x, FROBNORM_Pa, SPECNORM_Pa, &
                                        EUCNORM_v, FROBNORM_Pav, SPECNORM_Pav, &
                                        EUCNORM_xPa, FROBNORM_PaPa, SPECNORM_PaPa, &
-                                       ntrunc, suffix)
+                                       neign, suffix)
             end if
 
          end do

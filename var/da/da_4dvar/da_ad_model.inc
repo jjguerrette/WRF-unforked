@@ -92,6 +92,7 @@ subroutine da_ad_model ()
    head_grid%a_rqvften = 0.0
    head_grid%a_rthcuten = 0.0
    head_grid%a_rqvcuten = 0.0
+   head_grid%a_rthraten = 0.0
    head_grid%a_muts = 0.0
    head_grid%a_mudf = 0.0
    head_grid%a_ru_m = 0.0

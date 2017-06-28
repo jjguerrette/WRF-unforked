@@ -184,7 +184,8 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
       ! Print current eigenpairs
       ! ----------------------------------------------
       write(cnens,fmt='(I0)') nens
-      write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'Eigenvalues(r): ',eignval(1:nens)-1.D0
+      write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'Eigenvalues(r): ',eignval(1:nens)-1.D0
+
       do iens = 1, nens
          write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'EIGENVECTOR_MATRIX: ',eignvec(iens,1:nens)
       end do

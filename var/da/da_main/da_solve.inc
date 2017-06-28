@@ -60,8 +60,6 @@
    character(len=filename_len)  :: cvtfile_svd
    integer                      :: run_hours0
    integer                      :: nens
-   real, allocatable            :: ghat0(:)      ! Control variable structure.
-
 #if (WRF_CHEM != 1)
 #ifdef CLOUD_CV
    integer                           :: mz(13), info, nsstwrk
@@ -78,6 +76,7 @@
 
 #endif
 
+   real :: j0_total
 #if (WRF_CHEM == 1)
    real*8, allocatable          :: xhat_prev(:)     ! Control variable structure.
    integer                      :: neign_trunc
@@ -711,7 +710,6 @@
          allocate (eignvec(nens, nens))
          allocate (eignval(nens))
       end if
-      allocate (ghat0(1:cv_size))
 #endif
 
 ! Re-scale the variances and the scale-length for outer-loop > 1:
@@ -1042,7 +1040,7 @@
 
          else
             call da_minimise_lz(grid, config_flags, it, cv_size, xbx,& 
-                             be, iv, j_grad_norm_target, xhat, qhat, cvt, re, y, j, eignvec, eignval, neign, ghat0)
+                             be, iv, j_grad_norm_target, xhat, qhat, cvt, re, y, j, eignvec, eignval, neign, j0_total)
 #if (WRF_CHEM == 1)
             if (calc_aminusb) call da_calculate_aminusb(grid,config_flags,it,cv_size,xbx, &
                                 be,qhat,eignvec,eignval,neign,ntmax(it))
@@ -1055,6 +1053,7 @@
                                            be,iv,xhat,qhat,cvt,y,eignvec,eignval,neign )
 #if defined(LAPACK)
       else if ( use_randomsvd) then
+         j0_total = 0.D0
          if ( nens .gt. 0  .and.  svd_outer .gt. 0  .and.  it .eq. 1 ) then
             if (svd_outer .gt. 1 .and. svd_minimise) then
                write(cproc,fmt='(i4.4)') myproc
@@ -1192,9 +1191,8 @@
          end if
 #endif
       else
-
          call da_minimise_cg( grid, config_flags, it, be % cv % size, & 
-              xbx, be, iv, j_grad_norm_target, xhat, cvt, re, y, j)
+              xbx, be, iv, j_grad_norm_target, xhat, cvt, re, y, j, j0_total)
       end if
 
 #if (WRF_CHEM == 1)
@@ -1203,7 +1201,7 @@
          call da_hdgn(it, cv_size, be, xhat)
 
       else if (dgn_emiss .eq. 2) then
-         call da_dgn(grid, cv_size, xbx, be, iv, xhat, cvt, ob, config_flags, j % total)
+         call da_dgn(grid, cv_size, xbx, be, iv, xhat, cvt, ob, config_flags, j0_total)
       end if
    end if
 #endif
@@ -1212,12 +1210,12 @@
       cvt = cvt + xhat
 
 #if defined(LAPACK)
-      if ( use_randomsvd .and. .not.use_lanczos ) then
+!      if ( use_randomsvd .and. .not.use_lanczos ) then
          write(cproc,fmt='(i4.4)') myproc
          write(cit,fmt='(i2.2)') svd_outer
          cvtfile_svd = 'cvt.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
          call da_cv_io ('w', cvtfile_svd, cv_size, cvt(1:cv_size), grid, mz)
-      end if
+!      end if
 #endif
 
 #if (WRF_CHEM == 1)

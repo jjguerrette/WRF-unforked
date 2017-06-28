@@ -1,7 +1,7 @@
 subroutine da_minimise_cg(grid, config_flags,            &
                            it, cv_size, xbx, be, iv, &
                            j_grad_norm_target, xhat, cv, &
-                           re, y, j_cost)
+                           re, y, j_cost, j0_total)
 
    !-------------------------------------------------------------------------
    ! Purpose:         Main Conjugate Gradient minimisation routine 
@@ -36,6 +36,7 @@ subroutine da_minimise_cg(grid, config_flags,            &
 
    type(domain), intent(inout)       :: grid
    type(grid_config_rec_type), intent(inout) :: config_flags
+   real, intent(out)              :: j0_total
 
    integer                           :: iter            
    integer                           :: jp_start, jp_end       ! Start/end indices of Jp.
@@ -59,7 +60,7 @@ subroutine da_minimise_cg(grid, config_flags,            &
    type(qhat_type), allocatable      :: qhat(:)                ! cv copy.
    real                              :: apdotp,step,rrmold,rrmnew,ratio 
    real                              :: ob_grad, rrmnew_norm, gdot
-   real                              :: j_total, j0_total
+   real                              :: j_total
  
    ! Variables for Conjugate Gradient preconditioning
    real                              :: precon(1:cv_size)      ! cv copy.

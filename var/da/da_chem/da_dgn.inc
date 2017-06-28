@@ -76,12 +76,14 @@ subroutine da_dgn( grid, cv_size, xbx, be, iv, xhat, cv, ob, config_flags, ja_to
 
    ! Don't need to calculate initial jb (@ eta=1.) except to demonstrate need for DGN
    ! Could use jb/ja > 1 as criteria for needing DGN
-   call da_evaluate_j( grid, config_flags, cv_size, be%cv%size_jb, xbx, be, iv, xhat, cv, ob, &
+   call da_evaluate_j( grid, config_flags, cv_size, be%cv%size_jb, &
+                       xbx, be, iv, xhat, cv, ob, &
                        cv_s_ant, cv_e_ant, cv_s_bb, cv_e_bb, eta_b, jb)
    write(unit=stdout,fmt='("DGN: eta_b          jb")')
    write(unit=stdout,fmt='("DGN:",1F6.3,1F11.3)') eta_b,jb
 
-   call da_evaluate_j( grid, config_flags, cv_size, be%cv%size_jb, xbx, be, iv, xhat, cv, ob, &
+   call da_evaluate_j( grid, config_flags, cv_size, be%cv%size_jb, &
+                       xbx, be, iv, xhat, cv, ob, &
                        cv_s_ant, cv_e_ant, cv_s_bb, cv_e_bb, eta_c, jc)
    write(unit=stdout,fmt='("DGN: eta_c          jc")')
    write(unit=stdout,fmt='("DGN:",1F6.3,1F11.3)') eta_c,jc
@@ -92,7 +94,8 @@ subroutine da_dgn( grid, cv_size, xbx, be, iv, xhat, cv, ob, config_flags, ja_to
    itgold = 0
    do while (eta_b - eta_a .gt. tol)
       itgold = itgold + 1
-      call da_evaluate_j( grid, config_flags, cv_size, be%cv%size_jb, xbx, be, iv, xhat, cv, ob, &
+      call da_evaluate_j( grid, config_flags, cv_size, be%cv%size_jb, &
+                          xbx, be, iv, xhat, cv, ob, &
                           cv_s_ant, cv_e_ant, cv_s_bb, cv_e_bb, eta, jout)
       if (branch .eq. 1) then
          jc = jout
@@ -129,7 +132,28 @@ subroutine da_dgn( grid, cv_size, xbx, be, iv, xhat, cv, ob, config_flags, ja_to
 
       if (ja.gt.1e-6 &
              .and. abs(jb-ja)/min(ja,jb,jd).lt.0.005 &
-             .and. abs(jb-jd)/min(ja,jb,jd).lt.0.005) exit
+             .and. abs(jb-jd)/min(ja,jb,jd).lt.0.005) then
+!This should never happen --JJ Guerrette
+!         if (all(ja.lt.(/jb,jc,jd/))) then
+!            eta_b = eta_c
+!            jb = jc
+!            eta_c = eta_b - grat * (eta_b - eta_a)
+!            eta_d = eta_a + grat * (eta_b - eta_a)
+!            call da_evaluate_j( grid, config_flags, cv_size, be%cv%size_jb, &
+!                                xbx, be, iv, xhat, cv, ob, &
+!                                cv_s_ant, cv_e_ant, cv_s_bb, cv_e_bb, eta_c, jc)
+!            write(unit=stdout,fmt='("RESTARTING DGN: eta_c          jc")')
+!            write(unit=stdout,fmt='("RESTARTING DGN:",1F6.3,1F11.3)') eta_c,jc
+!
+!            eta = eta_d
+!
+!            branch = 2
+!          
+!            cycle
+!         end if
+         if (all(jb.lt.(/ja,jc,jd/))) eta_a = eta_b
+         exit
+      end if
 
       if (eta.gt.(1.d0 - tol)) then
          eta = 1.D0
