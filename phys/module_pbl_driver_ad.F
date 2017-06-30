@@ -685,7 +685,9 @@ SUBROUTINE A_PBL_DRIVER(itimestep, dt, u_frame, v_frame, bldt, curr_secs&
 &                rqvblten) .AND. PRESENT(rqcblten) .AND. .true.) THEN
 
                CALL PUSHREAL8ARRAY (pblh ,(ime-ims+1)*(jme-jms+1))
+#if (WRF_CHEM == 1)
                CALL PUSHREAL8ARRAY (chem ,(ime-ims+1)*(kme-kms+1)*(jme-jms+1)*nchem)
+#endif
                CALL ACMPBL(                                                        &
                  xtime=itimestep, dtpbl=dtbl, znw=znw, sigmah=znu               &
                 ,u3d=u_phytmp, v3d=v_phytmp, pp3d=p_phy, dz8w=dz8w, th3d=th_phy, t3d=t_phy   &
@@ -766,7 +768,9 @@ SUBROUTINE A_PBL_DRIVER(itimestep, dt, u_frame, v_frame, bldt, curr_secs&
 !!  These are values that are not supplied to pbl driver, but are required by ACM
             IF (PRESENT(qv_curr) .AND. PRESENT(qc_curr) .AND. PRESENT(&
 &                rqvblten) .AND. PRESENT(rqcblten) .AND. .true.) THEN
+#if (WRF_CHEM == 1)
               CALL POPREAL8ARRAY (chem ,(ime-ims+1)*(kme-kms+1)*(jme-jms+1)*nchem)
+#endif
               CALL POPREAL8ARRAY (pblh ,(ime-ims+1)*(jme-jms+1))
               CALL A_ACMPBL(xtime=itimestep, dtpbl=dtbl, znw=znw, sigmah&
 &                      =znu, u3d=u_phytmp, a_u3d=a_u_phytmp, v3d=v_phytmp&

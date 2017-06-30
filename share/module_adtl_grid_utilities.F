@@ -5,7 +5,7 @@ MODULE module_adtl_grid_utilities
 USE module_domain, ONLY : domain, get_ijk_from_grid
 USE module_configure, ONLY : grid_config_rec_type
 USE module_state_description, ONLY : &
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
                               num_chem, num_scaleant, num_scalebb, &
 #endif
                               PARAM_FIRST_SCALAR, num_moist, num_scalar, num_tracer
@@ -15,7 +15,7 @@ USE module_driver_constants, ONLY: max_sens
 REAL, ALLOCATABLE :: s_u_2(:,:,:), s_v_2(:,:,:), s_w_2(:,:,:)
 REAL, ALLOCATABLE :: s_ph_2(:,:,:), s_t_2(:,:,:), s_mu_2(:,:)
 REAL, ALLOCATABLE :: s_moist(:,:,:,:), s_scalar(:,:,:,:), s_tracer(:,:,:,:)
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
 REAL, ALLOCATABLE :: s_chem(:,:,:,:), s_scaleant(:,:,:,:), s_scalebb(:,:,:,:)
 #endif
 REAL, ALLOCATABLE :: s_tke_2(:,:,:)
@@ -47,7 +47,7 @@ REAL, ALLOCATABLE :: s_scalar_bxs(:,:,:,:), s_scalar_bxe(:,:,:,:), s_scalar_bys(
 REAL, ALLOCATABLE :: s_scalar_btxs(:,:,:,:), s_scalar_btxe(:,:,:,:), s_scalar_btys(:,:,:,:), s_scalar_btye(:,:,:,:)
 REAL, ALLOCATABLE :: s_tracer_bxs(:,:,:,:), s_tracer_bxe(:,:,:,:), s_tracer_bys(:,:,:,:), s_tracer_bye(:,:,:,:)
 REAL, ALLOCATABLE :: s_tracer_btxs(:,:,:,:), s_tracer_btxe(:,:,:,:), s_tracer_btys(:,:,:,:), s_tracer_btye(:,:,:,:)
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
 REAL, ALLOCATABLE :: s_chem_bxs(:,:,:,:), s_chem_bxe(:,:,:,:), s_chem_bys(:,:,:,:), s_chem_bye(:,:,:,:)
 REAL, ALLOCATABLE :: s_chem_btxs(:,:,:,:), s_chem_btxe(:,:,:,:), s_chem_btys(:,:,:,:), s_chem_btye(:,:,:,:)
 #endif
@@ -55,7 +55,7 @@ REAL, ALLOCATABLE :: s_chem_btxs(:,:,:,:), s_chem_btxe(:,:,:,:), s_chem_btys(:,:
 REAL, ALLOCATABLE :: b_u_2(:,:,:), b_v_2(:,:,:), b_w_2(:,:,:)
 REAL, ALLOCATABLE :: b_ph_2(:,:,:), b_t_2(:,:,:), b_mu_2(:,:)
 REAL, ALLOCATABLE :: b_moist(:,:,:,:), b_scalar(:,:,:,:), b_tracer(:,:,:,:)
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
 REAL, ALLOCATABLE :: b_chem(:,:,:,:), b_scaleant(:,:,:,:), b_scalebb(:,:,:,:)
 #endif
 
@@ -86,7 +86,7 @@ REAL, ALLOCATABLE :: b_scalar_bxs(:,:,:,:), b_scalar_bxe(:,:,:,:), b_scalar_bys(
 REAL, ALLOCATABLE :: b_scalar_btxs(:,:,:,:), b_scalar_btxe(:,:,:,:), b_scalar_btys(:,:,:,:), b_scalar_btye(:,:,:,:)
 REAL, ALLOCATABLE :: b_tracer_bxs(:,:,:,:), b_tracer_bxe(:,:,:,:), b_tracer_bys(:,:,:,:), b_tracer_bye(:,:,:,:)
 REAL, ALLOCATABLE :: b_tracer_btxs(:,:,:,:), b_tracer_btxe(:,:,:,:), b_tracer_btys(:,:,:,:), b_tracer_btye(:,:,:,:)
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
 REAL, ALLOCATABLE :: b_chem_bxs(:,:,:,:), b_chem_bxe(:,:,:,:), b_chem_bys(:,:,:,:), b_chem_bye(:,:,:,:)
 REAL, ALLOCATABLE :: b_chem_btxs(:,:,:,:), b_chem_btxe(:,:,:,:), b_chem_btys(:,:,:,:), b_chem_btye(:,:,:,:)
 #endif
@@ -131,7 +131,7 @@ CONTAINS
    kts = kps
    kte = kpe
 
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    numantsteps = grid%num_ant_steps
    numbbsteps  = grid%num_bb_steps
 #endif
@@ -350,7 +350,7 @@ CONTAINS
      CALL wrf_error_fatal ( &
      'share/module_adtl_grid_utilities.f: Failed to allocate s_tracer(sm31:em31, sm32:em32, sm33:em33, num_tracer). ')
    ENDIF
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    ALLOCATE ( s_chem(sm31:em31, sm32:em32, sm33:em33, num_chem), STAT=ierr )
    IF (ierr.NE.0) THEN
      CALL wrf_error_fatal ( &
@@ -703,7 +703,7 @@ CONTAINS
      'share/module_adtl_grid_utilities.f: Failed to allocate s_tracer_btye(sm31:em31,sm32:em32,spec_bdy_width,num_tracer). ')
    ENDIF
 
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    !  Chem Boundary
    ALLOCATE(s_chem_bxs(sm33:em33,sm32:em32,spec_bdy_width,num_chem),STAT=ierr) 
    IF (ierr.NE.0) THEN
@@ -907,7 +907,7 @@ CONTAINS
      CALL wrf_error_fatal ( &
      'share/module_adtl_grid_utilities.f: Failed to allocate b_tracer(sm31:em31, sm32:em32, sm33:em33, num_tracer). ')
    ENDIF
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    ALLOCATE ( b_chem(sm31:em31, sm32:em32, sm33:em33, num_chem), STAT=ierr )
    IF (ierr.NE.0) THEN
      CALL wrf_error_fatal ( &
@@ -1261,7 +1261,7 @@ CONTAINS
      'share/module_adtl_grid_utilities.f: Failed to allocate b_tracer_btye(sm31:em31,sm32:em32,spec_bdy_width,num_tracer). ')
    ENDIF
 
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    !  Chem Boundary
    ALLOCATE(b_chem_bxs(sm33:em33,sm32:em32,spec_bdy_width,num_chem),STAT=ierr) 
    IF (ierr.NE.0) THEN
@@ -1421,7 +1421,7 @@ CONTAINS
    ENDDO
    ENDDO
 
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    s_chem = 0.0D0
    DO mm = PARAM_FIRST_SCALAR, num_chem
    DO j = jts,MIN(jte,jde-1)
@@ -1543,7 +1543,7 @@ CONTAINS
    s_scalar_btxs = grid%scalar_btxs; s_scalar_btxe = grid%scalar_btxe; s_scalar_btys = grid%scalar_btys; s_scalar_btye = grid%scalar_btye
    s_tracer_bxs = grid%tracer_bxs; s_tracer_bxe = grid%tracer_bxe; s_tracer_bys = grid%tracer_bys; s_tracer_bye = grid%tracer_bye
    s_tracer_btxs = grid%tracer_btxs; s_tracer_btxe = grid%tracer_btxe; s_tracer_btys = grid%tracer_btys; s_tracer_btye = grid%tracer_btye
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    s_chem_bxs = grid%chem_bxs; s_chem_bxe = grid%chem_bxe; s_chem_bys = grid%chem_bys; s_chem_bye = grid%chem_bye
    s_chem_btxs = grid%chem_btxs; s_chem_btxe = grid%chem_btxe; s_chem_btys = grid%chem_btys; s_chem_btye = grid%chem_btye
 #endif
@@ -1562,7 +1562,7 @@ CONTAINS
    b_mu_2 = grid%mu_2
    b_moist = grid%moist
    b_tracer = grid%tracer
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    b_chem = grid%chem
    b_scaleant = grid%scaleant
    b_scalebb = grid%scalebb
@@ -1605,7 +1605,7 @@ CONTAINS
    grid%mu_2 = s_mu_2
    grid%moist = s_moist
    grid%tracer = s_tracer
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    grid%chem = s_chem
    grid%scaleant = s_scaleant
    grid%scalebb = s_scalebb
@@ -1660,8 +1660,10 @@ CONTAINS
    grid%scalar_btxs = s_scalar_btxs; grid%scalar_btxe = s_scalar_btxe; grid%scalar_btys = s_scalar_btys; grid%scalar_btye = s_scalar_btye
    grid%tracer_bxs = s_tracer_bxs; grid%tracer_bxe = s_tracer_bxe; grid%tracer_bys = s_tracer_bys; grid%tracer_bye = s_tracer_bye
    grid%tracer_btxs = s_tracer_btxs; grid%tracer_btxe = s_tracer_btxe; grid%tracer_btys = s_tracer_btys; grid%tracer_btye = s_tracer_btye
+#if (WRF_CHEM == 1)
    grid%chem_bxs = s_chem_bxs; grid%chem_bxe = s_chem_bxe; grid%chem_bys = s_chem_bys; grid%chem_bye = s_chem_bye
    grid%chem_btxs = s_chem_btxs; grid%chem_btxe = s_chem_btxe; grid%chem_btys = s_chem_btys; grid%chem_btye = s_chem_btye
+#endif
 
   END SUBROUTINE restore_grid
 
@@ -1711,7 +1713,7 @@ CONTAINS
    else
       factor_tracer = 0.0
    endif
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    if (grid%check_chem) then
       factor_chem =factor
    else
@@ -1739,7 +1741,7 @@ CONTAINS
    grid%g_mu_2 = factor_mu*s_mu_2
    grid%g_moist = factor_moist*s_moist
    grid%g_tracer = factor_tracer*s_tracer
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    grid%g_chem = factor_chem*s_chem
    grid%g_scaleant = factor_scaleant*s_scaleant
    grid%g_scalebb = factor_scalebb*s_scalebb
@@ -1777,7 +1779,7 @@ CONTAINS
    grid%g_moist_btxs = factor_moist*s_moist_btxs; grid%g_moist_btxe = factor_moist*s_moist_btxe; grid%g_moist_btys = factor_moist*s_moist_btys; grid%g_moist_btye = factor_moist*s_moist_btye
    grid%g_tracer_bxs = factor_tracer*s_tracer_bxs; grid%g_tracer_bxe = factor_tracer*s_tracer_bxe; grid%g_tracer_bys = factor_tracer*s_tracer_bys; grid%g_tracer_bye = factor_tracer*s_tracer_bye
    grid%g_tracer_btxs = factor_tracer*s_tracer_btxs; grid%g_tracer_btxe = factor_tracer*s_tracer_btxe; grid%g_tracer_btys = factor_tracer*s_tracer_btys; grid%g_tracer_btye = factor_tracer*s_tracer_btye
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    grid%g_chem_bxs = factor_chem*s_chem_bxs; grid%g_chem_bxe = factor_chem*s_chem_bxe; grid%g_chem_bys = factor_chem*s_chem_bys; grid%g_chem_bye = factor_chem*s_chem_bye
    grid%g_chem_btxs = factor_chem*s_chem_btxs; grid%g_chem_btxe = factor_chem*s_chem_btxe; grid%g_chem_btys = factor_chem*s_chem_btys; grid%g_chem_btye = factor_chem*s_chem_btye
 
@@ -1862,7 +1864,7 @@ CONTAINS
    b_tke_2 = grid%g_tke_2
    b_moist = grid%g_moist
    b_tracer = grid%g_tracer
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    b_chem = grid%g_chem
    b_scaleant = grid%g_scaleant
    b_scalebb = grid%g_scalebb
@@ -1895,7 +1897,7 @@ CONTAINS
    b_mu_bxs = grid%g_mu_bxs; b_mu_bxe = grid%g_mu_bxe; b_mu_bys = grid%g_mu_bys; b_mu_bye = grid%g_mu_bye
    b_moist_bxs = grid%g_moist_bxs; b_moist_bxe = grid%g_moist_bxe; b_moist_bys = grid%g_moist_bys; b_moist_bye = grid%g_moist_bye
    b_tracer_bxs = grid%g_tracer_bxs; b_tracer_bxe = grid%g_tracer_bxe; b_tracer_bys = grid%g_tracer_bys; b_tracer_bye = grid%g_tracer_bye
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    b_chem_bxs = grid%g_chem_bxs; b_chem_bxe = grid%g_chem_bxe; b_chem_bys = grid%g_chem_bys; b_chem_bye = grid%g_chem_bye
 #endif
 
@@ -1907,7 +1909,7 @@ CONTAINS
    b_mu_btxs = grid%g_mu_btxs; b_mu_btxe = grid%g_mu_btxe; b_mu_btys = grid%g_mu_btys; b_mu_btye = grid%g_mu_btye
    b_moist_btxs = grid%g_moist_btxs; b_moist_btxe = grid%g_moist_btxe; b_moist_btys = grid%g_moist_btys; b_moist_btye = grid%g_moist_btye
    b_tracer_btxs = grid%g_tracer_btxs; b_tracer_btxe = grid%g_tracer_btxe; b_tracer_btys = grid%g_tracer_btys; b_tracer_btye = grid%g_tracer_btye
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    b_chem_btxs = grid%g_chem_btxs; b_chem_btxe = grid%g_chem_btxe; b_chem_btys = grid%g_chem_btys; b_chem_btye = grid%g_chem_btye
 #endif
 
@@ -1996,7 +1998,7 @@ CONTAINS
    ENDDO
    ENDDO
 
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    DO mm = PARAM_FIRST_SCALAR, num_chem
    DO j = jts,MIN(jte,jde-1)
    DO k = kts,kte-1
@@ -2167,7 +2169,7 @@ CONTAINS
    ENDDO
    ENDDO
 
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    DO mm = PARAM_FIRST_SCALAR, num_chem
    DO j = jts,MIN(jte,jde-1)
    DO k = kts,kte-1
@@ -2313,7 +2315,7 @@ CONTAINS
    else
       factor_tracer = 1.0
    endif
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    if (grid%check_chem) then
       factor_chem =factor
    else
@@ -2340,7 +2342,7 @@ CONTAINS
    grid%mu_2 = factor_mu*s_mu_2
    grid%moist = factor_moist*s_moist
    grid%tracer = factor_tracer*s_tracer
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    grid%chem = factor_chem*s_chem
    grid%scaleant = factor_scaleant*s_scaleant
    grid%scalebb = factor_scalebb*s_scalebb
@@ -2381,7 +2383,7 @@ CONTAINS
    grid%moist_btxs = factor_moist*s_moist_btxs; grid%moist_btxe = factor_moist*s_moist_btxe; grid%moist_btys = factor_moist*s_moist_btys; grid%moist_btye = factor_moist*s_moist_btye
    grid%tracer_bxs = factor_tracer*s_tracer_bxs; grid%tracer_bxe = factor_tracer*s_tracer_bxe; grid%tracer_bys = factor_tracer*s_tracer_bys; grid%tracer_bye = factor_tracer*s_tracer_bye
    grid%tracer_btxs = factor_tracer*s_tracer_btxs; grid%tracer_btxe = factor_tracer*s_tracer_btxe; grid%tracer_btys = factor_tracer*s_tracer_btys; grid%tracer_btye = factor_tracer*s_tracer_btye
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    grid%chem_bxs = factor_chem*s_chem_bxs; grid%chem_bxe = factor_chem*s_chem_bxe; grid%chem_bys = factor_chem*s_chem_bys; grid%chem_bye = factor_chem*s_chem_bye
    grid%chem_btxs = factor_chem*s_chem_btxs; grid%chem_btxe = factor_chem*s_chem_btxe; grid%chem_btys = factor_chem*s_chem_btys; grid%chem_btye = factor_chem*s_chem_btye
 #endif
@@ -2471,7 +2473,7 @@ CONTAINS
    ENDDO
    ENDDO
 
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    DO mm = PARAM_FIRST_SCALAR, num_chem
    DO j = jts,MIN(jte,jde-1)
    DO k = kts,kte-1
@@ -2627,7 +2629,7 @@ CONTAINS
       ENDDO
       ENDDO
 
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
       DO mm = PARAM_FIRST_SCALAR, num_chem
       DO j = jts,MIN(jte,jde-1)
       DO k = kts,kte-1
@@ -2741,7 +2743,7 @@ CONTAINS
    grid%a_moist = 0.0D0
    grid%a_tracer = 0.0D0
 
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    grid%a_chem = 0.0D0
    grid%a_scaleant = 0.0D0
    grid%a_scalebb = 0.0D0
@@ -2866,7 +2868,7 @@ CONTAINS
    grid%a_mu_bxs = 0.0D0; grid%a_mu_bxe = 0.0D0; grid%a_mu_bys = 0.0D0; grid%a_mu_bye = 0.0D0
    grid%a_moist_bxs = 0.0D0; grid%a_moist_bxe = 0.0D0; grid%a_moist_bys = 0.0D0; grid%a_moist_bye = 0.0D0
    grid%a_tracer_bxs = 0.0D0; grid%a_tracer_bxe = 0.0D0; grid%a_tracer_bys = 0.0D0; grid%a_tracer_bye = 0.0D0
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    grid%a_chem_bxs = 0.0D0; grid%a_chem_bxe = 0.0D0; grid%a_chem_bys = 0.0D0; grid%a_chem_bye = 0.0D0
 #endif
 
@@ -2880,7 +2882,7 @@ CONTAINS
    grid%a_mu_btxs = 0.0D0; grid%a_mu_btxe = 0.0D0; grid%a_mu_btys = 0.0D0; grid%a_mu_btye = 0.0D0
    grid%a_moist_btxs = 0.0D0; grid%a_moist_btxe = 0.0D0; grid%a_moist_btys = 0.0D0; grid%a_moist_btye = 0.0D0
    grid%a_tracer_btxs = 0.0D0; grid%a_tracer_btxe = 0.0D0; grid%a_tracer_btys = 0.0D0; grid%a_tracer_btye = 0.0D0
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    grid%a_chem_btxs = 0.0D0; grid%a_chem_btxe = 0.0D0; grid%a_chem_btys = 0.0D0; grid%a_chem_btye = 0.0D0
 #endif
    grid%a_scalar_btxs = 0.0D0; grid%a_scalar_btxe = 0.0D0; grid%a_scalar_btys = 0.0D0; grid%a_scalar_btye = 0.0D0
@@ -2912,7 +2914,7 @@ CONTAINS
 
    grid%g_moist = 0.0D0
    grid%g_tracer = 0.0D0
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    grid%g_chem = 0.0D0
    grid%g_scaleant = 0.0D0
    grid%g_scalebb = 0.0D0
@@ -3037,7 +3039,7 @@ CONTAINS
    grid%g_mu_bxs = 0.0D0; grid%g_mu_bxe = 0.0D0; grid%g_mu_bys = 0.0D0; grid%g_mu_bye = 0.0D0
    grid%g_moist_bxs = 0.0D0; grid%g_moist_bxe = 0.0D0; grid%g_moist_bys = 0.0D0; grid%g_moist_bye = 0.0D0
    grid%g_tracer_bxs = 0.0D0; grid%g_tracer_bxe = 0.0D0; grid%g_tracer_bys = 0.0D0; grid%g_tracer_bye = 0.0D0
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    grid%g_chem_bxs = 0.0D0; grid%g_chem_bxe = 0.0D0; grid%g_chem_bys = 0.0D0; grid%g_chem_bye = 0.0D0
 #endif
    grid%g_scalar_bxs = 0.0D0; grid%g_scalar_bxe = 0.0D0; grid%g_scalar_bys = 0.0D0; grid%g_scalar_bye = 0.0D0
@@ -3051,7 +3053,7 @@ CONTAINS
    grid%g_mu_btxs = 0.0D0; grid%g_mu_btxe = 0.0D0; grid%g_mu_btys = 0.0D0; grid%g_mu_btye = 0.0D0
    grid%g_moist_btxs = 0.0D0; grid%g_moist_btxe = 0.0D0; grid%g_moist_btys = 0.0D0; grid%g_moist_btye = 0.0D0
    grid%g_tracer_btxs = 0.0D0; grid%g_tracer_btxe = 0.0D0; grid%g_tracer_btys = 0.0D0; grid%g_tracer_btye = 0.0D0
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    grid%g_chem_btxs = 0.0D0; grid%g_chem_btxe = 0.0D0; grid%g_chem_btys = 0.0D0; grid%g_chem_btye = 0.0D0
 #endif
    grid%g_scalar_btxs = 0.0D0; grid%g_scalar_btxe = 0.0D0; grid%g_scalar_btys = 0.0D0; grid%g_scalar_btye = 0.0D0
@@ -3200,7 +3202,7 @@ CONTAINS
    ENDDO
    ENDDO
    ENDDO
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
       DO mm = PARAM_FIRST_SCALAR, num_chem
       DO j = jts,MIN(jte,jde-1)
       DO k = kts,kte-1
@@ -3441,7 +3443,7 @@ CONTAINS
    ENDDO
    !$OMP END MASTER
 
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    DO mm=PARAM_FIRST_SCALAR, num_chem
    DO j=1,spec_bdy_width
    DO k=kts,kte-1
@@ -3519,7 +3521,7 @@ CONTAINS
    DO mm = PARAM_FIRST_SCALAR, num_tracer
       grid%a_tracer(i,k,j,mm) = factor(6+mm+num_moist)
    ENDDO
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    DO mm = PARAM_FIRST_SCALAR, num_chem
       grid%a_chem(i,k,j,mm) = factor(6+mm+num_moist+num_tracer)
    ENDDO
@@ -3553,7 +3555,7 @@ CONTAINS
    DO mm = PARAM_FIRST_SCALAR, num_tracer
       grid%g_tracer(i,k,j,mm) = factor(6+mm+num_moist)
   ENDDO
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    DO mm = PARAM_FIRST_SCALAR, num_chem
       grid%g_chem(i,k,j,mm) = factor(6+mm+num_moist+num_tracer)
    ENDDO
@@ -3588,7 +3590,7 @@ CONTAINS
    DO mm = PARAM_FIRST_SCALAR, num_tracer
       grid%tracer(i,k,j,mm) = ( 1.0D0 + nl_pert * factor(6+mm+num_moist) ) * s_tracer(i,k,j,mm)
    ENDDO
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    DO mm = PARAM_FIRST_SCALAR, num_chem
       grid%chem(i,k,j,mm) = (1.0D0 + nl_pert * factor(6+mm+num_moist+num_tracer) ) * s_chem(i,k,j,mm)
    ENDDO
@@ -3624,7 +3626,7 @@ CONTAINS
    DO mm = PARAM_FIRST_SCALAR, num_tracer
       der = grid%a_tracer(i,k,j,mm) * factor(6+mm+num_moist) + der
    ENDDO
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    DO mm = PARAM_FIRST_SCALAR, num_chem
       der = grid%a_chem(i,k,j,mm) * factor(6+mm+num_moist+num_tracer) + der
    ENDDO
@@ -3659,7 +3661,7 @@ CONTAINS
    DO mm = PARAM_FIRST_SCALAR, num_tracer
       der = grid%g_tracer(i,k,j,mm) * factor(6+mm+num_moist) + der
    ENDDO
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    DO mm = PARAM_FIRST_SCALAR, num_chem
       der = grid%g_chem(i,k,j,mm) * factor(6+mm+num_moist+num_tracer) + der
    ENDDO
@@ -3696,7 +3698,7 @@ CONTAINS
    DO mm = PARAM_FIRST_SCALAR, num_tracer
       num = (grid%tracer(i,k,j,mm) - b_tracer(i,k,j,mm)) * factor(6+mm+num_moist) + num
    ENDDO
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    DO mm = PARAM_FIRST_SCALAR, num_chem
       num = (grid%chem(i,k,j,mm) - b_chem(i,k,j,mm)) * factor(6+mm+num_moist+num_tracer) + num
    ENDDO
@@ -3726,7 +3728,7 @@ CONTAINS
    DO mm = PARAM_FIRST_SCALAR, num_tracer
       den = nl_pert * s_tracer(i,k,j,mm) * factor(6+mm+num_moist) + den
    ENDDO
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    DO mm = PARAM_FIRST_SCALAR, num_chem
       den = nl_pert * s_chem(i,k,j,mm) * factor(6+mm+num_moist+num_tracer) + den
    ENDDO
@@ -4050,7 +4052,7 @@ IF(abs(den) .LE. 1.d-9) den = 1.D0
      CALL wrf_error_fatal ( &
      'share/module_adtl_grid_utilities.f: Failed to deallocate s_tracer. ')
    ENDIF
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    DEALLOCATE ( s_chem, STAT=ierr )
    IF (ierr.NE.0) THEN
      CALL wrf_error_fatal ( &
@@ -4403,7 +4405,7 @@ IF(abs(den) .LE. 1.d-9) den = 1.D0
      CALL wrf_error_fatal ( &
      'share/module_adtl_grid_utilities.f: Failed to deallocate s_tracer_btye. ')
    ENDIF
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
 
    !  Chem Boundary
    DEALLOCATE(s_chem_bxs,STAT=ierr) 
@@ -4608,7 +4610,7 @@ IF(abs(den) .LE. 1.d-9) den = 1.D0
      CALL wrf_error_fatal ( &
      'share/module_adtl_grid_utilities.f: Failed to deallocate b_tracer. ')
    ENDIF
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
    DEALLOCATE ( b_chem, STAT=ierr )
    IF (ierr.NE.0) THEN
      CALL wrf_error_fatal ( &

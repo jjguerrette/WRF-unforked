@@ -96,7 +96,7 @@ MODULE module_mp_nssl_2mom
   logical, public :: cleardiag = .false.
   PRIVATE
 
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
   integer, parameter :: wrfchem_flag = 1
 #else
   integer, parameter :: wrfchem_flag = 0
@@ -2092,7 +2092,7 @@ SUBROUTINE nssl_2mom_driver(qv, qc, qr, qi, qs, qh, qhl, ccw, crw, cci, csw, chw
          IF ( lvh > 0 )  vhw(ix,kz,jy) = an(ix,1,kz,lvh)
          IF ( lvhl > 0 .and. present( vhl ) ) vhl(ix,kz,jy) = an(ix,1,kz,lvhl)
 
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
          IF ( wrfchem_flag > 0 ) THEN
            IF ( PRESENT( rainprod ) ) rainprod(ix,kz,jy) = rainprod2d(ix,kz)
            IF ( PRESENT( evapprod ) ) evapprod(ix,kz,jy) = evapprod2d(ix,kz)

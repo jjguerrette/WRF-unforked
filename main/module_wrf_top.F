@@ -1238,7 +1238,7 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
                         head_grid%i_end(ij)  .ge. iloc_i .AND. &
                         head_grid%j_start(ij) .le. jloc_i .AND. &
                         head_grid%j_end(ij)  .ge. jloc_i ) THEN
-                        CALL extract_ad_der( head_grid, dummy_der, iloc_i, jloc_i, kloc_i, 1, factors (:,2), vars_count)
+                        CALL extract_ad_der( head_grid, dummy_der, iloc_i, jloc_i, kloc_i, head_grid%scale_hr, factors (:,2), vars_count)
                      ENDIF
                   END DO
                   !$OMP END PARALLEL DO
@@ -1301,7 +1301,7 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
 #endif
                      ENDIF
    
-         IF ( head_grid%check_scaleant) THEN !This line used for debugging only
+!!         IF ( head_grid%check_scaleant) THEN !This line used for debugging only
                      !$OMP PARALLEL DO    &
                      !$OMP PRIVATE ( ij )
                      DO ij = 1 , head_grid%num_tiles
@@ -1309,13 +1309,13 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
                             head_grid%i_end(ij)  .ge. iloc_i .AND. &
                             head_grid%j_start(ij) .le. jloc_i .AND. &
                             head_grid%j_end(ij)  .ge. jloc_i ) THEN 
-                            CALL spot_force_nl( head_grid, iloc_i, jloc_i, kloc_i, 1, &
+                            CALL spot_force_nl( head_grid, iloc_i, jloc_i, kloc_i, head_grid%scale_hr, &
                                                 factors(:,2), vars_count, &
                                                 REAL(psign,8) * REAL(config_flags%nl_pert, 8))
                         ENDIF
                      ENDDO
                      !$OMP END PARALLEL DO
-         ENDIF
+!!         ENDIF
    
                      ! Set trajectory boundary form
                      CALL nl_set_io_form_boundary( head_grid%id, xtraj_boundary_form )
@@ -1432,7 +1432,7 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
                         head_grid%i_end(ij)  .ge. iloc_i .AND. &
                         head_grid%j_start(ij) .le. jloc_i .AND. &
                         head_grid%j_end(ij)  .ge. jloc_i ) THEN
-                        CALL spot_force_tl( head_grid, iloc_i, jloc_i, kloc_i, 1, factors(:,2), vars_count) 
+                        CALL spot_force_tl( head_grid, iloc_i, jloc_i, kloc_i, head_grid%scale_hr, factors(:,2), vars_count) 
                      ENDIF
                   ENDDO
                   !$OMP END PARALLEL DO
@@ -1535,7 +1535,7 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
 #endif
                   ENDIF
 
-      IF ( head_grid%check_scalebb) THEN !This line used for debugging only
+!!      IF ( head_grid%check_scalebb) THEN !This line used for debugging only
                   !$OMP PARALLEL DO    &
                   !$OMP PRIVATE ( ij )
                   DO ij = 1 , head_grid%num_tiles
@@ -1543,13 +1543,13 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
                          head_grid%i_end(ij)  .ge. iloc_i .AND. &
                          head_grid%j_start(ij) .le. jloc_i .AND. &
                          head_grid%j_end(ij)  .ge. jloc_i ) THEN 
-                         CALL spot_force_nl( head_grid, iloc_i, jloc_i, kloc_i, 1, &
+                         CALL spot_force_nl( head_grid, iloc_i, jloc_i, kloc_i, head_grid%scale_hr, &
                                              factors(:,2), vars_count, &
                                              REAL(psign,8) * REAL(config_flags%nl_pert, 8))
                      ENDIF
                   ENDDO
                   !$OMP END PARALLEL DO
-      ENDIF
+!!      ENDIF
 
                   ! Set trajectory boundary form
                   CALL nl_set_io_form_boundary( head_grid%id, xtraj_boundary_form )
@@ -1673,7 +1673,7 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
                      head_grid%i_end(ij)  .ge. iloc_i .AND. &
                      head_grid%j_start(ij) .le. jloc_i .AND. &
                      head_grid%j_end(ij)  .ge. jloc_i ) THEN
-                     CALL spot_force_tl( head_grid, iloc_i, jloc_i, kloc_i, 1, factors(:,2), vars_count) 
+                     CALL spot_force_tl( head_grid, iloc_i, jloc_i, kloc_i, head_grid%scale_hr, factors(:,2), vars_count) 
                   ENDIF
                ENDDO
                !$OMP END PARALLEL DO
@@ -1830,7 +1830,7 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
                               TRIM(check_name(nnumer)),']/d[',TRIM(check_name(ndenom)),']------'
 
             IF ( head_grid%check_NL ) THEN
-               WRITE(90456, FMT='(A,2(A3),4(1x,A17))') '      ','i','f','TL','AD','NL_BD','NL_FD'
+               WRITE(90456, FMT='(A,2(A3),3(1x,A17))') '      ','i','f','TL','NL_BD','NL_FD'
                DO ni = 1, ninitial
                   iter=(ni-1)*firatio
                   DO nf = 1, firatio

@@ -8,7 +8,7 @@ SUBROUTINE solve_interface ( grid )
    USE module_driver_constants
    USE module_configure
    USE module_wrf_error
-# ifdef WRF_CHEM
+# if (WRF_CHEM == 1)
    USE mediation_pertmod_io , ONLY : find_nl_xtraj, read_xtraj
    USE esmf_timemod, ONLY : ESMF_TimeInc
 #endif
@@ -30,7 +30,7 @@ SUBROUTINE solve_interface ( grid )
    END INTERFACE
 
    TYPE(domain) , INTENT(INOUT)  :: grid
-# ifdef WRF_CHEM
+# if (WRF_CHEM == 1)
 !   TYPE(domain) :: grid_check
    CHARACTER*256          :: message
 # endif
@@ -49,7 +49,7 @@ SUBROUTINE solve_interface ( grid )
 # include "actual_new_args.inc"
 !
                )
-# ifdef WRF_CHEM
+# if (WRF_CHEM == 1)
    IF ( config_flags%chem_opt > 0  ) THEN
      CALL chem_driver_tl  ( grid , config_flags  &
 !
@@ -60,7 +60,7 @@ SUBROUTINE solve_interface ( grid )
 # endif
 
    ELSE IF ( config_flags%dyn_opt == dyn_em_ad ) THEN
-# ifdef WRF_CHEM
+# if (WRF_CHEM == 1)
       IF ( config_flags%chem_opt > 0  ) THEN
          !Call solve_em to recalculate grid used by chem_driver
          grid%itimestep = grid%itimestep - 1

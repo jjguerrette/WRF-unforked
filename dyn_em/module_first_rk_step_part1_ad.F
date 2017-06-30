@@ -10,7 +10,7 @@ CONTAINS
   SUBROUTINE a_first_rk_step_part1 (   grid , config_flags              &
                              , moist , a_moist , moist_tend , a_moist_tend       &
                              , chem  , a_chem , chem_tend , a_chem_tend          &
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
                              , dvel &
 #endif
                              , tracer, a_tracer, tracer_tend, a_tracer_tend      &
@@ -56,7 +56,7 @@ CONTAINS
     USE module_dm, ONLY : local_communicator, mytask, ntasks, ntasks_x, ntasks_y, local_communicator_periodic, wrf_dm_maxval
     USE module_comm_dm, ONLY : halo_em_phys_a_sub,halo_em_phys_a_ad_sub,halo_pwp_sub,halo_em_phys_a_bl_surf_sub,halo_em_chem_e_3_sub,halo_em_chem_e_5_sub,halo_em_chem_e_3_ad_sub,halo_em_chem_e_5_ad_sub
 #endif
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
     USE module_input_chem_data, only: get_last_gas,mozcart_lbc_set
     USE module_dry_dep_vel
     USE a_module_dry_dep_vel
@@ -939,7 +939,7 @@ BENCH_START(pbl_driver_tim)
 
 BENCH_END(pbl_driver_tim)
 
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
 # ifdef DM_PARALLEL
    IF ( num_chem >= PARAM_FIRST_SCALAR .AND. config_flags%bl_pbl_physics == ACMPBLSCHEME) then
      CALL wrf_debug ( 200 , ' call HALO CHEM AFTER PBL' )

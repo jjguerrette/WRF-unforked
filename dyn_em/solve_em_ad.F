@@ -6156,7 +6156,7 @@ BENCH_START(a_tracer_adv_tim)
      ENDIF adj_tracer_advance
 BENCH_END(a_tracer_adv_tim)
 
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
 BENCH_START(a_chem_adv_tim)
        adj_chem_advance: IF (num_3d_c >= PARAM_FIRST_SCALAR)  THEN
 
@@ -7903,7 +7903,7 @@ BENCH_END(adj_rk_tend_tim)
        CALL a_first_rk_step_part1 (    grid, config_flags         &
                              , moist , a_moist, moist_tend, a_moist_tend  &
                              , chem  , a_chem,   chem_tend,   a_chem_tend     &
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
                              , dvel &
 #endif
                              , tracer, a_tracer, tracer_tend, a_tracer_tend   &
@@ -8050,7 +8050,7 @@ BENCH_END(adj_step_prep_tim)
      ENDDO
      !$OMP END PARALLEL DO
 
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
 
 # ifdef DM_PARALLEL
    if ( num_chem >= PARAM_FIRST_SCALAR ) then

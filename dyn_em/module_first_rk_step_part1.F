@@ -10,7 +10,7 @@ CONTAINS
   SUBROUTINE first_rk_step_part1 (   grid , config_flags              &
                              , moist , moist_tend               &
                              , chem  , chem_tend                &
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
                              , dvel &
 #endif
                              , tracer, tracer_tend              &
@@ -57,7 +57,7 @@ CONTAINS
     USE module_comm_dm, ONLY : halo_em_phys_a_sub,halo_em_fdda_sfc_sub,halo_pwp_sub,halo_em_chem_e_3_sub, &
     halo_em_chem_e_5_sub, halo_em_phys_a_bl_surf_sub, halo_em_hydro_noahmp_sub
 #endif
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
     USE module_input_chem_data, only: get_last_gas,mozcart_lbc_set
     USE module_dry_dep_vel
 #endif
@@ -1281,7 +1281,7 @@ BENCH_START(cu_driver_tim)
 BENCH_END(cu_driver_tim)
 
 !!! Will need this once chem/tracer convection is added to GF scheme - JJ Guerrette
-!!!#ifdef WRF_CHEM
+!!!#if (WRF_CHEM == 1)
 !!!# ifdef DM_PARALLEL
 !!!   IF ( num_chem >= PARAM_FIRST_SCALAR .AND. config_flags%cu_physics == GFSCHEME) then
 !!!     CALL wrf_debug ( 200 , ' call HALO CHEM AFTER CUMULUS' )

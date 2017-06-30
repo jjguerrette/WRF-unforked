@@ -328,7 +328,7 @@ SUBROUTINE solve_em_tl ( grid , config_flags  &
 
    IF (config_flags%polar) dclat = 90./REAL(jde-jds) !(0.5 * 180/ny)
 
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
 
    kte=min(k_end,kde-1)
 # ifdef DM_PARALLEL
@@ -714,7 +714,7 @@ BENCH_END(g_set_phys_bc_tim)
   CALL g_first_rk_step_part1 (   grid , config_flags                   &
                              , moist , g_moist, moist_tend, g_moist_tend   &
                              , chem  , g_chem,   chem_tend,   g_chem_tend    &
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
                              , dvel &
 #endif
                              , tracer, g_tracer, tracer_tend, g_tracer_tend  &

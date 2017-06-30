@@ -10,7 +10,7 @@ CONTAINS
   SUBROUTINE g_first_rk_step_part1 (   grid , config_flags              &
                              , moist , g_moist, moist_tend, g_moist_tend             &
                              , chem  , g_chem, chem_tend, g_chem_tend                &
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
                              , dvel &
 #endif
                              , tracer, g_tracer, tracer_tend, g_tracer_tend          &
@@ -56,7 +56,7 @@ CONTAINS
     USE module_dm, ONLY : local_communicator, mytask, ntasks, ntasks_x, ntasks_y, local_communicator_periodic, wrf_dm_maxval
     USE module_comm_dm, ONLY : halo_em_phys_a_tl_sub,halo_em_phys_a_bl_surf_sub,halo_pwp_sub,halo_em_chem_e_3_tl_sub,halo_em_chem_e_5_tl_sub
 #endif
-#ifdef WRF_CHEM
+#if (WRF_CHEM == 1)
     USE module_input_chem_data, only: get_last_gas,mozcart_lbc_set
     USE g_module_dry_dep_vel
 #endif
