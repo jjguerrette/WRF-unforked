@@ -489,8 +489,7 @@ module_first_rk_step_part1.o : \
 		../phys/module_fr_fire_driver_wrf.o \
 		../frame/module_comm_dm.o \
 		../phys/module_fddagd_driver.o \
-                ../chem/module_dry_dep_vel.o \
-                ../chem/module_input_chem_data.o
+		$(CFRK)
 
 module_first_rk_step_part1_tl.o : \
                 module_force_scm.o \
@@ -501,8 +500,7 @@ module_first_rk_step_part1_tl.o : \
                 ../phys/module_cumulus_driver_tl.o \
                 ../phys/module_pbl_driver_tl.o \
                 ../frame/module_comm_dm.o \
-                ../chem/module_dry_dep_vel_tl.o \
-                ../chem/module_input_chem_data.o
+		$(CFRKTL)
 
 module_first_rk_step_part1_ad.o : \
 		module_big_step_utilities_em.o \
@@ -514,9 +512,7 @@ module_first_rk_step_part1_ad.o : \
                 ../phys/module_pbl_driver.o \
                 ../phys/module_pbl_driver_ad.o \
                 ../frame/module_comm_dm.o \
-                ../chem/module_dry_dep_vel.o \
-                ../chem/module_dry_dep_vel_ad.o \
-                ../chem/module_input_chem_data.o
+		$(CFRKAD)
 
 module_first_rk_step_part2.o : \
                 module_em.o \
@@ -573,11 +569,6 @@ adapt_timestep_em.o: \
 		../frame/module_domain.o \
 		../frame/module_configure.o  \
 		../frame/module_dm.o
-
-#		../chem/module_chem_utilities.o \
-# 		../chem/module_input_chem_data.o \
-# 		../chem/module_input_chem_data_tl.o \
-# 		../chem/module_input_chem_data_ad.o
 
 # End of DEPENDENCIES for dyn_em
 

@@ -10,6 +10,14 @@ CHEM_FILES =	../chem/module_aerosols_sorgam.o \
 		../chem/module_input_tracer.o \
 		../chem/module_aerosols_soa_vbs.o
 CHEM_FILES2 =	../chem/module_data_mosaic_asect.o
+CHEM_FILES_RK=	../chem/module_dry_dep_vel.o \
+		../chem/module_input_chem_data.o
+CHEM_FILES_RKTL=	../chem/module_dry_dep_vel.o \
+			../chem/module_input_chem_data.o
+CHEM_FILES_RKAD=	../chem/module_dry_dep_vel.o \
+			../chem/module_dry_dep_vel_ad.o \
+			../chem/module_input_chem_data.o
+
 
 deflt :
 		@ echo Please compile the code using ./compile
@@ -924,10 +932,16 @@ em_core :
 	@ echo '--------------------------------------'
 	if [ $(WRF_CHEM) -eq 0 ] ; then \
 		CF= ; \
+		CFRK= ; \
+		CFRKTL= ; \
+		CFRKAD= ; \
 	else \
 		CF="$(CHEM_FILES)" ; \
+		CFRK="$(CHEM_FILES_RK)" ; \
+		CFRKTL="$(CHEM_FILES_RKTL)" ; \
+		CFRKAD="$(CHEM_FILES_RKAD)" ; \
 	fi
-	( cd dyn_em ; $(MAKE) $(J) CF="$(CF)" )
+	( cd dyn_em ; $(MAKE) $(J) CF="$(CF)" CFRK="$(CFRK)" CFRKTL="$(CFRKTL)" CFRKAD="$(CFRKAD)" )
 
 # rule used by configure to test if this will compile with MPI 2 calls MPI_Comm_f2c and _c2f
 mpi2_test :

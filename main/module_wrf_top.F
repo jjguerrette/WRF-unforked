@@ -1097,46 +1097,63 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
    WRITE(check_name(4),FMT='(A)') 'T'
    WRITE(check_name(5),FMT='(A)') 'PH'
    WRITE(check_name(6),FMT='(A)') 'MU'
+   ij = 0
    DO nsc = 1, num_moist
       IF( nsc .LT. PARAM_FIRST_SCALAR ) THEN
          WRITE(check_name(6+nsc),FMT='(A)')'DUMMY'
+         scenario_matrix(6+nsc,:) = -1
+         scenario_matrix(:,6+nsc) = -1
       ELSE
          WRITE(check_name(6+nsc),FMT='(A,I2.1)')'MOIST',nsc-PARAM_FIRST_SCALAR+1
       ENDIF
    ENDDO
+   ij = ij + num_moist
    DO nsc = 1, num_tracer
       IF( nsc .LT. PARAM_FIRST_SCALAR ) THEN
-         WRITE(check_name(6+nsc+num_moist),FMT='(A)')'DUMMY' 
+         WRITE(check_name(6+nsc+ij),FMT='(A)')'DUMMY' 
+         scenario_matrix(6+nsc+ij,:) = -1
+         scenario_matrix(:,6+nsc+ij) = -1
       ELSE
-         WRITE(check_name(6+nsc+num_moist),FMT='(A,I2.1)')'TRACER',nsc-PARAM_FIRST_SCALAR+1
+         WRITE(check_name(6+nsc+ij),FMT='(A,I2.1)')'TRACER',nsc-PARAM_FIRST_SCALAR+1
       ENDIF
    ENDDO 
+   ij = ij + num_tracer
 #if (WRF_CHEM == 1)
    DO nsc = 1, num_chem
       IF( nsc .LT. PARAM_FIRST_SCALAR ) THEN
-         WRITE(check_name(6+nsc+num_moist+num_tracer),FMT='(A)')'DUMMY' 
+         WRITE(check_name(6+nsc+ij),FMT='(A)')'DUMMY' 
+         scenario_matrix(6+nsc+ij,:) = -1
+         scenario_matrix(:,6+nsc+ij) = -1
       ELSE
-         WRITE(check_name(6+nsc+num_moist+num_tracer),FMT='(A,I2.1)')'CHEM',nsc-PARAM_FIRST_SCALAR+1
+         WRITE(check_name(6+nsc+ij),FMT='(A,I2.1)')'CHEM',nsc-PARAM_FIRST_SCALAR+1
       ENDIF
    ENDDO  
+   ij = ij + num_chem
    DO nsc = 1, num_scaleant
       IF( nsc .LT. PARAM_FIRST_SCALAR ) THEN
-         WRITE(check_name(6+nsc+num_moist+num_tracer+num_chem),FMT='(A)')'DUMMY' 
+         WRITE(check_name(6+nsc+ij),FMT='(A)')'DUMMY' 
+         scenario_matrix(6+nsc+ij,:) = -1
+         scenario_matrix(:,6+nsc+ij) = -1
       ELSE
-         WRITE(check_name(6+nsc+num_moist+num_tracer+num_chem),FMT='(A,I2.1)')'SCALEANT',nsc-PARAM_FIRST_SCALAR+1
+         WRITE(check_name(6+nsc+ij),FMT='(A,I2.1)')'SCALEANT',nsc-PARAM_FIRST_SCALAR+1
       ENDIF
    ENDDO  
+   ij = ij + num_scaleant
    DO nsc = 1, num_scalebb
       IF( nsc .LT. PARAM_FIRST_SCALAR ) THEN
-         WRITE(check_name(6+nsc+num_moist+num_tracer+num_chem+num_scaleant),FMT='(A)')'DUMMY' 
+         WRITE(check_name(6+nsc+ij),FMT='(A)')'DUMMY' 
+         scenario_matrix(6+nsc+ij,:) = -1
+         scenario_matrix(:,6+nsc+ij) = -1
       ELSE
-         WRITE(check_name(6+nsc+num_moist+num_tracer+num_chem+num_scaleant),FMT='(A,I2.1)')'SCALEBB',nsc-PARAM_FIRST_SCALAR+1
+         WRITE(check_name(6+nsc+ij),FMT='(A,I2.1)')'SCALEBB',nsc-PARAM_FIRST_SCALAR+1
       ENDIF
    ENDDO 
+   ij = ij + num_scalebb
 #endif
 
    CALL wrf_message("AVAILABLE CONTROL VARIABLES FOR VALIDATION")
    DO nvar = 1, vars_count
+      IF (all(scenario_matrix(nvar,:) .lt. 0)) CYCLE
       WRITE(wrf_msg, FMT='(I2,A,A)') nvar,'  ',check_name(nvar)
       CALL wrf_message(TRIM(wrf_msg)) 
    ENDDO
@@ -1144,8 +1161,12 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
    CALL wrf_message("")
    CALL wrf_message("SELECTED CONTROL VARIABLES")
    DO nnumer = 0, vars_count      
+      IF (nnumer.gt.0) THEN
+         IF (all(scenario_matrix(nnumer,:).lt.0))CYCLE
+      ENDIF
       WRITE(wrf_msg, FMT='(I2,A)') nnumer, ' ,  '
       DO ndenom = 1, vars_count
+         IF (all(scenario_matrix(:,ndenom).lt.0)) CYCLE
          IF ( nnumer .EQ. 0 ) THEN
             WRITE(wrf_msg, FMT='(A,I2,A)') TRIM(wrf_msg),&
                                 ndenom, ' ,  '
@@ -1173,7 +1194,7 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
       IF ( head_grid%check_AD ) THEN
       numer_vars_Loop1: DO nnumer = 1, vars_count
    
-         IF( ALL(scenario_matrix(nnumer,:) .EQ. 0) ) CYCLE numer_vars_Loop1
+         IF( ALL(scenario_matrix(nnumer,:) .LE. 0) ) CYCLE numer_vars_Loop1
          factors(:,1) = 0.0D0
          factors(nnumer,1) = 1.0D0
       
@@ -1219,7 +1240,7 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
                kloc_i = locations_i(iter,3)
       
                denom_vars_Loop1: DO ndenom = 1,vars_count
-                  IF ( scenario_matrix(nnumer,ndenom) .EQ. 0) CYCLE denom_vars_Loop1
+                  IF ( scenario_matrix(nnumer,ndenom) .LE. 0) CYCLE denom_vars_Loop1
                   factors(:,2)=0.0D0
                   factors(ndenom,2) = 1.0D0
                   WRITE(wrf_msg, FMT='(2(A,I3),5(A))') 'nf = ',nf, &
@@ -1238,7 +1259,13 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
                         head_grid%i_end(ij)  .ge. iloc_i .AND. &
                         head_grid%j_start(ij) .le. jloc_i .AND. &
                         head_grid%j_end(ij)  .ge. jloc_i ) THEN
-                        CALL extract_ad_der( head_grid, dummy_der, iloc_i, jloc_i, kloc_i, head_grid%scale_hr, factors (:,2), vars_count)
+                        CALL extract_ad_der( head_grid, dummy_der, iloc_i, jloc_i, kloc_i, &
+#if (WRF_CHEM == 1)
+                                             head_grid%scale_hr, &
+#else
+                                             1, &
+#endif
+                                             factors (:,2), vars_count)
                      ENDIF
                   END DO
                   !$OMP END PARALLEL DO
@@ -1267,7 +1294,7 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
             kloc_i = locations_i(iter,3)
    
             denom_vars_Loop2: DO ndenom = 1,vars_count
-               IF ( ALL(scenario_matrix(:,ndenom) .EQ. 0) ) CYCLE denom_vars_Loop2
+               IF ( ALL(scenario_matrix(:,ndenom) .LE. 0) ) CYCLE denom_vars_Loop2
                factors(:,2)=0.0D0
                factors(ndenom,2) = 1.0D0
      
@@ -1309,8 +1336,13 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
                             head_grid%i_end(ij)  .ge. iloc_i .AND. &
                             head_grid%j_start(ij) .le. jloc_i .AND. &
                             head_grid%j_end(ij)  .ge. jloc_i ) THEN 
-                            CALL spot_force_nl( head_grid, iloc_i, jloc_i, kloc_i, head_grid%scale_hr, &
-                                                factors(:,2), vars_count, &
+                            CALL spot_force_nl( head_grid, iloc_i, jloc_i, kloc_i, &
+#if (WRF_CHEM == 1)
+                                             head_grid%scale_hr, &
+#else
+                                             1, &
+#endif
+                                             factors(:,2), vars_count, &
                                                 REAL(psign,8) * REAL(config_flags%nl_pert, 8))
                         ENDIF
                      ENDDO
@@ -1368,8 +1400,13 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
                            head_grid%j_start(ij) .le. jloc_i .AND. &
                            head_grid%j_end(ij)  .ge. jloc_i ) THEN
                            CALL extract_nl_den( nl_den, &
-                                                iloc_i, jloc_i, kloc_i, 1, &
-                                                factors(:,2), vars_count, &
+                                                iloc_i, jloc_i, kloc_i, &
+#if (WRF_CHEM == 1)
+                                             head_grid%scale_hr, &
+#else
+                                             1, &
+#endif
+                                             factors(:,2), vars_count, &
                                                 REAL(psign,8)*REAL(config_flags%nl_pert, 8))
                         ENDIF
                      END DO
@@ -1383,7 +1420,7 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
                      numer_vars_Loop2: DO nnumer = 1, vars_count
                         nl_num = 0.0D0
  
-                        IF( scenario_matrix(nnumer,ndenom) .EQ. 0 ) CYCLE numer_vars_Loop2
+                        IF( scenario_matrix(nnumer,ndenom) .LE. 0 ) CYCLE numer_vars_Loop2
                         factors(:,1) = 0.0D0
                         factors(nnumer,1) = 1.0D0
                         WRITE(wrf_msg, FMT='(2(A,I3),5(A))')'nf = ',nf, &
@@ -1432,7 +1469,13 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
                         head_grid%i_end(ij)  .ge. iloc_i .AND. &
                         head_grid%j_start(ij) .le. jloc_i .AND. &
                         head_grid%j_end(ij)  .ge. jloc_i ) THEN
-                        CALL spot_force_tl( head_grid, iloc_i, jloc_i, kloc_i, head_grid%scale_hr, factors(:,2), vars_count) 
+                        CALL spot_force_tl( head_grid, iloc_i, jloc_i, kloc_i, &
+#if (WRF_CHEM == 1)
+                                             head_grid%scale_hr, &
+#else
+                                             1, &
+#endif
+                                             factors(:,2), vars_count) 
                      ENDIF
                   ENDDO
                   !$OMP END PARALLEL DO
@@ -1451,7 +1494,7 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
                   !gradient_out=.FALSE.
      
                   numer_vars_Loop3: DO nnumer = 1, vars_count
-                     IF( scenario_matrix(nnumer,ndenom) .EQ. 0 ) CYCLE numer_vars_Loop3
+                     IF( scenario_matrix(nnumer,ndenom) .LE. 0 ) CYCLE numer_vars_Loop3
                      factors(:,1) = 0.0D0
                      factors(nnumer,1) = 1.0D0
                      WRITE(wrf_msg, FMT='(2(A,I3),5(A))') 'nf = ',nf, &
@@ -1501,7 +1544,7 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
          head_grid%ni_tlnl = ni
 
          denom_vars_Loop3: DO ndenom = 1,vars_count
-            IF ( ALL(scenario_matrix(:,ndenom) .EQ. 0) ) CYCLE denom_vars_Loop3
+            IF ( ALL(scenario_matrix(:,ndenom) .LE. 0) ) CYCLE denom_vars_Loop3
             factors(:,2)=0.0D0
             factors(ndenom,2) = 1.0D0
   
@@ -1543,7 +1586,12 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
                          head_grid%i_end(ij)  .ge. iloc_i .AND. &
                          head_grid%j_start(ij) .le. jloc_i .AND. &
                          head_grid%j_end(ij)  .ge. jloc_i ) THEN 
-                         CALL spot_force_nl( head_grid, iloc_i, jloc_i, kloc_i, head_grid%scale_hr, &
+                         CALL spot_force_nl( head_grid, iloc_i, jloc_i, kloc_i, &
+#if (WRF_CHEM == 1)
+                                             head_grid%scale_hr, &
+#else
+                                             1, &
+#endif
                                              factors(:,2), vars_count, &
                                              REAL(psign,8) * REAL(config_flags%nl_pert, 8))
                      ENDIF
@@ -1604,7 +1652,12 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
                         head_grid%j_start(ij) .le. jloc_i .AND. &
                         head_grid%j_end(ij)  .ge. jloc_i ) THEN
                         CALL extract_nl_den( nl_den, &
-                                             iloc_i, jloc_i, kloc_i, 1, &
+                                             iloc_i, jloc_i, kloc_i, &
+#if (WRF_CHEM == 1)
+                                             head_grid%scale_hr, &
+#else
+                                             1, &
+#endif
                                              factors(:,2), vars_count, &
                                              REAL(psign,8)*REAL(config_flags%nl_pert, 8))
 
@@ -1618,7 +1671,7 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
 #endif
 
                   numer_vars_Loop4: DO nnumer = 1, vars_count
-                     IF( scenario_matrix(nnumer,ndenom) .EQ. 0 ) CYCLE numer_vars_Loop4
+                     IF( scenario_matrix(nnumer,ndenom) .LE. 0 ) CYCLE numer_vars_Loop4
                      factors(:,1) = 0.0D0
                      factors(nnumer,1) = 1.0D0
 
@@ -1673,7 +1726,13 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
                      head_grid%i_end(ij)  .ge. iloc_i .AND. &
                      head_grid%j_start(ij) .le. jloc_i .AND. &
                      head_grid%j_end(ij)  .ge. jloc_i ) THEN
-                     CALL spot_force_tl( head_grid, iloc_i, jloc_i, kloc_i, head_grid%scale_hr, factors(:,2), vars_count) 
+                     CALL spot_force_tl( head_grid, iloc_i, jloc_i, kloc_i, &
+#if (WRF_CHEM == 1)
+                                             head_grid%scale_hr, &
+#else
+                                             1, &
+#endif
+                                             factors(:,2), vars_count) 
                   ENDIF
                ENDDO
                !$OMP END PARALLEL DO
@@ -1694,7 +1753,7 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
                !gradient_out=.FALSE.
   
                numer_vars_Loop5: DO nnumer = 1, vars_count
-                  IF( scenario_matrix(nnumer,ndenom) .EQ. 0 ) CYCLE numer_vars_Loop5
+                  IF( scenario_matrix(nnumer,ndenom) .LE. 0 ) CYCLE numer_vars_Loop5
                   factors(:,1) = 0.0D0
                   factors(nnumer,1) = 1.0D0
     
@@ -1743,7 +1802,7 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
 
    IF ( .NOT. head_grid%check_TLNLonly ) THEN
       numer_vars_Loop6: DO nnumer = 1, vars_count
-         IF( ALL(scenario_matrix(nnumer,:) .EQ. 0) ) CYCLE numer_vars_Loop6
+         IF( ALL(scenario_matrix(nnumer,:) .LE. 0) ) CYCLE numer_vars_Loop6
          iter = 0
          DO nf = 1, nfinal
             DO ni = 1, firatio
@@ -1766,7 +1825,7 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
          ENDDO
 
          DO ndenom = 1, vars_count
-            IF( scenario_matrix(nnumer,ndenom) .EQ. 0) CYCLE
+            IF( scenario_matrix(nnumer,ndenom) .LE. 0) CYCLE
             WRITE(90456, FMT='(5(A))') '        ------check_type = d[',&
                               TRIM(check_name(nnumer)),']/d[',TRIM(check_name(ndenom)),']------'
 
@@ -1822,10 +1881,10 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
          ENDDO
       ENDDO
       numer_vars_Loop7: DO nnumer = 1, vars_count
-         IF( ALL(scenario_matrix(nnumer,:) .EQ. 0) ) CYCLE numer_vars_Loop7
+         IF( ALL(scenario_matrix(nnumer,:) .LE. 0) ) CYCLE numer_vars_Loop7
 
          DO ndenom = 1, vars_count
-            IF( scenario_matrix(nnumer,ndenom) .EQ. 0) CYCLE
+            IF( scenario_matrix(nnumer,ndenom) .LE. 0) CYCLE
             WRITE(90456, FMT='(5(A))') '        ------check_type = d[',&
                               TRIM(check_name(nnumer)),']/d[',TRIM(check_name(ndenom)),']------'
 
@@ -4026,6 +4085,7 @@ ENDIF
    ENDIF
 #endif
 
+   model_config_rec%dyn_opt = dyn_em
    IF ( model_config_rec%bl_pbl_physics(head_grid%id) .EQ. SURFDRAGSCHEME ) THEN
       head_grid%rublten = 0.0D0
       head_grid%rvblten = 0.0D0
