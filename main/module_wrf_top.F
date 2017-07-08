@@ -993,8 +993,8 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
       CALL nl_set_cu_physics (head_grid%id, 98)
       head_grid%cudt = 0
    ENDIF
-   CALL nl_set_ra_lw_physics (head_grid%id, 0)
-   CALL nl_set_ra_sw_physics (head_grid%id, 0)
+!   CALL nl_set_ra_lw_physics (head_grid%id, 0)
+!   CALL nl_set_ra_sw_physics (head_grid%id, 0)
    IF ( config_flags%sf_sfclay_physics.NE.SFCLAYSCHEME .AND. &
         config_flags%sf_sfclay_physics.NE.PXSFCSCHEME) &
       CALL nl_set_sf_sfclay_physics (head_grid%id, 0)
@@ -1221,16 +1221,19 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
    
             !gradient_out=.TRUE.
             model_config_rec%dyn_opt = dyn_em_check
-   
+
+#ifdef DM_PARALLEL
             IF ( wrf_dm_on_monitor() ) THEN
                CALL start_timing
             END IF
-   
+#endif   
             CALL wrf_run_ad_checkpt
-   
+
+#ifdef DM_PARALLEL
             IF ( wrf_dm_on_monitor() ) THEN
                CALL end_timing('Checkpointed AD')
             END IF
+#endif
             !gradient_out=.FALSE.
    
             DO ni = 1,firatio
@@ -1311,9 +1314,9 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
                      CALL domain_clock_get( head_grid, start_timestr=timestr )
                      CALL domain_clock_set( head_grid, current_timestr=timestr )
    
-                     IF ( head_grid%checkpoint_interval .eq. 0 ) THEN !This line used for debugging only
-                        CALL restore_grid ( head_grid )
-                     ELSE
+!                     IF ( head_grid%checkpoint_interval .eq. 0 ) THEN !This line used for debugging only
+!                        CALL restore_grid ( head_grid )
+!                     ELSE
                         !Read initial conditions
                         model_config_rec%restart = .false.
                         head_grid%restart = .false.
@@ -1326,7 +1329,7 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
                         head_grid%scaleant = 1.0D0
                         head_grid%scalebb = 1.0D0
 #endif
-                     ENDIF
+!                     ENDIF
    
 !!         IF ( head_grid%check_scaleant) THEN !This line used for debugging only
                      !$OMP PARALLEL DO    &
@@ -1456,8 +1459,24 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
                ENDIF
    
                IF ( head_grid%check_TL ) THEN
-                  CALL restore_grid ( head_grid )
-   
+!                  CALL restore_grid ( head_grid )
+                  IF ( head_grid%checkpoint_interval .eq. 0 ) THEN !This line used for debugging only
+                     CALL domain_clock_get( head_grid, start_timestr=timestr )
+                     CALL domain_clock_set( head_grid, current_timestr=timestr )
+
+                     !Read initial conditions
+                     model_config_rec%restart = .false.
+                     head_grid%restart = .false.
+                     CALL nl_set_restart ( head_grid%id, .false. )
+                     CALL model_to_grid_config_rec ( head_grid%id , model_config_rec , config_flags )
+                     CALL med_initialdata_input( head_grid , config_flags )
+#if (WRF_CHEM == 1)
+                     !Need to remove this once scaleant and scalebb are added to wrfinput or another stream,
+                     ! which is necessary to do 4DVAR -JJG 9-23-2014
+                     head_grid%scaleant = 1.0D0
+                     head_grid%scalebb = 1.0D0
+#endif
+                  ENDIF
                   !Set the single forcing value for each tangent linear run
                   CALL zero_out_tl( head_grid )
                   CALL zero_out_ad( head_grid )
@@ -1482,15 +1501,20 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
    
                   !gradient_out=.TRUE.
                   model_config_rec%dyn_opt = dyn_em_check
+
+#ifdef DM_PARALLEL
                   IF ( wrf_dm_on_monitor() ) THEN
                      CALL start_timing
                   END IF
-   
+#endif
+
                   CALL wrf_run_tl_checkpt
-   
+  
+#ifdef DM_PARALLEL
                   IF ( wrf_dm_on_monitor() ) THEN
                      CALL end_timing('Checkpointed TL')
                   END IF
+#endif
                   !gradient_out=.FALSE.
      
                   numer_vars_Loop3: DO nnumer = 1, vars_count
@@ -1561,9 +1585,9 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
                   CALL domain_clock_get( head_grid, start_timestr=timestr )
                   CALL domain_clock_set( head_grid, current_timestr=timestr )
 
-                  IF ( head_grid%checkpoint_interval .eq. 0 ) THEN !This line used for debugging only
-                     CALL restore_grid ( head_grid )
-                  ELSE
+!                  IF ( head_grid%checkpoint_interval .eq. 0 ) THEN !This line used for debugging only
+!                     CALL restore_grid ( head_grid )
+!                  ELSE
                      !Read initial conditions
                      model_config_rec%restart = .false.
                      head_grid%restart = .false.
@@ -1576,7 +1600,7 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
                      head_grid%scaleant = 1.0D0
                      head_grid%scalebb = 1.0D0
 #endif
-                  ENDIF
+!                  ENDIF
 
 !!      IF ( head_grid%check_scalebb) THEN !This line used for debugging only
                   !$OMP PARALLEL DO    &
@@ -1713,7 +1737,24 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
             ENDIF
 
             IF ( head_grid%check_TL ) THEN
-               CALL restore_grid ( head_grid )
+!               CALL restore_grid ( head_grid )
+               IF ( head_grid%checkpoint_interval .eq. 0 ) THEN !This line used for debugging only
+                  CALL domain_clock_get( head_grid, start_timestr=timestr )
+                  CALL domain_clock_set( head_grid, current_timestr=timestr )
+
+                  !Read initial conditions
+                  model_config_rec%restart = .false.
+                  head_grid%restart = .false.
+                  CALL nl_set_restart ( head_grid%id, .false. )
+                  CALL model_to_grid_config_rec ( head_grid%id , model_config_rec , config_flags )
+                  CALL med_initialdata_input( head_grid , config_flags )
+#if (WRF_CHEM == 1)
+                  !Need to remove this once scaleant and scalebb are added to wrfinput or another stream,
+                  ! which is necessary to do 4DVAR -JJG 9-23-2014
+                  head_grid%scaleant = 1.0D0
+                  head_grid%scalebb = 1.0D0
+#endif
+               ENDIF
 
                !Set the single forcing value for each tangent linear run
                CALL zero_out_tl( head_grid )
@@ -1739,17 +1780,21 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
 
                !gradient_out=.TRUE.
                model_config_rec%dyn_opt = dyn_em_check
+#ifdef DM_PARALLEL
                IF ( wrf_dm_on_monitor() ) THEN
                   CALL start_timing
                END IF
+#endif
 
                head_grid%print_NL = .false.
                CALL wrf_run_tl_checkpt
                head_grid%print_NL = .true.
-  
+
+#ifdef DM_PARALLEL
                IF ( wrf_dm_on_monitor() ) THEN
                   CALL end_timing('Checkpointed TL')
                END IF
+#endif
                !gradient_out=.FALSE.
   
                numer_vars_Loop5: DO nnumer = 1, vars_count
@@ -2001,6 +2046,12 @@ ENDIF
       head_grid%rqcblten = 0.0D0
       head_grid%rqiblten = 0.0D0
    ENDIF
+   IF ( model_config_rec%ra_sw_physics(head_grid%id) .GT. 0 .OR. &
+        model_config_rec%ra_lw_physics(head_grid%id) .GT. 0 ) THEN
+      head_grid%rthraten = 0.0D0
+      head_grid%gsw = 0.D0
+      head_grid%glw = 0.D0
+   ENDIF
    IF ( model_config_rec%mp_physics(head_grid%id) .EQ. LSCONDSCHEME ) THEN
       head_grid%h_diabatic = 0.0D0
       head_grid%qv_diabatic = 0.0D0
@@ -2103,6 +2154,12 @@ ENDIF
       head_grid%rqvblten = 0.0D0
       head_grid%rqcblten = 0.0D0
       head_grid%rqiblten = 0.0D0
+   ENDIF
+   IF ( model_config_rec%ra_sw_physics(head_grid%id) .GT. 0 .OR. &
+        model_config_rec%ra_lw_physics(head_grid%id) .GT. 0 ) THEN
+      head_grid%rthraten = 0.0D0
+      head_grid%gsw = 0.D0
+      head_grid%glw = 0.D0
    ENDIF
    IF ( model_config_rec%mp_physics(head_grid%id) .EQ. LSCONDSCHEME ) THEN
       head_grid%h_diabatic = 0.0D0
@@ -2529,8 +2586,8 @@ ENDIF
             CALL nl_set_cu_physics (head_grid%id, 98)
             head_grid%cudt = 0
          ENDIF
-         CALL nl_set_ra_lw_physics (head_grid%id, 0)
-         CALL nl_set_ra_sw_physics (head_grid%id, 0)
+!         CALL nl_set_ra_lw_physics (head_grid%id, 0)
+!         CALL nl_set_ra_sw_physics (head_grid%id, 0)
          IF ( config_flags%sf_sfclay_physics.NE.SFCLAYSCHEME .AND. &
               config_flags%sf_sfclay_physics.NE.PXSFCSCHEME) &
             CALL nl_set_sf_sfclay_physics (head_grid%id, 0)
@@ -3302,9 +3359,11 @@ ENDIF
 
          model_config_rec%dyn_opt = dyn_em_check
 
+#ifdef DM_PARALLEL
          IF ( wrf_dm_on_monitor() ) THEN
             CALL start_timing
          END IF
+#endif
 
          ! Enable boundary reading for checkpoint intervals shorter than
          ! lbc reading interval
@@ -3427,9 +3486,11 @@ ENDIF
             ENDDO
          ENDIF
 
+#ifdef DM_PARALLEL
          IF ( wrf_dm_on_monitor() ) THEN
             CALL end_timing('AD checkpoint I/O')
          END IF
+#endif
 
          CALL domain_clock_get( head_grid, start_timestr=timestr )
          CALL domain_clock_set( head_grid, current_timestr=timestr )
@@ -3549,8 +3610,8 @@ ENDIF
             CALL nl_set_cu_physics (head_grid%id, 98)
             head_grid%cudt = 0
          ENDIF
-         CALL nl_set_ra_lw_physics (head_grid%id, 0)
-         CALL nl_set_ra_sw_physics (head_grid%id, 0)
+!         CALL nl_set_ra_lw_physics (head_grid%id, 0)
+!         CALL nl_set_ra_sw_physics (head_grid%id, 0)
          IF ( config_flags%sf_sfclay_physics.NE.SFCLAYSCHEME .AND. &
               config_flags%sf_sfclay_physics.NE.PXSFCSCHEME) &
             CALL nl_set_sf_sfclay_physics (head_grid%id, 0)
@@ -3988,6 +4049,12 @@ ENDIF
       head_grid%rqcblten = 0.0D0
       head_grid%rqiblten = 0.0D0
    ENDIF
+   IF ( model_config_rec%ra_sw_physics(head_grid%id) .GT. 0 .OR. &
+        model_config_rec%ra_lw_physics(head_grid%id) .GT. 0 ) THEN
+      head_grid%rthraten = 0.0D0
+      head_grid%gsw = 0.D0
+      head_grid%glw = 0.D0
+   ENDIF
    IF ( model_config_rec%mp_physics(head_grid%id) .EQ. LSCONDSCHEME ) THEN
       head_grid%h_diabatic = 0.0D0
       head_grid%qv_diabatic = 0.0D0
@@ -4098,6 +4165,12 @@ ENDIF
       head_grid%rqvblten = 0.0D0
       head_grid%rqcblten = 0.0D0
       head_grid%rqiblten = 0.0D0
+   ENDIF
+   IF ( model_config_rec%ra_sw_physics(head_grid%id) .GT. 0 .OR. &
+        model_config_rec%ra_lw_physics(head_grid%id) .GT. 0 ) THEN
+      head_grid%rthraten = 0.0D0
+      head_grid%gsw = 0.D0
+      head_grid%glw = 0.D0
    ENDIF
    IF ( model_config_rec%mp_physics(head_grid%id) .EQ. LSCONDSCHEME ) THEN
       head_grid%h_diabatic = 0.0D0

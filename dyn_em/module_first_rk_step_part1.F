@@ -238,6 +238,20 @@ BENCH_END(phy_prep_tim)
          CALL wrf_error_fatal('WRFU_TimeGet failed')
          ENDIF
 
+#if ( WRFPLUS == 1 )
+! GSW and GLW (in future RTHRATEN) are needed for adjoint calls to pbl and surface drivers (and module_first_rk_step_part2_tl).
+! Two options:
+! (1) call radiation_driver radt (seconds) or stepra (# timesteps) in the past in module_first_rk_step_part1_ad
+! (2) store/retrieve these variables from trajectory and do not overwrite in dyn_em_ad call to module_first_rk_step_part1 (HERE for solve_em_ad)
+! We are using (2) above.  The downside is that the radiation_driver outputs will be offset by one time step from the appropriate forward model variables, but the AD/TL will be symmetric.
+!-JJ Guerrette 
+
+      IF(config_flags%dyn_opt .eq. dyn_em_ad) then
+         CALL PUSHREAL8ARRAY(grid%rthraten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
+         CALL PUSHREAL8ARRAY(grid%gsw, (ime-ims+1)*(jme-jms+1))
+         CALL PUSHREAL8ARRAY(grid%glw, (ime-ims+1)*(jme-jms+1))
+      ENDIF
+#endif
 ! this driver is only needed to handle non-local shadowing effects
       CALL pre_radiation_driver ( grid, config_flags                        &
      &        ,itimestep=grid%itimestep, ra_call_offset=grid%ra_call_offset    &
@@ -416,6 +430,14 @@ BENCH_START(rad_driver_tim)
      &         ,MP_PHYSICS=CONFIG_FLAGS%MP_PHYSICS )
 
 BENCH_END(rad_driver_tim)
+
+#if ( WRFPLUS == 1 )
+      IF(config_flags%dyn_opt .eq. dyn_em_ad) then
+         CALL POPREAL8ARRAY(grid%glw, (ime-ims+1)*(jme-jms+1))
+         CALL POPREAL8ARRAY(grid%gsw, (ime-ims+1)*(jme-jms+1))
+         CALL POPREAL8ARRAY(grid%rthraten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
+      ENDIF
+#endif
 
 !********* Surface driver
 ! surface

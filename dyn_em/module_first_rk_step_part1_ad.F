@@ -40,7 +40,7 @@ CONTAINS
     USE module_model_constants
     USE module_domain, ONLY : domain, domain_clock_get, get_ijk_from_subgrid
     USE module_configure, ONLY : grid_config_rec_type, model_config_rec
-!   USE module_radiation_driver, ONLY : pre_radiation_driver, radiation_driver
+   USE module_radiation_driver, ONLY : pre_radiation_driver, radiation_driver
    USE module_surface_driver, ONLY : surface_driver
 !   USE module_cumulus_driver, ONLY : cumulus_driver
 !   USE module_shallowcu_driver, ONLY : shallowcu_driver
@@ -233,6 +233,8 @@ CONTAINS
       CALL PUSHREAL8ARRAY(grid%rqicuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
 !      CALL PUSHREAL8ARRAY(grid%rqscuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
 
+      CALL PUSHREAL8ARRAY(grid%rthraten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
+
       !$OMP PARALLEL DO   &
       !$OMP PRIVATE ( ij )
       DO ij = 1 , grid%num_tiles
@@ -270,14 +272,215 @@ CONTAINS
       !$OMP END PARALLEL DO
 
 BENCH_END(phy_prep_tim)
+
+! radiation
      CALL domain_clock_get( grid, current_time=currentTime, &
                             current_timestr=mesg )
      read(mesg(6:7),FMT='(I2)') current_month
 
-!********* Surface driver
-! surface
+     CALL WRFU_TimeGet( currentTime, YY=yr, dayOfYear=day, H=hr, M=minute, S=sec, rc=rc)
+         IF( rc/= WRFU_SUCCESS)THEN
+         CALL wrf_error_fatal('WRFU_TimeGet failed')
+         ENDIF
 
-BENCH_START(surf_driver_tim)
+! GSW and GLW (in future RTHRATEN) are needed for adjoint calls to pbl and surface drivers (and module_first_rk_step_part2_tl).
+! Two options:
+! (1) call radiation_driver radt (seconds) or stepra (# timesteps) in the past
+! (2) store/retrieve these variables from trajectory and do not overwrite in dyn_em_ad call to module_first_rk_step_part1 (earlier in solve_em_ad)
+! We are using (2) above.  The downside is that the radiation_driver outputs will be offset by one time step from the appropriate forward model variables, but the AD/TL will be symmetric.
+!-JJ Guerrette 
+
+! this driver is only needed to handle non-local shadowing effects
+!!      CALL pre_radiation_driver ( grid, config_flags                        &
+!!     &        ,itimestep=grid%itimestep, ra_call_offset=grid%ra_call_offset    &
+!!     &        ,XLAT=grid%xlat, XLONG=grid%xlong, GMT=grid%gmt                  &
+!!     &        ,julian=grid%julian, xtime=grid%xtime, RADT=grid%radt            &
+!!     &        ,STEPRA=grid%stepra                                              &
+!!     &        ,ht=grid%ht,dx=grid%dx,dy=grid%dy,sina=grid%sina,cosa=grid%cosa  &
+!!     &        ,shadowmask=grid%shadowmask,slope_rad=config_flags%slope_rad     &
+!!     &        ,topo_shading=config_flags%topo_shading                          &
+!!     &        ,shadlen=config_flags%shadlen,ht_shad=grid%ht_shad,ht_loc=ht_loc &
+!!     &        ,ht_shad_bxs=grid%ht_shad_bxs, ht_shad_bxe=grid%ht_shad_bxe      &
+!!     &        ,ht_shad_bys=grid%ht_shad_bys, ht_shad_bye=grid%ht_shad_bye      &
+!!     &        ,nested=config_flags%nested, min_ptchsz=grid%min_ptchsz          &
+!!     &        ,spec_bdy_width=config_flags%spec_bdy_width                      &
+!!            ! indexes
+!!     &        ,IDS=ids,IDE=ide, JDS=jds,JDE=jde, KDS=kds,KDE=kde          &
+!!     &        ,IMS=ims,IME=ime, JMS=jms,JME=jme, KMS=kms,KME=kme          &
+!!     &        ,IPS=ips,IPE=ipe, JPS=jps,JPE=jpe, KPS=kps,KPE=kpe          &
+!!     &        ,i_start=grid%i_start,i_end=min(grid%i_end, ide-1)          &
+!!     &        ,j_start=grid%j_start,j_end=min(grid%j_end, jde-1)          &
+!!     &        ,kts=k_start, kte=min(k_end,kde-1)                          &
+!!     &        ,num_tiles=grid%num_tiles                                   )
+!!
+!!BENCH_START(rad_driver_tim)
+!!
+!!      CALL radiation_driver(                                                  &
+!!     &         p_top=grid%p_top & !DJW 140312 added p_top for vertical nesting
+!!     &        ,ACFRCV=grid%acfrcv      ,ACFRST=grid%acfrst      ,ALBEDO=grid%albedo  &
+!!     &        ,CFRACH=grid%cfrach      ,CFRACL=grid%cfracl      ,CFRACM=grid%cfracm  &
+!!     &        ,CUPPT=grid%cuppt        ,CZMEAN=grid%czmean      ,DT=grid%dt          &
+!!     &        ,DZ8W=dz8w               ,EMISS=grid%emiss        ,GLW=grid%glw        &
+!!     &        ,GMT=grid%gmt            ,GSW=grid%gsw            ,HBOT=grid%hbot      &
+!!     &        ,HTOP=grid%htop          ,HBOTR=grid%hbotr        ,HTOPR=grid%htopr    &
+!!     &        ,ICLOUD=config_flags%icloud                                            &
+!!     &        ,ITIMESTEP=grid%itimestep,JULDAY=grid%julday      , JULIAN=grid%julian &
+!!     &        ,JULYR=grid%julyr        ,LW_PHYSICS=config_flags%ra_lw_physics        &
+!!     &        ,NCFRCV=grid%ncfrcv      ,NCFRST=grid%ncfrst      ,NPHS=1              &
+!!     &        ,o3input=config_flags%o3input     ,O3rad=grid%o3rad                    &
+!!     &        ,aer_opt=config_flags%aer_opt ,aerod=aerod(:,:,:,P_ocarbon:P_upperaer) &
+!!     &        ,swint_opt=config_flags%swint_opt                                      &
+!!     &        ,P8W=grid%p_hyd_w        ,P=grid%p_hyd            ,PI=pi_phy           &
+!!     &        ,RADT=grid%radt          ,RA_CALL_OFFSET=grid%ra_call_offset           &
+!!     &        ,RHO=grid%rho            ,RLWTOA=grid%rlwtoa                           &
+!!     &        ,RSWTOA=grid%rswtoa      ,RTHRATEN=grid%rthraten                       &
+!!     &        ,RTHRATENLW=grid%rthratenlw       ,RTHRATENSW=grid%rthratensw          &
+!!     &        ,SNOW=grid%snow          ,STEPRA=grid%stepra      ,SWDOWN=grid%swdown  &
+!!     &        ,SWDOWNC=grid%swdownc    ,SW_PHYSICS=config_flags%ra_sw_physics        &
+!!     &        ,T8W=t8w                 ,T=grid%t_phy           ,TAUCLDC=grid%taucldc &
+!!     &        ,TAUCLDI=grid%taucldi    ,TSK=grid%tsk            ,VEGFRA=grid%vegfra  &
+!!     &        ,WARM_RAIN=grid%warm_rain ,XICE=grid%xice         ,XLAND=grid%xland    &
+!!     &        ,XLAT=grid%xlat          ,XLONG=grid%xlong        ,YR=yr               &
+!!           ! SSiB LSM radiation components (fds 06/2010)
+!!     &        ,ALSWVISDIR=grid%alswvisdir ,ALSWVISDIF=grid%alswvisdif      &  !ssib 
+!!     &        ,ALSWNIRDIR=grid%alswnirdir ,ALSWNIRDIF=grid%alswnirdif      &  !ssib
+!!     &        ,SWVISDIR=grid%swvisdir ,SWVISDIF=grid%swvisdif              &  !ssib
+!!     &        ,SWNIRDIR=grid%swnirdir ,SWNIRDIF=grid%swnirdif              &  !ssib
+!!     &        ,SF_SURFACE_PHYSICS=config_flags%sf_surface_physics          &  !ssib
+!!! WRF-solar and aerosol variables from jararias 2013/8 and 2013/11
+!!     &       ,SWDDIR=grid%swddir,SWDDNI=grid%swddni,SWDDIF=grid%swddif                              & 
+!!     &       ,Gx=grid%Gx,Bx=grid%Bx,gg=grid%gg,bb=grid%bb                                           &
+!!     &       ,swdown_ref=grid%swdown_ref,swddir_ref=grid%swddir_ref                                 &
+!!     &       ,coszen_ref=grid%coszen_ref                                                            &
+!!     &       ,aer_type=config_flags%aer_type                                                        &
+!!     &       ,aer_aod550_opt=config_flags%aer_aod550_opt,aer_aod550_val=config_flags%aer_aod550_val &
+!!     &       ,aer_angexp_opt=config_flags%aer_angexp_opt,aer_angexp_val=config_flags%aer_angexp_val &
+!!     &       ,aer_ssa_opt=config_flags%aer_ssa_opt,aer_ssa_val=config_flags%aer_ssa_val             &
+!!     &       ,aer_asy_opt=config_flags%aer_asy_opt,aer_asy_val=config_flags%aer_asy_val             &
+!!     &       ,aod5502d=grid%aod5502d,angexp2d=grid%angexp2d,aerssa2d=grid%aerssa2d                  &
+!!     &       ,aerasy2d=grid%aerasy2d,aod5503d=grid%aod5503d                                         &
+!!     &       ,taod5502d=grid%taod5502d,taod5503d=grid%taod5503d                                     & ! Trude
+!!!Optional solar variables
+!!     &        ,DECLINX=grid%declin ,SOLCONX=grid%solcon ,COSZEN=grid%coszen ,HRANG=grid%hrang    &
+!!     &        , CEN_LAT=grid%cen_lat                                      &
+!!     &        ,Z=grid%z                                                   &
+!!     &        ,ALEVSIZ=grid%alevsiz, no_src_types=grid%no_src_types       &
+!!     &        ,LEVSIZ=grid%levsiz, N_OZMIXM=num_ozmixm                    &
+!!     &        ,N_AEROSOLC=num_aerosolc                                    &
+!!     &        ,PAERLEV=grid%paerlev   ,ID=grid%id                         &
+!!     &        ,CAM_ABS_DIM1=grid%cam_abs_dim1, CAM_ABS_DIM2=grid%cam_abs_dim2 &
+!!     &        ,CAM_ABS_FREQ_S=grid%cam_abs_freq_s                         &
+!!     &        ,XTIME=grid%xtime                                                &
+!!              ,CURR_SECS=curr_secs, ADAPT_STEP_FLAG=adapt_step_flag       &
+!!!BSINGH - For WRFCuP scheme
+!!     &        ,CU_PHYSICS=config_flags%cu_physics                         & !CuP, wig 5-Oct-2006
+!!     &        ,SHALLOWCU_FORCED_RA=config_flags%shallowcu_forced_ra       & !CuP, wig
+!!     &        ,CUBOT=grid%cubot, CUTOP=grid%cutop                         & !CuP, wig 9-Oct-2006
+!!     &        ,CLDFRA_CUP=grid%cldfra_cup                                 & !CuP, wig 1-Oct-2006
+!!     &        ,SHALL=grid%shall                                           & !CuP, wig 4-Feb-2008
+!!!BSINGH - ENDS
+!!            ! indexes
+!!     &        ,IDS=ids,IDE=ide, JDS=jds,JDE=jde, KDS=kds,KDE=kde          &
+!!     &        ,IMS=ims,IME=ime, JMS=jms,JME=jme, KMS=kms,KME=kme          &
+!!     &        ,i_start=grid%i_start,i_end=min(grid%i_end, ide-1)          &
+!!     &        ,j_start=grid%j_start,j_end=min(grid%j_end, jde-1)          &
+!!     &        ,kts=k_start, kte=min(k_end,kde-1)                          &
+!!     &        ,num_tiles=grid%num_tiles                                   &
+!!            ! Optional
+!!!JJS 20101020 vvvvv
+!!     &        , TLWDN=grid%tlwdn, TLWUP=grid%tlwup                        & ! goddard schemes
+!!     &        , SLWDN=grid%slwdn, SLWUP=grid%slwup                        & ! goddard schemes
+!!     &        , TSWDN=grid%tswdn, TSWUP=grid%tswup                        & ! goddard schemes
+!!     &        , SSWDN=grid%sswdn, SSWUP=grid%sswup                        & ! goddard schemes
+!!!JJS 20101020 ^^^^^
+!!!ZCX+ cloud fraction for CLWRF
+!!     &        , CLDT=grid%cldt, ZNU=grid%znu                              &
+!!!ZCX-
+!!     &        , CLDFRA=grid%cldfra, CLDFRA_MP_ALL=grid%cldfra_mp_all      &
+!!     &        , LRADIUS=grid%LRADIUS,IRADIUS=grid%IRADIUS                 & !BSINGH(01/22/2014)
+!!     &        , CLDFRA_DP=grid%cldfra_dp                                  & ! ckay for subgrid cloud
+!!     &        , CLDFRA_SH=grid%cldfra_sh                                  &
+!!     &        , icloud_bl=config_flags%icloud_bl                        & !JOE: subgrid BL clouds
+!!     &        , qc_bl=grid%qc_bl,cldfra_bl=grid%cldfra_bl                 & !JOE: subgrid bl clouds
+!!     &        , re_cloud=grid%re_cloud, re_ice=grid%re_ice, re_snow=grid%re_snow & ! G. Thompson
+!!     &        , has_reqc=grid%has_reqc, has_reqi=grid%has_reqi, has_reqs=grid%has_reqs & ! G. Thompson
+!!     &        , PB=grid%pb                                                &
+!!     &        , F_ICE_PHY=grid%f_ice_phy,F_RAIN_PHY=grid%f_rain_phy       &
+!!     &        , QV=moist(ims,kms,jms,P_QV), F_QV=F_QV                     &
+!!     &        , QC=moist(ims,kms,jms,P_QC), F_QC=F_QC                     &
+!!     &        , QR=moist(ims,kms,jms,P_QR), F_QR=F_QR                     &
+!!     &        , QI=moist(ims,kms,jms,P_QI), F_QI=F_QI                     &
+!!     &        , QS=moist(ims,kms,jms,P_QS), F_QS=F_QS                     &
+!!     &        , QG=moist(ims,kms,jms,P_QG), F_QG=F_QG                     &
+!!     &        , QNDROP=scalar(ims,kms,jms,P_QNDROP), F_QNDROP=F_QNDROP    &
+!!     &        ,QNIFA=scalar(ims,kms,jms,P_QNIFA),F_QNIFA=F_QNIFA          & !Trude
+!!     &        ,QNWFA=scalar(ims,kms,jms,P_QNWFA),F_QNWFA=F_QNWFA          & !Trude
+!!     &        ,ACSWUPT=grid%acswupt    ,ACSWUPTC=grid%acswuptc            &
+!!     &        ,ACSWDNT=grid%acswdnt    ,ACSWDNTC=grid%acswdntc            &
+!!     &        ,ACSWUPB=grid%acswupb    ,ACSWUPBC=grid%acswupbc            &
+!!     &        ,ACSWDNB=grid%acswdnb    ,ACSWDNBC=grid%acswdnbc            &
+!!     &        ,ACLWUPT=grid%aclwupt    ,ACLWUPTC=grid%aclwuptc            &
+!!     &        ,ACLWDNT=grid%aclwdnt    ,ACLWDNTC=grid%aclwdntc            &
+!!     &        ,ACLWUPB=grid%aclwupb    ,ACLWUPBC=grid%aclwupbc            &
+!!     &        ,ACLWDNB=grid%aclwdnb    ,ACLWDNBC=grid%aclwdnbc            &
+!!     &        ,SWUPT=grid%swupt    ,SWUPTC=grid%swuptc                    &
+!!     &        ,SWDNT=grid%swdnt    ,SWDNTC=grid%swdntc                    &
+!!     &        ,SWUPB=grid%swupb    ,SWUPBC=grid%swupbc                    &
+!!     &        ,SWDNB=grid%swdnb    ,SWDNBC=grid%swdnbc                    &
+!!     &        ,LWUPT=grid%lwupt    ,LWUPTC=grid%lwuptc                    &
+!!     &        ,LWDNT=grid%lwdnt    ,LWDNTC=grid%lwdntc                    &
+!!     &        ,LWUPB=grid%lwupb    ,LWUPBC=grid%lwupbc                    &
+!!     &        ,LWDNB=grid%lwdnb    ,LWDNBC=grid%lwdnbc                    &
+!!     &        ,LWCF=grid%lwcf                                                  &
+!!     &        ,SWCF=grid%swcf                                                  &
+!!     &        ,OLR=grid%olr                                                    &
+!!     &        ,AERODM=grid%aerodm, PINA=grid%pina, AODTOT=grid%aodtot          &
+!!     &        ,OZMIXM=grid%ozmixm, PIN=grid%pin                                &
+!!     &        ,M_PS_1=grid%m_ps_1, M_PS_2=grid%m_ps_2, AEROSOLC_1=grid%aerosolc_1        &
+!!     &        ,AEROSOLC_2=grid%aerosolc_2, M_HYBI0=grid%m_hybi                      &
+!!     &        ,ABSTOT=grid%abstot, ABSNXT=grid%absnxt, EMSTOT=grid%emstot                &
+!!     &        ,RADTACTTIME=grid%radtacttime                                         &  
+!!     &        ,ICLOUD_CU=config_flags%ICLOUD_CU                            &
+!!     &        ,QC_CU=grid%QC_CU , QI_CU=grid%QI_CU                         &
+!!#if (WRF_CHEM == 1)
+!!     &        ,AER_RA_FEEDBACK=config_flags%aer_ra_feedback                &
+!!     &        ,PM2_5_DRY=grid%pm2_5_dry, PM2_5_WATER=grid%pm2_5_water               &
+!!     &        ,PM2_5_DRY_EC=grid%pm2_5_dry_ec                                  &
+!!     &        ,TAUAER300=grid%tauaer1, TAUAER400=grid%tauaer2 & ! jcb
+!!     &        ,TAUAER600=grid%tauaer3, TAUAER999=grid%tauaer4 & ! jcb
+!!     &        ,GAER300=grid%gaer1, GAER400=grid%gaer2, GAER600=grid%gaer3, GAER999=grid%gaer4 & ! jcb
+!!     &        ,WAER300=grid%waer1, WAER400=grid%waer2, WAER600=grid%waer3, WAER999=grid%waer4 & ! jcb
+!!     &        ,TAUAERlw1  =grid%tauaerlw1,  TAUAERlw2=grid%tauaerlw2    & 
+!!     &        ,TAUAERlw3  =grid%tauaerlw3,  TAUAERlw4=grid%tauaerlw4    & 
+!!     &        ,TAUAERlw5  =grid%tauaerlw5,  TAUAERlw6=grid%tauaerlw6    & 
+!!     &        ,TAUAERlw7  =grid%tauaerlw7,  TAUAERlw8=grid%tauaerlw8    & 
+!!     &        ,TAUAERlw9  =grid%tauaerlw9,  TAUAERlw10=grid%tauaerlw10    & 
+!!     &        ,TAUAERlw11 =grid%tauaerlw11, TAUAERlw12=grid%tauaerlw12    & 
+!!     &        ,TAUAERlw13 =grid%tauaerlw13, TAUAERlw14=grid%tauaerlw14    & 
+!!     &        ,TAUAERlw15 =grid%tauaerlw15, TAUAERlw16=grid%tauaerlw16   & 
+!!     &        ,progn=config_flags%progn                                            &
+!!#endif
+!!     &         ,slope_rad=config_flags%slope_rad,topo_shading=config_flags%topo_shading     &
+!!     &         ,shadowmask=grid%shadowmask,ht=grid%ht,dx=grid%dx,dy=grid%dy &           
+!!     &         ,diffuse_frac=grid%diffuse_frac &           
+!!     &         ,IS_CAMMGMP_USED = grid%is_CAMMGMP_used    &
+!!     &         ,MP_PHYSICS=CONFIG_FLAGS%MP_PHYSICS )
+!!
+!!BENCH_END(rad_driver_tim)
+!!
+!!!********* Surface driver
+!!! surface
+!!
+!!BENCH_START(surf_driver_tim)
+
+! !gmm halo of wtd and riverflow for leafhydro
+!#ifdef DM_PARALLEL
+!  IF ( config_flags%sf_surface_physics.eq.NOAHMPSCHEME ) THEN
+!       IF ( config_flags%opt_run.eq.5.and.mod(grid%itimestep,grid%STEPWTD).eq.0 )  THEN
+!#     include "HALO_EM_HYDRO_NOAHMP.inc"
+!       ENDIF
+!  ENDIF
+!#endif
 
 !-----------------------------------------------------------------
 ! urban related variable are added to arguments of surface_driver
@@ -1445,6 +1648,13 @@ CALL a_surface_driver(                                                &
 
 
 BENCH_END(a_surf_driver_tim)
+
+      !Placeholder until a_radiation_driver present
+      grid%a_rthraten = 0.D0
+
+
+      CALL POPREAL8ARRAY(grid%rthraten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
+
 !      CALL POPREAL8ARRAY(grid%rqscuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
       CALL POPREAL8ARRAY(grid%rqicuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
       CALL POPREAL8ARRAY(grid%rqccuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))

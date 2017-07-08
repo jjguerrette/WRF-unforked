@@ -648,7 +648,7 @@ CONTAINS
 #endif
 !--------------------------------------------------------------------------------------
       do_plumerisefire = .false.
-      IF ( config_flags%biomass_burn_opt == BIOMASSB_MOZC .OR. &
+      IF ( (config_flags%biomass_burn_opt == BIOMASSB_MOZC .OR. &
            config_flags%biomass_burn_opt == BIOMASSB_MOZ  .OR. &
            config_flags%biomass_burn_opt == BIOMASSB_GHG  .OR. &
            config_flags%biomass_burn_opt == BIOMASSB &
@@ -656,8 +656,9 @@ CONTAINS
            .OR. config_flags%biomass_burn_opt == ADTLBB &
            .OR. config_flags%biomass_burn_opt == ADTLBB_BCCO &
            .OR. config_flags%biomass_burn_opt == ADTLBB_BC &
+           ) .AND. .NOT. (config_flags%dyn_opt == dyn_em_ad & !plumerise handled in chem_driver_ad
 #endif
-            ) then
+            )) then
         IF ( ktau==1 ) then
            do_plumerisefire = .true.
         ELSE IF ( adapt_step_flag ) THEN
@@ -672,9 +673,6 @@ CONTAINS
         ELSE IF ( (MOD(ktau,stepfirepl)==0) .or. (stepfirepl==1) ) THEN
            do_plumerisefire = .true.
         ENDIF
-#if ( WRFPLUS == 1 )
-        IF(config_flags%dyn_opt == dyn_em_ad) do_plumerisefire = .false.
-#endif
       ENDIF
 
       do_bioemiss = .false.

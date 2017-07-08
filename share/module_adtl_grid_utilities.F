@@ -1507,6 +1507,9 @@ CONTAINS
    ENDDO
    ENDDO
 
+!RATEN 
+!   s_rthraten = 0.0D0
+
 !!BLTEN 
 !   s_rthblten = 0.0D0
 !   s_rublten = 0.0D0
@@ -1524,7 +1527,21 @@ CONTAINS
 !   s_rqrcuten = 0.0D0
 !   s_rqicuten = 0.0D0
 !   s_rqscuten = 0.0D0
-   
+
+!   s_rushten = 0.D0
+!   s_rvshten = 0.D0
+!   s_rthshten = 0.D0
+!   s_rqvshten = 0.D0
+!   s_rqcshten = 0.D0
+!   s_rqrshten = 0.D0
+!   s_rqishten = 0.D0
+!   s_rqsshten = 0.D0
+!   s_rqgshten = 0.D0
+!   s_RUNDGDTEN = 0.D0
+!   s_RVNDGDTEN = 0.D0
+!   s_RTHNDGDTEN = 0.D0
+!   s_RQVNDGDTEN = 0.D0
+
    s_u_bxs = grid%u_bxs; s_u_bxe = grid%u_bxe; s_u_bys = grid%u_bys; s_u_bye = grid%u_bye
    s_u_btxs = grid%u_btxs; s_u_btxe = grid%u_btxe; s_u_btys = grid%u_btys; s_u_btye = grid%u_btye
    s_v_bxs = grid%v_bxs; s_v_bxe = grid%v_bxe; s_v_bys =grid%v_bys; s_v_bye=grid%v_bye
@@ -2818,9 +2835,6 @@ CONTAINS
    grid%a_rv_m = 0.0D0
    grid%a_ww_m = 0.0D0
 
-   grid%a_rublten = 0.0
-   grid%a_rvblten = 0.0
-   grid%a_rqvblten = 0.0
 ! I variables
    grid%a_ustm = 0.0D0
    grid%a_hfx = 0.0D0
@@ -2834,6 +2848,8 @@ CONTAINS
    grid%a_tslb = 0.0D0
    grid%a_smois = 0.0D0
 
+!RATEN 
+   grid%a_rthraten = 0.0D0
 
 !BLTEN 
    grid%a_rthblten = 0.0D0
@@ -2852,6 +2868,20 @@ CONTAINS
    grid%a_rqrcuten = 0.0D0
    grid%a_rqicuten = 0.0D0
    grid%a_rqscuten = 0.0D0
+
+   grid%a_rushten = 0.D0
+   grid%a_rvshten = 0.D0
+   grid%a_rthshten = 0.D0
+   grid%a_rqvshten = 0.D0
+   grid%a_rqcshten = 0.D0
+   grid%a_rqrshten = 0.D0
+   grid%a_rqishten = 0.D0
+   grid%a_rqsshten = 0.D0
+   grid%a_rqgshten = 0.D0
+   grid%a_RUNDGDTEN = 0.D0
+   grid%a_RVNDGDTEN = 0.D0
+   grid%a_RTHNDGDTEN = 0.D0
+   grid%a_RQVNDGDTEN = 0.D0
 
    IF ( gwd_opt .EQ. 1 ) THEN
       grid%a_dtaux3d = 0.0
@@ -2989,10 +3019,6 @@ CONTAINS
    grid%g_rv_m = 0.0D0
    grid%g_ww_m = 0.0D0
 
-   grid%g_rublten = 0.0
-   grid%g_rvblten = 0.0
-   grid%g_rqvblten = 0.0
-
 ! I variables
    grid%g_ustm = 0.0D0
    grid%g_hfx = 0.0D0
@@ -3005,6 +3031,9 @@ CONTAINS
    grid%g_canwat = 0.0D0
    grid%g_tslb = 0.0D0
    grid%g_smois = 0.0D0
+
+!RATEN 
+   grid%g_rthraten = 0.0D0
 
 !BLTEN 
    grid%g_rthblten = 0.0D0
@@ -3023,6 +3052,20 @@ CONTAINS
    grid%g_rqrcuten = 0.0D0
    grid%g_rqicuten = 0.0D0
    grid%g_rqscuten = 0.0D0
+
+   grid%g_rushten = 0.D0
+   grid%g_rvshten = 0.D0
+   grid%g_rthshten = 0.D0
+   grid%g_rqvshten = 0.D0
+   grid%g_rqcshten = 0.D0
+   grid%g_rqrshten = 0.D0
+   grid%g_rqishten = 0.D0
+   grid%g_rqsshten = 0.D0
+   grid%g_rqgshten = 0.D0
+   grid%g_RUNDGDTEN = 0.D0
+   grid%g_RVNDGDTEN = 0.D0
+   grid%g_RTHNDGDTEN = 0.D0
+   grid%g_RQVNDGDTEN = 0.D0
 
    IF ( gwd_opt .EQ. 1 ) THEN
       grid%g_dtaux3d = 0.0
@@ -3516,21 +3559,21 @@ CONTAINS
    grid%a_mu_2(i,j)   = factor(6)
 
    DO mm = PARAM_FIRST_SCALAR, num_moist
-      grid%a_moist(i,k,j,mm) = factor(6+mm)
+      grid%a_moist(i,k,j,mm) = factor(mm+6)
    ENDDO
    DO mm = PARAM_FIRST_SCALAR, num_tracer
-      grid%a_tracer(i,k,j,mm) = factor(6+mm+num_moist)
+      grid%a_tracer(i,k,j,mm) = factor(mm+6+num_moist)
    ENDDO
 #if (WRF_CHEM == 1)
    DO mm = PARAM_FIRST_SCALAR, num_chem
-      grid%a_chem(i,k,j,mm) = factor(6+mm+num_moist+num_tracer)
+      grid%a_chem(i,k,j,mm) = factor(mm+6+num_moist+num_tracer)
    ENDDO
 !scaleant and scalebb are only inputs, not outputs
 !   DO mm = PARAM_FIRST_SCALAR, num_scaleant
-!      grid%a_scaleant(i,t,j,mm) = factor(6+mm+num_moist+num_tracer+num_chem)
+!      grid%a_scaleant(i,t,j,mm) = factor(mm+6+num_moist+num_tracer+num_chem)
 !   ENDDO
 !   DO mm = PARAM_FIRST_SCALAR, num_scalebb
-!      grid%a_scalebb(i,t,j,mm) = factor(6+mm+num_moist+num_tracer+num_chem+num_scaleant)
+!      grid%a_scalebb(i,t,j,mm) = factor(mm+6+num_moist+num_tracer+num_chem+num_scaleant)
 !   ENDDO
 #endif
   END SUBROUTINE spot_force_ad
@@ -3550,20 +3593,20 @@ CONTAINS
    grid%g_mu_2(i,j)   = factor(6)
 
    DO mm = PARAM_FIRST_SCALAR, num_moist
-      grid%g_moist(i,k,j,mm) = factor(6+mm)
+      grid%g_moist(i,k,j,mm) = factor(mm+6)
    ENDDO
    DO mm = PARAM_FIRST_SCALAR, num_tracer
-      grid%g_tracer(i,k,j,mm) = factor(6+mm+num_moist)
+      grid%g_tracer(i,k,j,mm) = factor(mm+6+num_moist)
   ENDDO
 #if (WRF_CHEM == 1)
    DO mm = PARAM_FIRST_SCALAR, num_chem
-      grid%g_chem(i,k,j,mm) = factor(6+mm+num_moist+num_tracer)
+      grid%g_chem(i,k,j,mm) = factor(mm+6+num_moist+num_tracer)
    ENDDO
    DO mm = PARAM_FIRST_SCALAR, num_scaleant
-      grid%g_scaleant(i,t,j,mm) = factor(6+mm+num_moist+num_tracer+num_chem)
+      grid%g_scaleant(i,t,j,mm) = factor(mm+6+num_moist+num_tracer+num_chem)
    ENDDO
    DO mm = PARAM_FIRST_SCALAR, num_scalebb
-      grid%g_scalebb(i,t,j,mm) = factor(6+mm+num_moist+num_tracer+num_chem+num_scaleant)
+      grid%g_scalebb(i,t,j,mm) = factor(mm+6+num_moist+num_tracer+num_chem+num_scaleant)
    ENDDO
 #endif
 
@@ -3585,20 +3628,20 @@ CONTAINS
    grid%mu_2(i,j)   = ( 1.0D0 + nl_pert * factor(6) ) * s_mu_2(i,j)
 
    DO mm = PARAM_FIRST_SCALAR, num_moist
-      grid%moist(i,k,j,mm) = ( 1.0D0 + nl_pert * factor(6+mm) ) * s_moist(i,k,j,mm)
+      grid%moist(i,k,j,mm) = ( 1.0D0 + nl_pert * factor(mm+6) ) * s_moist(i,k,j,mm)
    ENDDO
    DO mm = PARAM_FIRST_SCALAR, num_tracer
-      grid%tracer(i,k,j,mm) = ( 1.0D0 + nl_pert * factor(6+mm+num_moist) ) * s_tracer(i,k,j,mm)
+      grid%tracer(i,k,j,mm) = ( 1.0D0 + nl_pert * factor(mm+6+num_moist) ) * s_tracer(i,k,j,mm)
    ENDDO
 #if (WRF_CHEM == 1)
    DO mm = PARAM_FIRST_SCALAR, num_chem
-      grid%chem(i,k,j,mm) = (1.0D0 + nl_pert * factor(6+mm+num_moist+num_tracer) ) * s_chem(i,k,j,mm)
+      grid%chem(i,k,j,mm) = (1.0D0 + nl_pert * factor(mm+6+num_moist+num_tracer) ) * s_chem(i,k,j,mm)
    ENDDO
    DO mm = PARAM_FIRST_SCALAR, num_scaleant
-      grid%scaleant(i,t,j,mm) = (1.0D0 + nl_pert * factor(6+mm+num_moist+num_tracer+num_chem) ) * s_scaleant(i,t,j,mm)
+      grid%scaleant(i,t,j,mm) = (1.0D0 + nl_pert * factor(mm+6+num_moist+num_tracer+num_chem) ) * s_scaleant(i,t,j,mm)
    ENDDO
    DO mm = PARAM_FIRST_SCALAR, num_scalebb
-      grid%scalebb(i,t,j,mm) = (1.0D0 + nl_pert * factor(6+mm+num_moist+num_tracer+num_chem+num_scaleant) ) * s_scalebb(i,t,j,mm)
+      grid%scalebb(i,t,j,mm) = (1.0D0 + nl_pert * factor(mm+6+num_moist+num_tracer+num_chem+num_scaleant) ) * s_scalebb(i,t,j,mm)
    ENDDO 
 #endif
 
@@ -3621,20 +3664,20 @@ CONTAINS
    der = grid%a_mu_2(i,j) * factor(6) + der
 
    DO mm = PARAM_FIRST_SCALAR, num_moist
-      der = grid%a_moist(i,k,j,mm) * factor(6+mm) + der
+      der = grid%a_moist(i,k,j,mm) * factor(mm+6) + der
    ENDDO
    DO mm = PARAM_FIRST_SCALAR, num_tracer
-      der = grid%a_tracer(i,k,j,mm) * factor(6+mm+num_moist) + der
+      der = grid%a_tracer(i,k,j,mm) * factor(mm+6+num_moist) + der
    ENDDO
 #if (WRF_CHEM == 1)
    DO mm = PARAM_FIRST_SCALAR, num_chem
-      der = grid%a_chem(i,k,j,mm) * factor(6+mm+num_moist+num_tracer) + der
+      der = grid%a_chem(i,k,j,mm) * factor(mm+6+num_moist+num_tracer) + der
    ENDDO
    DO mm = PARAM_FIRST_SCALAR, num_scaleant
-      der = grid%a_scaleant(i,t,j,mm) * factor(6+mm+num_moist+num_tracer+num_chem) + der
+      der = grid%a_scaleant(i,t,j,mm) * factor(mm+6+num_moist+num_tracer+num_chem) + der
    ENDDO
    DO mm = PARAM_FIRST_SCALAR, num_scalebb
-      der = grid%a_scalebb(i,t,j,mm) * factor(6+mm+num_moist+num_tracer+num_chem+num_scaleant) + der
+      der = grid%a_scalebb(i,t,j,mm) * factor(mm+6+num_moist+num_tracer+num_chem+num_scaleant) + der
    ENDDO
 #endif
 
@@ -3656,20 +3699,20 @@ CONTAINS
    der = grid%g_mu_2(i,j) * factor(6) + der
 
    DO mm = PARAM_FIRST_SCALAR, num_moist
-      der = grid%g_moist(i,k,j,mm) * factor(6+mm) + der
+      der = grid%g_moist(i,k,j,mm) * factor(mm+6) + der
    ENDDO
    DO mm = PARAM_FIRST_SCALAR, num_tracer
-      der = grid%g_tracer(i,k,j,mm) * factor(6+mm+num_moist) + der
+      der = grid%g_tracer(i,k,j,mm) * factor(mm+6+num_moist) + der
    ENDDO
 #if (WRF_CHEM == 1)
    DO mm = PARAM_FIRST_SCALAR, num_chem
-      der = grid%g_chem(i,k,j,mm) * factor(6+mm+num_moist+num_tracer) + der
+      der = grid%g_chem(i,k,j,mm) * factor(mm+6+num_moist+num_tracer) + der
    ENDDO
 !   DO mm = PARAM_FIRST_SCALAR, num_scaleant
-!      der = grid%g_scaleant(i,t,j,mm) * factor(6+mm+num_moist+num_tracer+num_chem) + der
+!      der = grid%g_scaleant(i,t,j,mm) * factor(mm+6+num_moist+num_tracer+num_chem) + der
 !   ENDDO
 !   DO mm = PARAM_FIRST_SCALAR, num_scalebb
-!      der = grid%g_scalebb(i,t,j,mm) * factor(6+mm+num_moist+num_tracer+num_chem+num_scaleant) + der
+!      der = grid%g_scalebb(i,t,j,mm) * factor(mm+6+num_moist+num_tracer+num_chem+num_scaleant) + der
 !   ENDDO
 #endif
 
@@ -3693,14 +3736,14 @@ CONTAINS
    num = (grid%mu_2(i,j) - b_mu_2(i,j)) * factor(6) + num
 
    DO mm = PARAM_FIRST_SCALAR, num_moist
-      num = (grid%moist(i,k,j,mm) - b_moist(i,k,j,mm)) * factor(6+mm) + num
+      num = (grid%moist(i,k,j,mm) - b_moist(i,k,j,mm)) * factor(mm+6) + num
    ENDDO
    DO mm = PARAM_FIRST_SCALAR, num_tracer
-      num = (grid%tracer(i,k,j,mm) - b_tracer(i,k,j,mm)) * factor(6+mm+num_moist) + num
+      num = (grid%tracer(i,k,j,mm) - b_tracer(i,k,j,mm)) * factor(mm+6+num_moist) + num
    ENDDO
 #if (WRF_CHEM == 1)
    DO mm = PARAM_FIRST_SCALAR, num_chem
-      num = (grid%chem(i,k,j,mm) - b_chem(i,k,j,mm)) * factor(6+mm+num_moist+num_tracer) + num
+      num = (grid%chem(i,k,j,mm) - b_chem(i,k,j,mm)) * factor(mm+6+num_moist+num_tracer) + num
    ENDDO
 #endif
 
@@ -3723,20 +3766,20 @@ CONTAINS
    den = nl_pert * s_mu_2(i,j) * factor(6) + den
 
    DO mm = PARAM_FIRST_SCALAR, num_moist
-      den = nl_pert * s_moist(i,k,j,mm) * factor(6+mm) + den
+      den = nl_pert * s_moist(i,k,j,mm) * factor(mm+6) + den
    ENDDO
    DO mm = PARAM_FIRST_SCALAR, num_tracer
-      den = nl_pert * s_tracer(i,k,j,mm) * factor(6+mm+num_moist) + den
+      den = nl_pert * s_tracer(i,k,j,mm) * factor(mm+6+num_moist) + den
    ENDDO
 #if (WRF_CHEM == 1)
    DO mm = PARAM_FIRST_SCALAR, num_chem
-      den = nl_pert * s_chem(i,k,j,mm) * factor(6+mm+num_moist+num_tracer) + den
+      den = nl_pert * s_chem(i,k,j,mm) * factor(mm+6+num_moist+num_tracer) + den
    ENDDO
    DO mm = PARAM_FIRST_SCALAR, num_scaleant
-      den = nl_pert * s_scaleant(i,t,j,mm) * factor(6+mm+num_moist+num_tracer+num_chem) + den
+      den = nl_pert * s_scaleant(i,t,j,mm) * factor(mm+6+num_moist+num_tracer+num_chem) + den
    ENDDO
    DO mm = PARAM_FIRST_SCALAR, num_scalebb
-      den = nl_pert * s_scalebb(i,t,j,mm) * factor(6+mm+num_moist+num_tracer+num_chem+num_scaleant) + den
+      den = nl_pert * s_scalebb(i,t,j,mm) * factor(mm+6+num_moist+num_tracer+num_chem+num_scaleant) + den
    ENDDO
 #endif
 IF(abs(den) .LE. 1.d-9) den = 1.D0

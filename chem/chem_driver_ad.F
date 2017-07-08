@@ -565,28 +565,29 @@ and subgrid transport chem_driver')
        kts=k_start
        kte=min(k_end,kde-1)
 
-    CALL PUSHREAL8ARRAY(dz8w, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
-                              (grid%em33-grid%sm33+1))
-    CALL PUSHREAL8ARRAY(t_phy, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
-                              (grid%em33-grid%sm33+1))
-    CALL PUSHREAL8ARRAY(p8w, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
-                              (grid%em33-grid%sm33+1))
-    CALL PUSHREAL8ARRAY(rho, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
-                              (grid%em33-grid%sm33+1))
-    CALL PUSHREAL8ARRAY(u_phy, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
-                              (grid%em33-grid%sm33+1))
-    CALL PUSHREAL8ARRAY(v_phy, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
-                              (grid%em33-grid%sm33+1))
-    CALL PUSHREAL8ARRAY(p_phy, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
-                              (grid%em33-grid%sm33+1))
-    CALL PUSHREAL8ARRAY(t8w, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
-                              (grid%em33-grid%sm33+1))
-    CALL PUSHREAL8ARRAY(z_at_w, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
-                              (grid%em33-grid%sm33+1))
-    CALL PUSHREAL8ARRAY(rh, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
-                              (grid%em33-grid%sm33+1))
-    CALL PUSHREAL8ARRAY(grid%z, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
-                              (grid%em33-grid%sm33+1))
+!! These are strictly outputs from CHEM_PREP, not inputs
+!    CALL PUSHREAL8ARRAY(dz8w, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
+!                              (grid%em33-grid%sm33+1))
+!    CALL PUSHREAL8ARRAY(t_phy, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
+!                              (grid%em33-grid%sm33+1))
+!    CALL PUSHREAL8ARRAY(p8w, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
+!                              (grid%em33-grid%sm33+1))
+!    CALL PUSHREAL8ARRAY(rho, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
+!                              (grid%em33-grid%sm33+1))
+!    CALL PUSHREAL8ARRAY(u_phy, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
+!                              (grid%em33-grid%sm33+1))
+!    CALL PUSHREAL8ARRAY(v_phy, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
+!                              (grid%em33-grid%sm33+1))
+!    CALL PUSHREAL8ARRAY(p_phy, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
+!                              (grid%em33-grid%sm33+1))
+!    CALL PUSHREAL8ARRAY(t8w, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
+!                              (grid%em33-grid%sm33+1))
+!    CALL PUSHREAL8ARRAY(z_at_w, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
+!                              (grid%em33-grid%sm33+1))
+!    CALL PUSHREAL8ARRAY(rh, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
+!                              (grid%em33-grid%sm33+1))
+!    CALL PUSHREAL8ARRAY(grid%z, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
+!                              (grid%em33-grid%sm33+1))
 
     CALL CHEM_PREP(config_flags, grid%u_2, grid%v_2, &
 &             grid%p, grid%pb, grid%alt, grid%ph_2, &
@@ -630,19 +631,20 @@ chem_tile_loop_ad:DO ij=1,grid%num_tiles
 &        .GT. 0) THEN
 
       do_plumerisefire = .false.
-      IF ( config_flags%biomass_burn_opt == BIOMASSB_MOZC .OR. &
-           config_flags%biomass_burn_opt == BIOMASSB_MOZ  .OR. &
-           config_flags%biomass_burn_opt == BIOMASSB_GHG  .OR. &
-           config_flags%biomass_burn_opt == BIOMASSB &
-           .OR. config_flags%biomass_burn_opt == ADTLBB &
-           .OR. config_flags%biomass_burn_opt == ADTLBB_BCCO &
-            ) then
+      IF ( config_flags%biomass_burn_opt .EQ. BIOMASSB_MOZC .OR. &
+&          config_flags%biomass_burn_opt .EQ. BIOMASSB_MOZ .OR. &
+&          config_flags%biomass_burn_opt .EQ. BIOMASSB_GHG .OR. &
+&          config_flags%biomass_burn_opt .EQ. BIOMASSB .OR. &
+&          config_flags%biomass_burn_opt .EQ. ADTLBB .OR. &
+&          config_flags%biomass_burn_opt .EQ. ADTLBB_BCCO .OR. &
+&          config_flags%biomass_burn_opt .EQ. ADTLBB_BC &
+&          ) THEN
         IF ( ktau==1 ) then
            do_plumerisefire = .false.
         ELSE IF ( adapt_step_flag ) THEN
            IF ( (grid%plumerisefire_frq<=0) .or. &
-                ( curr_secs+0.01 >= &
-                ( FLOOR( (curr_secs - real(grid%dt,8))/real(grid%plumerisefire_frq*60.,8)+1.0D0 )*real(grid%plumerisefire_frq*60.,8) ) ) &
+                ( curr_secs+real(grid%dt,8)+0.01 >= &
+                ( FLOOR( curr_secs/real(grid%plumerisefire_frq*60.,8)+1.0D0 )*real(grid%plumerisefire_frq*60.,8) ) ) &
                 ) then
               do_plumerisefire = .true.
            ENDIF
@@ -655,54 +657,56 @@ chem_tile_loop_ad:DO ij=1,grid%num_tiles
 !The following PUSH calls must be made for any variable modified in chem_driver
 ! that is also part of the trajectory. Keep this in mind when adding aerosl-cloud
 ! interactions -JJG
-         CALL PUSHREAL8ARRAY(chem, (grid%em31-grid%sm31+1)*&
-                  (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1)*num_chem)
-         CALL PUSHREAL8ARRAY(tracer, (grid%em31-grid%sm31+1)*&
-                  (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1)*num_tracer)
 
-         CALL PUSHREAL8ARRAY(zmid, (grid%em31-grid%sm31+1)*&
-                  (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
-         CALL PUSHREAL8ARRAY(grid%u_2, (grid%em31-grid%sm31+1)*&
-                  (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
-         CALL PUSHREAL8ARRAY(grid%v_2, (grid%em31-grid%sm31+1)*&
-                  (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
-         CALL PUSHREAL8ARRAY(grid%w_2, (grid%em31-grid%sm31+1)*&
-                  (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
-         CALL PUSHREAL8ARRAY(grid%p, (grid%em31-grid%sm31+1)*&
-                  (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
-         CALL PUSHREAL8ARRAY(grid%alt, (grid%em31-grid%sm31+1)*&
-                  (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
-         CALL PUSHREAL8ARRAY(grid%ph_2, (grid%em31-grid%sm31+1)*&
-                  (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
-         CALL PUSHREAL8ARRAY(grid%t_2, (grid%em31-grid%sm31+1)*&
-                  (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
-         CALL PUSHREAL8ARRAY(grid%moist(:,:,:,p_qv), (grid%em31-grid%sm31+1)*&
-                  (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
+         IF (grid%plumerisefire_frq .gt. 0) THEN
+            CALL PUSHREAL8ARRAY(chem, (grid%em31-grid%sm31+1)*&
+                     (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1)*num_chem)
+            CALL PUSHREAL8ARRAY(tracer, (grid%em31-grid%sm31+1)*&
+                     (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1)*num_tracer)
+
+            CALL PUSHREAL8ARRAY(zmid, (grid%em31-grid%sm31+1)*&
+                     (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
+            CALL PUSHREAL8ARRAY(grid%u_2, (grid%em31-grid%sm31+1)*&
+                     (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
+            CALL PUSHREAL8ARRAY(grid%v_2, (grid%em31-grid%sm31+1)*&
+                     (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
+            CALL PUSHREAL8ARRAY(grid%w_2, (grid%em31-grid%sm31+1)*&
+                     (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
+            CALL PUSHREAL8ARRAY(grid%p, (grid%em31-grid%sm31+1)*&
+                     (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
+            CALL PUSHREAL8ARRAY(grid%alt, (grid%em31-grid%sm31+1)*&
+                     (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
+            CALL PUSHREAL8ARRAY(grid%ph_2, (grid%em31-grid%sm31+1)*&
+                     (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
+            CALL PUSHREAL8ARRAY(grid%t_2, (grid%em31-grid%sm31+1)*&
+                     (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
+            CALL PUSHREAL8ARRAY(moist(:,:,:,p_qv), (grid%em31-grid%sm31+1)*&
+                     (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
 
 
 !!!!Then calculate remainder of physics variables from end of solve_em call
-         CALL domain_clock_set( grid, time_step_seconds=-60*grid%plumerisefire_frq+config_flags%time_step )
-         grid%domain_clock%clockint%CurrTime =  ESMF_TimeInc (grid%domain_clock%clockint%CurrTime, &
-                                grid%domain_clock%clockint%TimeStep )
-         CALL domain_clock_get ( grid, current_timestr=message )
-         CALL find_nl_xtraj (message) !Points xtraj_pointer to correct time
-         CALL read_xtraj(message) !Reads same time as above, then advances xtraj_pointer
-         CALL CHEM_PREP(config_flags, grid%u_2, grid%v_2, &
-                  grid%p, grid%pb, grid%alt, grid%ph_2, &
-                  grid%phb, grid%t_2, moist, num_3d_m, rho, p_phy, &
-                  u_phy, v_phy, p8w, t_phy, t8w, grid%z, z_at_w, dz8w, &
-                  rh, grid%fnm, grid%fnp, ids, ide, jds, jde, kds, kde, ims, &
-                  ime, jms, jme, kms, kme, its, ite, jts, jte, k_start, k_end)
+            CALL domain_clock_set( grid, time_step_seconds=-60*grid%plumerisefire_frq+config_flags%time_step )
+            grid%domain_clock%clockint%CurrTime =  ESMF_TimeInc (grid%domain_clock%clockint%CurrTime, &
+                                   grid%domain_clock%clockint%TimeStep )
+            CALL domain_clock_get ( grid, current_timestr=message )
+            CALL find_nl_xtraj (message) !Points xtraj_pointer to correct time
+            CALL read_xtraj(message) !Reads same time as above, then advances xtraj_pointer
+            CALL CHEM_PREP(config_flags, grid%u_2, grid%v_2, &
+                     grid%p, grid%pb, grid%alt, grid%ph_2, &
+                     grid%phb, grid%t_2, moist, num_3d_m, rho, p_phy, &
+                     u_phy, v_phy, p8w, t_phy, t8w, grid%z, z_at_w, dz8w, &
+                     rh, grid%fnm, grid%fnp, ids, ide, jds, jde, kds, kde, ims, &
+                     ime, jms, jme, kms, kme, its, ite, jts, jte, k_start, k_end)
 !!!Have to place this after CHEM_PREP after grid%z is recalculated from the correct time step.
-         do j=jps,min(jde-1,jpe)
-            do k=kps,kpe
-               do i=ips,min(ide-1,ipe)
-                 vvel(i,k,j)=grid%w_2(i,k,j)
-                 zmid(i,k,j)=grid%z(i,k,j)
+            do j=jps,min(jde-1,jpe)
+               do k=kps,kpe
+                  do i=ips,min(ide-1,ipe)
+                    vvel(i,k,j)=grid%w_2(i,k,j)
+                    zmid(i,k,j)=grid%z(i,k,j)
+                  enddo
                enddo
             enddo
-         enddo
-
+         ENDIF
 ! Calculate plumerise
          CALL wrf_debug(15,'fire emissions: calling plumerise')
          write(0,*)ktau,grid%stepfirepl
@@ -719,55 +723,57 @@ chem_tile_loop_ad:DO ij=1,grid%num_tiles
            ims,ime, jms,jme, kms,kme,                                  &
            its,ite, jts,jte, kts,kte                                    )
 
+         IF (grid%plumerisefire_frq .gt. 0) THEN
 
 ! Restore physics variables to current time step (values after solve_em and after chem_driver)
-         CALL domain_clock_set( grid, time_step_seconds=60*grid%plumerisefire_frq-config_flags%time_step )
-         grid%domain_clock%clockint%CurrTime = ESMF_TimeInc (grid%domain_clock%clockint%CurrTime, &
-                            grid%domain_clock%clockint%TimeStep )
-         CALL domain_clock_get ( grid, current_timestr=message )
-         CALL find_nl_xtraj (message) !Points xtraj_pointer to correct time
-         CALL read_xtraj(message) !Reads same time as above, then advances xtraj_pointer
-         CALL domain_clock_set( grid, time_step_seconds=-1*config_flags%time_step )
+            CALL domain_clock_set( grid, time_step_seconds=60*grid%plumerisefire_frq-config_flags%time_step )
+            grid%domain_clock%clockint%CurrTime = ESMF_TimeInc (grid%domain_clock%clockint%CurrTime, &
+                               grid%domain_clock%clockint%TimeStep )
+            CALL domain_clock_get ( grid, current_timestr=message )
+            CALL find_nl_xtraj (message) !Points xtraj_pointer to correct time
+            CALL read_xtraj(message) !Reads same time as above, then advances xtraj_pointer
+            CALL domain_clock_set( grid, time_step_seconds=-1*config_flags%time_step )
 
-         CALL POPREAL8ARRAY(grid%moist(:,:,:,p_qv), (grid%em31-grid%sm31+1)*&
-                  (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
-         CALL POPREAL8ARRAY(grid%t_2, (grid%em31-grid%sm31+1)*&
-                  (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
-         CALL POPREAL8ARRAY(grid%ph_2, (grid%em31-grid%sm31+1)*&
-                  (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
-         CALL POPREAL8ARRAY(grid%alt, (grid%em31-grid%sm31+1)*&
-                  (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
-         CALL POPREAL8ARRAY(grid%p, (grid%em31-grid%sm31+1)*&
-                  (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
-         CALL POPREAL8ARRAY(grid%w_2, (grid%em31-grid%sm31+1)*&
-                  (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
-         CALL POPREAL8ARRAY(grid%v_2, (grid%em31-grid%sm31+1)*&
-                  (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
-         CALL POPREAL8ARRAY(grid%u_2, (grid%em31-grid%sm31+1)*&
-                  (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
-         CALL POPREAL8ARRAY(zmid, (grid%em31-grid%sm31+1)*&
-                  (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
+            CALL POPREAL8ARRAY(moist(:,:,:,p_qv), (grid%em31-grid%sm31+1)*&
+                     (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
+            CALL POPREAL8ARRAY(grid%t_2, (grid%em31-grid%sm31+1)*&
+                     (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
+            CALL POPREAL8ARRAY(grid%ph_2, (grid%em31-grid%sm31+1)*&
+                     (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
+            CALL POPREAL8ARRAY(grid%alt, (grid%em31-grid%sm31+1)*&
+                     (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
+            CALL POPREAL8ARRAY(grid%p, (grid%em31-grid%sm31+1)*&
+                     (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
+            CALL POPREAL8ARRAY(grid%w_2, (grid%em31-grid%sm31+1)*&
+                     (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
+            CALL POPREAL8ARRAY(grid%v_2, (grid%em31-grid%sm31+1)*&
+                     (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
+            CALL POPREAL8ARRAY(grid%u_2, (grid%em31-grid%sm31+1)*&
+                     (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
+            CALL POPREAL8ARRAY(zmid, (grid%em31-grid%sm31+1)*&
+                     (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1))
 
-         CALL POPREAL8ARRAY(tracer, (grid%em31-grid%sm31+1)*&
-                  (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1)*num_tracer)
-         CALL POPREAL8ARRAY(chem, (grid%em31-grid%sm31+1)*&
-                  (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1)*num_chem)
+            CALL POPREAL8ARRAY(tracer, (grid%em31-grid%sm31+1)*&
+                     (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1)*num_tracer)
+            CALL POPREAL8ARRAY(chem, (grid%em31-grid%sm31+1)*&
+                     (grid%em32-grid%sm32+1)*(grid%em33-grid%sm33+1)*num_chem)
 
-         do j=jps,min(jde-1,jpe)
-            do k=kps,kpe
-               do i=ips,min(ide-1,ipe)
-                 vvel(i,k,j)=grid%w_2(i,k,j)
-!                 zmid(i,k,j)=grid%z(i,k,j)
+            do j=jps,min(jde-1,jpe)
+               do k=kps,kpe
+                  do i=ips,min(ide-1,ipe)
+                    vvel(i,k,j)=grid%w_2(i,k,j)
+!                    zmid(i,k,j)=grid%z(i,k,j)
+                  enddo
                enddo
             enddo
-         enddo
 
-         CALL CHEM_PREP(config_flags, grid%u_2, grid%v_2, &
-                  grid%p, grid%pb, grid%alt, grid%ph_2, &
-                  grid%phb, grid%t_2, moist, num_3d_m, rho, p_phy, &
-                  u_phy, v_phy, p8w, t_phy, t8w, grid%z, z_at_w, dz8w, &
-                  rh, grid%fnm, grid%fnp, ids, ide, jds, jde, kds, kde, ims, &
-                  ime, jms, jme, kms, kme, its, ite, jts, jte, k_start, k_end)
+            CALL CHEM_PREP(config_flags, grid%u_2, grid%v_2, &
+                     grid%p, grid%pb, grid%alt, grid%ph_2, &
+                     grid%phb, grid%t_2, moist, num_3d_m, rho, p_phy, &
+                     u_phy, v_phy, p8w, t_phy, t8w, grid%z, z_at_w, dz8w, &
+                     rh, grid%fnm, grid%fnp, ids, ide, jds, jde, kds, kde, ims, &
+                     ime, jms, jme, kms, kme, its, ite, jts, jte, k_start, k_end)
+         ENDIF
       ENDIF
 
       CALL PUSHREAL8ARRAY(ebu, (grid%em31-grid%sm31+1)*&
@@ -1182,28 +1188,28 @@ chem_tile_loop_ad:DO ij=1,grid%num_tiles
        
        kts=k_start
        kte=min(k_end,kde-1)
-    CALL POPREAL8ARRAY(grid%z, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
-                              (grid%em33-grid%sm33+1))
-    CALL POPREAL8ARRAY(rh, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
-                              (grid%em33-grid%sm33+1))
-    CALL POPREAL8ARRAY(z_at_w, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
-                              (grid%em33-grid%sm33+1))
-    CALL POPREAL8ARRAY(t8w, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
-                              (grid%em33-grid%sm33+1))
-    CALL POPREAL8ARRAY(p_phy, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
-                              (grid%em33-grid%sm33+1))
-    CALL POPREAL8ARRAY(v_phy, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
-                              (grid%em33-grid%sm33+1))
-    CALL POPREAL8ARRAY(u_phy, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
-                              (grid%em33-grid%sm33+1))
-    CALL POPREAL8ARRAY(rho, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
-                            (grid%em33-grid%sm33+1))
-    CALL POPREAL8ARRAY(p8w, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
-                            (grid%em33-grid%sm33+1))
-    CALL POPREAL8ARRAY(t_phy, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
-                              (grid%em33-grid%sm33+1))
-    CALL POPREAL8ARRAY(dz8w, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
-                             (grid%em33-grid%sm33+1))
+!    CALL POPREAL8ARRAY(grid%z, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
+!                              (grid%em33-grid%sm33+1))
+!    CALL POPREAL8ARRAY(rh, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
+!                              (grid%em33-grid%sm33+1))
+!    CALL POPREAL8ARRAY(z_at_w, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
+!                              (grid%em33-grid%sm33+1))
+!    CALL POPREAL8ARRAY(t8w, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
+!                              (grid%em33-grid%sm33+1))
+!    CALL POPREAL8ARRAY(p_phy, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
+!                              (grid%em33-grid%sm33+1))
+!    CALL POPREAL8ARRAY(v_phy, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
+!                              (grid%em33-grid%sm33+1))
+!    CALL POPREAL8ARRAY(u_phy, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
+!                              (grid%em33-grid%sm33+1))
+!    CALL POPREAL8ARRAY(rho, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
+!                            (grid%em33-grid%sm33+1))
+!    CALL POPREAL8ARRAY(p8w, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
+!                            (grid%em33-grid%sm33+1))
+!    CALL POPREAL8ARRAY(t_phy, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
+!                              (grid%em33-grid%sm33+1))
+!    CALL POPREAL8ARRAY(dz8w, (grid%em31-grid%sm31+1)*(grid%em32-grid%sm32+1)*&
+!                             (grid%em33-grid%sm33+1))
 
     CALL A_CHEM_PREP(config_flags, grid%u_2, grid%a_u_2, &
 &               grid%v_2, grid%a_v_2, grid%p, &

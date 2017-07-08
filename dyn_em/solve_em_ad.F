@@ -728,6 +728,8 @@ BENCH_END(set_phys_bc_tim)
        CALL PUSHREAL8ARRAY ( grid%rqicuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
 
 !!!Added by J. Guerrette 07/11/2014
+       CALL PUSHREAL8ARRAY(grid%rthraten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
+
        CALL PUSHREAL8ARRAY(grid%ust, (ime-ims+1)*(jme-jms+1))
        CALL PUSHREAL8ARRAY(grid%ustm, (ime-ims+1)*(jme-jms+1))
        CALL PUSHREAL8ARRAY(grid%mol, (ime-ims+1)*(jme-jms+1))
@@ -795,6 +797,7 @@ BENCH_END(set_phys_bc_tim)
        CALL PUSHREAL8ARRAY ( grid%rqccuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
        CALL PUSHREAL8ARRAY ( grid%rqicuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
 
+       CALL PUSHREAL8ARRAY(grid%rthraten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
 !       CALL PUSHREAL8ARRAY ( chem_tend, (ime-ims+1)*(kme-kms+1)*(jme-jms+1)*num_chem )
        CALL PUSHREAL8ARRAY ( chem, (ime-ims+1)*(kme-kms+1)*(jme-jms+1)*num_chem )
 
@@ -7820,6 +7823,7 @@ BENCH_END(adj_rk_tend_tim)
 
        CALL POPREAL8ARRAY ( chem, (ime-ims+1)*(kme-kms+1)*(jme-jms+1)*num_chem )
 !       CALL POPREAL8ARRAY ( chem_tend, (ime-ims+1)*(kme-kms+1)*(jme-jms+1)*num_chem )
+       CALL POPREAL8ARRAY(grid%rthraten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
 
        CALL POPREAL8ARRAY ( grid%rqicuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
        CALL POPREAL8ARRAY ( grid%rqccuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
@@ -7885,6 +7889,8 @@ BENCH_END(adj_rk_tend_tim)
        CALL POPREAL8ARRAY(grid%mol, (ime-ims+1)*(jme-jms+1))
        CALL POPREAL8ARRAY(grid%ustm, (ime-ims+1)*(jme-jms+1))
        CALL POPREAL8ARRAY(grid%ust, (ime-ims+1)*(jme-jms+1))
+
+       CALL POPREAL8ARRAY(grid%rthraten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
 !!!
        CALL POPREAL8ARRAY ( grid%rqicuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
        CALL POPREAL8ARRAY ( grid%rqccuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
