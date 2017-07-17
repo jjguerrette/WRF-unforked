@@ -21,8 +21,8 @@ subroutine da_read_basicstates ( xbx, grid, config_flags, timestr, fgat )
          call input_nl_xtraj (timestr)
          call da_swap_xtraj (grid)
       else
-         config_flags%auxinput6_inname = "auxhist6_d<domain>_<date>"
-         call med_auxinput_in ( grid, auxinput6_only, config_flags )
+         config_flags%auxinput16_inname = "auxhist6_d<domain>_<date>"
+         call med_auxinput_in ( grid, auxinput16_only, config_flags )
       endif
       call da_transfer_wrftoxb(xbx, grid, config_flags)
    endif
