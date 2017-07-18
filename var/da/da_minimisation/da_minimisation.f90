@@ -197,7 +197,7 @@ module da_minimisation
       mu6_2, psfc6, moist6
    use da_transfer_model, only : da_transfer_xatowrftl_lbc, da_transfer_xatowrftl_adj_lbc, &
       da_transfer_wrftl_lbc_t0, da_transfer_wrftl_lbc_t0_adj, da_get_2nd_firstguess
-   USE module_io_wrf, only : auxinput6_only, auxhist18_alarm
+   USE module_io_wrf, only : auxinput16_only, auxhist18_alarm
 #endif
 
    implicit none
