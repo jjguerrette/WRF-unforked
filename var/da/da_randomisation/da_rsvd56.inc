@@ -34,7 +34,7 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
 
    real(wp), dimension(1:nens) :: LAM
  
-   integer                      :: iens, jens, i, j, p
+   integer                      :: iens, jens, i, j, p1
 
    real(wp)                     :: F1(nens, nens) ! intermediate matrix
    real(wp)                     :: F2(nens, nens) ! intermediate matrix
@@ -90,8 +90,11 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
    write(cnens,fmt='(I0)') nens
 
    info = 0
-   p = svd_p
-   if (p .eq. 0) then
+
+   ! p1 = 0  !--> Works for a perfectly numerically symmetric Hessian
+   p1 = -1 !--> Works for at least nearly symmetric Hessian (most general, default)
+   ! p1 > 0  !--> Use p1 for alternative method of oversampling to svd_p
+   if (p1 .eq. 0) then
       call GESV(F1, F2, piv, info) !F95
 
       ! GESV returns KMAT^T in F2
@@ -101,25 +104,25 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
          end do
       end do
    else !NEED TO ADJUST OVERSAMPLING METHOD!!!
-      if (p .lt. 0) p = 0
-      call GESVD(F1(1:nens,1:nens-p), &
-                 SIG(1:nens-p), &
-                 U = U(1:nens,1:nens-p), &
-                 VT = VT(1:nens-p,1:nens-p), &
+      if (p1 .lt. 0) p1 = 0
+      call GESVD(F1(1:nens,1:nens-p1), &
+                 SIG(1:nens-p1), &
+                 U = U(1:nens,1:nens-p1), &
+                 VT = VT(1:nens-p1,1:nens-p1), &
                  INFO = info)
 
-      allocate(TEMP1(1:nens-p,1:nens-p))
-      allocate(TEMP2(1:nens-p,1:nens-p))
-      do iens = 1, nens-p
+      allocate(TEMP1(1:nens-p1,1:nens-p1))
+      allocate(TEMP2(1:nens-p1,1:nens-p1))
+      do iens = 1, nens-p1
          TEMP2(iens,:) = (1.D0 / SIG(iens)) * VT(iens,:)
-         do jens = 1, nens-p
+         do jens = 1, nens-p1
             TEMP1(jens,iens) = sum(F2(1:nens,iens) * U(1:nens,jens))
          end do
       end do
 
 
-      do iens = 1, nens-p
-         do jens = 1, nens-p
+      do iens = 1, nens-p1
+         do jens = 1, nens-p1
                KMAT(iens,jens) = sum(TEMP1(:,iens) * TEMP2(:,jens))
          end do
       end do

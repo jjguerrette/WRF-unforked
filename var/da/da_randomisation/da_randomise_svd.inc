@@ -46,7 +46,7 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
    real(wp), allocatable        :: yhat(:,:)  ! yhat = A * omega
    real(wp), allocatable        :: omega(:,:) ! Gaussian draw
   
-   integer                      :: iens, jens, i, j, p, itype
+   integer                      :: iens, jens, i, j, itype, np
    integer                      :: jp_start, jp_end       ! Start/end indices of Jp.
    real*8                       :: ghat(1:cv_size)        ! cv copy.
    real(wp)                     :: F1(nens, nens) ! intermediate matrix
@@ -194,20 +194,22 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
       write(unit=stdout,fmt='(A,I5,A,I5,A)') 'Using ', neign, ' of ', nens, ' eigenpairs'
       write(unit=stdout,fmt='(A)') ' '
 
-      if (minval(eignval(1:neign)) .lt. 2.D0 .and. adapt_svd) then
+      np = neign
+      if (svd_p .gt. 0 .and. neign .gt. svd_p) np = neign - svd_p
+      if (minval(eignval(1:np)) .lt. 2.D0 .and. adapt_svd) then
          do i = 1, neign
             LAM(i) = - (eignval(i) - 1.D0) / eignval(i)
          end do
          itype = 2
 
-         write(unit=stdout,fmt='(A)') 'Carrying out RIOT-56 truncated amat_mul, LRU'
+         write(unit=stdout,fmt='(A)') 'Carrying out RIOT-56 amat_mul, LRU'
       else
          do i = 1, neign
             LAM(i) = 1.D0 / eignval(i)
          end do
          itype = 1
 
-         write(unit=stdout,fmt='(A)') 'Carrying out RIOT-56 truncated amat_mul, LRA'
+         write(unit=stdout,fmt='(A)') 'Carrying out RIOT-56 amat_mul, LRA'
       end if
 
       call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &

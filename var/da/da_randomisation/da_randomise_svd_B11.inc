@@ -195,7 +195,7 @@ subroutine da_randomise_svd_B11(grid, mz, config_flags,            &
 !      end do
 
    info = 0
-   p = svd_p
+   p = -1
    if (p .eq. 0) then
       write(unit=stdout,fmt='("Running GESV")')
       call GESV(F1, F2, piv, info) !F95
