@@ -91,6 +91,10 @@
    call mpi_barrier(comm,ierr)
 #endif
 
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
+
    if ( config_flags%use_baseparam_fr_nml ) then
       call nl_get_base_pres  ( 1 , base_pres )
       call nl_get_base_temp  ( 1 , base_temp )
@@ -679,6 +683,11 @@
    end if !end init_osse_chem
 #endif
 #endif
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: SOLVEINIT')
+#endif
+
    !---------------------------------------------------------------------------
    ! [8] Outerloop and chem Sensitivity
    !---------------------------------------------------------------------------
@@ -688,6 +697,10 @@
 
    j_grad_norm_target = 1.0
    do it = 1, max_ext_its
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
 
 !  Dynamically allocate the variables which depend on ntmax
       if (use_lanczos) then
@@ -947,6 +960,11 @@
 #ifdef VAR4D
             if (var4d) call da_finalize_model
 #endif
+
+#ifdef DM_PARALLEL
+            IF ( rootproc ) CALL end_timing('da_end_timing: CHEM_HX')
+#endif
+
             call wrf_message("*** WRF-Var generated chem_hx successfully ***")
             if (trace_use) call da_trace_exit("da_wrfvar_main")
             if (trace_use) call da_trace_report
@@ -998,6 +1016,15 @@
          return
 
       end if
+
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: OUTER_it_INIT')
+#endif
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
 
       ! [8.4] Minimize cost function:
 
@@ -1167,6 +1194,12 @@
 #ifdef VAR4D
                if (var4d) call da_finalize_model
 #endif
+
+#ifdef DM_PARALLEL
+               IF ( rootproc ) CALL end_timing('da_end_timing: RSVD_step')   
+#endif
+
+
                write(unit=message(1),fmt='(A,I2,A)') &
                  "***Completed Stage ",svd_stage," of Randomized SVD***"
                call wrf_message(message(1))
@@ -1195,6 +1228,14 @@
               xbx, be, iv, j_grad_norm_target, xhat, cvt, re, y, j, j0_total)
       end if
 
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: HESS_vector_multiply')
+#endif
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
+
 #if (WRF_CHEM == 1)
    if (cv_options .eq. 10) then
       if ( dgn_emiss .eq. 1 .and. eta_emiss .lt. 1.D0 .and. eta_emiss .gt. 0.D0 ) then
@@ -1204,6 +1245,14 @@
          call da_dgn(grid, cv_size, xbx, be, iv, xhat, cvt, ob, config_flags, j0_total)
       end if
    end if
+#endif
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: LINESEARCH')
+#endif
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
 #endif
 
       ! Update outer-loop control variable
@@ -1381,7 +1430,16 @@
         deallocate (eignvec)
         deallocate (eignval)
      end if
-   end do
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: OUTER_it_FINISH')
+#endif
+
+   end do !END OF OUTER ITERATION
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
 
    ! output wrfvar analysis
 
@@ -1510,6 +1568,12 @@
 #ifdef DM_PARALLEL
    call mpi_barrier (comm,ierr)
 #endif
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: WRFVAR_FINISH')
+#endif
+
+
 
    if (trace_use) call da_trace_exit ("da_solve")
 

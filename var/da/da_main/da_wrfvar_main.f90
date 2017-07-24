@@ -10,8 +10,9 @@ program da_wrfvar_main
    !-----------------------------------------------------------------------
 
    use module_symbols_util, only : wrfu_finalize
+   use module_timing
 
-   use da_control, only : trace_use, var4d
+   use da_control, only : trace_use, var4d, rootproc
    use da_tracing, only : da_trace_init, da_trace_report, da_trace_entry, &
       da_trace_exit
    use da_wrf_interfaces, only : wrf_shutdown, wrf_message, disable_quilting
@@ -32,9 +33,30 @@ program da_wrfvar_main
    if (trace_use) call da_trace_init
    if (trace_use) call da_trace_entry("da_wrfvar_main")
 
+#ifdef DM_PARALLEL
+   !Both rootproc and module_timing initialized in da_wrfvar_init1
+   IF ( rootproc ) CALL start_timing
+#endif
+
    call da_wrfvar_init2
 
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: WRFVARINIT2')
+#endif
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
+
    call da_wrfvar_run
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: WRFVARRUN')
+#endif
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
 
    call da_wrfvar_finalize
 
@@ -43,6 +65,10 @@ program da_wrfvar_main
       call clean_4dvar
       call da_finalize_model
    end if
+#endif
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: WRFVARFINALIZE')
 #endif
 
    call wrf_message("*** WRF-Var completed successfully ***")

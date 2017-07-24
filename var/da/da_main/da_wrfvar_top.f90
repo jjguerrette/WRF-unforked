@@ -14,6 +14,7 @@ module da_wrfvar_top
    use module_symbols_util, only : wrfu_finalize, wrfu_initialize, &
       wrfu_cal_gregorian
    use module_io_domain, only : close_dataset
+   use module_timing
 #ifdef VAR4D
    use da_4dvar, only : da_nl_model, model_grid, u6_2, v6_2, w6_2, t6_2, ph6_2, p6, &
 #if (WRF_CHEM == 1)
