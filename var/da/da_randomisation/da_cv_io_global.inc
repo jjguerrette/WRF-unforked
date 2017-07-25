@@ -81,6 +81,7 @@ subroutine da_cv_io_global (io_config, grid, filename, cv_size, rcv, mz)
       write(*,*) 'Unknown configuration for randomized SVD I/O routine'
    end if
 
+!! Use 'formatted' when cv file contents need to be ascii-type for debugging
 !   if (io_config == 'r') then
 !      if (rootproc) then
 !         write(*,*) 'Reading randomized SVD cv vector from '//trim(filename)
