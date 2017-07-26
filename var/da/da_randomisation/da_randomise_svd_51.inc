@@ -414,8 +414,7 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
       ! (2) Construct low rank estimate of A^-1 * ghat with leading neign modes of A
       np = neign
       if (svd_p .gt. 0 .and. neign .gt. svd_p) np = neign - svd_p
-
-      if (minval(eignval(1:np)) .lt. 2.D0 .and. adapt_svd) then
+      if ((minval(eignval(1:np)) .lt. 2.D0 .and. adapt_svd.eq.1) .or. adapt_svd.gt.1) then
          do i = 1, neign
             LAM(i) = - (eignval(i) - 1.D0) / eignval(i)
          end do

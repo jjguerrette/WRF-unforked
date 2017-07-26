@@ -399,7 +399,7 @@ rconfig   logical   use_randomsvd           namelist,wrfvar6  1  .false.  - "use
 rconfig   logical   use_global_cv_io        namelist,wrfvar6  1  .true.   - "use_global_cv_io"         ""  ""
 rconfig   logical   svd_minimise            namelist,wrfvar6  1  .true.  - "svd_minimise"             ""  ""
 rconfig   logical   quick_svd               namelist,wrfvar6  1  .false.  - "quick_svd"                ""  ""
-rconfig   logical   adapt_svd               namelist,wrfvar6  1  .false.  - "adapt_svd"                ""  ""
+rconfig   integer   adapt_svd               namelist,wrfvar6  1  0        - "adapt_svd"                ""  ""
 rconfig   integer   svd_stage               namelist,wrfvar6  1  0        - "svd_stage"                ""  ""
 rconfig   integer   ensdim_svd              namelist,wrfvar6  1  0        - "ensdim_svd"               ""  ""
 rconfig   integer   nens_compare            namelist,wrfvar6  1  0        - "nens_compare"             ""  ""
