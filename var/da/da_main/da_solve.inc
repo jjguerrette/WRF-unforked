@@ -1310,7 +1310,7 @@
 #if defined(LAPACK)
          end if
 #endif
-         if (use_lanczos .or. use_randomsvd) &
+         if ((use_lanczos .or. use_randomsvd) .and. evaluate_hessian) &
             call da_evaluate_hessian(grid, xbx, be, mz, cv_size, &
                                    floor(scale_hcheck*real(neign,8)), &
                                    neign, neign_trunc, &
