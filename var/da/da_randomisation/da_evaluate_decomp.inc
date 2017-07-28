@@ -8,9 +8,13 @@ subroutine da_evaluate_decomp(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
                               La_reduced, &
                               eignval, eignvec, qhat, &
                               eignval_hess, eignvec_hess, qhat_hess, &
+                              dvnorm_hess, dxnorm_hess, &
                               EUCNORM_x, FROBNORM_Pa, SPECNORM_Pa, &
                               EUCNORM_v, FROBNORM_Pav, SPECNORM_Pav, &
-                              EUCNORM_xPa, FROBNORM_PaPa, SPECNORM_PaPa)
+                              EUCNORM_xPa, FROBNORM_PaPa, SPECNORM_PaPa, &
+                              DIRNORM1_v, DIRNORM1_x, &
+                              DIRNORM2_v, DIRNORM2_x)
+
 
    !-------------------------------------------------------------------------
    ! Purpose:   Evaluate norms for Pa and increment approximations
@@ -43,11 +47,6 @@ subroutine da_evaluate_decomp(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
    integer, intent(in)        :: jp_start, jp_end
    integer, intent(in)        :: mz(:)
 
-   real*8, intent(out)        :: EUCNORM_x(3), FROBNORM_Pa(3), SPECNORM_Pa(3)
-   real*8, intent(out)        :: EUCNORM_v(3), FROBNORM_Pav(3), SPECNORM_Pav(3)
-   real*8, intent(out)        :: EUCNORM_xPa(3), FROBNORM_PaPa(3), SPECNORM_PaPa(3)
-!!   real*8, intent(out)        :: EUCNORM_xB(3), FROBNORM_PaB(3), SPECNORM_PaB(3)
-
    !Check Variables
    real(wp), intent(in), allocatable        :: omega_Pav(:,:) ! Gaussian draw
    real(wp), intent(in), allocatable        :: yhat_Pav_LRU(:,:)  ! yhat = Pav * omega_Pa
@@ -56,10 +55,24 @@ subroutine da_evaluate_decomp(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
    real(wp), intent(in), allocatable        :: yhat_Pa_LRA(:,:)  ! yhat = Pa * omega_Pa
    real(wp), intent(in), allocatable        :: La_reduced(:,:)  !  La^-1 = U^-1 Vm * (Im + LAM_m)^1/2 * Vm^T
 
+   real(wp), intent(in), allocatable        :: dvnorm_hess(:), dxnorm_hess(:)
+
+   !Metric outputs
+   real*8, intent(out)        :: EUCNORM_x(3), FROBNORM_Pa(3), SPECNORM_Pa(3)
+   real*8, intent(out)        :: EUCNORM_v(3), FROBNORM_Pav(3), SPECNORM_Pav(3)
+   real*8, intent(out)        :: EUCNORM_xPa(3), FROBNORM_PaPa(3), SPECNORM_PaPa(3)
+   real*8, intent(out)        :: DIRNORM1_v(3), DIRNORM1_x(3)
+   real*8, intent(out)        :: DIRNORM2_v(3), DIRNORM2_x(3)
+
+!!   real*8, intent(out)        :: EUCNORM_xB(3), FROBNORM_PaB(3), SPECNORM_PaB(3)
+
+
 
    real(wp)        :: UTomega(cv_size)
    real*8          :: xhat(cv_size)
    real*8          :: diffvec(cv_size)
+   real*8          :: dvnorm_(cv_size)
+   real*8          :: dxnorm_(cv_size)
 
    real(wp), allocatable  :: qhat_Pav(:,:)
    real(wp), allocatable  :: yhat_Pav_(:,:)
@@ -75,7 +88,7 @@ subroutine da_evaluate_decomp(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
 
    real*8          :: temp
    real*8          :: eignvec_res(rank_rsvd_Pa, rank_rsvd_Pa)
-   real*8          :: eignval_res(rank_rsvd_Pa), LAM(neign)
+   real*8          :: eignval_res(rank_rsvd_Pa), LAM(neign), LAM_hess(rankA)
 
    integer         :: iens, jens, i, j, k, ij, ic, itype, dummy, info, neign_trunc
 
@@ -90,6 +103,9 @@ subroutine da_evaluate_decomp(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
    EUCNORM_v=0.D0; FROBNORM_Pav=0.D0; SPECNORM_Pav=0.D0
 
    EUCNORM_xPa=0.D0; FROBNORM_PaPa=0.D0; SPECNORM_PaPa=0.D0
+
+   DIRNORM1_v=0.D0; DIRNORM1_x=0.D0
+   DIRNORM2_v=0.D0; DIRNORM2_x=0.D0
 
    if (neign .lt. rankA) then
       neign_trunc = neign
@@ -110,7 +126,6 @@ if (hess_comp_x) then
    !=====================================================================
    write(unit=stdout,fmt='(A)') 'Evaluating (xa_ - xa)'
    do itype = 1, 2
-
       xhat = 0.D0
       ! ||dva_ - dva||^2
       if (itype .eq. 1) then !LRA
@@ -152,8 +167,9 @@ if (hess_comp_x) then
                              , grid%vch &
 #endif
                              )
-#if (WRF_CHEM == 1)
+
       temp = 0.D0
+#if (WRF_CHEM == 1)
       !Only for chem so far
       do ic = PARAM_FIRST_SCALAR, num_scaleant
          do k = 1, num_ant_steps
@@ -174,6 +190,7 @@ if (hess_comp_x) then
             end do
          end do
       end do
+#endif
 
 #ifdef DM_PARALLEL
       EUCNORM_x(itype) = wrf_dm_sum_real(temp)
@@ -181,22 +198,102 @@ if (hess_comp_x) then
       EUCNORM_x(itype) = temp
 #endif
 
-#endif
       !------------------------------
       ! (1c) ||dxa_ - dxa||^2_{Pa^-1}
       !------------------------------
-      xhat = 0.D0
+      do i = 1, rankA
+         LAM_hess(i) = eignval_hess(i) - 1.D0
+      end do
+
+      dvnorm_ = 0.D0
       !Multiply Pav^-1 * (dva_ - dva)
+      ! L^T H^T R^-1 H L * diffvec
       call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size,&
                              rankA,rankA,rankA, &
-                             eignval_hess,eignvec_hess,qhat_hess,&
-                             diffvec,xhat,.true.)
+                             LAM_hess,eignvec_hess,qhat_hess,&
+                             diffvec,dvnorm_,.true.)
+
+      ! (I + L^T H^T R^-1 H L) * diffvec
+      dvnorm_ = dvnorm_ + diffvec
 
       !Multiply (dva_ - dva)^T * Pav^-1 * (dva_ - dva) = ||dxa_ - dxa||^2_{Pa^-1}
-      EUCNORM_xPa(itype) = da_dot_cv(cv_size, diffvec, xhat, grid, mz, jp_start, jp_end)
+      EUCNORM_xPa(itype) = da_dot_cv(cv_size, diffvec, dvnorm_, grid, mz, jp_start, jp_end)
 
-      write(unit=stdout,fmt='(A)') '          EUCNORM_v           EUCNORM_x           EUCNORM_xPa'
-      write(unit=stdout,fmt='(3D20.10)') EUCNORM_v(itype), EUCNORM_x(itype), EUCNORM_xPa(itype)
+
+   !=====================================================================
+   ! Compare directions of xhat/xhat_hess and Uxhat/Uxhat_hess
+   !  (1d)  v - increment in preconditioned v-space
+   !  (1e)  x - increment in state x-space
+   !=====================================================================
+      !------------------------------------------------
+      ! (1d) [ dv_^T/sqrt(dv_^T dv) dv/sqrt(dv^T dv) ]
+      !------------------------------------------------
+      if (allocated(dvnorm_hess)) then
+         temp = sqrt(da_dot_cv(cv_size, xhat, xhat, grid, mz, jp_start, jp_end))
+         dvnorm_ = xhat / temp
+         DIRNORM1_v(itype) = da_dot_cv(cv_size, dvnorm_, dvnorm_hess, grid, mz, jp_start, jp_end)
+
+         dvnorm_ = dvnorm_ - dvnorm_hess
+         DIRNORM2_v(itype) = da_dot_cv(cv_size, dvnorm_, dvnorm_, grid, mz, jp_start, jp_end)
+      end if
+
+      !------------------------------------------------
+      ! (1e) [ dx_^T/sqrt(dx_^T dx) dv/sqrt(dx^T dx) ]
+      !------------------------------------------------
+      if (allocated(dxnorm_hess)) then
+         call da_transform_vtox(grid, be%cv%size_jb, xbx, be, &
+                                grid%ep, xhat(1:be%cv%size_jb), &
+                                grid%vv, grid%vp &
+#if (WRF_CHEM == 1)
+                                , grid%vch &
+#endif
+                                )
+
+         dxnorm_ = 0.D0
+         ij = 0
+#if (WRF_CHEM == 1)
+         !Only for chem so far
+         do ic = PARAM_FIRST_SCALAR, num_scaleant
+            do k = 1, num_ant_steps
+               do j=jts,jte
+                  do i=its,ite
+                     ij = ij + 1
+                     if (ij .gt. cv_size) &
+                        call da_error(__FILE__,__LINE__, &
+                            (/"cv_size is incorrect"/))
+
+                     dxnorm_(ij) = grid%xach%alpha_ant(i,j,k,ic)
+                  end do
+               end do
+            end do
+         end do
+
+         do ic = PARAM_FIRST_SCALAR, num_scalebb
+            do k = 1, num_bb_steps
+               do j=jts,jte
+                  do i=its,ite
+                     ij = ij + 1
+                     if (ij .gt. cv_size) &
+                        call da_error(__FILE__,__LINE__, &
+                            (/"cv_size is incorrect"/))
+
+                     dxnorm_(ij) = grid%xach%alpha_bb(i,j,k,ic)
+                  end do
+               end do
+            end do
+         end do
+#endif
+         temp = sqrt(da_dot_cv(cv_size, dxnorm_, dxnorm_, grid, mz, jp_start, jp_end))
+         dxnorm_ = dxnorm_ / temp
+         DIRNORM1_x(itype) = da_dot_cv(cv_size, dxnorm_, dxnorm_hess, grid, mz, jp_start, jp_end)
+
+         dxnorm_ = dxnorm_ - dxnorm_hess
+         DIRNORM2_x(itype) = da_dot_cv(cv_size, dxnorm_, dxnorm_, grid, mz, jp_start, jp_end)
+      end if
+
+      write(unit=stdout,fmt='(A)') '    EUCNORM_v     EUCNORM_x   EUCNORM_xPa    DIRNORM1_v    DIRNORM1_x    DIRNORM2_v    DIRNORM2_x'
+      write(unit=stdout,fmt='(7D14.4)') EUCNORM_v(itype), EUCNORM_x(itype), EUCNORM_xPa(itype), DIRNORM1_v(itype), DIRNORM1_x(itype), DIRNORM2_v(itype), DIRNORM2_x(itype)
+
    end do
 
    ! Adaptive increment
@@ -204,10 +301,18 @@ if (hess_comp_x) then
       EUCNORM_v(3) = EUCNORM_v(2)
       EUCNORM_x(3) = EUCNORM_x(2)
       EUCNORM_xPa(3) = EUCNORM_xPa(2)
+      DIRNORM1_v(3) = DIRNORM1_v(2)
+      DIRNORM1_x(3) = DIRNORM1_x(2)
+      DIRNORM2_v(3) = DIRNORM2_v(2)
+      DIRNORM2_x(3) = DIRNORM2_x(2)
    else
       EUCNORM_v(3) = EUCNORM_v(1)
       EUCNORM_x(3) = EUCNORM_x(1)
       EUCNORM_xPa(3) = EUCNORM_xPa(1)
+      DIRNORM1_v(3) = DIRNORM1_v(1)
+      DIRNORM1_x(3) = DIRNORM1_x(1)
+      DIRNORM2_v(3) = DIRNORM2_v(1)
+      DIRNORM2_x(3) = DIRNORM2_x(1)
    end if
 end if
 
@@ -430,7 +535,6 @@ if (.true.) then
          end do
          !$OMP END PARALLEL DO
 #endif
-
          !Transfer vch (and later vv) to yhat_Pa_
          call da_vv_to_cv(grid%vv, grid%xp, mz, cv_size, &
                           yhat_Pa_(1:be%cv%size_jb, iens) &

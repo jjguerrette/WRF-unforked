@@ -1,11 +1,13 @@
 #if defined(LAPACK)
 subroutine da_evaluate_decomp_init(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
                                    rank_rsvd_Pa, rankA,  &
+                                   eignval_hess, eignvec_hess, qhat_hess, &
+                                   xhat_hess, &
                                    omega_Pav, &
                                    yhat_Pav_LRU, yhat_Pav_LRA, &
                                    yhat_Pa_LRU, yhat_Pa_LRA, &
                                    La_reduced, &
-                                   eignval_hess, eignvec_hess, qhat_hess)
+                                   dvnorm_hess, dxnorm_hess)
 
    !-------------------------------------------------------------------------
    ! Purpose:   Initialize decomposition comparison for full Hessian
@@ -27,6 +29,7 @@ subroutine da_evaluate_decomp_init(grid, xbx, be, mz, jp_start, jp_end, cv_size,
    real*8,         intent(in) :: eignvec_hess(rankA, rankA)
    real*8,         intent(in) :: eignval_hess(rankA)
    real*8,         intent(in) :: qhat_hess(cv_size, 0:rankA)
+   real*8,         intent(in) :: xhat_hess(cv_size)
 
    integer, intent(in)        :: jp_start, jp_end
    integer, intent(in)        :: mz(:)
@@ -41,6 +44,8 @@ subroutine da_evaluate_decomp_init(grid, xbx, be, mz, jp_start, jp_end, cv_size,
    real(wp), allocatable, intent(out)        :: La_reduced(:,:)  !  La^-1 = U^-1 Vm * (Im + LAM_m)^1/2 * Vm^T
 
 
+   real(wp), allocatable, intent(out)        :: dvnorm_hess(:), dxnorm_hess(:)
+
    real(wp), allocatable        :: omega_g(:,:) ! Global Gaussian draw
    real(wp), allocatable        :: omega1d(:) ! Gaussian draw
    real(wp), allocatable        :: dumcv(:)
@@ -50,6 +55,7 @@ subroutine da_evaluate_decomp_init(grid, xbx, be, mz, jp_start, jp_end, cv_size,
 
    real(wp)        :: UTomega(1:cv_size)
    real(wp)        :: LAM_hess(1:rankA)
+   real*8          :: temp
    integer         :: iens, jens, nens, neign, i, j, k, ij, ic, cv_s, cv_f, itype
 
    if (trace_use) call da_trace_entry("da_evaluate_decomp_init")
@@ -58,6 +64,65 @@ subroutine da_evaluate_decomp_init(grid, xbx, be, mz, jp_start, jp_end, cv_size,
    write(unit=stdout,fmt='(A)') 'Initialize OMEGA_Pa'
    call da_gen_omega(omega_Pav, cv_size, rank_rsvd_Pa, grid, mz)
 
+   !--------------------------------------------
+   !  Initialize dv and dx direction comparison
+   !--------------------------------------------
+if (hess_comp_x) then
+   !! Normalized dv
+   allocate(dvnorm_hess(cv_size))
+   temp = sqrt(da_dot_cv(cv_size, xhat_hess, xhat_hess, grid, mz, jp_start, jp_end))
+   dvnorm_hess = xhat_hess / temp
+
+
+   !! Normalized dx
+   allocate(dxnorm_hess(cv_size))
+   call da_transform_vtox(grid, be%cv%size_jb, xbx, be, &
+                          grid%ep, xhat_hess(1:be%cv%size_jb), &
+                          grid%vv, grid%vp &
+#if (WRF_CHEM == 1)
+                          , grid%vch &
+#endif
+                          )
+
+   dxnorm_hess = 0.D0
+   ij = 0
+#if (WRF_CHEM == 1)
+   !Only for chem so far
+   do ic = PARAM_FIRST_SCALAR, num_scaleant
+      do k = 1, num_ant_steps
+         do j=jts,jte
+            do i=its,ite
+               ij = ij + 1
+               if (ij .gt. cv_size) &
+                  call da_error(__FILE__,__LINE__, &
+                      (/"cv_size is incorrect"/))
+
+               dxnorm_hess(ij) = grid%xach%alpha_ant(i,j,k,ic)
+            end do
+         end do
+      end do
+   end do
+
+   do ic = PARAM_FIRST_SCALAR, num_scalebb
+      do k = 1, num_bb_steps
+         do j=jts,jte
+            do i=its,ite
+               ij = ij + 1
+               if (ij .gt. cv_size) &
+                  call da_error(__FILE__,__LINE__, &
+                      (/"cv_size is incorrect"/))
+
+               dxnorm_hess(ij) = grid%xach%alpha_bb(i,j,k,ic)
+            end do
+         end do
+      end do
+   end do
+#endif
+
+   temp = sqrt(da_dot_cv(cv_size, dxnorm_hess, dxnorm_hess, grid, mz, jp_start, jp_end))
+
+   dxnorm_hess = dxnorm_hess / temp
+end if
    !-------------------------------------
    !  Initialize Pav comparison
    !-------------------------------------

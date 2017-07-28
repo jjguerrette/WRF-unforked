@@ -59,6 +59,7 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
    real(wp), allocatable        :: yhat_Pa_LRU(:,:)  ! yhat = Pa * omega
    real(wp), allocatable        :: yhat_Pa_LRA(:,:)  ! yhat = Pa * omega
    real(wp), allocatable        :: La_reduced(:,:)  !  La^-1 = U^-1 Vm * (Im + LAM_m)^1/2 * Vm^T
+   real(wp), allocatable        :: dvnorm_hess(:), dxnorm_hess(:)
 
 
    real*8, allocatable          :: eignvec(:, :)
@@ -74,6 +75,10 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
    real*8        :: EUCNORM_x(3), FROBNORM_Pa(3), SPECNORM_Pa(3)
    real*8        :: EUCNORM_v(3), FROBNORM_Pav(3), SPECNORM_Pav(3)
    real*8        :: EUCNORM_xPa(3), FROBNORM_PaPa(3), SPECNORM_PaPa(3)
+   real*8        :: DIRNORM1_v(3), DIRNORM1_x(3)
+   real*8        :: DIRNORM2_v(3), DIRNORM2_x(3)
+
+
 
    character(len=filename_len)  :: filename
    character*3  :: stat
@@ -95,11 +100,13 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
 
    call da_evaluate_decomp_init(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
                                    rank_rsvd_Pa, rankA, &
+                                   eignval_hess, eignvec_hess, qhat_hess, &
+                                   xhat_hess, &
                                    omega_Pav, &
                                    yhat_Pav_LRU, yhat_Pav_LRA, &
                                    yhat_Pa_LRU, yhat_Pa_LRA, &
                                    La_reduced, &
-                                   eignval_hess, eignvec_hess, qhat_hess)
+                                   dvnorm_hess, dxnorm_hess)
 
    !-------------------------------------------------------------------------
    ! [2.0] TSVD:
@@ -121,13 +128,19 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
                                  La_reduced, &
                                  eignval_hess, eignvec_hess, qhat_hess(:,0:rankA), &
                                  eignval_hess, eignvec_hess, qhat_hess, &
+                                 dvnorm_hess, dxnorm_hess, &
                                  EUCNORM_x, FROBNORM_Pa, SPECNORM_Pa, &
                                  EUCNORM_v, FROBNORM_Pav, SPECNORM_Pav, &
-                                 EUCNORM_xPa, FROBNORM_PaPa, SPECNORM_PaPa)
+                                 EUCNORM_xPa, FROBNORM_PaPa, SPECNORM_PaPa, &
+                                 DIRNORM1_v, DIRNORM1_x, &
+                                 DIRNORM2_v, DIRNORM2_x )
+
 
          call da_write_norms(    EUCNORM_x, FROBNORM_Pa, SPECNORM_Pa, &
                                  EUCNORM_v, FROBNORM_Pav, SPECNORM_Pav, &
                                  EUCNORM_xPa, FROBNORM_PaPa, SPECNORM_PaPa, &
+                                 DIRNORM1_v, DIRNORM1_x , &
+                                 DIRNORM2_v, DIRNORM2_x , &
                                  neign, suffix)
       end do
    end if
@@ -200,15 +213,21 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
                                  La_reduced, &
                                  eignval, eignvec, qhat(:,0:neign), &
                                  eignval_hess, eignvec_hess, qhat_hess, &
+                                 dvnorm_hess, dxnorm_hess, &
                                  EUCNORM_x, FROBNORM_Pa, SPECNORM_Pa, &
                                  EUCNORM_v, FROBNORM_Pav, SPECNORM_Pav, &
-                                 EUCNORM_xPa, FROBNORM_PaPa, SPECNORM_PaPa)
+                                 EUCNORM_xPa, FROBNORM_PaPa, SPECNORM_PaPa, &
+                                 DIRNORM1_v, DIRNORM1_x, &
+                                 DIRNORM2_v, DIRNORM2_x )
+
          deallocate(eignval)
          deallocate(eignvec)
 
          call da_write_norms(    EUCNORM_x, FROBNORM_Pa, SPECNORM_Pa, &
                                  EUCNORM_v, FROBNORM_Pav, SPECNORM_Pav, &
                                  EUCNORM_xPa, FROBNORM_PaPa, SPECNORM_PaPa, &
+                                 DIRNORM1_v, DIRNORM1_x , &
+                                 DIRNORM2_v, DIRNORM2_x , &
                                  neign, suffix)
       end do
 
@@ -276,10 +295,12 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
                                        La_reduced, &
                                        eignval, eignvec, qhat(:,0:neign), &
                                        eignval_hess, eignvec_hess, qhat_hess, &
+                                       dvnorm_hess, dxnorm_hess, &
                                        EUCNORM_x, FROBNORM_Pa, SPECNORM_Pa, &
                                        EUCNORM_v, FROBNORM_Pav, SPECNORM_Pav, &
-                                       EUCNORM_xPa, FROBNORM_PaPa, SPECNORM_PaPa)
-
+                                       EUCNORM_xPa, FROBNORM_PaPa, SPECNORM_PaPa, &
+                                       DIRNORM1_v, DIRNORM1_x, &
+                                       DIRNORM2_v, DIRNORM2_x )
 
                write(pchar,fmt='(I2.2)') p
                suffix = "rsvd_p="//pchar
@@ -287,6 +308,8 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
                call da_write_norms(    EUCNORM_x, FROBNORM_Pa, SPECNORM_Pa, &
                                        EUCNORM_v, FROBNORM_Pav, SPECNORM_Pav, &
                                        EUCNORM_xPa, FROBNORM_PaPa, SPECNORM_PaPa, &
+                                       DIRNORM1_v, DIRNORM1_x , &
+                                       DIRNORM2_v, DIRNORM2_x , &
                                        neign, suffix)
             end if
 
@@ -312,6 +335,9 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
    if (allocated(yhat_Pa_LRA)) deallocate(yhat_Pa_LRA)
 
    if (allocated(La_reduced)) deallocate(La_reduced)
+
+   if (allocated(dvnorm_hess)) deallocate(dvnorm_hess)
+   if (allocated(dxnorm_hess)) deallocate(dxnorm_hess)
 
    if (trace_use) call da_trace_exit("da_compare_decomp_methods")
 

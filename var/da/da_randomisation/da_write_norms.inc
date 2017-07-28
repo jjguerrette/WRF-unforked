@@ -2,6 +2,8 @@
 subroutine da_write_norms(    EUCNORM_x, FROBNORM_Pa, SPECNORM_Pa, &
                               EUCNORM_v, FROBNORM_Pav, SPECNORM_Pav, &
                               EUCNORM_xPa, FROBNORM_PaPa, SPECNORM_PaPa, &
+                              DIRNORM1_v, DIRNORM1_x, &
+                              DIRNORM2_v, DIRNORM2_x, &
                               neign, suffix)
 
    !-------------------------------------------------------------------------
@@ -18,6 +20,9 @@ subroutine da_write_norms(    EUCNORM_x, FROBNORM_Pa, SPECNORM_Pa, &
    real*8, intent(in)        :: EUCNORM_x(3), FROBNORM_Pa(3), SPECNORM_Pa(3)
    real*8, intent(in)        :: EUCNORM_v(3), FROBNORM_Pav(3), SPECNORM_Pav(3)
    real*8, intent(in)        :: EUCNORM_xPa(3), FROBNORM_PaPa(3), SPECNORM_PaPa(3)
+   real*8, intent(in)        :: DIRNORM1_v(3), DIRNORM1_x(3)
+   real*8, intent(in)        :: DIRNORM2_v(3), DIRNORM2_x(3)
+
 !!   real*8, intent(in)        :: EUCNORM_xB(3), FROBNORM_PaB(3), SPECNORM_PaB(3)
 
    integer, intent(in)       :: neign
@@ -30,7 +35,7 @@ subroutine da_write_norms(    EUCNORM_x, FROBNORM_Pa, SPECNORM_Pa, &
 
    if (trace_use) call da_trace_entry("da_write_norms")
 
-   do itype = 1, 9
+   do itype = 1, 13
       select case (itype)
          case (1)
             vals = EUCNORM_x
@@ -42,21 +47,33 @@ subroutine da_write_norms(    EUCNORM_x, FROBNORM_Pa, SPECNORM_Pa, &
             vals = EUCNORM_xPa
             filename = "EUCNORM_xPa_"//trim(suffix)
          case (4)
+            vals = DIRNORM1_v
+            filename = "DIRNORM1_v_"//trim(suffix)
+         case (5)
+            vals = DIRNORM1_x
+            filename = "DIRNORM1_x_"//trim(suffix)
+         case (6)
+            vals = DIRNORM2_v
+            filename = "DIRNORM2_v_"//trim(suffix)
+         case (7)
+            vals = DIRNORM2_x
+            filename = "DIRNORM2_x_"//trim(suffix)
+         case (8)
             vals = FROBNORM_Pa
             filename = "FROBNORM_Pa_"//trim(suffix)
-         case (5)
+         case (9)
             vals = FROBNORM_Pav
             filename = "FROBNORM_Pav_"//trim(suffix)
-         case (6)
+         case (10)
             vals = FROBNORM_PaPa
             filename = "FROBNORM_PaPa_"//trim(suffix)
-         case (7)
+         case (11)
             vals = SPECNORM_Pa
             filename = "SPECNORM_Pa_"//trim(suffix)
-         case (8)
+         case (12)
             vals = SPECNORM_Pav
             filename = "SPECNORM_Pav_"//trim(suffix)
-         case (9)
+         case (13)
             vals = SPECNORM_PaPa
             filename = "SPECNORM_PaPa_"//trim(suffix)
       end select

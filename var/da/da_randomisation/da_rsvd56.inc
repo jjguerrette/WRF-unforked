@@ -203,22 +203,11 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
    end do
 
    neign = nens
-!   cyc = 0
-
    eignval = LAM
    do iens = 1, nens
-!!      eignval(iens) = LAM(iens) !!!+ 1.D0
-!      if (cyc .eq. 1) cycle
       if (neign .eq. nens .and. LAM(iens) .lt. 0.D0) then
          if (iens .gt. 1) then
             neign = iens - 1
-!         else
-!!NEED TO ADJUST THIS LANGUAGE
-!            write(unit=stdout,fmt='(A)') &
-!               'WARNING: There need to be some positive eigenvalues of KMAT'
-!            cyc = 1
-!
-!!!            CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
          end if
       end if
    end do
