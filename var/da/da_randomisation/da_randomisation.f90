@@ -25,6 +25,7 @@ module da_randomisation
        hess_comp_PaPa_LRU, hess_comp_PaPa_LRA, &
        scale_hcheck, &
        check_hess_symm, &
+       rewrite_ahat_ascii, &
 #if (WRF_CHEM == 1)
        chem_surf, chem_acft, &
        num_ant_steps, num_bb_steps, &

@@ -156,11 +156,20 @@ subroutine da_calculate_hessian(grid, mz, config_flags, &
          write(cens,fmt='(i4.4)') iens
          filename = 'ahat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
          call da_cv_io ('r', filename, cv_size, AMAT(1:cv_size,iens), grid, mz)
+
+         if (rewrite_ahat_ascii) then
+            filename = 'ahat_ascii.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+            call da_cv_io ('w', filename, cv_size, AMAT(1:cv_size,iens), grid, mz, .true.)
+         end if
       end do
 
       ! Read gradient
       filename = 'ghat.p'//trim(adjustl(cproc))
       call da_cv_io ('r', filename, cv_size, ghat, grid, mz)
+      if (rewrite_ahat_ascii) then
+         filename = 'ghat_ascii.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+         call da_cv_io ('w', filename, cv_size, ghat, grid, mz, .true.)
+      end if
 
 #ifdef DM_PARALLEL
       !Perform global SVD of AMAT matrix
