@@ -225,9 +225,10 @@ if (hess_comp_x) then
    !  (1d)  v - increment in preconditioned v-space
    !  (1e)  x - increment in state x-space
    !=====================================================================
-      !------------------------------------------------
+      !----------------------------------------------------
       ! (1d) [ dv_^T/sqrt(dv_^T dv) dv/sqrt(dv^T dv) ]
-      !------------------------------------------------
+      ! and || dv_^T/sqrt(dv_^T dv) - dv/sqrt(dv^T dv) ||^2
+      !----------------------------------------------------
       if (allocated(dvnorm_hess)) then
          temp = sqrt(da_dot_cv(cv_size, xhat, xhat, grid, mz, jp_start, jp_end))
          dvnorm_ = xhat / temp
@@ -237,9 +238,10 @@ if (hess_comp_x) then
          DIRNORM2_v(itype) = da_dot_cv(cv_size, dvnorm_, dvnorm_, grid, mz, jp_start, jp_end)
       end if
 
-      !------------------------------------------------
-      ! (1e) [ dx_^T/sqrt(dx_^T dx) dv/sqrt(dx^T dx) ]
-      !------------------------------------------------
+      !----------------------------------------------------
+      ! (1e) [ dx_^T/sqrt(dx_^T dx) dx/sqrt(dx^T dx) ]
+      ! and || dx_^T/sqrt(dx_^T dx) - dx/sqrt(dx^T dx) ||^2
+      !----------------------------------------------------
       if (allocated(dxnorm_hess)) then
          call da_transform_vtox(grid, be%cv%size_jb, xbx, be, &
                                 grid%ep, xhat(1:be%cv%size_jb), &
