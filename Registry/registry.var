@@ -340,11 +340,6 @@ rconfig   integer   interp_option           namelist,wrfvar11  1  1        - "in
 rconfig   integer   balance_type            namelist,wrfvar12  1  3        - "balance_type"            ""  "For use_wpec: 1 = geostrophic; 2 = cyclostrophic; 3 = both"
 rconfig   logical   use_wpec                namelist,wrfvar12  1  .false.  - "use_wpec"                ""  ""
 rconfig   real      wpec_factor             namelist,wrfvar12  1  0.001    - "wpec_factor"             ""  "Inverse of WPEC gamma factor"
-rconfig   logical   use_lsac                namelist,wrfvar12  1  .false.  - "use_lsac"                "switch for large scale analysis constraint"  ""
-rconfig   integer   lsac_nhskip             namelist,wrfvar12  1  5        - "lsac_nhskip"             "number of horizontal grid points to skip"  ""
-rconfig   integer   lsac_nvskip             namelist,wrfvar12  1  4        - "lsac_nvskip"             "number of vertical grid points to skip"  ""
-rconfig   logical   lsac_calcerr            namelist,wrfvar12  1  .false.  - "lsac_calcerr"            "switch for using fixed (false) or scaled (true) error"  ""
-rconfig   logical   lsac_print_details      namelist,wrfvar12  1  .false.  - "lsac_print_details"      "switch for printout"  ""
 rconfig   integer   vert_corr               namelist,wrfvar13  1  2        - "vert_corr"               ""  ""  
 rconfig   integer   vertical_ip             namelist,wrfvar13  1  0        - "vertical_ip"             ""  ""  
 rconfig   integer   vert_evalue             namelist,wrfvar13  1  1        - "vert_evalue"             ""  ""  
@@ -494,13 +489,14 @@ package   dyn_em_ad    dyn_opt==302                 -             -
 package   dyn_em_tst   dyn_opt==402                 -             -
 package   dyn_em_var   dyn_opt==502                 -             -
 
+package   not_set         mp_physics==-1               -             moist:qv,qc,qr,qi,qs,qg;g_moist:g_qv,g_qc,g_qr,g_qi,g_qs,g_qg;a_moist:a_qv,a_qc,a_qr,a_qi,a_qs,a_qg
 package   passiveqv       mp_physics==0                -             moist:qv;g_moist:g_qv;a_moist:a_qv
 package   kesslerscheme   mp_physics==1                -             moist:qv,qc,qr;g_moist:g_qv,g_qc,g_qr;a_moist:a_qv,a_qc,a_qr
 package   linscheme       mp_physics==2                -             moist:qv,qc,qr,qi,qs,qg;g_moist:g_qv,g_qc,g_qr,g_qi,g_qs,g_qg;a_moist:a_qv,a_qc,a_qr,a_qi,a_qs,a_qg
 package   wsm3scheme      mp_physics==3                -             moist:qv,qc,qr;g_moist:g_qv,g_qc,g_qr;a_moist:a_qv,a_qc,a_qr
 package   wsm5scheme      mp_physics==4                -             moist:qv,qc,qr,qi,qs;g_moist:g_qv,g_qc,g_qr,g_qi,g_qs;a_moist:a_qv,a_qc,a_qr,a_qi,a_qs
-package   fer_mp_hires    mp_physics==5                -             moist:qv,qc,qr,qs;g_moist:g_qv,g_qc,g_qr,g_qs;a_moist:a_qv,a_qc,a_qr,a_qs;scalar:qt
-package   fer_mp_hires_advect  mp_physics==15          -             moist:qv,qc,qr,qi;g_moist:g_qv,g_qc,g_qr,g_qi;a_moist:a_qv,a_qc,a_qr,a_qi;scalar:qrimef
+package   fer_mp_hires    mp_physics==5                -             moist:qv,qc,qr,qi;g_moist:g_qv,g_qc,g_qr,g_qi;a_moist:a_qv,a_qc,a_qr,a_qi;scalar:qt
+package   fer_mp_hires_advect  mp_physics==15          -             moist:qv,qc,qr,qi;g_moist:g_qv,g_qc,g_qr,g_qi;a_moist:a_qv,a_qc,a_qr,a_qi
 package   wsm6scheme      mp_physics==6                -             moist:qv,qc,qr,qi,qs,qg;g_moist:g_qv,g_qc,g_qr,g_qi,g_qs,g_qg;a_moist:a_qv,a_qc,a_qr,a_qi,a_qs,a_qg
 package   gsfcgcescheme   mp_physics==7                -             moist:qv,qc,qr,qi,qs,qg;g_moist:g_qv,g_qc,g_qr,g_qi,g_qs,g_qg;a_moist:a_qv,a_qc,a_qr,a_qi,a_qs,a_qg
 package   thompson        mp_physics==8                -             moist:qv,qc,qr,qi,qs,qg;g_moist:g_qv,g_qc,g_qr,g_qi,g_qs,g_qg;a_moist:a_qv,a_qc,a_qr,a_qi,a_qs,a_qg;scalar:qni,qnr
@@ -516,7 +512,9 @@ package   nssl_2momccn    mp_physics==18               -             moist:qv,qc
 package   nssl_1mom       mp_physics==19               -             moist:qv,qc,qr,qi,qs,qg,qh;g_moist:g_qv,g_qc,g_qr,g_qi,g_qs,g_qg,g_qh;a_moist:a_qv,a_qc,a_qr,a_qi,a_qs,a_qg,a_qh;scalar:qvolg
 package   nssl_1momlfo    mp_physics==21               -             moist:qv,qc,qr,qi,qs,qg;g_moist:g_qv,g_qc,g_qr,g_qi,g_qs,g_qg;a_moist:a_qv,a_qc,a_qr,a_qi,a_qs,a_qg
 package   nssl_2momg      mp_physics==22               -             moist:qv,qc,qr,qi,qs,qg;g_moist:g_qv,g_qc,g_qr,g_qi,g_qs,g_qg;a_moist:a_qv,a_qc,a_qr,a_qi,a_qs,a_qg;scalar:qndrop,qnr,qni,qns,qng,qvolg
-package   thompsonaero    mp_physics==28               -             moist:qv,qc,qr,qi,qs,qg;g_moist:g_qv,g_qc,g_qr,g_qi,g_qs,g_qg;a_moist:a_qv,a_qc,a_qr,a_qi,a_qs,a_qg;scalar:qni,qnr,qnc,qnwfa,qnifa
+package   thompsonaero    mp_physics==28               -             moist:qv,qc,qr,qi,qs,qg;g_moist:g_qv,g_qc,g_qr,g_qi,g_qs,g_qg;a_moist:a_qv,a_qc,a_qr,a_qi,a_qs,a_qg;scalar:qni,qnr,qnc
+package   p3_1category    mp_physics==50               -             moist:qv,qc,qr,qi;g_moist:g_qv,g_qc,g_qr,g_qi;a_moist:a_qv,a_qc,a_qr,a_qi
+package   p3_1category_nc mp_physics==51               -             moist:qv,qc,qr,qi;g_moist:g_qv,g_qc,g_qr,g_qi;a_moist:a_qv,a_qc,a_qr,a_qi
 package   etampnew        mp_physics==95               -             moist:qv,qc,qr,qs;g_moist:g_qv,g_qc,g_qr,g_qs;a_moist:a_qv,a_qc,a_qr,a_qs;scalar:qt
 package   lscondscheme    mp_physics==98               -             moist:qv;g_moist:g_qv;a_moist:a_qv
 package   mkesslerscheme   mp_physics==99              -             moist:qv,qc,qr;g_moist:g_qv,g_qc,g_qr;a_moist:a_qv,a_qc,a_qr

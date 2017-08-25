@@ -541,3 +541,23 @@ which can be changed by the user for sensitivity testing purposes.
  rBinSize            = 0.0001,0.0001,0.0001,
  minDeepFreq         = 0.333, 0.333, 0.333,
  minShallowFreq      = 0.01,  0.01,  0.01, 
+
+
+** To write out an input file during the model simulation.
+
+&time_control
+ write_input                         = .TRUE.,
+ inputout_interval_m                 = 60, 60, 60
+ input_outname                       = "wrfinput_out_d<domain>_<date>"
+ inputout_begin_h                    = 3, 6, 6
+ inputout_end_h                      = 9, 6, 6
+
+
+** The hybrid vertical coordinate (HVC) requires three pieces:
+1. The WRF and real codes must be built with HVC activated (./configure -hyb)
+2. The eta location (etac) at which the eta levels higher up in the atmosphere
+   become isobaric must be defined (suggested default in Registry).
+3. The run-time option to select the HVC (hybrid_opt, default is OFF): 
+&dynamics
+ hybrid_opt          = 2,
+ etac                = 0.2,
