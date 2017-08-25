@@ -722,10 +722,12 @@ BENCH_END(set_phys_bc_tim)
        CALL PUSHREAL8ARRAY ( grid%rqcblten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
        CALL PUSHREAL8ARRAY ( grid%rqiblten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
 
+     if ( config_flags%cu_physics .gt. 0 ) then
        CALL PUSHREAL8ARRAY ( grid%rthcuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
        CALL PUSHREAL8ARRAY ( grid%rqvcuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
        CALL PUSHREAL8ARRAY ( grid%rqccuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
        CALL PUSHREAL8ARRAY ( grid%rqicuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
+     end if
 
 !!!Added by J. Guerrette 07/11/2014
        CALL PUSHREAL8ARRAY(grid%rthraten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
@@ -743,7 +745,6 @@ BENCH_END(set_phys_bc_tim)
 
        CALL PUSHREAL8ARRAY(grid%pblh, (ime-ims+1)*(jme-jms+1))
 !!!
-
        CALL first_rk_step_part1 (    grid, config_flags         &
                              , moist , moist_tend               &
                              , chem  , chem_tend                &
@@ -791,11 +792,12 @@ BENCH_END(set_phys_bc_tim)
        CALL PUSHREAL8ARRAY ( grid%rqvblten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
        CALL PUSHREAL8ARRAY ( grid%rqcblten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
        CALL PUSHREAL8ARRAY ( grid%rqiblten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
-
+     if ( config_flags%cu_physics .gt. 0 ) then
        CALL PUSHREAL8ARRAY ( grid%rthcuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
        CALL PUSHREAL8ARRAY ( grid%rqvcuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
        CALL PUSHREAL8ARRAY ( grid%rqccuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
        CALL PUSHREAL8ARRAY ( grid%rqicuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
+     end if
 
        CALL PUSHREAL8ARRAY(grid%rthraten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
 !       CALL PUSHREAL8ARRAY ( chem_tend, (ime-ims+1)*(kme-kms+1)*(jme-jms+1)*num_chem )
@@ -7825,11 +7827,12 @@ BENCH_END(adj_rk_tend_tim)
 !       CALL POPREAL8ARRAY ( chem_tend, (ime-ims+1)*(kme-kms+1)*(jme-jms+1)*num_chem )
        CALL POPREAL8ARRAY(grid%rthraten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
 
+     if ( config_flags%cu_physics .gt. 0 ) then
        CALL POPREAL8ARRAY ( grid%rqicuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
        CALL POPREAL8ARRAY ( grid%rqccuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
        CALL POPREAL8ARRAY ( grid%rqvcuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
        CALL POPREAL8ARRAY ( grid%rthcuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
-
+     end if
        CALL POPREAL8ARRAY ( grid%rqiblten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
        CALL POPREAL8ARRAY ( grid%rqcblten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
        CALL POPREAL8ARRAY ( grid%rqvblten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
@@ -7892,11 +7895,12 @@ BENCH_END(adj_rk_tend_tim)
 
        CALL POPREAL8ARRAY(grid%rthraten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
 !!!
+     if ( config_flags%cu_physics .gt. 0 ) then
        CALL POPREAL8ARRAY ( grid%rqicuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
        CALL POPREAL8ARRAY ( grid%rqccuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
        CALL POPREAL8ARRAY ( grid%rqvcuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
        CALL POPREAL8ARRAY ( grid%rthcuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
-
+     end if
        CALL POPREAL8ARRAY ( grid%rqiblten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
        CALL POPREAL8ARRAY ( grid%rqcblten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
        CALL POPREAL8ARRAY ( grid%rqvblten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )

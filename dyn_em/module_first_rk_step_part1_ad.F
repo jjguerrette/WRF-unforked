@@ -224,16 +224,16 @@ CONTAINS
       CALL PUSHREAL8ARRAY(grid%rqvblten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
       CALL PUSHREAL8ARRAY(grid%rqcblten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
       CALL PUSHREAL8ARRAY(grid%rqiblten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
-
+      CALL PUSHREAL8ARRAY(grid%rthraten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
+    if ( config_flags%cu_physics .gt. 0 ) then
 !      CALL PUSHREAL8ARRAY(grid%rucuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
 !      CALL PUSHREAL8ARRAY(grid%rvcuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
-      CALL PUSHREAL8ARRAY(grid%rthcuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
-      CALL PUSHREAL8ARRAY(grid%rqvcuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
       CALL PUSHREAL8ARRAY(grid%rqccuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
       CALL PUSHREAL8ARRAY(grid%rqicuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
 !      CALL PUSHREAL8ARRAY(grid%rqscuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
-
-      CALL PUSHREAL8ARRAY(grid%rthraten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
+      CALL PUSHREAL8ARRAY ( grid%rthcuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
+      CALL PUSHREAL8ARRAY ( grid%rqvcuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
+    end if
 
       !$OMP PARALLEL DO   &
       !$OMP PRIVATE ( ij )
@@ -1653,16 +1653,16 @@ BENCH_END(a_surf_driver_tim)
       grid%a_rthraten = 0.D0
 
 
-      CALL POPREAL8ARRAY(grid%rthraten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
-
+    if ( config_flags%cu_physics .gt. 0 ) then
+      CALL POPREAL8ARRAY ( grid%rqvcuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
+      CALL POPREAL8ARRAY ( grid%rthcuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
 !      CALL POPREAL8ARRAY(grid%rqscuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
       CALL POPREAL8ARRAY(grid%rqicuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
       CALL POPREAL8ARRAY(grid%rqccuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
-      CALL POPREAL8ARRAY(grid%rqvcuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
-      CALL POPREAL8ARRAY(grid%rthcuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
 !      CALL POPREAL8ARRAY(grid%rvcuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
 !      CALL POPREAL8ARRAY(grid%rucuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
-
+    end if
+      CALL POPREAL8ARRAY(grid%rthraten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
       CALL POPREAL8ARRAY(grid%rqiblten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
       CALL POPREAL8ARRAY(grid%rqcblten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
       CALL POPREAL8ARRAY(grid%rqvblten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
