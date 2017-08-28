@@ -144,6 +144,9 @@ CONTAINS
                                       sims , sime , sjms , sjme , skms , skme , &
                                       sips , sipe , sjps , sjpe , skps , skpe
 
+   integer :: funit !JJG DEBUG
+
+
    CHARACTER (LEN=256) :: mminlu
    CHARACTER (LEN=1000) :: message
 
@@ -910,9 +913,9 @@ BENCH_START(pbl_driver_tim)
                     k_start, k_end                   )
                  
                if( config_flags%chem_opt == MOZART_KPP .or. &
-                config_flags%chem_opt == MOZCART_KPP .or. &
-                config_flags%chem_opt == MOZART_MOSAIC_4BIN_KPP .or. &
-                config_flags%chem_opt == MOZART_MOSAIC_4BIN_AQ_KPP) then
+                   config_flags%chem_opt == MOZCART_KPP .or. &
+                   config_flags%chem_opt == MOZART_MOSAIC_4BIN_KPP .or. &
+                   config_flags%chem_opt == MOZART_MOSAIC_4BIN_AQ_KPP) then
                   call mozcart_lbc_set( chem, num_chem, grid%id, &
                                         ims, ime, jms, jme, kms, kme,    & 
                                         grid%i_start(ij), grid%i_end(ij), &
@@ -934,6 +937,37 @@ BENCH_START(pbl_driver_tim)
 #     include "HALO_EM_PHYS_A_BL_SURF.inc"
       ENDIF
 #endif
+
+if(ips.le.config_flags%ii_debug .and. & !JJG DEBUG
+   ipe.ge.config_flags%ii_debug .and. & !JJG DEBUG
+   jps.le.config_flags%jj_debug .and. & !JJG DEBUG
+   jpe.ge.config_flags%jj_debug) then !JJG DEBUG
+
+funit = config_flags%ii_debug*100 + config_flags%jj_debug !JJG DEBUG
+write(funit,fmt='(A)') 'FIRSTRK:ABCDF' !JJG DEBUG
+
+write(funit,fmt='(A)') 'rthblten:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%rthblten(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(A)') 'rqvblten:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%rqvblten(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(A)') 'rqcblten:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%rqcblten(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(A)') 'rqiblten:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%rqiblten(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(A)') 'rublten:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%rublten(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(A)') 'rvblten:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%rvblten(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(A)') 'bc1:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') chem(config_flags%ii_debug,:,config_flags%jj_debug,p_bc1) 
+write(funit,fmt='(A)') 'bc2:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') chem(config_flags%ii_debug,:,config_flags%jj_debug,p_bc2) 
+write(funit,fmt='(A)') 'qfx:' !JJG DEBUG
+write(funit,fmt='(D25.15)') grid%qfx(config_flags%ii_debug,config_flags%jj_debug) 
+write(funit,fmt='(A)') 'hfx:' !JJG DEBUG
+write(funit,fmt='(D25.15)') grid%hfx(config_flags%ii_debug,config_flags%jj_debug) 
+
+end if !JJG DEBUG
 
 
       CALL pbl_driver(                                                              &
@@ -1089,7 +1123,7 @@ BENCH_START(pbl_driver_tim)
      &        ,NUM_VERT_MIX=grid%num_vert_mix                            &
 #endif
      &        ,QNORM=grid%QNORM, fasdas=config_flags%fasdas              & !fasdas
-     &        )
+     &        ,ii_debug=config_flags%ii_debug,jj_debug=config_flags%jj_debug) !JJG DEBUG
 
 #if (WRF_CHEM == 1)
 #ifdef DM_PARALLEL
@@ -1127,6 +1161,36 @@ BENCH_END(pbl_driver_tim)
 # endif
 # endif
 
+if(ips.le.config_flags%ii_debug .and. & !JJG DEBUG
+   ipe.ge.config_flags%ii_debug .and. & !JJG DEBUG
+   jps.le.config_flags%jj_debug .and. & !JJG DEBUG
+   jpe.ge.config_flags%jj_debug) then !JJG DEBUG
+
+funit = config_flags%ii_debug*100 + config_flags%jj_debug !JJG DEBUG
+write(funit,fmt='(A)') 'FIRSTRK:ABCDF' !JJG DEBUG
+
+write(funit,fmt='(A)') 'rthblten:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%rthblten(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(A)') 'rqvblten:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%rqvblten(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(A)') 'rqcblten:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%rqcblten(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(A)') 'rqiblten:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%rqiblten(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(A)') 'rublten:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%rublten(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(A)') 'rvblten:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%rvblten(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(A)') 'bc1:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') chem(config_flags%ii_debug,:,config_flags%jj_debug,p_bc1) 
+write(funit,fmt='(A)') 'bc2:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') chem(config_flags%ii_debug,:,config_flags%jj_debug,p_bc2) 
+write(funit,fmt='(A)') 'qfx:' !JJG DEBUG
+write(funit,fmt='(D25.15)') grid%qfx(config_flags%ii_debug,config_flags%jj_debug) 
+write(funit,fmt='(A)') 'hfx:' !JJG DEBUG
+write(funit,fmt='(D25.15)') grid%hfx(config_flags%ii_debug,config_flags%jj_debug) 
+
+end if !JJG DEBUG
 
 !*****
 ! fire 

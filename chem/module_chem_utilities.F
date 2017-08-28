@@ -54,7 +54,7 @@ CONTAINS
 
    REAL , DIMENSION( kms:kme ) ,           INTENT(IN   ) ::     fzm,   &
                                                                 fzp
-
+   integer :: funit !JJG DEBUG
    INTEGER :: i_start, i_end, j_start, j_end, k_start, k_end
    INTEGER :: i, j, k
    REAL    :: w1, w2, z0, z1, z2
@@ -107,6 +107,48 @@ CONTAINS
     enddo
     enddo
     enddo
+
+if(its.le.config_flags%ii_debug .and. & !JJG DEBUG
+   ite.ge.config_flags%ii_debug .and. & !JJG DEBUG
+   jts.le.config_flags%jj_debug .and. & !JJG DEBUG
+   jte.ge.config_flags%jj_debug) then !JJG DEBUG
+
+funit = config_flags%ii_debug*100 + config_flags%jj_debug !JJG DEBUG
+write(funit,fmt='(A)') 'CHEMPREP' !JJG DEBUG
+write(funit,fmt='(A,D25.15)') 'g:', g !JJG DEBUG
+
+write(funit,fmt='(A)') 'p_phy:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') p_phy(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(50D25.15)') p(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(50D25.15)') pb(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 't_phy:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') t_phy(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(50D25.15)') t(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'rho:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') rho(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(50D25.15)') alt(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'u_phy:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') u_phy(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(50D25.15)') u(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'v_phy:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') v_phy(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(50D25.15)') v(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'phb:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') phb(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+
+write(funit,fmt='(A)') 'ph:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') ph(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+
+write(funit,fmt='(A)') 'z_at_w:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') z_at_w(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+
+end if !JJG DEBUG
+
 
     do j = j_start,j_end
     do k = k_start, kte-1

@@ -183,6 +183,8 @@ SUBROUTINE solve_em ( grid , config_flags  &
 
    INTEGER                                    :: temp_itimestep
 
+   integer :: funit !JJG DEBUG
+
 !!Timeseries TLNL Test -JJG
    INTEGER, DIMENSION(:,:), ALLOCATABLE :: locations_f, locations_i
    INTEGER :: ierr, nfloc, nf, nf0, nf1, iloc_f, jloc_f, kloc_f
@@ -733,6 +735,43 @@ BENCH_START(set_phys_bc_tim)
      !$OMP END PARALLEL DO
 BENCH_END(set_phys_bc_tim)
 
+if(ips.le.config_flags%ii_debug .and. & !JJG DEBUG
+   ipe.ge.config_flags%ii_debug .and. & !JJG DEBUG
+   jps.le.config_flags%jj_debug .and. & !JJG DEBUG
+   jpe.ge.config_flags%jj_debug) then !JJG DEBUG
+
+funit = config_flags%ii_debug*100 + config_flags%jj_debug !JJG DEBUG
+write(funit,fmt='(A)') 'SOLVE_EM:1' !JJG DEBUG
+
+write(funit,fmt='(A)') 'p:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%p(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(50D25.15)') grid%pb(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 't:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%t_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'alt:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%alt(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'u:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%u_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'v:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%v_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'moist:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') moist(config_flags%ii_debug,:,config_flags%jj_debug,p_qv) 
+
+write(funit,fmt='(A)') 'mu:' !JJG DEBUG
+write(funit,fmt='(D25.15)') grid%mu_2(config_flags%ii_debug,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'phb:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%phb(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+
+write(funit,fmt='(A)') 'ph:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%ph_2(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+end if !JJG DEBUG
+
      rk_step_is_one : IF (rk_step == 1) THEN ! only need to initialize diffusion tendencies
 
 !<DESCRIPTION>
@@ -824,6 +863,43 @@ BENCH_END(set_phys_bc_tim)
 
 !************************************************************************************************************************
 ! LES_fix convert theta to theta_m: point 1  ! 28 January 2015
+if(ips.le.config_flags%ii_debug .and. & !JJG DEBUG
+   ipe.ge.config_flags%ii_debug .and. & !JJG DEBUG
+   jps.le.config_flags%jj_debug .and. & !JJG DEBUG
+   jpe.ge.config_flags%jj_debug) then !JJG DEBUG
+
+funit = config_flags%ii_debug*100 + config_flags%jj_debug !JJG DEBUG
+write(funit,fmt='(A)') 'SOLVE_EM:2' !JJG DEBUG
+
+write(funit,fmt='(A)') 'p:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%p(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(50D25.15)') grid%pb(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 't:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%t_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'alt:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%alt(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'u:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%u_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'v:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%v_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'moist:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') moist(config_flags%ii_debug,:,config_flags%jj_debug,p_qv) 
+
+write(funit,fmt='(A)') 'mu:' !JJG DEBUG
+write(funit,fmt='(D25.15)') grid%mu_2(config_flags%ii_debug,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'phb:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%phb(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+
+write(funit,fmt='(A)') 'ph:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%ph_2(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+end if !JJG DEBUG
+
 
      IF ( ( config_flags%use_theta_m .EQ. 1 ) .AND. (P_Qv .GE. PARAM_FIRST_SCALAR) ) THEN
         CALL theta_to_thetam ( grid%t_1 , moist_old(ims,kms,jms,P_qv) ,  &
@@ -903,6 +979,43 @@ BENCH_START(rk_tend_tim)
      END DO
      !$OMP END PARALLEL DO
 BENCH_END(rk_tend_tim)
+if(ips.le.config_flags%ii_debug .and. & !JJG DEBUG
+   ipe.ge.config_flags%ii_debug .and. & !JJG DEBUG
+   jps.le.config_flags%jj_debug .and. & !JJG DEBUG
+   jpe.ge.config_flags%jj_debug) then !JJG DEBUG
+
+funit = config_flags%ii_debug*100 + config_flags%jj_debug !JJG DEBUG
+write(funit,fmt='(A)') 'SOLVE_EM:3' !JJG DEBUG
+
+write(funit,fmt='(A)') 'p:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%p(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(50D25.15)') grid%pb(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 't:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%t_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'alt:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%alt(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'u:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%u_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'v:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%v_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'moist:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') moist(config_flags%ii_debug,:,config_flags%jj_debug,p_qv) 
+
+write(funit,fmt='(A)') 'mu:' !JJG DEBUG
+write(funit,fmt='(D25.15)') grid%mu_2(config_flags%ii_debug,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'phb:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%phb(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+
+write(funit,fmt='(A)') 'ph:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%ph_2(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+end if !JJG DEBUG
+
 
      IF (config_flags%use_adaptive_time_step) THEN
        DO ij = 1 , grid%num_tiles
@@ -1103,6 +1216,43 @@ BENCH_START(relax_bdy_dry_tim)
      END DO
      !$OMP END PARALLEL DO
 BENCH_END(relax_bdy_dry_tim)
+if(ips.le.config_flags%ii_debug .and. & !JJG DEBUG
+   ipe.ge.config_flags%ii_debug .and. & !JJG DEBUG
+   jps.le.config_flags%jj_debug .and. & !JJG DEBUG
+   jpe.ge.config_flags%jj_debug) then !JJG DEBUG
+
+funit = config_flags%ii_debug*100 + config_flags%jj_debug !JJG DEBUG
+write(funit,fmt='(A)') 'SOLVE_EM:4' !JJG DEBUG
+
+write(funit,fmt='(A)') 'p:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%p(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(50D25.15)') grid%pb(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 't:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%t_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'alt:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%alt(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'u:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%u_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'v:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%v_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'moist:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') moist(config_flags%ii_debug,:,config_flags%jj_debug,p_qv) 
+
+write(funit,fmt='(A)') 'mu:' !JJG DEBUG
+write(funit,fmt='(D25.15)') grid%mu_2(config_flags%ii_debug,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'phb:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%phb(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+
+write(funit,fmt='(A)') 'ph:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%ph_2(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+end if !JJG DEBUG
+
 
 !<DESCRIPTION>
 !<pre>
@@ -1193,6 +1343,43 @@ BENCH_START(small_step_prep_tim)
      ENDDO
      !$OMP END PARALLEL DO
 BENCH_END(small_step_prep_tim)
+if(ips.le.config_flags%ii_debug .and. & !JJG DEBUG
+   ipe.ge.config_flags%ii_debug .and. & !JJG DEBUG
+   jps.le.config_flags%jj_debug .and. & !JJG DEBUG
+   jpe.ge.config_flags%jj_debug) then !JJG DEBUG
+
+funit = config_flags%ii_debug*100 + config_flags%jj_debug !JJG DEBUG
+write(funit,fmt='(A)') 'SOLVE_EM:5' !JJG DEBUG
+
+write(funit,fmt='(A)') 'p:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%p(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(50D25.15)') grid%pb(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 't:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%t_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'alt:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%alt(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'u:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%u_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'v:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%v_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'moist:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') moist(config_flags%ii_debug,:,config_flags%jj_debug,p_qv) 
+
+write(funit,fmt='(A)') 'mu:' !JJG DEBUG
+write(funit,fmt='(D25.15)') grid%mu_2(config_flags%ii_debug,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'phb:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%phb(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+
+write(funit,fmt='(A)') 'ph:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%ph_2(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+end if !JJG DEBUG
+
 
 #ifdef DM_PARALLEL
 !-----------------------------------------------------------------------
@@ -1318,6 +1505,44 @@ BENCH_START(set_phys_bc2_tim)
      END DO
      !$OMP END PARALLEL DO
 BENCH_END(set_phys_bc2_tim)
+if(ips.le.config_flags%ii_debug .and. & !JJG DEBUG
+   ipe.ge.config_flags%ii_debug .and. & !JJG DEBUG
+   jps.le.config_flags%jj_debug .and. & !JJG DEBUG
+   jpe.ge.config_flags%jj_debug) then !JJG DEBUG
+
+funit = config_flags%ii_debug*100 + config_flags%jj_debug !JJG DEBUG
+write(funit,fmt='(A)') 'SOLVE_EM:6' !JJG DEBUG
+
+write(funit,fmt='(A)') 'p:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%p(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(50D25.15)') grid%pb(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 't:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%t_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'alt:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%alt(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'u:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%u_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'v:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%v_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'moist:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') moist(config_flags%ii_debug,:,config_flags%jj_debug,p_qv) 
+
+write(funit,fmt='(A)') 'mu:' !JJG DEBUG
+write(funit,fmt='(D25.15)') grid%mu_2(config_flags%ii_debug,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'phb:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%phb(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+
+write(funit,fmt='(A)') 'ph:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%ph_2(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+end if !JJG DEBUG
+
+
      small_steps : DO iteration = 1 , number_of_small_timesteps
 
        ! Boundary condition time (or communication time).  
@@ -1422,6 +1647,43 @@ BENCH_END(spec_bdy_uv_tim)
 
        END DO
        !$OMP END PARALLEL DO
+if(ips.le.config_flags%ii_debug .and. & !JJG DEBUG
+   ipe.ge.config_flags%ii_debug .and. & !JJG DEBUG
+   jps.le.config_flags%jj_debug .and. & !JJG DEBUG
+   jpe.ge.config_flags%jj_debug) then !JJG DEBUG
+
+funit = config_flags%ii_debug*100 + config_flags%jj_debug !JJG DEBUG
+write(funit,fmt='(A)') 'SOLVE_EM:7' !JJG DEBUG
+
+write(funit,fmt='(A)') 'p:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%p(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(50D25.15)') grid%pb(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 't:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%t_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'alt:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%alt(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'u:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%u_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'v:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%v_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'moist:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') moist(config_flags%ii_debug,:,config_flags%jj_debug,p_qv) 
+
+write(funit,fmt='(A)') 'mu:' !JJG DEBUG
+write(funit,fmt='(D25.15)') grid%mu_2(config_flags%ii_debug,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'phb:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%phb(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+
+write(funit,fmt='(A)') 'ph:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%ph_2(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+end if !JJG DEBUG
+
 
 #ifdef DM_PARALLEL
 !
@@ -1575,6 +1837,43 @@ BENCH_END(advance_w_tim)
 
        ENDDO
        !$OMP END PARALLEL DO
+if(ips.le.config_flags%ii_debug .and. & !JJG DEBUG
+   ipe.ge.config_flags%ii_debug .and. & !JJG DEBUG
+   jps.le.config_flags%jj_debug .and. & !JJG DEBUG
+   jpe.ge.config_flags%jj_debug) then !JJG DEBUG
+
+funit = config_flags%ii_debug*100 + config_flags%jj_debug !JJG DEBUG
+write(funit,fmt='(A)') 'SOLVE_EM:8' !JJG DEBUG
+
+write(funit,fmt='(A)') 'p:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%p(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(50D25.15)') grid%pb(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 't:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%t_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'alt:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%alt(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'u:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%u_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'v:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%v_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'moist:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') moist(config_flags%ii_debug,:,config_flags%jj_debug,p_qv) 
+
+write(funit,fmt='(A)') 'mu:' !JJG DEBUG
+write(funit,fmt='(D25.15)') grid%mu_2(config_flags%ii_debug,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'phb:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%phb(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+
+write(funit,fmt='(A)') 'ph:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%ph_2(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+end if !JJG DEBUG
+
 
 !-----------------------------------------------------------
 !  acoustic integration polar filter for smallstep w, geopotential
@@ -1772,6 +2071,43 @@ BENCH_START(phys_bc_tim)
 BENCH_END(phys_bc_tim)
 
      END DO small_steps
+if(ips.le.config_flags%ii_debug .and. & !JJG DEBUG
+   ipe.ge.config_flags%ii_debug .and. & !JJG DEBUG
+   jps.le.config_flags%jj_debug .and. & !JJG DEBUG
+   jpe.ge.config_flags%jj_debug) then !JJG DEBUG
+
+funit = config_flags%ii_debug*100 + config_flags%jj_debug !JJG DEBUG
+write(funit,fmt='(A)') 'SOLVE_EM:9' !JJG DEBUG
+
+write(funit,fmt='(A)') 'p:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%p(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(50D25.15)') grid%pb(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 't:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%t_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'alt:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%alt(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'u:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%u_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'v:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%v_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'moist:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') moist(config_flags%ii_debug,:,config_flags%jj_debug,p_qv) 
+
+write(funit,fmt='(A)') 'mu:' !JJG DEBUG
+write(funit,fmt='(D25.15)') grid%mu_2(config_flags%ii_debug,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'phb:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%phb(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+
+write(funit,fmt='(A)') 'ph:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%ph_2(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+end if !JJG DEBUG
+
 
      !$OMP PARALLEL DO   &
      !$OMP PRIVATE ( ij )
@@ -1858,6 +2194,43 @@ BENCH_END(small_step_finish_tim)
 
      END DO
      !$OMP END PARALLEL DO
+if(ips.le.config_flags%ii_debug .and. & !JJG DEBUG
+   ipe.ge.config_flags%ii_debug .and. & !JJG DEBUG
+   jps.le.config_flags%jj_debug .and. & !JJG DEBUG
+   jpe.ge.config_flags%jj_debug) then !JJG DEBUG
+
+funit = config_flags%ii_debug*100 + config_flags%jj_debug !JJG DEBUG
+write(funit,fmt='(A)') 'SOLVE_EM:10' !JJG DEBUG
+
+write(funit,fmt='(A)') 'p:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%p(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(50D25.15)') grid%pb(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 't:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%t_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'alt:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%alt(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'u:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%u_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'v:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%v_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'moist:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') moist(config_flags%ii_debug,:,config_flags%jj_debug,p_qv) 
+
+write(funit,fmt='(A)') 'mu:' !JJG DEBUG
+write(funit,fmt='(D25.15)') grid%mu_2(config_flags%ii_debug,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'phb:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%phb(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+
+write(funit,fmt='(A)') 'ph:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%ph_2(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+end if !JJG DEBUG
+
 
 !-----------------------------------------------------------
 !  polar filter for full dynamics variables and time-averaged mass fluxes 
@@ -2055,6 +2428,43 @@ BENCH_END(small_step_finish_tim)
            ENDDO
          END DO
          !$OMP END PARALLEL DO
+if(ips.le.config_flags%ii_debug .and. & !JJG DEBUG
+   ipe.ge.config_flags%ii_debug .and. & !JJG DEBUG
+   jps.le.config_flags%jj_debug .and. & !JJG DEBUG
+   jpe.ge.config_flags%jj_debug) then !JJG DEBUG
+
+funit = config_flags%ii_debug*100 + config_flags%jj_debug !JJG DEBUG
+write(funit,fmt='(A)') 'SOLVE_EM:11' !JJG DEBUG
+
+write(funit,fmt='(A)') 'p:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%p(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(50D25.15)') grid%pb(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 't:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%t_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'alt:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%alt(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'u:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%u_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'v:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%v_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'moist:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') moist(config_flags%ii_debug,:,config_flags%jj_debug,p_qv) 
+
+write(funit,fmt='(A)') 'mu:' !JJG DEBUG
+write(funit,fmt='(D25.15)') grid%mu_2(config_flags%ii_debug,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'phb:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%phb(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+
+write(funit,fmt='(A)') 'ph:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%ph_2(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+end if !JJG DEBUG
+
 
 !---------------------- positive definite bc call
 #ifdef DM_PARALLEL
@@ -2117,6 +2527,44 @@ BENCH_END(small_step_finish_tim)
            ENDDO
          END DO
          !$OMP END PARALLEL DO
+
+if(ips.le.config_flags%ii_debug .and. & !JJG DEBUG
+   ipe.ge.config_flags%ii_debug .and. & !JJG DEBUG
+   jps.le.config_flags%jj_debug .and. & !JJG DEBUG
+   jpe.ge.config_flags%jj_debug) then !JJG DEBUG
+
+funit = config_flags%ii_debug*100 + config_flags%jj_debug !JJG DEBUG
+write(funit,fmt='(A)') 'SOLVE_EM:12' !JJG DEBUG
+
+write(funit,fmt='(A)') 'p:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%p(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(50D25.15)') grid%pb(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 't:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%t_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'alt:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%alt(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'u:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%u_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'v:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%v_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'moist:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') moist(config_flags%ii_debug,:,config_flags%jj_debug,p_qv) 
+
+write(funit,fmt='(A)') 'mu:' !JJG DEBUG
+write(funit,fmt='(D25.15)') grid%mu_2(config_flags%ii_debug,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'phb:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%phb(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+
+write(funit,fmt='(A)') 'ph:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%ph_2(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+end if !JJG DEBUG
+
 
 !---------------------- positive definite bc call
 #ifdef DM_PARALLEL
@@ -2426,6 +2874,44 @@ BENCH_START(tke_adv_tim)
           CALL wrf_error_fatal(TRIM(wrf_err_message))
          ENDIF
 #endif
+if(ips.le.config_flags%ii_debug .and. & !JJG DEBUG
+   ipe.ge.config_flags%ii_debug .and. & !JJG DEBUG
+   jps.le.config_flags%jj_debug .and. & !JJG DEBUG
+   jpe.ge.config_flags%jj_debug) then !JJG DEBUG
+
+funit = config_flags%ii_debug*100 + config_flags%jj_debug !JJG DEBUG
+write(funit,fmt='(A)') 'SOLVE_EM:13' !JJG DEBUG
+
+write(funit,fmt='(A)') 'p:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%p(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(50D25.15)') grid%pb(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 't:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%t_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'alt:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%alt(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'u:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%u_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'v:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%v_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'moist:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') moist(config_flags%ii_debug,:,config_flags%jj_debug,p_qv) 
+
+write(funit,fmt='(A)') 'mu:' !JJG DEBUG
+write(funit,fmt='(D25.15)') grid%mu_2(config_flags%ii_debug,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'phb:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%phb(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+
+write(funit,fmt='(A)') 'ph:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%ph_2(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+end if !JJG DEBUG
+
+
          !$OMP PARALLEL DO   &
          !$OMP PRIVATE ( ij, tenddec )
          tke_tile_loop_1: DO ij = 1 , grid%num_tiles
@@ -2993,6 +3479,43 @@ BENCH_END(tracer_adv_tim)
 !************************************************************************************************************************
 
  !  update the pressure and density at the new time level
+if(ips.le.config_flags%ii_debug .and. & !JJG DEBUG
+   ipe.ge.config_flags%ii_debug .and. & !JJG DEBUG
+   jps.le.config_flags%jj_debug .and. & !JJG DEBUG
+   jpe.ge.config_flags%jj_debug) then !JJG DEBUG
+
+funit = config_flags%ii_debug*100 + config_flags%jj_debug !JJG DEBUG
+write(funit,fmt='(A)') 'SOLVE_EM:14' !JJG DEBUG
+
+write(funit,fmt='(A)') 'p:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%p(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(50D25.15)') grid%pb(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 't:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%t_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'alt:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%alt(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'u:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%u_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'v:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%v_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'moist:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') moist(config_flags%ii_debug,:,config_flags%jj_debug,p_qv) 
+
+write(funit,fmt='(A)') 'mu:' !JJG DEBUG
+write(funit,fmt='(D25.15)') grid%mu_2(config_flags%ii_debug,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'phb:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%phb(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+
+write(funit,fmt='(A)') 'ph:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%ph_2(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+end if !JJG DEBUG
+
 
      !$OMP PARALLEL DO   &
      !$OMP PRIVATE ( ij )
@@ -3380,6 +3903,43 @@ BENCH_END(diag_w_tim)
        END DO tile_bc_loop_1
        !$OMP END PARALLEL DO
 BENCH_END(bc_end_tim)
+
+if(ips.le.config_flags%ii_debug .and. & !JJG DEBUG
+   ipe.ge.config_flags%ii_debug .and. & !JJG DEBUG
+   jps.le.config_flags%jj_debug .and. & !JJG DEBUG
+   jpe.ge.config_flags%jj_debug) then !JJG DEBUG
+
+funit = config_flags%ii_debug*100 + config_flags%jj_debug !JJG DEBUG
+write(funit,fmt='(A)') 'SOLVE_EM:15' !JJG DEBUG
+
+write(funit,fmt='(A)') 'p:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%p(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(50D25.15)') grid%pb(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 't:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%t_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'alt:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%alt(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'u:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%u_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'v:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%v_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'moist:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') moist(config_flags%ii_debug,:,config_flags%jj_debug,p_qv) 
+
+write(funit,fmt='(A)') 'mu:' !JJG DEBUG
+write(funit,fmt='(D25.15)') grid%mu_2(config_flags%ii_debug,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'phb:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%phb(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+
+write(funit,fmt='(A)') 'ph:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%ph_2(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+end if !JJG DEBUG
 
 
 #ifdef DM_PARALLEL
@@ -3879,6 +4439,43 @@ BENCH_START(micro_driver_tim)
 
                                                                           )
 BENCH_END(micro_driver_tim)
+if(ips.le.config_flags%ii_debug .and. & !JJG DEBUG
+   ipe.ge.config_flags%ii_debug .and. & !JJG DEBUG
+   jps.le.config_flags%jj_debug .and. & !JJG DEBUG
+   jpe.ge.config_flags%jj_debug) then !JJG DEBUG
+
+funit = config_flags%ii_debug*100 + config_flags%jj_debug !JJG DEBUG
+write(funit,fmt='(A)') 'SOLVE_EM:16' !JJG DEBUG
+
+write(funit,fmt='(A)') 'p:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%p(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(50D25.15)') grid%pb(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 't:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%t_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'alt:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%alt(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'u:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%u_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'v:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%v_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'moist:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') moist(config_flags%ii_debug,:,config_flags%jj_debug,p_qv) 
+
+write(funit,fmt='(A)') 'mu:' !JJG DEBUG
+write(funit,fmt='(D25.15)') grid%mu_2(config_flags%ii_debug,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'phb:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%phb(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+
+write(funit,fmt='(A)') 'ph:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%ph_2(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+end if !JJG DEBUG
+
 
 #if 0
 BENCH_START(microswap_2)
@@ -4045,6 +4642,43 @@ BENCH_START(moist_phys_end_tim)
 !-----------------------------------------------------------
 !  end filter for moist variables post-microphysics and end of timestep
 !-----------------------------------------------------------
+
+if(ips.le.config_flags%ii_debug .and. & !JJG DEBUG
+   ipe.ge.config_flags%ii_debug .and. & !JJG DEBUG
+   jps.le.config_flags%jj_debug .and. & !JJG DEBUG
+   jpe.ge.config_flags%jj_debug) then !JJG DEBUG
+
+funit = config_flags%ii_debug*100 + config_flags%jj_debug !JJG DEBUG
+write(funit,fmt='(A)') 'SOLVE_EM:17' !JJG DEBUG
+
+write(funit,fmt='(A)') 'p:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%p(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(50D25.15)') grid%pb(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 't:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%t_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'alt:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%alt(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'u:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%u_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'v:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%v_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'moist:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') moist(config_flags%ii_debug,:,config_flags%jj_debug,p_qv) 
+
+write(funit,fmt='(A)') 'mu:' !JJG DEBUG
+write(funit,fmt='(D25.15)') grid%mu_2(config_flags%ii_debug,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'phb:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%phb(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+
+write(funit,fmt='(A)') 'ph:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%ph_2(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+end if !JJG DEBUG
 
 
    !$OMP PARALLEL DO   &
@@ -4318,6 +4952,43 @@ BENCH_END(moist_phys_end_tim)
 #endif
 
 !  now set physical b.c on a patch
+if(ips.le.config_flags%ii_debug .and. & !JJG DEBUG
+   ipe.ge.config_flags%ii_debug .and. & !JJG DEBUG
+   jps.le.config_flags%jj_debug .and. & !JJG DEBUG
+   jpe.ge.config_flags%jj_debug) then !JJG DEBUG
+
+funit = config_flags%ii_debug*100 + config_flags%jj_debug !JJG DEBUG
+write(funit,fmt='(A)') 'SOLVE_EM:18' !JJG DEBUG
+
+write(funit,fmt='(A)') 'p:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%p(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(50D25.15)') grid%pb(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 't:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%t_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'alt:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%alt(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'u:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%u_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'v:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%v_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'moist:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') moist(config_flags%ii_debug,:,config_flags%jj_debug,p_qv) 
+
+write(funit,fmt='(A)') 'mu:' !JJG DEBUG
+write(funit,fmt='(D25.15)') grid%mu_2(config_flags%ii_debug,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'phb:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%phb(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+
+write(funit,fmt='(A)') 'ph:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%ph_2(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+end if !JJG DEBUG
+
 
 BENCH_START(bc_2d_tim)
    !$OMP PARALLEL DO   &
@@ -4642,6 +5313,43 @@ BENCH_END(bc_2d_tim)
                             imsy, imey, jmsy, jmey, kmsy, kmey,  &
                             ipsy, ipey, jpsy, jpey, kpsy, kpey   )
 
+
+if(ips.le.config_flags%ii_debug .and. & !JJG DEBUG
+   ipe.ge.config_flags%ii_debug .and. & !JJG DEBUG
+   jps.le.config_flags%jj_debug .and. & !JJG DEBUG
+   jpe.ge.config_flags%jj_debug) then !JJG DEBUG
+
+funit = config_flags%ii_debug*100 + config_flags%jj_debug !JJG DEBUG
+write(funit,fmt='(A)') 'SOLVE_EM:19' !JJG DEBUG
+
+write(funit,fmt='(A)') 'p:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%p(config_flags%ii_debug,:,config_flags%jj_debug) 
+write(funit,fmt='(50D25.15)') grid%pb(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 't:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%t_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'alt:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%alt(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'u:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%u_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'v:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%v_2(config_flags%ii_debug,:,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'moist:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') moist(config_flags%ii_debug,:,config_flags%jj_debug,p_qv) 
+
+write(funit,fmt='(A)') 'mu:' !JJG DEBUG
+write(funit,fmt='(D25.15)') grid%mu_2(config_flags%ii_debug,config_flags%jj_debug) 
+
+write(funit,fmt='(A)') 'phb:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%phb(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+
+write(funit,fmt='(A)') 'ph:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') grid%ph_2(config_flags%ii_debug,:,config_flags%jj_debug) !JJG DEBUG
+end if !JJG DEBUG
 
 
 #ifdef DM_PARALLEL

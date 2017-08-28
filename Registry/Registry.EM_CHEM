@@ -11,36 +11,36 @@ include registry.stoch
 include registry.les
 include registry.cam
 include registry.clm
-include registry.lake
 include registry.ssib
-include registry.sbm
-include registry.diags
-include registry.afwa
-include registry.rasm_diag
-include registry.elec
-include registry.bdy_perturb
-include registry.new3d_gca
-include registry.hyb_coord
-include registry.new3d_wif
-
-ifdef WRFPLUS=1
-include registry.wrfplus
-include registry.chemplus
 package   lscondscheme  mp_physics==98               -             moist:qv;g_moist:g_qv;a_moist:a_qv
 package   mkesslerscheme mp_physics==99              -             moist:qv,qc,qr;g_moist:g_qv,g_qc,g_qr;a_moist:a_qv,a_qc,a_qr
 package   surfdragscheme bl_pbl_physics==98          -             -
 package   ducuscheme     cu_physics==98              -             -
 halo      HALO_EM_PHYS_A_BL_SURF  dyn_em 4:xland
-endif
+#ifdef WRFPLUS=1
+include registry.wrfplus
+include registry.chemplus
+#endif
+include registry.lake
+include registry.diags
+include registry.afwa
+include registry.rasm_diag
+include registry.sbm
+include registry.elec
+include registry.bdy_perturb
+include registry.hyb_coord
+include registry.new3d_wif
+include registry.new3d_gca
 
-state   real   landmask            ij    misc          1     -     i012rh0d=(interp_fcnm_imask)u=(copy_fcnm)   "LANDMASK"      "LAND MASK (1 FOR LAND, 0 FOR WATER)"  ""
-state   real   lakemask            ij    misc          1     -     i012rh0d=(interp_fcnm_imask)u=(copy_fcnm)   "LAKEMASK"      "LAKE MASK (1 FOR LAND, 0 FOR WATER)"  ""
+
+state   real   landmask            ij    misc          1     -     i0125rh056d=(interp_fcnm_imask)u=(copy_fcnm)   "LANDMASK"      "LAND MASK (1 FOR LAND, 0 FOR WATER)"  ""
+state   real   lakemask            ij    misc          1     -     i012rhd=(interp_fcnm_imask)u=(copy_fcnm)   "LAKEMASK"      "LAKE MASK (1 FOR LAND, 0 FOR WATER)"  ""
 
 # Masked SST interpolation from the CG
 #state    real   SST              ij    misc        1         -     i0124rh0d=(interp_mask_field:lu_index,iswater)f=(p2c_mask:lu_index,tslb,num_soil_layers,iswater)   "SST"              "SEA SURFACE TEMPERATURE" "K"
 # Simple SST interpolation from the CG
 #state    real   SST              ij    misc        1         -     i0124rh0d=(interp_mask_field:lu_index,iswater)f=(p2c)   "SST"              "SEA SURFACE TEMPERATURE" "K"
-state    real   SST              ij     misc        1         -     i0124rh0d=(interp_mask_field:lu_index,iswater)   "SST"              "SEA SURFACE TEMPERATURE" "K"
+state    real   SST              ij     misc        1         -     i01245rh0d=(interp_mask_field:lu_index,iswater)   "SST"              "SEA SURFACE TEMPERATURE" "K"
 state    real   SST_INPUT        ij     misc        1         -     rh   "SST_INPUT"              "SEA SURFACE TEMPERATURE FROM WRFLOWINPUT FILE" "K"
 
 package   restofwrf      use_wps_input==0            -             -

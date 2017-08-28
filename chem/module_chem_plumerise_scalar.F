@@ -9,7 +9,7 @@ Module module_chem_plumerise_scalar
 CONTAINS
 subroutine plumerise(m1,m2,m3,ia,iz,ja,jz,firesize,mean_fct   &
                     ,nspecies,eburn_in,eburn_out      &
-                    ,up,vp,wp,theta,pp,dn0,rv,zt_rams,zm_rams)
+                    ,up,vp,wp,theta,pp,dn0,rv,zt_rams,zm_rams,ii,jj) !JJG DEBUG
 ! use module_zero_plumegen_coms, only : ucon,vcon,wcon,thtcon,rvcon,picon,tmpcon&
 !                          ,dncon,prcon,zcon,zzcon,scon
   
@@ -23,6 +23,7 @@ subroutine plumerise(m1,m2,m3,ia,iz,ja,jz,firesize,mean_fct   &
   integer :: kmt
  real,dimension(m1,nspecies), intent(out) :: eburn_out
  real,dimension(nspecies), intent(in) :: eburn_in
+ integer, intent(in) :: ii,jj !JJG DEBUG
 
   real,    dimension(m1,m2,m3) :: up, vp, wp,theta,pp,dn0,rv
 				 
@@ -105,7 +106,7 @@ subroutine plumerise(m1,m2,m3,ia,iz,ja,jz,firesize,mean_fct   &
          enddo
  	
          !- get envinronmental state (temp, water vapor mix ratio, ...)
- 	 call get_env_condition(1,m1,kmt,wind_eff)
+ 	 call get_env_condition(1,m1,kmt,wind_eff,ii,jj) !JJG DEBUG
  	    
          !- loop nos 4 biomas agregados com possivel queimada 
  	 do iveg_ag=1,nveg_agreg
@@ -204,11 +205,13 @@ subroutine plumerise(m1,m2,m3,ia,iz,ja,jz,firesize,mean_fct   &
 end subroutine plumerise
 !-------------------------------------------------------------------------
 
-subroutine get_env_condition(k1,k2,kmt,wind_eff)
+subroutine get_env_condition(k1,k2,kmt,wind_eff,ii,jj) !JJG DEBUG
 
 !se module_zero_plumegen_coms
 !use rconstants
 implicit none
+integer, intent(in) :: ii,jj !JJG DEBUG
+integer :: funit !JJG DEBUG
 integer :: k1,k2,k,kcon,klcl,kmt,nk,nkmid,i
 real :: znz,themax,tlll,plll,rlll,zlll,dzdd,dzlll,tlcl,plcl,dzlcl,dummy
 integer :: n_setgrid = 0 
@@ -223,7 +226,20 @@ if( n_setgrid == 0) then
 endif
 
 znz=zcon(k2)
+funit = ii*100+jj !JJG DEBUG
+write(funit,fmt='(A)') '' !JJG DEBUG
+write(funit,fmt='(A,I10)') 'k2:',k2 !JJG DEBUG
+
+write(funit,fmt='(A)') '' !JJG DEBUG
+write(funit,fmt='(A)') 'zcon:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') zcon !JJG DEBUG
+
+write(funit,fmt='(A)') '' !JJG DEBUG
+write(funit,fmt='(A)') 'znz:' !JJG DEBUG
+write(funit,fmt='(2D25.15)') znz,zcon(k2) !JJG DEBUG
+
 do k=nkp,1,-1
+     write(funit,fmt='(A,I10,D25.15)') 'k,zt(k):',k, zt(k) !JJG DEBUG
   if(zt(k).lt.znz)go to 13
 enddo
 stop ' envir stop 12'

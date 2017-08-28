@@ -126,7 +126,7 @@ CONTAINS
 !
 ! END FASDAS
 !
-                                                                     )
+               ,ii_debug,jj_debug                                                      )
        
 !------------------------------------------------------------------
 #if (EM_CORE==1)
@@ -778,6 +778,10 @@ CONTAINS
    REAL, DIMENSION( ims:ime, jms:jme ) , INTENT(  OUT) , OPTIONAL ::   QNORM
    INTEGER, INTENT(IN   )                                         ::   fasdas
    REAL                                                           ::   scrp1
+
+   integer :: funit !JJG DEBUG
+   integer, intent(in) :: ii_debug,jj_debug !JJG DEBUG
+
 !
 ! END FASDAS
 !
@@ -951,6 +955,27 @@ CONTAINS
    !$OMP PRIVATE ( ij,i,j,k )
 
    DO ij = 1 , num_tiles
+
+if(i_start(ij).le.ii_debug .and. & !JJG DEBUG
+   i_end(ij).ge.ii_debug .and. & !JJG DEBUG
+   j_start(ij).le.jj_debug .and. & !JJG DEBUG
+   j_end(ij).ge.jj_debug) then !JJG DEBUG
+
+funit = ii_debug*100 + jj_debug !JJG DEBUG
+write(funit,fmt='(A)') 'PBLDRV:1' !JJG DEBUG
+
+write(funit,fmt='(A)') 'u_phy:' !jjg debug
+write(funit,fmt='(50D25.15)') u_phy(ii_debug,:,jj_debug) 
+write(funit,fmt='(A)') 'v_phy:' !jjg debug
+write(funit,fmt='(50D25.15)') v_phy(ii_debug,:,jj_debug) 
+
+write(funit,fmt='(A)') 'u_frame:' !jjg debug
+write(funit,fmt='(D25.15)') u_frame
+write(funit,fmt='(A)') 'v_frame:' !jjg debug
+write(funit,fmt='(D25.15)') v_frame
+
+end if !JJG DEBUG
+
       DO j=j_start(ij),j_end(ij)
       DO i=i_start(ij),i_end(ij)
          TSKOLD(i,j)=TSK(i,j)
@@ -991,6 +1016,21 @@ CONTAINS
          ENDIF
       ENDDO
       ENDDO
+
+if(i_start(ij).le.ii_debug .and. & !JJG DEBUG
+   i_end(ij).ge.ii_debug .and. & !JJG DEBUG
+   j_start(ij).le.jj_debug .and. & !JJG DEBUG
+   j_end(ij).ge.jj_debug) then !JJG DEBUG
+
+funit = ii_debug*100 + jj_debug !JJG DEBUG
+write(funit,fmt='(A)') 'PBLDRV:2' !JJG DEBUG
+
+write(funit,fmt='(A)') 'u_phytmp:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') u_phytmp(ii_debug,:,jj_debug) 
+write(funit,fmt='(A)') 'v_phytmp:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') v_phytmp(ii_debug,:,jj_debug) 
+end if !JJG DEBUG
+
 
       IF (bl_pbl_physics .EQ. QNSEPBLSCHEME ) THEN
 ! use u_phytmp instead of wthv_mf, and v_phytmp instead of lm_bl89

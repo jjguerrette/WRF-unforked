@@ -4863,8 +4863,8 @@ BENCH_END(bc_2d_tim)
   a_chem_old = 0.D0
   a_scalar_old = 0.D0 
 
-  a_muus = 0.D0 
-  a_muvs = 0.D0 
+  grid%a_muus = 0.D0 
+  grid%a_muvs = 0.D0 
   a_muave = 0.D0 
   a_c2a = 0.D0 
   a_pm1 = 0.D0 

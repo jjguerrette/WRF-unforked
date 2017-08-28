@@ -89,6 +89,7 @@ subroutine plumerise_driver (id,ktau,dtstep,                           &
                               ,z_lev
 ! real, dimension(nveg_agreg) :: firesize,mean_fct
       real :: sum, ffirs, ratio
+      integer :: funit !JJG DEBUG
 !     real,save,dimension(its:ite,jts:jte) :: ffirs
       ffirs=0.
       nspecies=num_ebu
@@ -285,11 +286,62 @@ subroutine plumerise_driver (id,ktau,dtstep,                           &
 !               write(0,*)'eburn',eburn_in(1),mean_fct,firesize
 !             endif
 
+funit = i*100+j !JJG DEBUG
+write(funit,fmt='(A)') '' !JJG DEBUG
+write(funit,fmt='(A)') 'PLUMERISE' !JJG DEBUG
+write(funit,fmt='(A,3I10)') 'i,j,kte:',i,j,kte !JJG DEBUG
+
+write(funit,fmt='(A)') '' !JJG DEBUG
+write(funit,fmt='(A)') 'z:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') z(i,:,j) !JJG DEBUG
+
+write(funit,fmt='(A)') '' !JJG DEBUG
+write(funit,fmt='(A)') 'z_at_w:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') z_at_w(i,:,j) !JJG DEBUG
+
+write(funit,fmt='(A)') '' !JJG DEBUG
+write(funit,fmt='(A)') 'zmid:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') zmid !JJG DEBUG
+
+write(funit,fmt='(A)') '' !JJG DEBUG
+write(funit,fmt='(A)') 'z_lev:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') z_lev !JJG DEBUG
+
+write(funit,fmt='(A)') '' !JJG DEBUG
+write(funit,fmt='(A)') 'u_in:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') u_in !JJG DEBUG
+
+write(funit,fmt='(A)') '' !JJG DEBUG
+write(funit,fmt='(A)') 'v_in:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') v_in !JJG DEBUG
+
+write(funit,fmt='(A)') '' !JJG DEBUG
+write(funit,fmt='(A)') 'w_in:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') w_in !JJG DEBUG
+
+write(funit,fmt='(A)') '' !JJG DEBUG
+write(funit,fmt='(A)') 'qv_in:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') qv_in !JJG DEBUG
+
+write(funit,fmt='(A)') '' !JJG DEBUG
+write(funit,fmt='(A)') 'pi_in:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') pi_in !JJG DEBUG
+
+write(funit,fmt='(A)') '' !JJG DEBUG
+write(funit,fmt='(A)') 'rho_phyin:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') rho_phyin !JJG DEBUG
+
+write(funit,fmt='(A)') '' !JJG DEBUG
+write(funit,fmt='(A)') 'theta_in:' !JJG DEBUG
+write(funit,fmt='(50D25.15)') theta_in !JJG DEBUG
+
+
+
             call plumerise(kte,1,1,1,1,1,1,firesize,mean_fct  &
                     ,nspecies,eburn_in,eburn_out &
                     ,u_in ,v_in ,w_in ,theta_in ,pi_in  &
                     ,rho_phyin ,qv_in ,zmid    &
-                    ,z_lev                               )
+                    ,z_lev                               ,i,j)
 
 !             if(ffirs.le.5)then
 !           do k=kts,kte

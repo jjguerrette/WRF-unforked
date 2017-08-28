@@ -42,6 +42,9 @@ rconfig   integer pinterp_option   namelist,perturbation         1   1       -  
 
 rconfig   integer force_pbl        namelist,perturbation         1   0  r    "force_pbl"        ""      ""
 
+rconfig   integer ii_debug         namelist,chem                 1   5  r    "ii_debug"         ""      ""
+rconfig   integer jj_debug         namelist,chem                 1   5  r    "jj_debug"         ""      ""
+
 # chem observation arrays
 ## SURFACE
 state    real  i_surf  {nsurf}  misc           1         -      h{17}      "i_surf"        "surf_obs grid location"             ""
@@ -119,8 +122,8 @@ state    real    a_acft_ch4    {ntim}{nplt}f  a_acft_hx       1         -     h{
 
 # deposition velocities
 #
-state    real  a_dep_vel   i{kdv}j{ndv}  misc           1         Z      i{17}h{17}      "DEP_VEL"        "deposition velocity"             "cm/s"
-state    real  g_dep_vel   i{kdv}j{ndv}  misc           1         Z      i{18}h{18}      "DEP_VEL"        "deposition velocity"             "cm/s"
+state    real  a_dep_vel   i{kdv}j{ndv}  misc           1         Z      i{17}h{17}      "A_DEP_VEL"        "deposition velocity"             "cm/s"
+state    real  g_dep_vel   i{kdv}j{ndv}  misc           1         Z      i{18}h{18}      "G_DEP_VEL"        "deposition velocity"             "cm/s"
 
 #
 # Emission Scaling Factors

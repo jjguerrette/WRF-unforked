@@ -522,8 +522,8 @@ BENCH_END(phy_prep_tim)
      &        ,QSHLTR=grid%qshltr      ,QZ0=grid%qz0            ,RAINCV=grid%raincv      &
      &        ,RA_LW_PHYSICS=config_flags%ra_lw_physics         ,RHO=grid%rho            &
      &        ,RMOL=grid%rmol          ,SFCEVP=grid%sfcevp      ,SFCEXC=grid%sfcexc      &
-     &        ,SFCRUNOFF=grid%sfcrunoff                                        &
-     &        ,opt_thcnd=config_flags%opt_thcnd                                                   &
+     &        ,SFCRUNOFF=grid%sfcrunoff,ACRUNOFF=grid%ACRUNOFF                           &
+     &        ,opt_thcnd=config_flags%opt_thcnd                                          &
      &        ,SF_SFCLAY_PHYSICS=config_flags%sf_sfclay_physics                        &
      &        ,SF_SURFACE_PHYSICS=config_flags%sf_surface_physics  ,SH2O=grid%sh2o          &
      &        ,SHDMAX=grid%shdmax      ,SHDMIN=grid%shdmin      ,SMOIS=grid%smois        &
@@ -769,7 +769,9 @@ BENCH_END(phy_prep_tim)
      &        , zsnsoxy=grid%zsnsoxy  , snicexy=grid%snicexy , snliqxy=grid%snliqxy  &
      &        ,lfmassxy=grid%lfmassxy ,rtmassxy=grid%rtmassxy,stmassxy=grid%stmassxy &
      &        ,  woodxy=grid%woodxy   ,stblcpxy=grid%stblcpxy,fastcpxy=grid%fastcpxy &
-     &        , grainxy=grid%grainxy  ,   gddxy=grid%gddxy                           &
+     &        , grainxy=grid%grainxy  ,   gddxy=grid%gddxy   ,   pgsxy=grid%pgsxy    &
+     &        , cropcat=grid%cropcat                                                 &
+     &        ,planting=grid%planting , harvest=grid%harvest ,season_gdd=grid%season_gdd  &
      &        ,  xsaixy=grid%xsaixy   , taussxy=grid%taussxy                         &
      &        ,  t2mvxy=grid%t2mvxy   ,  t2mbxy=grid%t2mbxy                          &
      &        ,  q2mvxy=grid%q2mvxy   ,  q2mbxy=grid%q2mbxy                          & 
@@ -874,6 +876,9 @@ BENCH_END(phy_prep_tim)
      &        ,ZOL=grid%ZOL                                                                             &
      &        ,SDA_HFX=grid%SDA_HFX, SDA_QFX=grid%SDA_QFX,HFX_BOTH=grid%HFX_BOTH                        &  !fasdas
      &        ,QFX_BOTH=grid%QFX_BOTH,QNORM=grid%QNORM,fasdas=config_flags%fasdas                       &  !fasdas
+     &        ,spp_lsm=config_flags%spp_lsm,pattern_spp_lsm=grid%pattern_spp_lsm     & !SPP
+     &        ,field_sf=grid%field_sf                                                & !SPP
+     &        ,spp_pbl=config_flags%spp_pbl,pattern_spp_pbl=grid%pattern_spp_pbl     & !SPP
      &                                                           )
 
 #ifdef WRF_HYDRO
@@ -930,9 +935,9 @@ BENCH_START(pbl_driver_tim)
                     k_start, k_end                   )
                  
                if( config_flags%chem_opt == MOZART_KPP .or. &
-                 config_flags%chem_opt == MOZCART_KPP .or. &
-                 config_flags%chem_opt == MOZART_MOSAIC_4BIN_KPP .or. &
-                 config_flags%chem_opt == MOZART_MOSAIC_4BIN_AQ_KPP) then
+                   config_flags%chem_opt == MOZCART_KPP .or. &
+                   config_flags%chem_opt == MOZART_MOSAIC_4BIN_KPP .or. &
+                   config_flags%chem_opt == MOZART_MOSAIC_4BIN_AQ_KPP) then
                   call mozcart_lbc_set( chem, num_chem, grid%id, &
                                         ims, ime, jms, jme, kms, kme,    & 
                                         grid%i_start(ij), grid%i_end(ij), &
@@ -1050,22 +1055,23 @@ BENCH_START(pbl_driver_tim)
      &        ,bl_mynn_tkebudget=config_flags%bl_mynn_tkebudget           &
      &        ,bl_mynn_cloudpdf=config_flags%bl_mynn_cloudpdf             &
      &        ,bl_mynn_mixlength=config_flags%bl_mynn_mixlength           &
-     &        , icloud_bl=config_flags%icloud_bl                        & !JOE: subgrid cloud
-     &        , qc_bl=grid%qc_bl,cldfra_bl=grid%cldfra_bl                 & !JOE: subgrid cloud
-     &        ,bl_mynn_edmf=config_flags%bl_mynn_edmf                     & !JOE- MYNN edmf
-     &        ,bl_mynn_edmf_mom=config_flags%bl_mynn_edmf_mom             & !JOE- MYNN edmf
-     &        ,bl_mynn_edmf_tke=config_flags%bl_mynn_edmf_tke             & !JOE- MYNN edmf
-     &        ,bl_mynn_edmf_part=config_flags%bl_mynn_edmf_part           & !JOE- MYNN edmf
-     &        ,bl_mynn_cloudmix=config_flags%bl_mynn_cloudmix             & !JOE- MYNN cloud mixing
-     &        ,bl_mynn_mixqt=config_flags%bl_mynn_mixqt                   & !JOE- MYNN tendency method
+     &        ,icloud_bl=config_flags%icloud_bl                           &
+     &        ,qc_bl=grid%qc_bl,cldfra_bl=grid%cldfra_bl                  &
+     &        ,bl_mynn_edmf=config_flags%bl_mynn_edmf                     &
+     &        ,bl_mynn_edmf_mom=config_flags%bl_mynn_edmf_mom             &
+     &        ,bl_mynn_edmf_tke=config_flags%bl_mynn_edmf_tke             &
+     &        ,bl_mynn_edmf_part=config_flags%bl_mynn_edmf_part           &
+     &        ,bl_mynn_cloudmix=config_flags%bl_mynn_cloudmix             &
+     &        ,bl_mynn_mixqt=config_flags%bl_mynn_mixqt                   &
      &        ,edmf_a=grid%edmf_a,edmf_w=grid%edmf_w                      &
      &        ,edmf_thl=grid%edmf_thl,edmf_qt=grid%edmf_qt                &
-     &        ,edmf_ent=grid%edmf_ent,edmf_qc=grid%edmf_qc                & !JOE- MYNN edmf
+     &        ,edmf_ent=grid%edmf_ent,edmf_qc=grid%edmf_qc                &
      &        ,rmol=grid%rmol, ch=grid%ch                                 &
      &        ,qcg=grid%qcg, grav_settling=config_flags%grav_settling     &
 !    &        ,K_m=grid%K_m, K_h=grid%K_h, K_q=grid%K_q                   &
-     &        ,vdfg=grid%vdfg                                             & ! Katata - fogdep
-!GWD for ARW
+     &        ,vdfg=grid%vdfg                                             &
+     &        ,spp_pbl=config_flags%spp_pbl                               & !SPP
+     &        ,pattern_spp_pbl=grid%pattern_spp_pbl                       & !SPP
      &        ,GWD_OPT=config_flags%gwd_opt &
      &        ,DTAUX3D=grid%dtaux3d,DTAUY3D=grid%dtauy3d &
      &        ,DUSFCG=grid%dusfcg,DVSFCG=grid%dvsfcg &
@@ -1109,7 +1115,7 @@ BENCH_START(pbl_driver_tim)
      &        ,NUM_VERT_MIX=grid%num_vert_mix                            &
 #endif
      &        ,QNORM=grid%QNORM, fasdas=config_flags%fasdas              & !fasdas
-     &        )
+     &        ,ii_debug=config_flags%ii_debug,jj_debug=config_flags%jj_debug) !JJG DEBUG
 
 BENCH_END(pbl_driver_tim)
 

@@ -67,14 +67,14 @@ state   real    trbc2        ikjftb  tracer        1         -     irhusdf=(bdy_
 
 state   real    -          ikjftb  g_tracer      1         -     -    -                                       
 state   real    g_plume    ikjftb  g_tracer      1         -     irhusdf=(bdy_interp:dt)    "G_PLUME"        "Fukushima Tracer"          -
-state   real    g_trbc1        ikjftb  g_tracer    1         -     irhusdf=(bdy_interp:dt)    "g_TRBC1"            "g_TRBC1"           "ug/kg-dryair"
-state   real    g_trbc2        ikjftb  g_tracer    1         -     irhusdf=(bdy_interp:dt)    "g_TRBC2"            "g_TRBC2"           "ug/kg-dryair"
+#state   real    g_trbc1        ikjftb  g_tracer    1         -     irhusdf=(bdy_interp:dt)    "g_TRBC1"            "g_TRBC1"           "ug/kg-dryair"
+#state   real    g_trbc2        ikjftb  g_tracer    1         -     irhusdf=(bdy_interp:dt)    "g_TRBC2"            "g_TRBC2"           "ug/kg-dryair"
 
 
 state   real    -          ikjftb  a_tracer      1         -     -    -                                       
 state   real    a_plume    ikjftb  a_tracer      1         -     irhusdf=(bdy_interp:dt)    "A_PLUME"        "Fukushima Tracer"          -
-state   real    a_trbc1        ikjftb  a_tracer    1         -     irhusdf=(bdy_interp:dt)    "a_TRBC1"            "a_TRBC1"           "ug/kg-dryair"
-state   real    a_trbc2        ikjftb  a_tracer    1         -     irhusdf=(bdy_interp:dt)    "a_TRBC2"            "a_TRBC2"           "ug/kg-dryair"
+#state   real    a_trbc1        ikjftb  a_tracer    1         -     irhusdf=(bdy_interp:dt)    "a_TRBC1"            "a_TRBC1"           "ug/kg-dryair"
+#state   real    a_trbc2        ikjftb  a_tracer    1         -     irhusdf=(bdy_interp:dt)    "a_TRBC2"            "a_TRBC2"           "ug/kg-dryair"
 
 
 package   tracer_test1  tracer_opt==2       -             tracer:tr17_1,tr17_2,tr17_3,tr17_4,tr17_5,tr17_6,tr17_7,tr17_8

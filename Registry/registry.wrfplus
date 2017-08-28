@@ -629,10 +629,10 @@ state   real    a_tr17_6     ikjftb  a_tracer        1         -     ih    "a_tr
 state   real    a_tr17_7     ikjftb  a_tracer        1         -     ih    "a_tr17_7"         "a_tr17_7"          -
 state   real    a_tr17_8     ikjftb  a_tracer        1         -     ih    "a_tr17_8"         "a_tr17_8"
 
-state    real    g_th_old         ikj   misc        1         -    i01usd    "g_TH_OLD"        "Old Value of Th"   "K"
-state    real    g_qv_old         ikj   misc        1         -    i01usd    "g_QV_OLD"        "Old Value of qv"   "kg kg^-1"
-state    real    a_th_old         ikj   misc        1         -    i01usd    "a_TH_OLD"        "Old Value of Th"   "K"
-state    real    a_qv_old         ikj   misc        1         -    i01usd    "a_QV_OLD"        "Old Value of qv"   "kg kg^-1"
+state    real    g_th_old         ikj   misc        1         -    i1usd    "g_TH_OLD"        "Old Value of Th"   "K"
+state    real    g_qv_old         ikj   misc        1         -    i1usd    "g_QV_OLD"        "Old Value of qv"   "kg kg^-1"
+state    real    a_th_old         ikj   misc        1         -    i1usd    "a_TH_OLD"        "Old Value of Th"   "K"
+state    real    a_qv_old         ikj   misc        1         -    i1usd    "a_QV_OLD"        "Old Value of qv"   "kg kg^-1"
 
 #Used for TLNLonly_spot_check
 state     integer ni_tlnl      -        -          -         -           -         "ni_tlnl"             ""         ""
