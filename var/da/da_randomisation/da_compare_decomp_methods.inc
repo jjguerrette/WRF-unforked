@@ -265,8 +265,9 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
 
       end do
 
+      qhat(:,1:nens) = yhat(:,1:nens)
       call da_gram_schmidt(grid,mz,jp_start,jp_end, &
-                            yhat,qhat,cv_size,nens)
+                            qhat,cv_size,nens)
 
       do neign = 1, nens
          allocate(eignvec(1:neign,1:neign))

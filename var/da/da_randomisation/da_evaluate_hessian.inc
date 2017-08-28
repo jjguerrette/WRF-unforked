@@ -249,8 +249,9 @@ subroutine da_evaluate_hessian(grid, xbx, be, mz, cv_size, &
 
          allocate(qhat_Pa(cv_size,0:rankA))
 
+         qhat_Pa(:,1:rankA) = yhat_Pa(:,1:rankA)
          call da_gram_schmidt(grid,mz,jp_start,jp_end, &
-                               yhat_Pa,qhat_Pa,cv_size,rankA)
+                               qhat_Pa,cv_size,rankA)
 
          call da_rsvd56(grid, mz, jp_start, jp_end, &
                         omega_Pa, yhat_Pa, qhat_Pa, cv_size, &

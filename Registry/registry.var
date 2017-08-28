@@ -401,6 +401,7 @@ rconfig   logical   rewrite_ahat_ascii      namelist,wrfvar6  1  .false.  - "rew
 rconfig   logical   svd_minimise            namelist,wrfvar6  1  .true.  - "svd_minimise"             ""  ""
 rconfig   logical   quick_svd               namelist,wrfvar6  1  .false.  - "quick_svd"                ""  ""
 rconfig   integer   adapt_svd               namelist,wrfvar6  1  0        - "adapt_svd"                ""  ""
+rconfig   integer   prepend_rsvd_basis      namelist,wrfvar6  max_outer_iterations  0       - "prepend_rsvd_basis"       ""  ""
 rconfig   integer   svd_stage               namelist,wrfvar6  1  0        - "svd_stage"                ""  ""
 rconfig   integer   ensdim_svd              namelist,wrfvar6  1  0        - "ensdim_svd"               ""  ""
 rconfig   integer   nens_compare            namelist,wrfvar6  1  0        - "nens_compare"             ""  ""

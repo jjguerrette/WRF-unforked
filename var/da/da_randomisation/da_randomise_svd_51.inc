@@ -122,7 +122,7 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
          filename = 'ghat.p'//trim(adjustl(cproc))
          call da_cv_io ('w', filename, cv_size, ghat, grid, mz)
 
-         if (riot_precon.eq.1 .and. svd_outer.gt.1 .and. sum(ntmax(1:svd_outer-1)).gt.nens) &
+         if (any(riot_precon.eq.(/1,2,3,4/)) .and. svd_outer.gt.1 .and. sum(ntmax(1:svd_outer-1)).gt.nens) &
             call da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat)
 
       else if (ensmember .gt. 0 .and. ensmember .le. nens) then
@@ -443,9 +443,12 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
          call da_hessian_io ('w',grid, cv_size,svd_outer,nens,neign,&
                             eignvec,eignval,qhat,mz,ghat)
 
-      if (riot_precon.eq.1 .and. sum(ntmax(1:svd_outer)).lt.ntmax(svd_outer+1)) riot_precon=4
+      if (riot_precon.gt.0 .and. sum(ntmax(1:svd_outer)).lt.ntmax(svd_outer+1)) then
+         if ( riot_precon.eq.1 ) riot_precon=14
+         if ( riot_precon.eq.3 ) riot_precon=15
+      end if
 
-      if (any(riot_precon.eq.(/2,3,4/))) &
+      if ( any(riot_precon.eq.(/12,13,14,15/)) ) &
          call da_precon_omega(grid, cv_size, mz, jp_start, jp_end, ntmax(svd_outer+1), ghat)
 
       deallocate(KMAT)

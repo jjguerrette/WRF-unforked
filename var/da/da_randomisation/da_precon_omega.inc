@@ -7,7 +7,7 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
    !
    ! History: 04/24/2017  Creation (JJ Guerrette)
    !
-   ! References: Bousserez et al. (2017)
+   ! References: Bousserez, Guerrette, and Henze (2017) [unpublished]
    !
    !-------------------------------------------------------------------------
 
@@ -39,7 +39,8 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
    real*8   :: gdot, gdot_prev
    real*8   :: crit_save(nens)
    integer  :: precon_list(nens)
-   integer    :: it, eig_count, eig_total, crit_imin(1), nens_it, neign_it, nouter_seed
+   integer    :: it, eig_count, eig_total, crit_imin(1), &
+                 nens_it, neign_it, num_omega_it, nouter_seed
 
    if (trace_use) call da_trace_entry("da_precon_omega")
 
@@ -58,10 +59,10 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
    ! [2.0] Select preconditioned omega vectors
    !-------------------------------------------------------------------------
 
-   if (riot_precon .eq. 1) nouter_seed = svd_outer-1
-   if (any(riot_precon .eq. (/2,3,4/))) nouter_seed = svd_outer
+   nouter_seed = svd_outer-1
+   if (any(riot_precon .eq. (/12,13,14,15/))) nouter_seed = svd_outer
 
-   if(riot_precon .eq. 4) then
+   if ( any(riot_precon .eq. (/14,15/)) ) then
       eig_total = 0
       do it=nouter_seed, 1, -1
          nens_it = ensdim_svd
@@ -70,7 +71,8 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
          end if
 
          call da_hessian_io ('r',grid, cv_size,it,nens_it,neign_it)
-         eig_total = eig_total + neign_it
+         if(riot_precon .eq. 14) eig_total = eig_total + neign_it
+         if(riot_precon .eq. 15) eig_total = eig_total + nens_it
       end do
    end if
 
@@ -90,22 +92,30 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
       call da_hessian_io ('r',grid, cv_size,it,nens_it,neign_it,&
                          eignvec_prev,eignval_prev,qhat_prev,mz)
 
-      do iens = 1, neign_it
-         do i = 1, cv_size
-            nuhat(i,1) = da_dot(nens_it, qhat_prev(i,1:nens_it), eignvec_prev(1:nens_it,iens))
-         end do
-
+      if (any(riot_precon .eq. (/3,4,15/))) then
+         num_omega_it = nens_it
+      else
+         num_omega_it = neign_it
+      end if
+      do iens = 1, num_omega_it
+         if (any(riot_precon .eq. (/3,4,15/))) then
+            nuhat(:,1) = qhat_prev(:,iens)
+         else
+            do i = 1, cv_size
+               nuhat(i,1) = da_dot(nens_it, qhat_prev(i,1:nens_it), eignvec_prev(1:nens_it,iens))
+            end do
+         end if
          eig_count = eig_count + 1
 
-         if (riot_precon .eq. 1 .or. riot_precon .eq. 2) &
+         if (any(riot_precon .eq. (/1,2,3,4,12/))) &
             crit(eig_count) = ( da_dot_cv(cv_size, nuhat(:,1), ghat, &
                                            grid, mz, jp_start, jp_end) &
                                             / gdot ) **2
 
-         if (riot_precon .eq. 3) &
+         if (riot_precon .eq. 13) &
             crit(eig_count) = eignval_prev(iens)
 
-         if (riot_precon .eq. 4) &
+         if (any(riot_precon .eq. (/14,15/))) &
             crit(eig_count) = real(eig_total - eig_count + 1,8)
 
          lam_all(eig_count) = eignval_prev(iens)
@@ -156,6 +166,22 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
    deallocate(crit)
    deallocate(lam_all)
 
+   !Prepend with gradient vector
+   if (any(riot_precon .eq. (/2,4/))) then
+      omega(:,2:nens) = omega(:,1:nens-1)
+      omega(:,1) = ghat / gdot
+   end if
+
+   !Orthonormalization - should do this every time
+!   if (any(riot_precon .eq. (/1,2,3,4,15/))) then
+      allocate(qhat_prev(cv_size,0:nens))
+      qhat_prev(:,1:nens) = omega(:,1:nens)
+      call da_gram_schmidt(grid,mz,jp_start,jp_end, &
+                            qhat_prev,cv_size,nens)
+
+      omega(:,1:nens) = qhat_prev(:,1:nens)
+      deallocate(qhat_prev)
+!   end if
 
    !-------------------------------------------------------------------------
    ! [3.0] Write preconditioned omega vectors

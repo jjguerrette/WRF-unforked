@@ -44,11 +44,13 @@ echo ""
                    # - Eventually SVDN can be replaced with retrieval of ntmax(1) 
                    #    from namelist.input.  For now, this separate setting is a
                    #    reminder to set the number of nodes/cores.
-                   # - NUMNODES must be >= $((SVDN+1)) [+1 node is used for the gradient]
-                   # - When 2 nodes per AD/TL simulation is desired, set NUMNODES=$((2*$((SVDN+1))))
-                   # FUTURE IDEA: it may reduce wall-time of 1st ensemble member 
-                   #  to request 1 extra node that acts as independent head node
+                   # - NUMNODES must be >= $((SVDN+1)) [where the +1 accounts for the gradient]
+                   # - For 2 nodes per AD/TL simulation, set NUMNODES=$((2*$((SVDN+1)))), etc.
+                   # FUTURE IDEA: it may reduce wall-time of 1st ensemble member (slowest one)
+                   #  to request 1 extra independent head node for process management
 #export svd_type=6 # 1-RSVD5.1 (chem only); 6-RSVD5.6 (default); 2-HESS(SVDN=Nobs, chem only); 10-B-cov debug
+#export prepend_rsvd_basis=0 #If ==1, prepend RSVD basis with gradient vector in 
+#                            # all outer iterations after the first
 #export RIOT_PRECON=0  #Set to 0 (default), 1, 2, 3, or 4 to control preconditioning for it > 1
 #export ADAPT_SVD="1" #0, 1 (default), or 2
 #export svd_p=0 #some small value (e.g., 5) between [0,min(SVDN)), only used for adaptive
@@ -162,8 +164,9 @@ echo "(7) LRA-LRU Adaptation: ADAPT_SVD=$ADAPT_SVD"
 #fi
 echo ""
 echo "(8) Preconditioning Option: RIOT_PRECON=$RIOT_PRECON"
-if [ "$RIOT_PRECON" -lt 0 ] || [ "$RIOT_PRECON" -gt 4 ]; then
-   echo "ERROR: RIOT_PRECON must be between 0 and 4"; echo 3; exit 3
+if [ "$RIOT_PRECON" -lt 0 ]; then
+#if [ "$RIOT_PRECON" -lt 0 ] || [ "$RIOT_PRECON" -gt 4 ]; then
+   echo "ERROR: RIOT_PRECON must be >= 0"; echo 3; exit 3
 fi
 echo ""
 if [ -z $GLOBAL_OPT ]; then
@@ -196,7 +199,7 @@ fi
 PBSNODE0=$PBS_NODEFILE
 NUMNODES=`cat $PBSNODE0 | uniq | wc -l`
 if [ $NUMNODES -lt $((SVDN+1)) ]; then
-   echo "ERROR: NUMNODES must be set >= SVDN ($SVDN)"
+   echo "ERROR: NUMNODES must be set >= SVDN+1 (i.e., $((SVDN+1)))"
    echo 6; exit 6
 fi
 
@@ -210,16 +213,30 @@ else
 fi
 
 if [ $NPpJMAX -gt $NUMPROC ]; then
-   echo "ERROR: NPpJMAX must be set <= total number of processors"
-   echo 7; exit 7
+   NPpJMAX=$NUMPROC
+   export NPpJMAX=$NPpJMAX
+#   echo "ERROR: NPpJMAX must be set <= total number of processors"
+#   echo 7; exit 7
 fi
+#Use as many of the cores as possible for ensemble members
+#NODES_ens=$((NUMNODES/NENS))
+#NPpJ=$((NODES_ens*PPN))
 
-NPpJ=$(($((NUMNODES/NENS))*PPN)) #Use as many of the cores as possible for ensemble members
-NODES_ens=$((NPpJ/PPN*NENS))
-NODES_grad=$((NUMNODES-NODES_ens))
-NPpJ_grad=$((NODES_grad*PPN)) #Use remaining cores for gradient member
-
+NPpJ=$(($((NUMNODES/NENS))*PPN)) 
 if [ $NPpJ -gt $NPpJMAX ]; then NPpJ=$(($((NPpJMAX/PPN))*PPN)); fi
+NODES_ens=$((NPpJ/PPN*NENS))
+
+#Use remaining cores for gradient member
+NODES_grad=$((NUMNODES-NODES_ens))
+#Fail-safe for when mod(NUMNODES,NENS)==0
+if [ $NODES_grad -lt 1 ]; then
+   #NODES_ens=$(($((NUMNODES-1))/NENS))
+   #NPpJ=$((NODES_ens*PPN))
+   NPpJ=$(($(($((NUMNODES-1))/NENS))*PPN)) 
+   NODES_ens=$((NPpJ/PPN*NENS))
+   NODES_grad=$((NUMNODES-NODES_ens))
+fi
+NPpJ_grad=$((NODES_grad*PPN))
 if [ $NPpJ_grad -gt $NPpJMAX ]; then NPpJ_grad=$(($((NPpJMAX/PPN))*PPN)); fi
 NODES_grad=$((NPpJ_grad/PPN))
 echo "Cores per ensemble job: "$NPpJ
@@ -264,24 +281,6 @@ fi
 echo "=================================================================="
 echo " Automatically initialize 4D-Var namelist.input settings for RIOT"
 echo "=================================================================="
-# Turn off lanczos
-if (grep -q use_lanczos namelist.input); then
-   ex -c :"/use_lanczos" +:":s/use_lanczos.*/use_lanczos=false,/" +:wq namelist.input
-fi
-
-# Add or modify RIOT namelist options
-SVD_VARS=("svd_outer" "svd_minimise" "ensmember" "ensdim_svd" "svd_stage" "use_randomsvd" "svd_type" "quick_svd" "adapt_svd" "svd_p" "riot_precon" "read_omega" "use_global_cv_io")
-SVD_VALS=("1" "true" "0" "$NENS" "0" "true" "$svd_type" "true" "$ADAPT_SVD" "$svd_p" "$RIOT_PRECON" "false" "$GLOBAL_OPT")
-ivar=0
-for var in ${SVD_VARS[@]}
-do
-   if (grep -q $var namelist.input); then # check if NL option is present already
-      ex -c :"/$var" +:":s/=.*/=${SVD_VALS[$ivar]},/" +:wq namelist.input
-   else
-      ex -c :"/wrfvar6" +:":s/\(wrfvar6\)\n/\1\r$var=${SVD_VALS[$ivar]},\r/" +:wq namelist.input
-   fi
-   ivar=$((ivar+1))
-done
 
 #------------------------------------------------------------------
 # Set checkpoint interval and OSSE from environment variables
@@ -290,9 +289,11 @@ done
 # - if non-zero, namelist values should already be set
 #------------------------------------------------------------------
 CPDT=$checkpoint_interval 
+quick_svd="true"
 if [ -z $CPDT ] || [ $WRF_CHEM -eq 0 ]; then
 #   CPDT=60 # (or manually, e.g., 5, 6, 10, 12, 15, 20, 30, 60, 180)
    CPDT=0 
+   quick_svd="false"
 fi
 echo "checkpoint interval = "
 echo "==> "$CPDT
@@ -304,6 +305,32 @@ if [ -z $OSSE ] || [ $WRF_CHEM -eq 0 ]; then
 fi
 echo "OSSE = "
 echo "==> "$OSSE
+
+
+# Turn off lanczos
+if (grep -q use_lanczos namelist.input); then
+   ex -c :"/use_lanczos" +:":s/use_lanczos.*/use_lanczos=false,/" +:wq namelist.input
+fi
+
+# Add or modify RIOT namelist options
+SVD_VARS=("svd_outer" "svd_minimise" "ensmember" "ensdim_svd" "svd_stage" "use_randomsvd" "svd_type" "quick_svd" "adapt_svd" "svd_p" "riot_precon" "read_omega" "use_global_cv_io" "prepend_rsvd_basis")
+SVD_VALS=("1" "true" "0" "$NENS" "0" "true" "$svd_type" "$quick_svd" "$ADAPT_SVD" "$svd_p" "$RIOT_PRECON" "false" "$GLOBAL_OPT" "0")
+ivar=0
+for var in ${SVD_VARS[@]}
+do
+   if (grep -q $var namelist.input); then # check if NL option is present already
+      ex -c :"/$var" +:":s/=.*/=${SVD_VALS[$ivar]},/" +:wq namelist.input
+   else
+      ex -c :"/wrfvar6" +:":s/\(wrfvar6\)\n/\1\r$var=${SVD_VALS[$ivar]},\r/" +:wq namelist.input
+   fi
+   ivar=$((ivar+1))
+done
+prepend_basis=" 0," #For now, do not prepend in first iteration
+for it in $(seq 2 $nout_RIOT)
+do
+   prepend_basis=$prepend_basis" $prepend_rsvd_basis,"
+done
+ex -c :"/prepend_basis" +:":s/=.*/=$prepend_basis/" +:wq namelist.input
 
 
 echo "=================================================="
@@ -537,11 +564,21 @@ do
 
          ii_grad=$ii
 
-         # This test avoids extra wall time when RIOT_PRECON=1 and NENS in 
+         # This test avoids extra wall time when RIOT_PRECON=[1,3] and NENS in 
          # current iteration is larger than number of potential preconditioning vectors
-         if [ $RIOT_PRECON -eq 1 ] && [ $NENS_PREV -gt $NENS ]; then PRECON1=1; else PRECON1=0; fi
+         dependent_grad=0
+         if [ $NENS_PREV -gt $NENS ] && \
+           ([ $RIOT_PRECON -eq 1 ] || [ $RIOT_PRECON -eq 3 ]); then dependent_grad=1; fi
+         if [ $RIOT_PRECON -eq 2 ] || [ $RIOT_PRECON -eq 4 ]; then dependent_grad=1; fi
 
-         if [ $PRECON1 -eq 1 ]; then
+#         if ([ $NENS_PREV -gt $NENS ] \
+#            && ([ $RIOT_PRECON -eq 1 ] \
+#             || [ $RIOT_PRECON -eq 3 ])) \
+#             || [ $RIOT_PRECON -eq 2 ] \
+#             || [ $RIOT_PRECON -eq 4 ] ; then
+#            dependent_grad=1; else dependent_grad=0; fi
+
+         if [ $dependent_grad -eq 1 ]; then
             #Calculate gradient and preconditioned OMEGA vectors before ensemble
             NJOBS=$NENS
 
@@ -599,7 +636,7 @@ do
 
             diri=../run.$ii
          else
-            #RIOT_PRECON=2,3,4 --> EXTRACT omega_precon.e*.p* only
+            #RIOT_PRECON=12,13,14,15 --> EXTRACT omega_precon.e*.p* only
             diri=../run
          fi
 
@@ -645,7 +682,7 @@ do
       ##--------------------------------------------------------------------------
       ##2 - Adjust cores per job to fit NUMPROC as NENS changes
       if [ "$GLOBAL_OPT" == "true" ]; then # && [ $NENS -ne $NENS_last ]; then
-         if [ $PRECON1 -eq 1 ]; then
+         if [ $dependent_grad -eq 1 ]; then
             NODES_ens=$NUMNODES
          else
             NODES_ens=$((NUMNODES-NODES_grad))
@@ -1024,8 +1061,12 @@ do
       cd ../
       SECONDS=0
 
-      if [ $CLEANUP -eq 1 ]; then tar -czf vectors_$it0.tar.gz vectors_$it0; fi
+      if [ $CLEANUP -eq 1 ]; then 
+         tar -czf vectors_$it0.tar.gz vectors_$it0
+         echo "Completed tar of vectors_$it0.tar.gz"
+      fi
 
+   
       rm -r vectors_$it0
 
       hr0=$(($SECONDS / 3600))
@@ -1045,7 +1086,6 @@ do
       if [ $sec0 -lt 10 ]; then sec0="0"$sec0; fi
       echo "Total accum. cleanup time: $hr0:$min0:$sec0"
 
-      echo "Completed tar of vectors_$it0.tar.gz"
    fi
    cd $CWD
 done

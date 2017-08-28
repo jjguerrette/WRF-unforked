@@ -1,9 +1,9 @@
 subroutine da_gram_schmidt(grid,mz,jp_start,jp_end, &
-                            yhat,qhat,cv_size,nvec)
+                            qhat,cv_size,nvec)
 
    !-------------------------------------------------------------------------
    ! Purpose:        Perform Gram-Schmidt Orthogonalization 
-   ! Input: yhat
+   ! Input: qhat
    ! Output: qhat
    !
    ! History: 02/22/2017  Creation (JJ Guerrette)
@@ -16,8 +16,7 @@ subroutine da_gram_schmidt(grid,mz,jp_start,jp_end, &
    integer, intent(in)             :: jp_start, jp_end
    integer, intent(in)             :: mz(:)
    integer, intent(in)             :: cv_size, nvec
-   real(wp), intent(in)            :: yhat(1:cv_size,nvec)               ! control variable
-   real(wp), intent(out)           :: qhat(1:cv_size,0:nvec)               ! control variable
+   real(wp), intent(inout)         :: qhat(1:cv_size,0:nvec)               ! control variable
  
    integer                         :: ivec, jvec, i
    real(wp)                        :: gdot, beta
@@ -25,10 +24,8 @@ subroutine da_gram_schmidt(grid,mz,jp_start,jp_end, &
    if (trace_use) call da_trace_entry("da_gram_schmidt")
 
       qhat(:,0) = 0.D0
-
       ! Generate qhat basis vectors by Modified Gram-Schmidt orthonormalization
       do ivec = 1, nvec
-         qhat(:,ivec) = yhat(:,ivec)
          if (ivec .gt. 1) then
             !Second iteration improves numerical precision (Bjorck, 1994) 
             do i = 1,2

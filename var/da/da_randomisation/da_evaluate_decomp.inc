@@ -370,8 +370,9 @@ if (.true.) then
 
       allocate(qhat_Pav(cv_size,0:rank_rsvd_Pa))
 
+      qhat_Pav(:,1:rank_rsvd_Pa) = yhat_Pav_(:,1:rank_rsvd_Pa)
       call da_gram_schmidt(grid,mz,jp_start,jp_end, &
-                            yhat_Pav_,qhat_Pav,cv_size,rank_rsvd_Pa)
+                            qhat_Pav,cv_size,rank_rsvd_Pa)
 
       call da_rsvd56(grid, mz, jp_start, jp_end, &
                      omega_Pav, yhat_Pav_, qhat_Pav, cv_size, &
@@ -552,8 +553,9 @@ if (.true.) then
 
       allocate(qhat_Pa(cv_size,0:rank_rsvd_Pa))
 
+      qhat_Pa(:,1:rank_rsvd_Pa) = yhat_Pa_(:,1:rank_rsvd_Pa)
       call da_gram_schmidt(grid,mz,jp_start,jp_end, &
-                            yhat_Pa_,qhat_Pa,cv_size,rank_rsvd_Pa)
+                            qhat_Pa,cv_size,rank_rsvd_Pa)
 
       call da_rsvd56(grid, mz, jp_start, jp_end, &
                      omega_Pav, yhat_Pa_, qhat_Pa, cv_size, &
