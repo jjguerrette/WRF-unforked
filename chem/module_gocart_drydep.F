@@ -77,7 +77,7 @@ CONTAINS
   do nv=numgas+1,num_chem
     do j=jts,jte
       do i=its,ite
-        ddvel(i,j,nv) = 0.
+        ddvel(i,j,nv) = 0._8
       enddo
     enddo
   enddo
@@ -98,24 +98,31 @@ CONTAINS
       ii = 1
 !     if(ivgtyp(i,j).eq.19.or.ivgtyp(i,j).eq.23)ii=1
       ireg(1,1) = 1
-      airden(1,1)   = real( rho_phy(i,kts,j),kind=8 )
-      delz_sfc(1,1) = real( dz8w(i,kts,j),kind=8 )
-      ustar(1,1) = max( 1.e-1_8,real(ust(i,j),kind=8) )
-      hflux(1,1) = real( hfx(i,j),kind=8 )
-      pblz(1,1)  = real( pbl(i,j),kind=8 )
-      ps(1,1) = real(p8w(i,kts,j),kind=8)*.01_8
-      z0(1,1) = real( znt(i,j),kind=8 )
-      ts(1,1) = real( tsk(i,j),kind=8 )
+      airden(1,1)   = rho_phy(i,kts,j)
+      delz_sfc(1,1) = dz8w(i,kts,j)
+      ustar(1,1) = max( 1.e-1_8,ust(i,j) )
+      hflux(1,1) = hfx(i,j)
+      pblz(1,1)  = pbl(i,j)
+      ps(1,1) = p8w(i,kts,j)*.01_8
+      z0(1,1) = znt(i,j)
+      ts(1,1) = tsk(i,j)
 !    if(i.eq.23.and.j.eq.74)ipr=1
       call depvel_gocart(config_flags,ipr,ii,imx,jmx,lmx,&
                          airden, delz_sfc, pblz, ts, ustar, hflux, ilwi, &
                          ps, z0, dvel, drydf,g,rmol(i,j),aer_res(i,j))
-      do nv = p_p25,num_chem
-        ddvel(i,j,nv) = real( dvel(1,1),kind=4 )
+
+      do nv = max(numgas+1,2),num_chem
+        ddvel(i,j,nv) = dvel(1,1)
       enddo
-      ddvel(i,j,p_sulf) = real( dvel(1,1),kind=4 )
-      ddvel(i,j,p_msa)  = real( dvel(1,1),kind=4 )
-      
+      if (p_sulf .gt. 0) ddvel(i,j,p_sulf) = dvel(1,1)
+      if (p_msa .gt. 0) ddvel(i,j,p_msa)  = dvel(1,1)
+
+!!      do nv = p_p25,num_chem
+!!        ddvel(i,j,nv) = dvel(1,1)
+!!      enddo
+!!      ddvel(i,j,p_sulf) = dvel(1,1)
+!!      ddvel(i,j,p_msa)  = dvel(1,1)
+     
       depvelocity(i,j) = ddvel(i,j,p_dust_5)
 ! drydep [ug/m2/s] = dvel [m/s] * chem [ug/kg] * airden [kg/m3]
       dustdrydep_1(i,j)=-dvel(1,1)*chem(i,1,j,p_dust_1)*airden(1,1)
@@ -218,7 +225,7 @@ SUBROUTINE depvel_gocart( config_flags,ipr,ii,imx,jmx,lmx, &
         ELSE
            ! MINVAL(hflux), MINVAL(airden), MINVAL(ustar) =??
            obk = -airden(i,j) * 1000.0_8 * ts(i,j) * (ustar(i,j))**3 &
-                / (vk * real(g0,kind=8) * hflux(i,j)) 
+                / (vk * g0 * hflux(i,j)) 
 ! -- debug:
            IF ( obk == 0.0_8 ) WRITE(*,211) obk, i, j
 211        FORMAT(1X,'OBK=', E11.2, 1X,' i,j = ', 2I4)
@@ -227,7 +234,7 @@ SUBROUTINE depvel_gocart( config_flags,ipr,ii,imx,jmx,lmx, &
 !       write(0,*)1./obk,rmol
         
         if(rmol.ne.0.)then
-          obk=1._8/real(rmol,kind=8)
+          obk=1._8/rmol
         else
           obk=1.e5_8
         endif
@@ -289,7 +296,7 @@ SUBROUTINE depvel_gocart( config_flags,ipr,ii,imx,jmx,lmx, &
            !  Aerosol species, Rs here is the combination of Rb and Rs.
 
            ra = (LOG(cz/z0(i,j)) - psi_h) / (vk*ustar(i,j))
-        
+
            vds = 0.002_8*ustar(i,j)
            IF (obk < 0.0_8) vds = vds * (1.0_8+(-300.0_8/obk)**0.6667_8)
 
@@ -299,7 +306,7 @@ SUBROUTINE depvel_gocart( config_flags,ipr,ii,imx,jmx,lmx, &
 
            IF( config_flags%chem_opt /= CHEM_VASH      .and.                  &
                config_flags%chem_opt /= DUST           )THEN
-              ra = real(aer_res,kind=8)
+              ra = aer_res
            ENDIF
 
            ! --Set Vds to be less than VDSMAX (entry in input file divided --

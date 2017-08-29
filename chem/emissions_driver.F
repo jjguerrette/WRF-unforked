@@ -616,7 +616,10 @@ CONTAINS
       IF ( config_flags%biomass_burn_opt == BIOMASSB_MOZC .OR. &
            config_flags%biomass_burn_opt == BIOMASSB_MOZ  .OR. &
            config_flags%biomass_burn_opt == BIOMASSB_GHG  .OR. &
-           config_flags%biomass_burn_opt == BIOMASSB ) then
+           config_flags%biomass_burn_opt == BIOMASSB      .OR. &
+           config_flags%biomass_burn_opt == ADTLBB_BCCO  &
+      .OR. config_flags%biomass_burn_opt == ADTLBB_BC  &
+         ) then
         IF ( ktau==1 ) then
            do_plumerisefire = .true.
         ELSE IF ( adapt_step_flag ) THEN
@@ -768,7 +771,8 @@ CONTAINS
 !!! ***********   FIRE AND CHEM ****************************************
 !
     fire_select:  SELECT CASE(config_flags%biomass_burn_opt)
-     CASE (BIOMASSB,BIOMASSB_MOZC,BIOMASSB_MOZ,BIOMASSB_GHG)
+     CASE (BIOMASSB,BIOMASSB_MOZC,BIOMASSB_MOZ,BIOMASSB_GHG,&
+           ADTLBB_BCCO,ADTLBB_BC)
 !      if( do_plumerisefire )then
 !         CALL wrf_debug(15,'fire emissions: calling biomassb')
 !         write(0,*)ktau,stepfirepl
@@ -1471,6 +1475,38 @@ CONTAINS
        end do
        endif
 ! do this here for now, quick and dirty
+
+    CASE (GOCART_BCCO)
+       if(config_flags%emiss_opt == ADTLANT_BCCO) then
+       do j=jts,jte
+          do i=its,ite
+             do k=kts,min(config_flags%kemit,kte-ksub)
+                conv = 4.828e-4/rho_phy(i,k,j)*dtstep/(dz8w(i,k,j)*60.)
+                chem(i,k,j,p_bc1)  = chem(i,k,j,p_bc1)                     &
+                     +(emis_ant(i,k,j,p_e_eci) &
+                     + emis_ant(i,k,j,p_e_ecj) &
+                     )*alt(i,k,j)*dtstep/dz8w(i,k,j)
+
+                chem(i,k,j,p_co)  = chem(i,k,j,p_co)                       &
+                         +emis_ant(i,k,j,p_e_co) &
+                         *conv
+             end do
+          end do
+       end do
+       endif
+    CASE (GOCART_BC)
+       if(config_flags%emiss_opt == ADTLANT_BC) then
+       do j=jts,jte
+          do i=its,ite
+             do k=kts,min(config_flags%kemit,kte-ksub)
+                chem(i,k,j,p_bc1)  = chem(i,k,j,p_bc1)                     &
+                     +(emis_ant(i,k,j,p_e_eci) &
+                     + emis_ant(i,k,j,p_e_ecj) &
+                     )*alt(i,k,j)*dtstep/dz8w(i,k,j)
+             end do
+          end do
+       end do
+       endif
 
     CASE DEFAULT
        call wrf_debug(15,'emissions_driver NOT CALLING gas add_... routines')

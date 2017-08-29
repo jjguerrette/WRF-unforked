@@ -151,6 +151,8 @@ call wrf_message("**************************************************************
    chem_select: SELECT CASE(config_flags%chem_opt)
      CASE (GOCART_SIMPLE)
        CALL wrf_debug(15,'calling only gocart aerosols driver from chem_driver')
+     CASE (GOCART_BCCO,GOCART_BC)
+       CALL wrf_debug(15,'calling only black carbon aerosols from chem_driver')
      CASE (GOCARTRADM2_KPP)
        CALL wrf_debug(15,'calling gocart and radmkpp driver from chem_driver')
      CASE (GOCARTRADM2)
@@ -1031,6 +1033,55 @@ ENDIF ghg_block
                    chem(i,k,j,p_oc1)=0.1e-3
                    chem(i,k,j,p_oc2)=0.1e-3
                    chem(i,k,j,p_p25)=1.
+                 enddo
+              enddo
+           enddo
+         endif
+!
+! next is done to scale background oh and no3 in dependence on average zenith angle and day/night for no3
+! this is done since background values are only available as average/month. It will not be necessary if other
+! chemistry packages are used that provide oh,no3,h2o2
+!
+         endif
+           ndystep=86400/ifix(dt)
+           do j=jts,jte
+                 do i=its,ite
+                   tcosz(i,j)=0.
+                   ttday(i,j)=0.
+                   rlat=xlat(i,j)*3.1415926535590/180.
+                   xlonn=xlong(i,j)
+                   do n=1,ndystep
+                      xtime=n*dt/60.
+                      ixhour=ifix(gmt+.01)+ifix(xtime/60.)
+                      xhour=float(ixhour)
+                      xmin=60.*gmt+(xtime-xhour*60.)
+                      gmtp=mod(xhour,24.)
+                      gmtp=gmtp+xmin/60.
+                      CALL szangle(1, 1, julday, gmtp, sza, cosszax,xlonn,rlat)
+                      TCOSZ(i,j)=TCOSZ(I,J)+cosszax(1,1) 
+                      if(cosszax(1,1).gt.0.)ttday(i,j)=ttday(i,j)+dt
+                    enddo
+!                if(i.eq.19.and.j.eq.19)write(0,*)'in cheminit'
+!                if(i.eq.19.and.j.eq.19)write(0,*)TCOSZ(i,j),ttday(i,j),julday, gmtp, sza, cosszax,xlonn,rlat
+           enddo
+          enddo
+     CASE (GOCART_BCCO,GOCART_BC)
+       if(config_flags%phot_opt .NE. 0 )then
+         call wrf_error_fatal("GOCART simple initialization, phot_opt  MUST BE ZERO")
+       endif
+       CALL wrf_debug(15,'call GOCART chem/aerosols initialization')
+        ch_dust(:,:)=0.8D-9
+        ch_ss(:,:)=1.
+        if( .NOT. config_flags%restart )then
+        if(config_flags%chem_in_opt == 0 )then
+           do j=jts,jte
+              do k=kts,kte
+                 do i=its,ite
+                   do n=1,num_chem
+                     chem(i,k,j,n)=1.e-12
+                   enddo
+                   chem(i,k,j,p_bc1)=0.1e-3
+                   chem(i,k,j,p_bc2)=0.1e-3
                  enddo
               enddo
            enddo

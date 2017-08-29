@@ -255,6 +255,8 @@ CONTAINS
            config_flags%chem_opt /= CHEM_VOLC_4BIN .and.                  &
            config_flags%chem_opt /= DUST           .and.                  &
            config_flags%chem_opt /= GOCART_SIMPLE  .and.                  &
+           config_flags%chem_opt /= GOCART_BCCO    .and.                  &
+           config_flags%chem_opt /= GOCART_BC    .and.                  &
            config_flags%chem_opt /= GOCARTRACM_KPP )THEN
           call wesely_driver(id,ktau,dtstep,                              &
                config_flags,current_month,                                &
@@ -345,7 +347,11 @@ CONTAINS
                 enddo
            endif
 
-       ELSEIF ( config_flags%chem_opt == GOCART_SIMPLE ) then
+       ELSEIF ( config_flags%chem_opt == GOCART_SIMPLE &
+                .OR. config_flags%chem_opt == GOCART_BCCO &
+                .OR. config_flags%chem_opt == GOCART_BC &
+              ) then
+
           call wesely_driver(id,ktau,dtstep,                              &
                config_flags,current_month,                                &
                gmt,julday,t_phy,moist,p8w,t8w,raincv,                     &

@@ -415,6 +415,9 @@
      CASE (GOCART_SIMPLE)
        CALL wrf_debug(15,'calling only gocart aerosols driver from chem_driver')
        haveaer = .false.
+     CASE (GOCART_BCCO,GOCART_BC)
+       CALL wrf_debug(15,'calling only black carbon aerosols from chem_driver')
+       haveaer = .false.
      CASE (GOCARTRACM_KPP)
        CALL wrf_debug(15,'calling gocart and racm driver from chem_driver')
        haveaer = .false.
@@ -1467,9 +1470,6 @@ end if !Chemistry time step check
                                its,ite, jts,jte, kts,kte            )
     endif
 
-
-   END DO chem_tile_loop_1
-
 !-- Work around for dgnum and dgnumwet not being written to restart files.
    
    grid%dgnum_a1(its:ite, kts:kte, jts:jte) = grid%dgnum4d(its:ite, kts:kte, jts:jte, 1)
@@ -1480,6 +1480,8 @@ end if !Chemistry time step check
    grid%dgnumwet_a2(its:ite, kts:kte, jts:jte) = grid%dgnumwet4d(its:ite, kts:kte, jts:jte, 2)
    grid%dgnumwet_a3(its:ite, kts:kte, jts:jte) = grid%dgnumwet4d(its:ite, kts:kte, jts:jte, 3)
 
+
+   END DO chem_tile_loop_1
 
     END subroutine chem_driver
 

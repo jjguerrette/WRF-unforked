@@ -204,7 +204,7 @@
 !
    cps_select: SELECT CASE(config_flags%chem_opt)
 
-   CASE (GOCART_SIMPLE,GOCARTRACM_KPP,GOCARTRADM2_KPP,GOCARTRADM2,MOZCART_KPP)
+   CASE (GOCART_SIMPLE,GOCARTRACM_KPP,GOCARTRADM2_KPP,GOCARTRADM2,MOZCART_KPP, GOCART_BCCO)
       call gocart_aerosols_driver(ktauc,dtstepc,config_flags,t_phy,moist,  &
          chem,rho_phy,dz8w,p8w,dx,g,         &
          ids,ide, jds,jde, kds,kde,                                        &

@@ -509,7 +509,11 @@ real::t1,t2,t3,t4
               CALL med_read_wrf_chem_input ( grid , config_flags)
 
               IF(grid%emiss_opt == ECPTEC .or. grid%emiss_opt == GOCART_ECPTEC   &
-                                         .or. grid%biomass_burn_opt == BIOMASSB) THEN
+                                         .or. grid%biomass_burn_opt == BIOMASSB  &
+                                         .or. grid%biomass_burn_opt == ADTLBB_BCCO &
+                                         .or. grid%biomass_burn_opt == ADTLBB_BC &
+                 ) THEN
+
                  message = 'READING EMISSIONS DATA OPT 3'
                  CALL  wrf_message ( message )
                  CALL med_read_wrf_chem_emissopt3 ( grid , config_flags)
@@ -548,7 +552,10 @@ real::t1,t2,t3,t4
                  CALL med_read_wrf_chem_bioemiss ( grid , config_flags)
               END IF
               IF(grid%emiss_opt == ECPTEC .or. grid%emiss_opt == GOCART_ECPTEC   &
-                                         .or. grid%biomass_burn_opt == BIOMASSB) THEN
+                                         .or. grid%biomass_burn_opt == BIOMASSB  &
+                                         .or. grid%biomass_burn_opt == ADTLBB_BCCO &
+                                         .or. grid%biomass_burn_opt == ADTLBB_BC &
+                ) THEN
                  message = 'READING EMISSIONS DATA OPT 3'
                  CALL  wrf_message ( message )
 !                CALL med_read_bin_chem_emissopt3 ( grid , config_flags)

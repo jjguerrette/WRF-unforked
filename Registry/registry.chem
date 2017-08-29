@@ -3469,6 +3469,7 @@ package   eco2            emiss_opt==16                  -             emis_ant:
 package   eghg            emiss_opt==17                  -             emis_ant:e_co2,e_co2tst,e_co,e_cotst,e_ch4,e_ch4tst
 package   ecrimech        emiss_opt==19                   -             emis_ant:e_co,e_no,e_no2,e_so2,e_nh3,e_c2h6,e_c3h8,e_c2h4,e_c3h6,e_c5h8,e_tm123b,e_tm124b,e_tm135b,e_oethtol,e_methtol,e_pethtol,e_dime35eb,e_hcho,e_ch3cho,e_c2h5cho,e_ket,e_mek,e_ch3oh,e_c2h5oh,e_c2h2,e_benzene,e_nc4h10,e_toluene,e_oxyl,e_tbut2ene,e_ch3co2h
 package   ecrimechtno     emiss_opt==20                  -             emis_ant:e_co,e_no,e_no2,e_so2,e_nh3,e_c2h6,e_c3h8,e_c2h4,e_c3h6,e_c5h8,e_tm123b,e_tm124b,e_tm135b,e_oethtol,e_methtol,e_pethtol,e_dime35eb,e_hcho,e_ch3cho,e_c2h5cho,e_ket,e_mek,e_ch3oh,e_c2h5oh,e_c2h2,e_benzene,e_nc4h10,e_toluene,e_oxyl,e_tbut2ene,e_ch3co2h,e_bc_1,e_ec_1_25,e_ec_25_10,e_oc_dom,e_oc_tra,e_oc_25_10,e_pm25,e_oin_25,e_oin_10
+
 #
 package   vash    emiss_opt_vol==1                   -             emis_vol:e_vash1,e_vash2,e_vash3,e_vash4,e_vash5,e_vash6,e_vash7,e_vash8,e_vash9,e_vash10
 package   vashso2 emiss_opt_vol==2                   -             emis_vol:e_vash1,e_vash2,e_vash3,e_vash4,e_vash5,e_vash6,e_vash7,e_vash8,e_vash9,e_vash10,e_vso2
@@ -3584,4 +3585,12 @@ rconfig  real       ltng_temp_lower          namelist,physics   max_domains    -
 package  lnox_opt_none      lnox_opt==0    -   -
 package  lnox_opt_ott       lnox_opt==1    -   tracer:lnox_total
 package  lnox_opt_decaria   lnox_opt==2    -   tracer:lnox_ic,lnox_cg
+
+#Used for WRFPLUS-chem initial condition generation
+package   gocart_bcco     chem_opt==304          -    chem:co,bc1,bc2
+package   adtlant_bcco    emiss_opt==98          -    emis_ant:e_co,e_eci,e_ecj
+package   adtlbb_bcco     biomass_burn_opt==98   -    state:mean_fct_agtf,mean_fct_agef,mean_fct_agsv,mean_fct_aggr,firesize_agtf,firesize_agef,firesize_agsv,firesize_aggr;ebu:ebu_co,ebu_bc;ebu_in:ebu_in_co,ebu_in_bc
+package   gocart_bc    chem_opt==305          -    chem:bc1,bc2
+package   adtlant_bc   emiss_opt==99          -    emis_ant:e_eci,e_ecj
+package   adtlbb_bc    biomass_burn_opt==99   -    state:mean_fct_agtf,mean_fct_agef,mean_fct_agsv,mean_fct_aggr,firesize_agtf,firesize_agef,firesize_agsv,firesize_aggr;ebu:ebu_bc;ebu_in:ebu_in_bc
 
