@@ -8517,8 +8517,9 @@
       else
         start_ind = ipcg1_b_c_g
       end if
-
-      do iv = start_ind, ngas_ioa + ngas_soa
+      !BSINGH(03/10/2015): Added 2 in the following do-loop to accomodate oh and gly species.
+      ! *IMPORTANT*:This is a TEMPORARY fix, we need a better fix for this problem.
+      do iv = start_ind, ngas_ioa + ngas_soa+2
         speed = mean_molecular_speed(t_k,mw_vol(iv))    ! cm/s
         dg(iv) = 0.1                                    ! cm^2/s (increased from 0.2 to 0.035 by Manish Shrivastava)
         freepath(iv) = 3.*dg(iv)/speed
@@ -8714,13 +8715,15 @@
         dens_dry_a(ibin) = mass_dry_a(ibin)/vol_dry_a(ibin) ! g/cc(aerosol)
         dens_wet_a(ibin) = mass_wet_a(ibin)/vol_wet_a(ibin) ! g/cc(aerosol)
 
-! calculate mean dry and wet particle surface areas
-        area_dry_a(ibin)= 0.785398*num_a(ibin)*Dp_dry_a(ibin)**2	! cm^2/cc(air)
-        area_wet_a(ibin)= 0.785398*num_a(ibin)*Dp_wet_a(ibin)**2	! cm^2/cc(air)
-
 ! calculate mean dry and wet particle diameters
         dp_dry_a(ibin)=(1.90985*vol_dry_a(ibin)/num_a(ibin))**0.3333333	! cm
         dp_wet_a(ibin)=(1.90985*vol_wet_a(ibin)/num_a(ibin))**0.3333333 ! cm
+
+! calculate mean dry and wet particle surface areas
+        area_dry_a(ibin)= 3.14159*num_a(ibin)*dp_dry_a(ibin)**2	! cm^2/cc(air)
+        area_wet_a(ibin)= 3.14159*num_a(ibin)*dp_wet_a(ibin)**2	! cm^2/cc(air)
+
+
 
 ! calculate volume average refractive index
 !   load comp_a array

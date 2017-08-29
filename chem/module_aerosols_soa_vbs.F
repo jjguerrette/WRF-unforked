@@ -21,8 +21,6 @@ MODULE module_aerosols_soa_vbs
 ! Ackermann, I. J., H. Hass, M. Memmesheimer, A. Ebel, F. S. Binkowski, and U. Shankar (1998),
 ! Modal aerosol dynamics model for Europe: Development and first applications, Atmos. Environ., 32(17), 2981-2999.
 !
-!!WARNING! This aerosol option does not support cloud phase aerosol!
-!
 !!WARNING! The deposition of organic condensable vapours (cvasoa* and cvbsoa*) are highly uncertain due to lack of observations.
 ! Currently this process is parameterized using modeled dry deposition velocities of HNO3 (multiplied by "depo_fact" for OCVs).
 ! Paper by Ahmadov et al. (2012) desribes this approach. The default value for "depo_fact" in WRF-CHEM is 0.25.
@@ -30,7 +28,8 @@ MODULE module_aerosols_soa_vbs
 !
 !!WARNING! Another uncertainty is wet removal of OCVs! This is neglected in the current version of the WRF-CHEM code.
 !
-!
+! 30/06/2014: Modified by Paolo Tuccella
+!             The module has been modified in order to include the aqueous phase
 !
   USE module_state_description
 !  USE module_data_radm2
@@ -529,6 +528,14 @@ SUBROUTINE sum_pm_soa_vbs (                                         &
          do n=p_so4aj,p_p25i
             pm2_5_dry(i,k,j) = pm2_5_dry(i,k,j)+chem(ii,k,jj,n)
          enddo
+
+!!! TUCCELLA
+         if( p_p25cwi .gt. p_p25i) then
+         do n=p_so4cwj,p_p25cwi
+            pm2_5_dry(i,k,j) = pm2_5_dry(i,k,j)+chem(ii,k,jj,n)
+         enddo
+         endif
+
          pm2_5_dry_ec(i,k,j) = pm2_5_dry_ec(i,k,j)+chem(ii,k,jj,p_ecj) &
                                + chem(ii,k,jj,p_eci)
          pm2_5_water(i,k,j) =  pm2_5_water(i,k,j)+h2oaj(i,k,j)       &
@@ -550,6 +557,13 @@ SUBROUTINE sum_pm_soa_vbs (                                         &
                            + ( chem(ii,k,jj,p_antha)               &
                            + chem(ii,k,jj,p_soila)                 &
                            + chem(ii,k,jj,p_seas) ) / alt(ii,k,jj)
+!!!TUCCELLA
+               if( p_p25cwi .gt. p_p25i) then
+                    pm10(i,k,j) = pm10(i,k,j)                       &
+                           + ( chem(ii,k,jj,p_anthcw)               &
+                           + chem(ii,k,jj,p_soilcw)                 &
+                           + chem(ii,k,jj,p_seascw) ) / alt(ii,k,jj)
+               endif
             enddo
          enddo
       enddo
@@ -6227,6 +6241,8 @@ SUBROUTINE         aerosols_soa_vbs_init(chem,convfac,z_at_w,                   
                    its,ite, jts,jte, kts,kte, config_flags                     )
 
     USE module_configure, only: grid_config_rec_type
+!!! TUCCELLA (BUG, commented the line below)
+    !USE module_prep_wetscav_sorgam,only: aerosols_soa_vbs_init_aercld_ptrs
 
    implicit none
    INTEGER,      INTENT(IN   ) ::  chem_in_opt,aer_ic_opt
@@ -6366,9 +6382,12 @@ SUBROUTINE         aerosols_soa_vbs_init(chem,convfac,z_at_w,                   
         ccofm_org = alphaorg*sqrt(pirs*rgasuniv/(2.0*mworg))
         mwso4=96.03
 
-! initialize pointers used by aerosol-cloud-interaction routines
-!        call aerosols_soa_vbs_init_aercld_ptrs( &
-!           num_chem, is_aerosol, config_flags )
+!   initialize pointers used by aerosol-cloud-interaction routines
+! TUCCELLA (BUG, now aerosols_soa_vbs_aercld_ptrs is called chemics_init.F !
+!                and was moved to module_prep_wetscav_sorgam.F)
+
+        !call aerosols_soa_vbs_init_aercld_ptrs( &
+        !   num_chem, is_aerosol, config_flags )
 
         pm2_5_dry(its:ite, kts:kte-1, jts:jte)    = 0.
         pm2_5_water(its:ite, kts:kte-1, jts:jte)  = 0.
@@ -6732,14 +6751,10 @@ SUBROUTINE soa_vbs_addemiss( id, dtstep, u10, v10, alt, dz8w, xland, chem,      
           ims,ime, jms,jme, kms,kme,                             &
           its,ite, jts,jte, kts,kte                              )
   end if
-  if( seasalt_emiss_active == 2 ) then
-!     call Monahan_seasalt_emiss(                                 &
-!          dtstep, u10, v10, alt, dz8w, xland, chem,              &
-!          ids,ide, jds,jde, kds,kde,                             &
-!          ims,ime, jms,jme, kms,kme,                             &
-!          its,ite, jts,jte, kts,kte                              )
-  end if
+ ! if( seasalt_emiss_active == 2 ) then
+ ! end if
   if( dust_opt == 2 ) then
+    call wrf_message("WARNING: You are calling DUSTRAN dust emission scheme with MOSAIC, which is highly experimental and not recommended for use. Please use dust_opt==13")
       call soa_vbs_dust_emiss(                                     &
            slai, ust, smois, ivgtyp, isltyp,                      &
            id, dtstep, u10, v10, alt, dz8w,                       &
@@ -6748,7 +6763,9 @@ SUBROUTINE soa_vbs_addemiss( id, dtstep, u10, v10, alt, dz8w, xland, chem,      
            ims,ime, jms,jme, kms,kme,                             &
            its,ite, jts,jte, kts,kte                              )
   end if
-  if( dust_opt == 3 ) then
+ !     dust_opt changed to 13 since it conflicts with gocart/afwa
+  if( dust_opt == 13 ) then
+   !czhao -------------------------- 
       call soa_vbs_dust_gocartemis(                                &
            ktau,dtstep,num_soil_layers,alt,u_phy,                 &
            v_phy,chem,rho_phy,dz8w,smois,u10,v10,p8w,erod,        &
@@ -7331,7 +7348,7 @@ END SUBROUTINE soa_vbs_seasalt_emiss
          jdustcon = sum(bems(1:5))*accfrac/airmas  ! kg/kg-dryair
          jdustcon = jdustcon * converi   ! ug/kg-dryair
 
-         chem(i,k,j,p_p25)=chem(i,k,j,p_p25j) + jdustcon
+         chem(i,k,j,p_p25j)=chem(i,k,j,p_p25j) + jdustcon
          chem(i,k,j,p_soila)=chem(i,k,j,p_soila) + cdustcon
 
 ! czhao doing dust number emission following pm10
@@ -7436,7 +7453,78 @@ END SUBROUTINE soa_vbs_source_du
 
 !===========================================================================
 
-!===========================================================================
+!!!TUCCELLA (BUG, now wetscav_sorgam_driver is in module_prep_wetscav_sorgam.F)
 
+!===========================================================================
+!   subroutine wetscav_soa_vbs_driver (id,ktau,dtstep,ktauc,config_flags,      &
+!               dtstepc,alt,t_phy,p8w,t8w,p_phy,chem,rho_phy,cldfra,        &
+!               qlsink,precr,preci,precs,precg,qsrflx,                      &
+!               gas_aqfrac, numgas_aqfrac,                                  &
+!               ids,ide, jds,jde, kds,kde,                                  &
+!               ims,ime, jms,jme, kms,kme,                                  &
+!               its,ite, jts,jte, kts,kte                                   )
+
+!  wet removal by grid-resolved precipitation
+!  scavenging of cloud-phase aerosols and gases by collection, freezing, ...
+!  scavenging of interstitial-phase aerosols by impaction
+!  scavenging of gas-phase gases by mass transfer and reaction
+
+!----------------------------------------------------------------------
+!   USE module_configure
+!   USE module_state_description
+!   USE module_data_soa_vbs
+!   USE module_mosaic_wetscav,only:  wetscav
+
+!----------------------------------------------------------------------
+!   IMPLICIT NONE
+
+!   TYPE(grid_config_rec_type),  INTENT(IN   )    :: config_flags
+
+!   INTEGER,      INTENT(IN   )    ::                                &
+!                                      ids,ide, jds,jde, kds,kde,    &
+!                                      ims,ime, jms,jme, kms,kme,    &
+!                                      its,ite, jts,jte, kts,kte,    &
+!                                      id, ktau, ktauc, numgas_aqfrac
+!      REAL,      INTENT(IN   ) :: dtstep,dtstepc
+
+! all advected chemical species
+!
+!   REAL, DIMENSION( ims:ime, kms:kme, jms:jme, num_chem ),          &
+!         INTENT(INOUT ) ::                                chem
+
+! fraction of gas species in cloud water
+!   REAL, DIMENSION( ims:ime, kms:kme, jms:jme, numgas_aqfrac ),     &
+!         INTENT(IN ) ::                                   gas_aqfrac
+
+!
+!
+! input from meteorology
+!   REAL,  DIMENSION( ims:ime , kms:kme , jms:jme )         ,        &
+!         INTENT(IN   ) ::                                          &
+!                                                        alt,        &
+!                                                      t_phy,        &
+!                                                      p_phy,        &
+!                                                   t8w,p8w,         &
+!                                    qlsink,precr,preci,precs,precg, &
+!                                                    rho_phy,cldfra
+!   REAL, DIMENSION( ims:ime, jms:jme, num_chem ),          &
+!         INTENT(OUT ) ::                                qsrflx ! column change due to scavening
+
+!   call wetscav (id,ktau,dtstep,ktauc,config_flags,                     &
+!        dtstepc,alt,t_phy,p8w,t8w,p_phy,chem,rho_phy,cldfra,            &
+!        qlsink,precr,preci,precs,precg,qsrflx,                          &
+!        gas_aqfrac, numgas_aqfrac,                                      &
+!        ntype_aer, nsize_aer, ncomp_aer,                                &
+!        massptr_aer, dens_aer, numptr_aer,                              &
+!        maxd_acomp, maxd_asize,maxd_atype, maxd_aphase, ai_phase, cw_phase, &
+!        volumcen_sect, volumlo_sect, volumhi_sect,                      &
+!        waterptr_aer, dens_water_aer,                                   &
+!        scavimptblvol, scavimptblnum, nimptblgrow_mind, nimptblgrow_maxd,dlndg_nimptblgrow, &
+!        ids,ide, jds,jde, kds,kde,                                      &
+!        ims,ime, jms,jme, kms,kme,                                      &
+!       its,ite, jts,jte, kts,kte                                       )
+
+!   end subroutine wetscav_soa_vbs_driver
+!===========================================================================
 
 END Module module_aerosols_soa_vbs

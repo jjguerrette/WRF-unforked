@@ -9,6 +9,7 @@ CHEM_FILES =	../chem/module_aerosols_sorgam.o \
 		../chem/module_mosaic_driver.o \
 		../chem/module_input_tracer.o \
 		../chem/module_aerosols_soa_vbs.o
+CHEM_FILES2 =	../chem/module_data_mosaic_asect.o
 
 deflt :
 		@ echo Please compile the code using ./compile
@@ -40,6 +41,37 @@ ALL_MODULES =                           \
                $(INCLUDE_MODULES)
 
 configcheck:
+	@echo " "
+	@echo "============================================================================================== "
+	@echo " "
+	@echo "The following indicate the compilers selected to build the WRF system"
+	@echo " "
+	@echo "Serial Fortran compiler (mostly for tool generation):"
+	@echo which SFC
+	@which `echo $(SFC) | cut -d " " -f1`
+	@echo " "
+	@echo "Serial C compiler (mostly for tool generation):"
+	@echo which SCC
+	@which `echo $(SCC) | cut -d " " -f1`
+	@echo " "
+	@echo "Fortran compiler for the model source code:"
+	@echo which FC
+	@if command -v timex > /dev/null 2>&1; then \
+	  which `echo $(FC) | cut -d " " -f2` ; \
+	  echo "Will use 'timex' to report timing information" ; \
+	elif command -v time > /dev/null 2>&1; then \
+	  which `echo $(FC) | cut -d " " -f2` ; \
+	  echo "Will use 'time' to report timing information" ; \
+	else \
+	  which `echo $(FC) | cut -d " " -f1` ; \
+	fi
+	@echo " "
+	@echo "C compiler for the model source code:"
+	@echo which CC
+	@which `echo $(CC) | cut -d " " -f1`
+	@echo " "
+	@echo "============================================================================================== "
+	@echo " "
 	@if [ "$(A2DCASE)" -a "$(DMPARALLEL)" ] ; then \
 	 echo "------------------------------------------------------------------------------" ; \
 	 echo "WRF CONFIGURATION ERROR                                                       " ; \
@@ -50,6 +82,7 @@ configcheck:
 	 echo "------------------------------------------------------------------------------" ; \
          exit 2 ; \
 	fi
+ 
 
 framework_only : configcheck
 	$(MAKE) MODULE_DIRS="$(ALL_MODULES)" ext
@@ -65,10 +98,10 @@ wrf : framework_only
 	if [ $(WRF_NMM_CORE) -eq 1 ]   ; then $(MAKE) MODULE_DIRS="$(ALL_MODULES)" nmm_core ; fi
 	if [ $(WRF_EXP_CORE) -eq 1 ]   ; then $(MAKE) MODULE_DIRS="$(ALL_MODULES)" exp_core ; fi
 	if [ $(WRF_HYDRO) -eq 1 ]   ; then $(MAKE) MODULE_DIRS="$(ALL_MODULES)" wrf_hydro ; fi
-	( cd main ; $(MAKE) MODULE_DIRS="$(ALL_MODULES)" SOLVER=em em_wrf )
+	( cd main ; $(MAKE) RLFLAGS="$(RLFLAGS)" MODULE_DIRS="$(ALL_MODULES)" SOLVER=em em_wrf )
 	( cd run ; /bin/rm -f wrf.exe ; ln -s ../main/wrf.exe . )
 	if [ $(ESMF_COUPLING) -eq 1 ] ; then \
-	  ( cd main ; $(MAKE) MODULE_DIRS="$(ALL_MODULES)" SOLVER=em em_wrf_SST_ESMF ) ; \
+	  ( cd main ; $(MAKE) RLFLAGS="$(RLFLAGS)" MODULE_DIRS="$(ALL_MODULES)" SOLVER=em em_wrf_SST_ESMF ) ; \
 	fi
 	@echo "build started:   $(START_OF_COMPILE)"
 	@echo "build completed:" `date`
@@ -76,13 +109,12 @@ wrf : framework_only
 all_wrfvar : 
 	$(MAKE) MODULE_DIRS="$(DA_WRFVAR_MODULES)" ext
 	$(MAKE) MODULE_DIRS="$(DA_WRFVAR_MODULES)" toolsdir
-	if [ $(CRTM) ] ; then \
-	  (cd var/external/crtm_2.1.3; \
-	   export ABI_CRTM="${ABI_CRTM}"; . configure/$(SFC_CRTM).setup; $(MAKE) $(J) ) ; \
+	if [ $(CRTM) -ne 0 ] ; then \
+	  (cd var/external/crtm_2.2.3; $(MAKE) $(J)) ; \
 	fi
 	if [ $(BUFR) ] ; then \
 	  (cd var/external/bufr;  \
-	  $(MAKE) $(J) FC="$(SFC)" CC="$(SCC)" CPP="$(CPP)" CPPFLAGS="$(CPPFLAGS)" CFLAGS="$(CFLAGS)" FFLAGS="$(FCDEBUG) $(FORMAT_FIXED)" RANLIB="$(RANLIB)" AR="$(AR)" ARFLAGS="$(ARFLAGS)" ) ; \
+	  $(MAKE) $(J) FC="$(SFC)" CC="$(SCC)" CPP="$(CPP)" CPPFLAGS="$(CPPFLAGS)" CFLAGS="$(CFLAGS)" FFLAGS="$(FCOPTIM) $(FORMAT_FIXED)" RANLIB="$(RANLIB)" AR="$(AR)" ARFLAGS="$(ARFLAGS)" ) ; \
 	fi
 ### Use 'make' to avoid '-i -r' above:
 	if [ $(WAVELET) ] ; then \
@@ -96,6 +128,14 @@ all_wrfvar :
 	@echo "build started:   $(START_OF_COMPILE)"
 	@echo "build completed:" `date`
 
+gen_be :
+	$(MAKE) MODULE_DIRS="$(DA_WRFVAR_MODULES)" ext
+	$(MAKE) MODULE_DIRS="$(DA_WRFVAR_MODULES)" toolsdir
+	( cd var/build; make depend; $(MAKE) $(J) gen_be )
+	@echo "build started:   $(START_OF_COMPILE)"
+	@echo "build completed:" `date`
+
+
 ### 3.a.  rules to build the framework and then the experimental core
 
 exp_wrf : configcheck
@@ -103,7 +143,7 @@ exp_wrf : configcheck
 	$(MAKE) MODULE_DIRS="$(ALL_MODULES)" toolsdir
 	$(MAKE) MODULE_DIRS="$(ALL_MODULES)" framework
 	$(MAKE) MODULE_DIRS="$(ALL_MODULES)" shared
-	( cd main ; $(MAKE) MODULE_DIRS="$(ALL_MODULES)" SOLVER=exp exp_wrf )
+	( cd main ; $(MAKE) RLFLAGS="$(RLFLAGS)" MODULE_DIRS="$(ALL_MODULES)" SOLVER=exp exp_wrf )
 
 
 nmm_wrf : wrf
@@ -112,30 +152,30 @@ nmm_wrf : wrf
 #  Eulerian mass coordinate initializations
 
 em_fire : wrf
+	@/bin/rm -f ideal.exe > /dev/null 2>&1
+	@/bin/rm -f wrf.exe   > /dev/null 2>&1
 	@ echo '--------------------------------------'
-	( cd main ; $(MAKE) MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=fire em_ideal )
+	( cd main ; $(MAKE) RLFLAGS="$(RLFLAGS)" MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=fire em_ideal )
 	( cd test/em_fire ; /bin/rm -f wrf.exe ; ln -s ../../main/wrf.exe . )
 	( cd test/em_fire ; /bin/rm -f ideal.exe ; ln -s ../../main/ideal.exe . )
 	( cd test/em_fire ; /bin/rm -f README.namelist ; ln -s ../../run/README.namelist . )
-	( cd test/em_fire ; /bin/rm -f gribmap.txt ; ln -s ../../run/gribmap.txt . )
-	( cd test/em_fire ; /bin/rm -f grib2map.tbl ; ln -s ../../run/grib2map.tbl . )
 	( cd test/em_fire ; /bin/sh create_links.sh )
 	( cd run ; /bin/rm -f ideal.exe ; ln -s ../main/ideal.exe . )
 	( cd run ; if test -f namelist.input ; then \
-		/bin/cp -f namelist.input namelist.input.backup ; fi ; \
+		/bin/cp -f namelist.input namelist.input.backup.`date +%Y-%m-%d_%H_%M_%S` ; fi ; \
 		/bin/rm -f namelist.input ; cp ../test/em_fire/namelist.input . )
 	( cd run ; /bin/rm -f input_sounding ; ln -s ../test/em_fire/input_sounding . )
 	@echo "build started:   $(START_OF_COMPILE)"
 	@echo "build completed:" `date`
 
 em_quarter_ss : wrf
+	@/bin/rm -f ideal.exe > /dev/null 2>&1
+	@/bin/rm -f wrf.exe   > /dev/null 2>&1
 	@ echo '--------------------------------------'
-	( cd main ; $(MAKE) MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=quarter_ss em_ideal )
+	( cd main ; $(MAKE) RLFLAGS="$(RLFLAGS)" MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=quarter_ss em_ideal )
 	( cd test/em_quarter_ss ; /bin/rm -f wrf.exe ; ln -s ../../main/wrf.exe . )
 	( cd test/em_quarter_ss ; /bin/rm -f ideal.exe ; ln -s ../../main/ideal.exe . )
 	( cd test/em_quarter_ss ; /bin/rm -f README.namelist ; ln -s ../../run/README.namelist . )
-	( cd test/em_quarter_ss ; /bin/rm -f gribmap.txt ; ln -s ../../run/gribmap.txt . )
-	( cd test/em_quarter_ss ; /bin/rm -f grib2map.tbl ; ln -s ../../run/grib2map.tbl . )
 	( cd test/em_quarter_ss ; /bin/rm -f bulkdens.asc_s_0_03_0_9 ; ln -s ../../run/bulkdens.asc_s_0_03_0_9 . )
 	( cd test/em_quarter_ss ; /bin/rm -f bulkradii.asc_s_0_03_0_9 ; ln -s ../../run/bulkradii.asc_s_0_03_0_9 . )
 	( cd test/em_quarter_ss ; /bin/rm -f capacity.asc ; ln -s ../../run/capacity.asc . )
@@ -148,123 +188,279 @@ em_quarter_ss : wrf
 	( cd test/em_quarter_ss ; /bin/rm -f termvels.asc ; ln -s ../../run/termvels.asc . )
 	( cd run ; /bin/rm -f ideal.exe ; ln -s ../main/ideal.exe . )
 	( cd run ; if test -f namelist.input ; then \
-		/bin/cp -f namelist.input namelist.input.backup ; fi ; \
+		/bin/cp -f namelist.input namelist.input.backup.`date +%Y-%m-%d_%H_%M_%S` ; fi ; \
 		/bin/rm -f namelist.input ; cp ../test/em_quarter_ss/namelist.input . )
 	( cd run ; /bin/rm -f input_sounding ; ln -s ../test/em_quarter_ss/input_sounding . )
+	@echo " "
+	@echo "=========================================================================="
 	@echo "build started:   $(START_OF_COMPILE)"
 	@echo "build completed:" `date`
+	@if test -e main/wrf.exe -a -e main/ideal.exe ; then \
+		echo " " ; \
+		echo "--->                  Executables successfully built                  <---" ; \
+		echo " " ; \
+		ls -l main/*.exe ; \
+		echo " " ; \
+		echo "==========================================================================" ; \
+		echo " " ; \
+	else \
+		echo " " ; \
+		echo "---> Problems building executables, look for errors in the build log  <---" ; \
+		echo " " ; \
+		echo "==========================================================================" ; \
+		echo " " ; \
+	fi
 
 em_squall2d_x : wrf
+	@/bin/rm -f ideal.exe > /dev/null 2>&1
+	@/bin/rm -f wrf.exe   > /dev/null 2>&1
 	@ echo '--------------------------------------'
-	( cd main ; $(MAKE) MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=squall2d_x em_ideal )
+	( cd main ; $(MAKE) RLFLAGS="$(RLFLAGS)" MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=squall2d_x em_ideal )
 	( cd test/em_squall2d_x ; /bin/rm -f wrf.exe ; ln -s ../../main/wrf.exe . )
 	( cd test/em_squall2d_x ; /bin/rm -f ideal.exe ; ln -s ../../main/ideal.exe . )
 	( cd test/em_squall2d_x ; /bin/rm -f README.namelist ; ln -s ../../run/README.namelist . )
-	( cd test/em_squall2d_x ; /bin/rm -f gribmap.txt ; ln -s ../../run/gribmap.txt . )
-	( cd test/em_squall2d_x ; /bin/rm -f grib2map.tbl ; ln -s ../../run/grib2map.tbl . )
 	( cd run ; /bin/rm -f ideal.exe ; ln -s ../main/ideal.exe . )
 	( cd run ; if test -f namelist.input ; then \
-		/bin/cp -f namelist.input namelist.input.backup ; fi ; \
+		/bin/cp -f namelist.input namelist.input.backup.`date +%Y-%m-%d_%H_%M_%S` ; fi ; \
 		/bin/rm -f namelist.input ; cp ../test/em_squall2d_x/namelist.input . )
 	( cd run ; /bin/rm -f input_sounding ; ln -s ../test/em_squall2d_x/input_sounding . )
 	@echo "build started:   $(START_OF_COMPILE)"
 	@echo "build completed:" `date`
+	@echo " "
+	@echo "=========================================================================="
+	@echo "build started:   $(START_OF_COMPILE)"
+	@echo "build completed:" `date`
+	@if test -e main/wrf.exe -a -e main/ideal.exe ; then \
+		echo " " ; \
+		echo "--->                  Executables successfully built                  <---" ; \
+		echo " " ; \
+		ls -l main/*.exe ; \
+		echo " " ; \
+		echo "==========================================================================" ; \
+		echo " " ; \
+	else \
+		echo " " ; \
+		echo "---> Problems building executables, look for errors in the build log  <---" ; \
+		echo " " ; \
+		echo "==========================================================================" ; \
+		echo " " ; \
+	fi
 
 em_squall2d_y : wrf
+	@/bin/rm -f ideal.exe > /dev/null 2>&1
+	@/bin/rm -f wrf.exe   > /dev/null 2>&1
 	@ echo '--------------------------------------'
-	( cd main ; $(MAKE) MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=squall2d_y em_ideal )
+	( cd main ; $(MAKE) RLFLAGS="$(RLFLAGS)" MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=squall2d_y em_ideal )
 	( cd test/em_squall2d_y ; /bin/rm -f wrf.exe ; ln -s ../../main/wrf.exe . )
 	( cd test/em_squall2d_y ; /bin/rm -f ideal.exe ; ln -s ../../main/ideal.exe . )
 	( cd test/em_squall2d_y ; /bin/rm -f README.namelist ; ln -s ../../run/README.namelist . )
-	( cd test/em_squall2d_y ; /bin/rm -f gribmap.txt ; ln -s ../../run/gribmap.txt . )
-	( cd test/em_squall2d_y ; /bin/rm -f grib2map.tbl ; ln -s ../../run/grib2map.tbl . )
 	( cd run ; /bin/rm -f ideal.exe ; ln -s ../main/ideal.exe . )
 	( cd run ; if test -f namelist.input ; then \
-		/bin/cp -f namelist.input namelist.input.backup ; fi ; \
+		/bin/cp -f namelist.input namelist.input.backup.`date +%Y-%m-%d_%H_%M_%S` ; fi ; \
 		/bin/rm -f namelist.input ; cp ../test/em_squall2d_y/namelist.input . )
 	( cd run ; /bin/rm -f input_sounding ; ln -s ../test/em_squall2d_y/input_sounding . )
+	@echo " "
+	@echo "=========================================================================="
 	@echo "build started:   $(START_OF_COMPILE)"
 	@echo "build completed:" `date`
+	@if test -e main/wrf.exe -a -e main/ideal.exe ; then \
+		echo " " ; \
+		echo "--->                  Executables successfully built                  <---" ; \
+		echo " " ; \
+		ls -l main/*.exe ; \
+		echo " " ; \
+		echo "==========================================================================" ; \
+		echo " " ; \
+	else \
+		echo " " ; \
+		echo "---> Problems building executables, look for errors in the build log  <---" ; \
+		echo " " ; \
+		echo "==========================================================================" ; \
+		echo " " ; \
+	fi
 
 em_b_wave : wrf
+	@/bin/rm -f ideal.exe > /dev/null 2>&1
+	@/bin/rm -f wrf.exe   > /dev/null 2>&1
 	@ echo '--------------------------------------'
-	( cd main ; $(MAKE) MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=b_wave em_ideal )
+	( cd main ; $(MAKE) RLFLAGS="$(RLFLAGS)" MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=b_wave em_ideal )
 	( cd test/em_b_wave ; /bin/rm -f wrf.exe ; ln -s ../../main/wrf.exe . )
 	( cd test/em_b_wave ; /bin/rm -f ideal.exe ; ln -s ../../main/ideal.exe . )
 	( cd test/em_b_wave ; /bin/rm -f README.namelist ; ln -s ../../run/README.namelist . )
-	( cd test/em_b_wave ; /bin/rm -f gribmap.txt ; ln -s ../../run/gribmap.txt . )
-	( cd test/em_b_wave ; /bin/rm -f grib2map.tbl ; ln -s ../../run/grib2map.tbl . )
 	( cd run ; /bin/rm -f ideal.exe ; ln -s ../main/ideal.exe . )
 	( cd run ; if test -f namelist.input ; then \
-		/bin/cp -f namelist.input namelist.input.backup ; fi ; \
+		/bin/cp -f namelist.input namelist.input.backup.`date +%Y-%m-%d_%H_%M_%S` ; fi ; \
 		/bin/rm -f namelist.input ; cp ../test/em_b_wave/namelist.input . )
 	( cd run ; /bin/rm -f input_jet ; ln -s ../test/em_b_wave/input_jet . )
+	@echo " "
+	@echo "=========================================================================="
 	@echo "build started:   $(START_OF_COMPILE)"
 	@echo "build completed:" `date`
+	@if test -e main/wrf.exe -a -e main/ideal.exe ; then \
+		echo " " ; \
+		echo "--->                  Executables successfully built                  <---" ; \
+		echo " " ; \
+		ls -l main/*.exe ; \
+		echo " " ; \
+		echo "==========================================================================" ; \
+		echo " " ; \
+	else \
+		echo " " ; \
+		echo "---> Problems building executables, look for errors in the build log  <---" ; \
+		echo " " ; \
+		echo "==========================================================================" ; \
+		echo " " ; \
+	fi
 
 em_les : wrf
+	@/bin/rm -f ideal.exe > /dev/null 2>&1
+	@/bin/rm -f wrf.exe   > /dev/null 2>&1
 	@ echo '--------------------------------------'
-	( cd main ; $(MAKE) MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=les em_ideal )
+	( cd main ; $(MAKE) RLFLAGS="$(RLFLAGS)" MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=les em_ideal )
 	( cd test/em_les ; /bin/rm -f wrf.exe ; ln -s ../../main/wrf.exe . )
 	( cd test/em_les ; /bin/rm -f ideal.exe ; ln -s ../../main/ideal.exe . )
 	( cd test/em_les ; /bin/rm -f README.namelist ; ln -s ../../run/README.namelist . )
-	( cd test/em_les ; /bin/rm -f gribmap.txt ; ln -s ../../run/gribmap.txt . )
-	( cd test/em_les ; /bin/rm -f grib2map.tbl ; ln -s ../../run/grib2map.tbl . )
 	( cd run ; /bin/rm -f ideal.exe ; ln -s ../main/ideal.exe . )
 	( cd run ; if test -f namelist.input ; then \
-		/bin/cp -f namelist.input namelist.input.backup ; fi ; \
+		/bin/cp -f namelist.input namelist.input.backup.`date +%Y-%m-%d_%H_%M_%S` ; fi ; \
 		/bin/rm -f namelist.input ; cp ../test/em_les/namelist.input . )
 	( cd run ; /bin/rm -f input_sounding ; ln -s ../test/em_les/input_sounding . )
+	@echo " "
+	@echo "=========================================================================="
 	@echo "build started:   $(START_OF_COMPILE)"
 	@echo "build completed:" `date`
+	@if test -e main/wrf.exe -a -e main/ideal.exe ; then \
+		echo " " ; \
+		echo "--->                  Executables successfully built                  <---" ; \
+		echo " " ; \
+		ls -l main/*.exe ; \
+		echo " " ; \
+		echo "==========================================================================" ; \
+		echo " " ; \
+	else \
+		echo " " ; \
+		echo "---> Problems building executables, look for errors in the build log  <---" ; \
+		echo " " ; \
+		echo "==========================================================================" ; \
+		echo " " ; \
+	fi
 
 em_seabreeze2d_x : wrf
+	@/bin/rm -f ideal.exe > /dev/null 2>&1
+	@/bin/rm -f wrf.exe   > /dev/null 2>&1
 	@ echo '--------------------------------------'
-	( cd main ; $(MAKE) MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=seabreeze2d_x em_ideal )
+	( cd main ; $(MAKE) RLFLAGS="$(RLFLAGS)" MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=seabreeze2d_x em_ideal )
 	( cd test/em_seabreeze2d_x ; /bin/rm -f wrf.exe ; ln -s ../../main/wrf.exe . )
 	( cd test/em_seabreeze2d_x ; /bin/rm -f ideal.exe ; ln -s ../../main/ideal.exe . )
 	( cd test/em_seabreeze2d_x ; /bin/rm -f README.namelist ; ln -s ../../run/README.namelist . )
-	( cd test/em_seabreeze2d_x ; /bin/rm -f gribmap.txt ; ln -s ../../run/gribmap.txt . )
-	( cd test/em_seabreeze2d_x ; /bin/rm -f grib2map.tbl ; ln -s ../../run/grib2map.tbl . )
 	( cd run ; /bin/rm -f ideal.exe ; ln -s ../main/ideal.exe . )
 	( cd run ; if test -f namelist.input ; then \
-		/bin/cp -f namelist.input namelist.input.backup ; fi ; \
+		/bin/cp -f namelist.input namelist.input.backup.`date +%Y-%m-%d_%H_%M_%S` ; fi ; \
 		/bin/rm -f namelist.input ; cp ../test/em_seabreeze2d_x/namelist.input . )
 	( cd run ; /bin/rm -f input_sounding ; ln -s ../test/em_seabreeze2d_x/input_sounding . )
+	@echo " "
+	@echo "=========================================================================="
+	@echo "build started:   $(START_OF_COMPILE)"
+	@echo "build completed:" `date`
+	@if test -e main/wrf.exe -a -e main/ideal.exe ; then \
+		echo " " ; \
+		echo "--->                  Executables successfully built                  <---" ; \
+		echo " " ; \
+		ls -l main/*.exe ; \
+		echo " " ; \
+		echo "==========================================================================" ; \
+		echo " " ; \
+	else \
+		echo " " ; \
+		echo "---> Problems building executables, look for errors in the build log  <---" ; \
+		echo " " ; \
+		echo "==========================================================================" ; \
+		echo " " ; \
+	fi
+
+em_convrad : wrf
+	@ echo '--------------------------------------'
+	( cd main ; $(MAKE) RLFLAGS="$(RLFLAGS)" MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=convrad em_ideal )
+	( cd test/em_convrad ; /bin/rm -f wrf.exe ; ln -s ../../main/wrf.exe . )
+	( cd test/em_convrad ; /bin/rm -f ideal.exe ; ln -s ../../main/ideal.exe . )
+	( cd test/em_convrad ; /bin/rm -f README.namelist ; ln -s ../../run/README.namelist . )
+	( cd run ; /bin/rm -f ideal.exe ; ln -s ../main/ideal.exe . )
+	( cd run ; if test -f namelist.input ; then \
+		/bin/cp -f namelist.input namelist.input.backup.`date +%Y-%m-%d_%H_%M_%S` ; fi ; \
+		/bin/rm -f namelist.input ; cp ../test/em_convrad/namelist.input . )
+	( cd run ; /bin/rm -f input_sounding ; ln -s ../test/em_convrad/input_sounding . )
 	@echo "build started:   $(START_OF_COMPILE)"
 	@echo "build completed:" `date`
 
 em_tropical_cyclone : wrf
+	@/bin/rm -f ideal.exe > /dev/null 2>&1
+	@/bin/rm -f wrf.exe   > /dev/null 2>&1
 	@ echo '--------------------------------------'
-	( cd main ; $(MAKE) MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=tropical_cyclone em_ideal )
+	( cd main ; $(MAKE) RLFLAGS="$(RLFLAGS)" MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=tropical_cyclone em_ideal )
 	( cd test/em_tropical_cyclone ; /bin/rm -f wrf.exe ; ln -s ../../main/wrf.exe . )
 	( cd test/em_tropical_cyclone ; /bin/rm -f ideal.exe ; ln -s ../../main/ideal.exe . )
 	( cd test/em_tropical_cyclone ; /bin/rm -f README.namelist ; ln -s ../../run/README.namelist . )
 	( cd run ; /bin/rm -f ideal.exe ; ln -s ../main/ideal.exe . )
 	( cd run ; if test -f namelist.input ; then \
-		/bin/cp -f namelist.input namelist.input.backup ; fi ; \
+		/bin/cp -f namelist.input namelist.input.backup.`date +%Y-%m-%d_%H_%M_%S` ; fi ; \
 		/bin/rm -f namelist.input ; cp ../test/em_tropical_cyclone/namelist.input . )
 	( cd run ; /bin/rm -f input_sounding ; ln -s ../test/em_tropical_cyclone/input_sounding . )
+	@echo " "
+	@echo "=========================================================================="
 	@echo "build started:   $(START_OF_COMPILE)"
 	@echo "build completed:" `date`
+	@if test -e main/wrf.exe -a -e main/ideal.exe ; then \
+		echo " " ; \
+		echo "--->                  Executables successfully built                  <---" ; \
+		echo " " ; \
+		ls -l main/*.exe ; \
+		echo " " ; \
+		echo "==========================================================================" ; \
+		echo " " ; \
+	else \
+		echo " " ; \
+		echo "---> Problems building executables, look for errors in the build log  <---" ; \
+		echo " " ; \
+		echo "==========================================================================" ; \
+		echo " " ; \
+	fi
 
 em_scm_xy : wrf
+	@/bin/rm -f ideal.exe > /dev/null 2>&1
+	@/bin/rm -f wrf.exe   > /dev/null 2>&1
 	@ echo '--------------------------------------'
-	( cd main ; $(MAKE) MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=scm_xy em_ideal )
+	( cd main ; $(MAKE) RLFLAGS="$(RLFLAGS)" MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=scm_xy em_ideal )
 	( cd test/em_scm_xy ; /bin/rm -f wrf.exe ; ln -s ../../main/wrf.exe . )
 	( cd test/em_scm_xy ; /bin/rm -f ideal.exe ; ln -s ../../main/ideal.exe . )
 	( cd test/em_scm_xy ; /bin/rm -f README.namelist ; ln -s ../../run/README.namelist . )
 	( cd run ; /bin/rm -f ideal.exe ; ln -s ../main/ideal.exe . )
 	( cd run ; if test -f namelist.input ; then \
-		/bin/cp -f namelist.input namelist.input.backup ; fi ; \
+		/bin/cp -f namelist.input namelist.input.backup.`date +%Y-%m-%d_%H_%M_%S` ; fi ; \
 		/bin/rm -f namelist.input ; cp ../test/em_scm_xy/namelist.input . )
 	( cd run ; /bin/rm -f input_sounding ; ln -s ../test/em_scm_xy/input_sounding . )
+	@echo " "
+	@echo "=========================================================================="
 	@echo "build started:   $(START_OF_COMPILE)"
 	@echo "build completed:" `date`
+	@if test -e main/wrf.exe -a -e main/ideal.exe ; then \
+		echo " " ; \
+		echo "--->                  Executables successfully built                  <---" ; \
+		echo " " ; \
+		ls -l main/*.exe ; \
+		echo " " ; \
+		echo "==========================================================================" ; \
+		echo " " ; \
+	else \
+		echo " " ; \
+		echo "---> Problems building executables, look for errors in the build log  <---" ; \
+		echo " " ; \
+		echo "==========================================================================" ; \
+		echo " " ; \
+	fi
 
 convert_em : framework_only
 	if [ $(WRF_CONVERT) -eq 1 ] ; then \
-            ( cd main ; $(MAKE) MODULE_DIRS="$(ALL_MODULES)" convert_em ) ; \
+            ( cd main ; $(MAKE) RLFLAGS="$(RLFLAGS)" MODULE_DIRS="$(ALL_MODULES)" convert_em ) ; \
         fi
 
 # Link wrf.exe and wrf_SST_ESMF.exe into 
@@ -273,11 +469,15 @@ convert_em : framework_only
 # wrf_SST_ESMF.exe is a coupled application.  Note that make 
 # target $(SOLVER)_wrf_SST_ESMF builds wrf_SST_ESMF.exe.  
 em_real : wrf
+	@/bin/rm -f real.exe  > /dev/null 2>&1
+	@/bin/rm -f tc.exe    > /dev/null 2>&1
+	@/bin/rm -f ndown.exe > /dev/null 2>&1
+	@/bin/rm -f wrf.exe   > /dev/null 2>&1
 	@ echo '--------------------------------------'
-	( cd main ; $(MAKE) MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=real em_real )
+	( cd main ; $(MAKE) RLFLAGS="$(RLFLAGS)" MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=real em_real )
 	( cd test/em_real ; /bin/rm -f wrf.exe ; ln -s ../../main/wrf.exe . )
 	if [ $(ESMF_COUPLING) -eq 1 ] ; then \
-	  ( cd main ; $(MAKE) MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=real em_wrf_SST_ESMF ) ; \
+	  ( cd main ; $(MAKE) RLFLAGS="$(RLFLAGS)" MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=real em_wrf_SST_ESMF ) ; \
 	  ( cd test/em_esmf_exp ; /bin/rm -f wrf.exe ; ln -s ../../main/wrf.exe . ) ; \
 	  ( cd test/em_esmf_exp ; /bin/rm -f wrf_SST_ESMF.exe ; ln -s ../../main/wrf_SST_ESMF.exe . ) ; \
 	  ( cd test/em_esmf_exp ; /bin/rm -f real.exe ; ln -s ../../main/real.exe . ) ; \
@@ -312,6 +512,7 @@ em_real : wrf
                ln -sf ../../run/aerosol_lon.formatted . ;              \
                ln -sf ../../run/aerosol_plev.formatted . ;             \
                ln -sf ../../run/CCN_ACTIVATE.BIN . ;                   \
+               ln -sf ../../run/p3_lookup_table_1.dat . ;              \
                if [ $(RWORDSIZE) -eq 8 ] ; then                        \
                   ln -sf ../../run/ETAMPNEW_DATA_DBL ETAMPNEW_DATA ;   \
                   ln -sf ../../run/ETAMPNEW_DATA.expanded_rain_DBL ETAMPNEW_DATA.expanded_rain ;   \
@@ -334,7 +535,7 @@ em_real : wrf
 	( cd test/em_real ; /bin/rm -f real.exe ; ln -s ../../main/real.exe . )
 	( cd test/em_real ; /bin/rm -f tc.exe ; ln -s ../../main/tc.exe . )
 	( cd test/em_real ; /bin/rm -f ndown.exe ; ln -s ../../main/ndown.exe . )
-	( cd test/em_real ; /bin/rm -f nup.exe ; ln -s ../../main/nup.exe . )
+	#TEMPORARILY REMOVED ( cd test/em_real ; /bin/rm -f nup.exe ; ln -s ../../main/nup.exe . )
 	( cd test/em_real ; /bin/rm -f README.namelist ; ln -s ../../run/README.namelist . )
 	( cd test/em_real ; /bin/rm -f ETAMPNEW_DATA.expanded_rain ETAMPNEW_DATA RRTM_DATA RRTMG_LW_DATA RRTMG_SW_DATA ;    \
              ln -sf ../../run/ETAMPNEW_DATA . ;                     \
@@ -376,6 +577,7 @@ em_real : wrf
              ln -sf ../../run/bulkdens.asc_s_0_03_0_9 . ;            \
              ln -sf ../../run/bulkradii.asc_s_0_03_0_9 . ;            \
              ln -sf ../../run/CCN_ACTIVATE.BIN . ;                   \
+             ln -sf ../../run/p3_lookup_table_1.dat . ;                   \
              if [ $(RWORDSIZE) -eq 8 ] ; then                       \
                 ln -sf ../../run/ETAMPNEW_DATA_DBL ETAMPNEW_DATA ;  \
                 ln -sf ../../run/ETAMPNEW_DATA.expanded_rain_DBL ETAMPNEW_DATA.expanded_rain ;   \
@@ -397,60 +599,128 @@ em_real : wrf
 	( cd run ; /bin/rm -f real.exe ; ln -s ../main/real.exe . )
 	( cd run ; /bin/rm -f tc.exe ; ln -s ../main/tc.exe . )
 	( cd run ; /bin/rm -f ndown.exe ; ln -s ../main/ndown.exe . )
-	( cd run ; /bin/rm -f nup.exe ; ln -s ../main/nup.exe . )
+	#TEMPORARILY REMOVED ( cd run ; /bin/rm -f nup.exe ; ln -s ../main/nup.exe . )
 	( cd run ; if test -f namelist.input ; then \
-		/bin/cp -f namelist.input namelist.input.backup ; fi ; \
+		/bin/cp -f namelist.input namelist.input.backup.`date +%Y-%m-%d_%H_%M_%S` ; fi ; \
 		/bin/rm -f namelist.input ; cp ../test/em_real/namelist.input . )
+	@echo " "
+	@echo "=========================================================================="
 	@echo "build started:   $(START_OF_COMPILE)"
 	@echo "build completed:" `date`
+	@if test -e main/wrf.exe -a -e main/real.exe -a -e main/ndown.exe -a -e main/tc.exe  ; then \
+		echo " " ; \
+		echo "--->                  Executables successfully built                  <---" ; \
+		echo " " ; \
+		ls -l main/*.exe ; \
+		echo " " ; \
+		echo "==========================================================================" ; \
+		echo " " ; \
+	else \
+		echo " " ; \
+		echo "---> Problems building executables, look for errors in the build log  <---" ; \
+		echo " " ; \
+		echo "==========================================================================" ; \
+		echo " " ; \
+	fi
 
 
 em_hill2d_x : wrf
+	@/bin/rm -f ideal.exe > /dev/null 2>&1
+	@/bin/rm -f wrf.exe   > /dev/null 2>&1
 	@ echo '--------------------------------------'
-	( cd main ; $(MAKE) MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=hill2d_x em_ideal )
+	( cd main ; $(MAKE) RLFLAGS="$(RLFLAGS)" MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=hill2d_x em_ideal )
 	( cd test/em_hill2d_x ; /bin/rm -f wrf.exe ; ln -s ../../main/wrf.exe . )
 	( cd test/em_hill2d_x ; /bin/rm -f ideal.exe ; ln -s ../../main/ideal.exe . )
 	( cd test/em_hill2d_x ; /bin/rm -f README.namelist ; ln -s ../../run/README.namelist . )
-	( cd test/em_hill2d_x ; /bin/rm -f gribmap.txt ; ln -s ../../run/gribmap.txt . )
-	( cd test/em_hill2d_x ; /bin/rm -f grib2map.tbl ; ln -s ../../run/grib2map.tbl . )
 	( cd run ; /bin/rm -f ideal.exe ; ln -s ../main/ideal.exe . )
 	( cd run ; if test -f namelist.input ; then \
-		/bin/cp -f namelist.input namelist.input.backup ; fi ; \
+		/bin/cp -f namelist.input namelist.input.backup.`date +%Y-%m-%d_%H_%M_%S` ; fi ; \
 		/bin/rm -f namelist.input ; cp ../test/em_hill2d_x/namelist.input . )
 	( cd run ; /bin/rm -f input_sounding ; ln -s ../test/em_hill2d_x/input_sounding . )
+	@echo " "
+	@echo "=========================================================================="
 	@echo "build started:   $(START_OF_COMPILE)"
 	@echo "build completed:" `date`
+	@if test -e main/wrf.exe -a -e main/ideal.exe ; then \
+		echo " " ; \
+		echo "--->                  Executables successfully built                  <---" ; \
+		echo " " ; \
+		ls -l main/*.exe ; \
+		echo " " ; \
+		echo "==========================================================================" ; \
+		echo " " ; \
+	else \
+		echo " " ; \
+		echo "---> Problems building executables, look for errors in the build log  <---" ; \
+		echo " " ; \
+		echo "==========================================================================" ; \
+		echo " " ; \
+	fi
 
 em_grav2d_x : wrf
+	@/bin/rm -f ideal.exe > /dev/null 2>&1
+	@/bin/rm -f wrf.exe   > /dev/null 2>&1
 	@ echo '--------------------------------------'
-	( cd main ; $(MAKE) MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=grav2d_x em_ideal )
+	( cd main ; $(MAKE) RLFLAGS="$(RLFLAGS)" MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=grav2d_x em_ideal )
 	( cd test/em_grav2d_x ; /bin/rm -f wrf.exe ; ln -s ../../main/wrf.exe . )
 	( cd test/em_grav2d_x ; /bin/rm -f ideal.exe ; ln -s ../../main/ideal.exe . )
 	( cd test/em_grav2d_x ; /bin/rm -f README.namelist ; ln -s ../../run/README.namelist . )
-	( cd test/em_grav2d_x ; /bin/rm -f gribmap.txt ; ln -s ../../run/gribmap.txt . )
-	( cd test/em_grav2d_x ; /bin/rm -f grib2map.tbl ; ln -s ../../run/grib2map.tbl . )
 	( cd run ; /bin/rm -f ideal.exe ; ln -s ../main/ideal.exe . )
 	( cd run ; if test -f namelist.input ; then \
-		/bin/cp -f namelist.input namelist.input.backup ; fi ; \
+		/bin/cp -f namelist.input namelist.input.backup.`date +%Y-%m-%d_%H_%M_%S` ; fi ; \
 		/bin/rm -f namelist.input ; cp ../test/em_grav2d_x/namelist.input . )
 	( cd run ; /bin/rm -f input_sounding ; ln -s ../test/em_grav2d_x/input_sounding . )
+	@echo " "
+	@echo "=========================================================================="
 	@echo "build started:   $(START_OF_COMPILE)"
 	@echo "build completed:" `date`
+	@if test -e main/wrf.exe -a -e main/ideal.exe ; then \
+		echo " " ; \
+		echo "--->                  Executables successfully built                  <---" ; \
+		echo " " ; \
+		ls -l main/*.exe ; \
+		echo " " ; \
+		echo "==========================================================================" ; \
+		echo " " ; \
+	else \
+		echo " " ; \
+		echo "---> Problems building executables, look for errors in the build log  <---" ; \
+		echo " " ; \
+		echo "==========================================================================" ; \
+		echo " " ; \
+	fi
 
 em_heldsuarez : wrf
+	@/bin/rm -f ideal.exe > /dev/null 2>&1
+	@/bin/rm -f wrf.exe   > /dev/null 2>&1
 	@ echo '--------------------------------------'
-	( cd main ; $(MAKE) MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=heldsuarez em_ideal )
+	( cd main ; $(MAKE) RLFLAGS="$(RLFLAGS)" MODULE_DIRS="$(ALL_MODULES)" SOLVER=em IDEAL_CASE=heldsuarez em_ideal )
 	( cd test/em_heldsuarez ; /bin/rm -f wrf.exe ; ln -s ../../main/wrf.exe . )
 	( cd test/em_heldsuarez ; /bin/rm -f ideal.exe ; ln -s ../../main/ideal.exe . )
 	( cd test/em_heldsuarez ; /bin/rm -f README.namelist ; ln -s ../../run/README.namelist . )
-	( cd test/em_heldsuarez ; /bin/rm -f gribmap.txt ; ln -s ../../run/gribmap.txt . )
-	( cd test/em_heldsuarez ; /bin/rm -f grib2map.tbl ; ln -s ../../run/grib2map.tbl . )
 	( cd run ; /bin/rm -f ideal.exe ; ln -s ../main/ideal.exe . )
 	( cd run ; if test -f namelist.input ; then \
-		/bin/cp -f namelist.input namelist.input.backup ; fi ; \
+		/bin/cp -f namelist.input namelist.input.backup.`date +%Y-%m-%d_%H_%M_%S` ; fi ; \
 		/bin/rm -f namelist.input ; cp ../test/em_heldsuarez/namelist.input . )
+	@echo " "
+	@echo "=========================================================================="
 	@echo "build started:   $(START_OF_COMPILE)"
 	@echo "build completed:" `date`
+	@if test -e main/wrf.exe -a -e main/ideal.exe ; then \
+		echo " " ; \
+		echo "--->                  Executables successfully built                  <---" ; \
+		echo " " ; \
+		ls -l main/*.exe ; \
+		echo " " ; \
+		echo "==========================================================================" ; \
+		echo " " ; \
+	else \
+		echo " " ; \
+		echo "---> Problems building executables, look for errors in the build log  <---" ; \
+		echo " " ; \
+		echo "==========================================================================" ; \
+		echo " " ; \
+	fi
 
 #### anthropogenic emissions converter
 
@@ -460,7 +730,7 @@ emi_conv : wrf
 	( cd test/em_real ; /bin/rm -f convert_emiss.exe ; ln -s ../../chem/convert_emiss.exe . )
 	( cd test/em_real ; /bin/rm -f README.namelist ; ln -s ../../run/README.namelist . )
 	( cd run ; if test -f namelist.input ; then \
-		/bin/cp -f namelist.input namelist.input.backup ; fi ; \
+		/bin/cp -f namelist.input namelist.input.backup.`date +%Y-%m-%d_%H_%M_%S` ; fi ; \
 		/bin/rm -f namelist.input ; cp ../test/em_real/namelist.input . )
 
 #### emissions opt 3 converter
@@ -471,7 +741,7 @@ opt3_conv : wrf
 	( cd test/em_real ; /bin/rm -f convert_fireemiss.exe ; ln -s ../../chem/convert_fireemiss.exe . )
 	( cd test/em_real ; /bin/rm -f README.namelist ; ln -s ../../run/README.namelist . )
 	( cd run ; if test -f namelist.input ; then \
-		/bin/cp -f namelist.input namelist.input.backup ; fi ; \
+		/bin/cp -f namelist.input namelist.input.backup.`date +%Y-%m-%d_%H_%M_%S` ; fi ; \
 		/bin/rm -f namelist.input ; cp ../test/em_real/namelist.input . )
 
 #### biogenic emissions converter
@@ -482,7 +752,7 @@ bio_conv : wrf
 	( cd test/em_real ; /bin/rm -f convert_bioemiss.exe ; ln -s ../../chem/convert_bioemiss.exe . )
 	( cd test/em_real ; /bin/rm -f README.namelist ; ln -s ../../run/README.namelist . )
 	( cd run ; if test -f namelist.input ; then \
-		/bin/cp -f namelist.input namelist.input.backup ; fi ; \
+		/bin/cp -f namelist.input namelist.input.backup.`date +%Y-%m-%d_%H_%M_%S` ; fi ; \
 		/bin/rm -f namelist.input ; cp ../test/em_real/namelist.input . )
 
 bioemiss_conv_megan2 : wrf
@@ -491,7 +761,7 @@ bioemiss_conv_megan2 : wrf
 	( cd test/em_real ; /bin/rm -f convert_bioemiss_megan2.exe ; ln -s ../../chem/convert_bioemiss_megan2.exe . )
 	( cd test/em_real ; /bin/rm -f README.namelist ; ln -s ../../run/README.namelist . )
 	( cd run ; if test -f namelist.input ; then \
-	        /bin/cp -f namelist.input namelist.input.backup ; fi ; \
+	        /bin/cp -f namelist.input namelist.input.backup.`date +%Y-%m-%d_%H_%M_%S` ; fi ; \
 	        /bin/rm -f namelist.input ; cp ../test/em_real/namelist.input . )
 
 #### DMS emissions converter
@@ -502,7 +772,7 @@ dms_conv : wrf
 	( cd test/em_real ; /bin/rm -f convert_dms.exe ; ln -s ../../chem/convert_dms.exe . )
 	( cd test/em_real ; /bin/rm -f README.namelist ; ln -s ../../run/README.namelist . )
 	( cd run ; if test -f namelist.input ; then \
-		/bin/cp -f namelist.input namelist.input.backup ; fi ; \
+		/bin/cp -f namelist.input namelist.input.backup.`date +%Y-%m-%d_%H_%M_%S` ; fi ; \
 		/bin/rm -f namelist.input ; cp ../test/em_real/namelist.input . )
 
 
@@ -514,7 +784,7 @@ dust_conv : wrf
 	( cd test/em_real ; /bin/rm -f convert_dust.exe ; ln -s ../../chem/convert_dust.exe . )
 	( cd test/em_real ; /bin/rm -f README.namelist ; ln -s ../../run/README.namelist . )
 	( cd run ; if test -f namelist.input ; then \
-		/bin/cp -f namelist.input namelist.input.backup ; fi ; \
+		/bin/cp -f namelist.input namelist.input.backup.`date +%Y-%m-%d_%H_%M_%S` ; fi ; \
 		/bin/rm -f namelist.input ; cp ../test/em_real/namelist.input . )
 
 #### GOCART background state for oh, no3 and h2o2 converter
@@ -525,7 +795,7 @@ gocart_conv : wrf
 	( cd test/em_real ; /bin/rm -f convert_gocart.exe ; ln -s ../../chem/convert_gocart.exe . )
 	( cd test/em_real ; /bin/rm -f README.namelist ; ln -s ../../run/README.namelist . )
 	( cd run ; if test -f namelist.input ; then \
-		/bin/cp -f namelist.input namelist.input.backup ; fi ; \
+		/bin/cp -f namelist.input namelist.input.backup.`date +%Y-%m-%d_%H_%M_%S` ; fi ; \
 		/bin/rm -f namelist.input ; cp ../test/em_real/namelist.input . )
 
 
@@ -540,7 +810,7 @@ nmm_tropical_cyclone : nmm_wrf
 	( cd test/nmm_tropical_cyclone ; /bin/rm -f README.namelist ; ln -s ../../run/README.namelist . )
 	( cd run ; /bin/rm -f ideal.exe ; ln -s ../main/ideal.exe . )
 	( cd run ; if test -f namelist.input ; then \
-		/bin/cp -f namelist.input namelist.input.backup ; fi ; \
+		/bin/cp -f namelist.input namelist.input.backup.`date +%Y-%m-%d_%H_%M_%S` ; fi ; \
 		/bin/rm -f namelist.input ; cp ../test/nmm_tropical_cyclone/namelist.input . )
 	@echo "build started:   $(START_OF_COMPILE)"
 	@echo "build completed:" `date`
@@ -573,7 +843,7 @@ nmm_real : nmm_wrf
 	( cd test/nmm_real ; /bin/rm -f co2_trans ; ln -s ../../run/co2_trans . )
 	( cd run ; /bin/rm -f real_nmm.exe ; ln -s ../main/real_nmm.exe . )
 	( cd run ; if test -f namelist.input ; then \
-		/bin/cp -f namelist.input namelist.input.backup ; fi ; \
+		/bin/cp -f namelist.input namelist.input.backup.`date +%Y-%m-%d_%H_%M_%S` ; fi ; \
 		/bin/rm -f namelist.input ; cp ../test/nmm_real/namelist.input . )
 
 
@@ -584,7 +854,8 @@ nmm_real : nmm_wrf
 io :
 	@ echo '--------------------------------------'
 	( cd tools ; $(MAKE) standard.exe )
-	( cd frame ; $(MAKE) io_only )
+	(            $(MAKE) io_only )
+	(            $(MAKE) MODULE_DIRS="$(ALL_MODULES)" toolsdir )
 	( cd frame ; $(MAKE) module_driver_constants.o pack_utils.o module_machine.o module_internal_header_util.o wrf_debug.o )
 	( cd frame ; $(AR) $(ARFLAGS) ../main/libwrflib.a module_driver_constants.o pack_utils.o module_machine.o  \
 					module_internal_header_util.o module_wrf_error.o wrf_debug.o )
@@ -597,24 +868,30 @@ framework :
 	@ echo '--------------------------------------'
 	( cd frame ; $(MAKE) $(J) framework; \
           cd ../external/io_netcdf ; \
-          $(MAKE) NETCDFPATH="$(NETCDFPATH)" FC="$(SFC) $(FCBASEOPTS)" RANLIB="$(RANLIB)" \
+          $(MAKE) NETCDFPATH="$(NETCDFPATH)" \
+               FC="$(FC) $(FCBASEOPTS) $(PROMOTION) $(FCDEBUG) $(OMP)" RANLIB="$(RANLIB)" \
                CPP="$(CPP)" LDFLAGS="$(LDFLAGS)" TRADFLAG="$(TRADFLAG)" ESMF_IO_LIB_EXT="$(ESMF_IO_LIB_EXT)" \
 	       LIB_LOCAL="$(LIB_LOCAL)" \
                ESMF_MOD_DEPENDENCE="$(ESMF_MOD_DEPENDENCE)" AR="INTERNAL_BUILD_ERROR_SHOULD_NOT_NEED_AR" diffwrf; \
+          cd ../io_netcdf ; \
+          $(MAKE) NETCDFPATH="$(NETCDFPATH)" \
+               FC="$(SFC) $(FCBASEOPTS) $(PROMOTION) $(FCDEBUG) $(OMP)" RANLIB="$(RANLIB)" \
+               CPP="$(CPP)" LDFLAGS="$(LDFLAGS)" TRADFLAG="$(TRADFLAG)" ESMF_IO_LIB_EXT="$(ESMF_IO_LIB_EXT)" \
+	       LIB_LOCAL="$(LIB_LOCAL)" \
+               ESMF_MOD_DEPENDENCE="$(ESMF_MOD_DEPENDENCE)" AR="INTERNAL_BUILD_ERROR_SHOULD_NOT_NEED_AR"; \
+          cd ../io_pio ; \
+          echo SKIPPING PIO BUILD $(MAKE) NETCDFPATH="$(PNETCDFPATH)" \
+               FC="$(SFC) $(FCBASEOPTS) $(PROMOTION) $(FCDEBUG) $(OMP)" RANLIB="$(RANLIB)" \
+               CPP="$(CPP)" LDFLAGS="$(LDFLAGS)" TRADFLAG="$(TRADFLAG)" ESMF_IO_LIB_EXT="$(ESMF_IO_LIB_EXT)" \
+	       LIB_LOCAL="$(LIB_LOCAL)" \
+               ESMF_MOD_DEPENDENCE="$(ESMF_MOD_DEPENDENCE)" AR="INTERNAL_BUILD_ERROR_SHOULD_NOT_NEED_AR"; \
           cd ../io_int ; \
-          $(MAKE) SFC="$(SFC) $(FCBASEOPTS)" FC="$(SFC) $(FCBASEOPTS)" RANLIB="$(RANLIB)" CPP="$(CPP) $(ARCH_LOCAL)" DM_FC="$(DM_FC) $(FCBASEOPTS)"\
+          $(MAKE) SFC="$(SFC) $(FCBASEOPTS)" \
+               FC="$(SFC) $(FCBASEOPTS) $(PROMOTION) $(FCDEBUG) $(OMP)" \
+               RANLIB="$(RANLIB)" CPP="$(CPP) $(ARCH_LOCAL)" DM_FC="$(DM_FC) $(FCBASEOPTS)"\
                TRADFLAG="$(TRADFLAG)" ESMF_IO_LIB_EXT="$(ESMF_IO_LIB_EXT)" \
                ESMF_MOD_DEPENDENCE="$(ESMF_MOD_DEPENDENCE)" AR="INTERNAL_BUILD_ERROR_SHOULD_NOT_NEED_AR" diffwrf ; \
           cd ../../frame )
-
-#          cd ../external/io_netcdf ; \
-#          $(MAKE) NETCDFPATH="$(NETCDFPATH)" FC="$(SFC) $(FCBASEOPTS)" RANLIB="$(RANLIB)" \
-#               CPP="$(CPP)" LDFLAGS="$(LDFLAGS)" TRADFLAG="$(TRADFLAG)" ESMF_IO_LIB_EXT="$(ESMF_IO_LIB_EXT)" \
-#               ESMF_MOD_DEPENDENCE="$(ESMF_MOD_DEPENDENCE)" AR="$(AR)" ARFLAGS+"$(ARFLAGS)" diffwrf; \
-#          cd ../io_int ; \
-#          $(MAKE) SFC="$(SFC) $(FCBASEOPTS)" FC="$(SFC) $(FCBASEOPTS)" RANLIB="$(RANLIB)" CPP="$(CPP)" \
-#               TRADFLAG="$(TRADFLAG)" ESMF_IO_LIB_EXT="$(ESMF_IO_LIB_EXT)" \
-#               ESMF_MOD_DEPENDENCE="$(ESMF_MOD_DEPENDENCE)" AR="$(AR)" "$(ARFLAGS)" diffwrf ; \
 
 shared :
 	@ echo '--------------------------------------'
@@ -643,7 +920,11 @@ chemics :
 
 physics :
 	@ echo '--------------------------------------'
-	( cd phys ; $(MAKE) )
+	if [ $(WRF_CHEM) -eq 0 ] ; then \
+		( cd phys ; $(MAKE) CF2=" " ) ; \
+	else \
+		( cd phys ; $(MAKE) CF2="$(CHEM_FILES2)" ) ; \
+	fi
 
 em_core :
 	@ echo '--------------------------------------'
@@ -686,6 +967,10 @@ fortran_2003_flush_test:
 # rule used by configure to test if Fortran 2003 FLUSH intrinsic subroutine is replaced by FFLUSH (thanks xlf)
 fortran_2003_fflush_test:
 	@cd tools ; /bin/rm -f fortran_2003_fflush_test.{exe,o} ; $(SFC) -o fortran_2003_fflush_test.exe fortran_2003_fflush_test.F ; cd ..
+
+# rule used by configure to test if Fortran 2008 gamma intrinsic function is available
+fortran_2008_gamma_test:
+	@cd tools ; /bin/rm -f fortran_2008_gamma_test.{exe,o} ; $(SFC) -o fortran_2008_gamma_test.exe fortran_2008_gamma_test.F ; cd ..
 
 ### 3.b.  sub-rule to build the experimental core
 

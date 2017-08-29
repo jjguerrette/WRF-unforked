@@ -54,19 +54,77 @@ subroutine da_wrfvar_init2
       global = .false.
    end if
 
-   if ( hybrid_dual_res .and. ensdim_alpha.ge.1 ) then
-      anal_type_hybrid_dual_res = .true.
-   else
-      anal_type_hybrid_dual_res = .false.
+   anal_type_hybrid_dual_res = .false.
+   if ( hybrid_dual_res ) then
+      if ( ensdim_alpha >= 1 ) then
+         if ( max_dom /= 2 ) then
+            call da_error(__FILE__,__LINE__, (/'max_dom has to be 2 for hybrid_dual_res application'/))
+         end if
+         anal_type_hybrid_dual_res = .true.
+      else
+         write(unit=message(1),fmt='(A,2(I4))') "ensdim_alpha has to be non-zero for hybrid_dual_res application, resetting hybrid_dual_res=.false."
+         call da_warning(__FILE__,__LINE__,message(1:1))
+         anal_type_hybrid_dual_res = .false.
+      end if
    endif
 
    if ( anal_type_hybrid_dual_res ) then
       call nl_set_shw( 1 , 0 )
       call nl_set_shw( 2 , 0 )
-      write(unit=message(1),fmt='(A,2(I4))') "Resetting shw for dual-res hybrid to shw = ",shw(1),shw(2)
+      !write(unit=message(1),fmt='(A,2(I4))') "Resetting shw for dual-res hybrid to shw = ",shw(1),shw(2)
+      write(unit=message(1),fmt='(A,2(I4))') "Running WRFDA in dual-resolution hybrid mode"
       call da_message(message(1:1))
    endif
 
+   !mp_physics_da can be 0/1, used for allocating moist variables
+   !allocate all moist variables (excluding qh) used in DA when mp_physics is on
+   do i = 1, model_config_rec%max_dom
+      if ( mp_physics(i) > 0 ) then
+         model_config_rec%mp_physics_da(i) = 1
+      else if ( mp_physics(i) == 0 ) then
+         model_config_rec%mp_physics_da(i) = 0
+      else if ( mp_physics(i) == -1 ) then
+         !for DA, if physics_suite is set and mp_physics is not set, mp_physics will be -1
+         !in this case, also allocate all moist variables
+         model_config_rec%mp_physics_da(i) = 1
+      end if
+   end do
+
+   if ( var4d ) then
+      model_config_rec%var4d_used = 1
+      !mp_physics_da_4dvar can be 0/1, used for allocating a_moist and g_moist variables
+      do i = 1, model_config_rec%max_dom
+         if ( mp_physics(i) > 0 ) then
+            model_config_rec%mp_physics_da_4dvar(i) = 1
+         else
+            model_config_rec%mp_physics_da_4dvar(i) = 0
+         end if
+      end do
+   end if
+
+   if ( adj_sens ) then
+      model_config_rec%adj_sens_used = 1
+   end if
+
+   if ( var4d ) then
+      model_config_rec%var4d_cloudcv = cloud_cv_options
+      if ( use_cv_w ) model_config_rec%var4d_w_cv = 1
+   end if
+   if ( use_cv_w ) then
+      model_config_rec%cv_w_used = 1
+   end if
+   if ( ensdim_alpha > 0 ) then
+      model_config_rec%ens_used = 1
+   end if
+   if ( alpha_hydrometeors ) then
+      model_config_rec%cloud_ens_used = 1
+   end if
+   if ( use_wpec ) then
+      model_config_rec%wpec_used = 1
+   end if
+   if ( use_4denvar .and. num_fgat_time > 1 ) then
+      model_config_rec%alloc_xa_static = 1
+   end if
 
    !<DESCRIPTION>
    ! Among the configuration variables read from the namelist is
@@ -88,7 +146,7 @@ subroutine da_wrfvar_init2
 
 !  if (max_dom > 1 ) then 
    if (max_dom > 1 .and. ( .not. anal_type_hybrid_dual_res) ) then
-      call da_error(__FILE__,__LINE__, (/'nesting not available for wrfvar'/))
+      call da_error(__FILE__,__LINE__, (/'WRFDA does not handle nests (max_domain > 1)'/))
    end if
 
    !<DESCRIPTION>
@@ -130,12 +188,13 @@ subroutine da_wrfvar_init2
    call setup_timekeeping (head_grid) 
 
    if ( anal_type_hybrid_dual_res ) then
-      inquire(file=input_file_ens, exist=isfile)
+      ! input_file_ens is 'fg_ens', set in da_control.f90
+      inquire(file=trim(input_file_ens), exist=isfile)
       if ( .not. isfile ) then
-         write(unit=message(1),fmt='(a)') 'File ',input_file_ens,' is missing.'
+         write(unit=message(1),fmt='(a,a,a)') 'File ',trim(input_file_ens),' (low-resolution ensemble file) is missing.'
          call da_error(__FILE__,__LINE__,message(1:1))
       endif
-      call da_med_initialdata_input (head_grid, config_flags, 'fg_ens')
+      call da_med_initialdata_input (head_grid, config_flags, trim(input_file_ens))
       parent_grid => head_grid
       call alloc_and_configure_domain (domain_id=2, grid=another_grid, parent=parent_grid, kid=1)
       call model_to_grid_config_rec (another_grid%id, model_config_rec, config_flags)

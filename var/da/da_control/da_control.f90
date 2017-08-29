@@ -17,6 +17,12 @@ module da_control
    logical :: use_rad
 
    !---------------------------------------------------------------------------
+   ! [0.0] WRF hybrid coordinate variables
+   !---------------------------------------------------------------------------
+   real, allocatable :: c1f(:), c2f(:), c3f(:), c4f(:)
+   real, allocatable :: c1h(:), c2h(:), c3h(:), c4h(:)
+
+   !---------------------------------------------------------------------------
    ! [1.0] Physical parameter constants (all NIST standard values):
    !---------------------------------------------------------------------------
 
@@ -100,7 +106,7 @@ module da_control
    integer, parameter ::  missing       = -888888
    real   , parameter ::  missing_r     = -888888.0
    real   , parameter ::  xmiss         = -88.0
-   real   , parameter ::  Max_StHeight_Diff = 100.0
+!   real   , parameter ::  Max_StHeight_Diff = 100.0 !became a namelist variable
 
    integer, parameter :: cv_options_hum_specific_humidity = 1
    integer, parameter :: cv_options_hum_relative_humidity = 2
@@ -188,6 +194,7 @@ module da_control
    integer, parameter :: Forward_FFT     = -1 ! Grid to spectral
    integer, parameter :: Inverse_FFT     =  1 ! Spectral to grid.
    integer, parameter :: num_fft_factors = 10 ! Max number of factors.
+   integer, parameter :: nrange          =1000! Range to search for efficient FFT.
  
    ! Balance:
    integer, parameter :: balance_geo = 1      ! Geostrophic balance.
@@ -216,6 +223,8 @@ module da_control
    real, parameter    :: typical_qrn_rms = 0.00001 ! g/kg
    real, parameter    :: typical_qcw_rms = 0.00001 ! g/kg
    real, parameter    :: typical_qci_rms = 0.00001 ! g/kg
+   real, parameter    :: typical_qsn_rms = 0.00001 ! g/kg
+   real, parameter    :: typical_qgr_rms = 0.00001 ! g/kg
    real, parameter    :: typical_w_rms = 0.1     ! m/s
    real, parameter    :: typical_rv_rms = 1.0    ! m/s
    real, parameter    :: typical_rf_rms = 1.0    ! dBZ
@@ -286,7 +295,8 @@ module da_control
    ! [3.0] Variables used in MM5 part of code:
    !---------------------------------------------------------------------------
 
-   integer            :: map_projection       ! 1=LamConf/2=PolarSte/3=Mercator
+   integer            :: map_projection       !1=LamConf/2=PolarSte/3=Mercator
+                                              !0=CylEqui/6=Cassini
    real               :: ycntr
    integer            :: coarse_ix            ! coarse domain dim in i direction.
    integer            :: coarse_jy            ! coarse domain dim in y direction.
@@ -519,8 +529,13 @@ module da_control
       "mtgirs        ", &
       "tamdar        ", &
       "tamdar_sfc    ", &
-      "rain          " &  
+      "rain          " &
    /)
+
+   logical :: pseudo_tpw
+   logical :: pseudo_ztd
+   logical :: pseudo_ref
+   logical :: pseudo_uvtpq
 
    integer, parameter :: max_no_fm = 290
 
@@ -616,23 +631,15 @@ module da_control
 
    character (len=filename_len) :: input_file_ens = 'fg_ens'
 
-
    TYPE dual_res_type
-         real :: x
-         real :: y
          integer :: i
          integer :: j
          real    :: dx
          real    :: dy
          real    :: dxm
          real    :: dym
-         integer :: xx
-         integer :: yy
    END TYPE dual_res_type
-
-   TYPE(dual_res_type), allocatable :: ob_locs(:)
-   integer :: total_here
-   
+   TYPE(dual_res_type), allocatable :: aens_locs(:,:)
 
    integer :: num_qcstat_conv(2,num_ob_indexes,num_ob_vars,npres_print+1)
    character*4, parameter :: ob_vars(num_ob_vars) = (/'U   ','V   ','T   ',&
@@ -645,6 +652,7 @@ module da_control
                       299.9,  249.9, 199.9, 149.9, 99.9, 49.9/)
 
    real*8, allocatable :: time_slots(:)
+   integer             :: ifgat_ana !index of First Guess at Appropriate Time of analysis
 
    logical :: global
 

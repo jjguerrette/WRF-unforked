@@ -1,7 +1,8 @@
 module da_obs
 
    use da_define_structures, only : multi_level_type, y_type, iv_type, infa_type, &
-      field_type, each_level_type,da_allocate_y, da_random_seed,da_allocate_y_rain
+      field_type, each_level_type,da_allocate_y, da_random_seed,da_allocate_y_rain, &
+      da_allocate_y_radar
    use module_domain, only : domain, x_type
 
    use da_airep, only : da_transform_xtoy_airep, da_transform_xtoy_airep_adj 
@@ -22,8 +23,10 @@ module da_obs
       sound, mtgirs, synop, profiler, gpsref, gpspw, polaramv, geoamv, ships, metar, &
       satem, radar, ssmi_rv, ssmi_tb, ssmt1, ssmt2, airsr, pilot, airep, sonde_sfc,rain, &
       bogus, buoy, qscat, tamdar, tamdar_sfc, pseudo, num_ob_indexes, its,ite,jds,jts,jte,ids, &
-      write_mod_filtered_obs, radiance, use_varbc, obs_names
+      write_mod_filtered_obs, radiance, use_varbc, obs_names, q_error_options
    ! use_crtm_kmatrix,use_crtm_kmatrix_fast
+   use da_control, only : pseudo_tpw, pseudo_ztd, pseudo_ref, pseudo_uvtpq
+   use da_define_structures, only : da_allocate_obs_info
 #ifdef CRTM
    use da_crtm, only : da_transform_xtoy_crtm, da_transform_xtoy_crtm_adj
       !da_transform_xtoy_crtmk,da_transform_xtoy_crtmk_adj
@@ -74,9 +77,9 @@ contains
 #include "da_add_noise_to_ob.inc"
 #include "da_check_missing.inc"
 #include "da_fill_obs_structures.inc"
+#include "da_fill_obs_structures_radar.inc"
 #include "da_fill_obs_structures_rain.inc"
 #include "da_random_omb_all.inc"
-#include "da_setup_pseudo_obs.inc"
 #include "da_store_obs_grid_info.inc"
 #include "da_store_obs_grid_info_rad.inc"
 #include "da_count_filtered_obs.inc"

@@ -12,8 +12,8 @@
     USE module_model_constants
     USE module_utility
     IMPLICIT NONE
-#include <wrf_io_flags.h>
-#include <wrf_status_codes.h>
+#include "wrf_io_flags.h"
+#include "wrf_status_codes.h"
     TYPE(domain) :: grid
     TYPE(grid_config_rec_type),  INTENT(INOUT)    :: config_flags
     INTEGER, INTENT(IN) :: fid, switch
@@ -38,14 +38,19 @@
     REAL    gmt, cen_lat, cen_lon, bdyfrq , truelat1 , truelat2 , moad_cen_lat , stand_lon
     INTEGER km_opt, diff_opt, damp_opt,  &
             mp_physics, ra_lw_physics, ra_sw_physics, sf_sfclay_physics, &
-            sf_surface_physics, bl_pbl_physics, cu_physics, hypsometric_opt, sf_lake_physics
+            sf_surface_physics, bl_pbl_physics, cu_physics, hypsometric_opt, sf_lake_physics, &
+            use_theta_m, use_maxw_level, use_trop_level,hybrid_opt, gwd_opt
     INTEGER swint_opt, aer_type,aer_aod550_opt,aer_angexp_opt,aer_ssa_opt,aer_asy_opt, aer_opt
-    REAL    aer_aod550_val,aer_angexp_val,aer_ssa_val,aer_asy_val
+    REAL    aer_aod550_val,aer_angexp_val,aer_ssa_val,aer_asy_val,etac
     REAL    khdif, kvdif, swrad_scat, dampcoef,radt,bldt,cudt
     REAL    dt, adapt_dt_start, adapt_dt_min, adapt_dt_max
     INTEGER sf_urban_physics, w_damping, smooth_option, feedback, surface_input_source, sst_update
-    INTEGER stoch_force_opt, stoch_vertstruc_opt, nens
-    REAL    tot_backscat_psi, tot_backscat_t
+    INTEGER skebs_on, sppt_on, rand_perturb_on, nens,ISEED_SKEBS,ISEED_SPPT,ISEED_RAND_PERT
+    INTEGER skebs_vertstruc, sppt_vertstruc, rand_pert_vertstruc
+    INTEGER LMINFORC,LMAXFORC,KMINFORC,KMAXFORC,LMINFORCT,LMAXFORCT,KMINFORCT,KMAXFORCT
+    REAL    gridpt_stddev_rand_pert,stddev_cutoff_rand_pert,timescale_rand_pert
+    REAL    gridpt_stddev_sppt,stddev_cutoff_sppt,timescale_sppt
+    REAL    tot_backscat_psi,tot_backscat_t,REXPONENT_PSI,REXPONENT_T,ZTAU_PSI,ZTAU_T
 #if (EM_CORE == 1)
     INTEGER grid_id , parent_id , i_parent_start , j_parent_start , parent_grid_ratio
     INTEGER diff_6th_opt
@@ -58,7 +63,7 @@
     REAL    guv_sfc, gt_sfc, gq_sfc, rinblw
     INTEGER moist_adv_opt, scalar_adv_opt, tke_adv_opt
     INTEGER save_topo_orig
-    INTEGER scalar_pblmix, tracer_pblmix, grav_settling
+    INTEGER scalar_pblmix, tracer_pblmix, grav_settling, ysu_topdown_pblmix
 #endif
     CHARACTER (len=19) simulation_start_date
     CHARACTER (len=len_current_date) current_date_save
@@ -76,7 +81,7 @@
 
     CHARACTER*80  dname, memord
     CHARACTER*256 message
-    CHARACTER*80  fname
+    CHARACTER*256  fname
     CHARACTER*80  char_junk
     CHARACTER(LEN=256) :: MMINLU
     INTEGER    ibuf(1)
@@ -93,6 +98,7 @@
     INTEGER seconds, seconds2, iring
     INTEGER :: nio_tasks_per_group
 
+    LOGICAL, EXTERNAL :: wrf_dm_on_monitor
 
     WRITE(wrf_err_message,*)'output_wrf: begin, fid = ',fid
     CALL wrf_debug( 300 , wrf_err_message )
@@ -147,8 +153,8 @@
     call nl_get_aer_asy_opt        ( grid%id,  aer_asy_opt        )
     call nl_get_aer_aod550_val     ( grid%id,  aer_aod550_val     )
     call nl_get_aer_angexp_val     ( grid%id,  aer_angexp_val     )
-    call nl_get_aer_ssa_opt        ( grid%id,  aer_ssa_val        )
-    call nl_get_aer_asy_opt        ( grid%id,  aer_asy_val        )
+    call nl_get_aer_ssa_val        ( grid%id,  aer_ssa_val        )
+    call nl_get_aer_asy_val        ( grid%id,  aer_asy_val        )
     call nl_get_sf_lake_physics    ( grid%id,  sf_lake_physics    )
 
 #if (EM_CORE == 1)
@@ -156,6 +162,7 @@
     adapt_dt_min = grid%min_time_step
     adapt_dt_max = grid%max_time_step
     adapt_dt_start = grid%starting_time_step
+    call nl_get_gwd_opt            ( grid%id,  gwd_opt            )
 #endif
 
 ! add nml variables in 2.2
@@ -169,6 +176,9 @@
 
 #if (EM_CORE == 1)
     call nl_get_hypsometric_opt    ( 1, hypsometric_opt           )
+    call nl_get_use_theta_m        ( 1, use_theta_m               )
+    call nl_get_use_maxw_level     ( 1, use_maxw_level            )
+    call nl_get_use_trop_level     ( 1, use_trop_level            )
     CALL nl_get_moist_adv_opt  ( grid%id , moist_adv_opt )
     CALL nl_get_scalar_adv_opt ( grid%id , scalar_adv_opt )
     CALL nl_get_tke_adv_opt    ( grid%id , tke_adv_opt )
@@ -182,7 +192,16 @@
     CALL nl_get_auxinput9_interval_m ( grid%id , sgfdda_interval_m )
     CALL nl_get_scalar_pblmix  ( grid%id , scalar_pblmix )
     CALL nl_get_tracer_pblmix  ( grid%id , tracer_pblmix )
+    CALL nl_get_ysu_topdown_pblmix  ( grid%id , ysu_topdown_pblmix )
     CALL nl_get_grav_settling  ( grid%id , grav_settling )
+
+#if ( HYBRID_COORD==1 )
+    CALL nl_get_hybrid_opt ( 1       , hybrid_opt )
+    CALL nl_get_etac       ( 1       , etac )
+    IF ( hybrid_opt .EQ. 0 ) THEN
+       etac = 0.
+    END IF
+#endif
 
     IF ( grid_fdda == 1 ) THEN
     CALL nl_get_fgdt       ( grid%id , fgdt )
@@ -202,7 +221,7 @@
     CALL nl_get_dtramp_min ( 1       , dtramp_min )
     ENDIF
 
-    IF ( grid_sfdda == 1 ) THEN
+    IF ( grid_sfdda >= 1 ) THEN
     CALL nl_get_guv_sfc      ( grid%id , guv_sfc )
     CALL nl_get_gt_sfc       ( grid%id , gt_sfc )
     CALL nl_get_gq_sfc       ( grid%id , gq_sfc )
@@ -226,11 +245,36 @@
     ENDIF
 
 #if ( DA_CORE != 1)
-    CALL nl_get_stoch_force_opt     ( grid%id, stoch_force_opt     )
-    CALL nl_get_stoch_vertstruc_opt ( grid%id, stoch_vertstruc_opt )
-    CALL nl_get_nens                ( grid%id, nens                )
+    CALL nl_get_skebs_on            ( grid%id, skebs_on            )
+    CALL nl_get_sppt_on             ( grid%id, sppt_on             )
+    CALL nl_get_rand_perturb_on     ( grid%id, rand_perturb_on     )
+    CALL nl_get_skebs_vertstruc     ( grid%id, skebs_vertstruc     )
     CALL nl_get_tot_backscat_psi    ( grid%id, tot_backscat_psi    )
     CALL nl_get_tot_backscat_t      ( grid%id, tot_backscat_t      )
+    CALL nl_get_REXPONENT_PSI       ( grid%id, REXPONENT_PSI       )
+    CALL nl_get_REXPONENT_T         ( grid%id, REXPONENT_T         )
+    CALL nl_get_ZTAU_T              ( grid%id, ZTAU_T              )
+    CALL nl_get_ZTAU_PSI            ( grid%id, ZTAU_PSI            )
+    CALL nl_get_LMINFORC            ( grid%id, LMINFORC            )
+    CALL nl_get_LMAXFORC            ( grid%id, LMAXFORC            )
+    CALL nl_get_KMINFORC            ( grid%id, KMINFORC            )
+    CALL nl_get_KMAXFORC            ( grid%id, KMAXFORC            )
+    CALL nl_get_LMINFORCT           ( grid%id, LMINFORCT           )
+    CALL nl_get_LMAXFORCT           ( grid%id, LMAXFORCT           )
+    CALL nl_get_KMINFORCT           ( grid%id, KMINFORCT           )
+    CALL nl_get_KMAXFORCT           ( grid%id, KMAXFORCT           )
+    CALL nl_get_ISEED_SKEBS         ( grid%id, ISEED_SKEBS         )
+    CALL nl_get_ISEED_SPPT          ( grid%id, ISEED_SPPT          )
+    CALL nl_get_ISEED_RAND_PERT     ( grid%id, ISEED_RAND_PERT     )
+    CALL nl_get_nens                ( grid%id, nens                )
+    CALL nl_get_sppt_vertstruc      ( grid%id, sppt_vertstruc      )
+    CALL nl_get_rand_pert_vertstruc ( grid%id, rand_pert_vertstruc )
+    CALL nl_get_gridpt_stddev_sppt  ( grid%id, gridpt_stddev_sppt  )
+    CALL nl_get_stddev_cutoff_sppt  ( grid%id, stddev_cutoff_sppt  )
+    CALL nl_get_timescale_sppt      ( grid%id, timescale_sppt  )
+    CALL nl_get_gridpt_stddev_rand_pert  ( grid%id, gridpt_stddev_rand_pert  )
+    CALL nl_get_stddev_cutoff_rand_pert  ( grid%id, stddev_cutoff_rand_pert  )
+    CALL nl_get_timescale_rand_pert ( grid%id, timescale_rand_pert  )
 #endif
 #endif
 
@@ -298,7 +342,7 @@
     CALL wrf_put_dom_ti_char ( fid , 'START_DATE', TRIM(start_date) , ierr )
     IF ( switch .EQ. input_only) THEN
        CALL wrf_put_dom_ti_char ( fid , 'SIMULATION_START_DATE', TRIM(start_date) , ierr )
-#ifdef HWRF
+#if ( HWRF == 1 )
     ELSE
 #else
     ELSE IF ( ( switch .EQ. restart_only ) .OR. ( switch .EQ. history_only ) ) THEN
@@ -361,8 +405,18 @@
            ELSE
              write(alarmname,'("WRF_ALARM_SECS_TIL_NEXT_RING_",i2)')i
            ENDIF
-           CALL WRFU_TimeIntervalGet(interval,S=seconds)
-           CALL WRFU_TimeIntervalGet(tmpinterval,S=seconds2)
+
+#ifdef DM_PARALLEL
+           if(wrf_dm_on_monitor()) then
+#endif
+             CALL WRFU_TimeIntervalGet(interval,S=seconds)
+             CALL WRFU_TimeIntervalGet(tmpinterval,S=seconds2)
+#ifdef DM_PARALLEL
+           endif
+
+           call wrf_dm_bcast_integer(seconds, 1)
+           call wrf_dm_bcast_integer(seconds2, 1)
+#endif
            IF ( seconds .GE. 1700000000 .OR. seconds .LE. -1700000000 ) THEN   ! it is a forever value, do not change it
              CALL wrf_put_dom_ti_integer( fid, TRIM(alarmname), seconds, 1, ierr )
            ELSE
@@ -489,14 +543,57 @@ endif
     END IF
 
     IF (switch .EQ. history_only) THEN
-       CALL    wrf_put_dom_ti_integer( fid, 'STOCH_FORCE_OPT'        , stoch_force_opt       , 1, ierr )
-       IF ( stoch_force_opt .NE. 0 )  THEN
-          CALL wrf_put_dom_ti_integer( fid, 'STOCH_VERTSTRUC_OPT'    , stoch_vertstruc_opt   , 1, ierr )
-          CALL wrf_put_dom_ti_integer( fid, 'NENS'                   , nens                  , 1, ierr )
-          CALL wrf_put_dom_ti_real   ( fid, 'tot_backscat_psi'       , tot_backscat_psi      , 1, ierr )
-          CALL wrf_put_dom_ti_real   ( fid, 'tot_backscat_t'         , tot_backscat_t        , 1, ierr )
+       CALL    wrf_put_dom_ti_integer( fid, 'SKEBS_ON'           , config_flags%skebs_on           , 1, ierr )
+       IF ( config_flags%skebs_on .NE. 0 )  THEN
+          CALL wrf_put_dom_ti_real   ( fid, 'TOT_BACKSCAT_PSI'   , config_flags%tot_backscat_psi   , 1, ierr )
+          CALL wrf_put_dom_ti_real   ( fid, 'TOT_BACKSCAT_T'     , config_flags%tot_backscat_t     , 1, ierr )
+          CALL wrf_put_dom_ti_real   ( fid, 'REXPONENT_PSI'      , config_flags%REXPONENT_PSI      , 1, ierr )
+          CALL wrf_put_dom_ti_real   ( fid, 'REXPONENT_T'        , config_flags%REXPONENT_T        , 1, ierr )
+          CALL wrf_put_dom_ti_real   ( fid, 'ZTAU_PSI'           , config_flags%ZTAU_PSI           , 1, ierr )
+          CALL wrf_put_dom_ti_real   ( fid, 'ZTAU_T  '           , config_flags%ZTAU_T             , 1, ierr )
+          CALL wrf_put_dom_ti_integer( fid, 'LMINFORC'           , config_flags%LMINFORC           , 1, ierr )
+          CALL wrf_put_dom_ti_integer( fid, 'LMAXFORC'           , config_flags%LMAXFORC           , 1, ierr )
+          CALL wrf_put_dom_ti_integer( fid, 'KMINFORC'           , config_flags%KMINFORC           , 1, ierr )
+          CALL wrf_put_dom_ti_integer( fid, 'KMAXFORC'           , config_flags%KMAXFORC           , 1, ierr )
+          CALL wrf_put_dom_ti_integer( fid, 'LMINFORCT'          , config_flags%LMINFORCT          , 1, ierr )
+          CALL wrf_put_dom_ti_integer( fid, 'LMAXFORCT'          , config_flags%LMAXFORCT          , 1, ierr )
+          CALL wrf_put_dom_ti_integer( fid, 'KMINFORCT'          , config_flags%KMINFORCT          , 1, ierr )
+          CALL wrf_put_dom_ti_integer( fid, 'KMAXFORCT'          , config_flags%KMAXFORCT          , 1, ierr )
+          CALL wrf_put_dom_ti_integer( fid, 'SKEBS_VERTSTRUC'    , config_flags%skebs_vertstruc    , 1, ierr )
+          CALL wrf_put_dom_ti_integer( fid, 'NENS'               , config_flags%nens               , 1, ierr )
+          CALL wrf_put_dom_ti_integer( fid, 'ISEED_SKEBS'        , config_flags%ISEED_SKEBS        , 1, ierr )
        END IF
+       IF ( config_flags%rand_perturb_on .NE. 0 ) THEN
+          CALL wrf_put_dom_ti_real   ( fid, 'GRIDPT_STDDEV_RAND_PERT', config_flags%gridpt_stddev_rand_pert, 1, ierr )
+          CALL wrf_put_dom_ti_real   ( fid, 'STDDEV_CUTOFF_RAND_PERT', config_flags%stddev_cutoff_rand_pert, 1, ierr )
+          CALL wrf_put_dom_ti_real   ( fid, 'LENGTHSCALE_RAND_PERT',   config_flags%lengthscale_rand_pert, 1, ierr )
+          CALL wrf_put_dom_ti_real   ( fid, 'TIMESCALE_RAND_PERT',     config_flags%timescale_rand_pert, 1, ierr )
+          CALL wrf_put_dom_ti_integer( fid, 'RAND_PERT_VERTSTRUC',     config_flags%rand_pert_vertstruc, 1, ierr )
+          CALL wrf_put_dom_ti_integer( fid, 'NENS'               ,     config_flags%nens               , 1, ierr )
+          CALL wrf_put_dom_ti_integer( fid, 'ISEED_RAND_PERT'    ,     config_flags%ISEED_RAND_PERT    , 1, ierr )
+       END IF
+       IF ( config_flags%sppt_on      .NE. 0 ) THEN
+          CALL wrf_put_dom_ti_real   ( fid, 'GRIDPT_STDDEV_SPPT', config_flags%gridpt_stddev_sppt, 1, ierr )
+          CALL wrf_put_dom_ti_real   ( fid, 'STDDEV_CUTOFF_SPPT', config_flags%stddev_cutoff_sppt, 1, ierr )
+          CALL wrf_put_dom_ti_real   ( fid, 'LENGTHSCALE_SPPT',   config_flags%lengthscale_sppt, 1, ierr )
+          CALL wrf_put_dom_ti_real   ( fid, 'TIMESCALE_SPPT',     config_flags%timescale_sppt, 1, ierr )
+          CALL wrf_put_dom_ti_integer( fid, 'SPPT_VERTSTRUC',     config_flags%sppt_vertstruc, 1, ierr )
+          CALL wrf_put_dom_ti_integer( fid, 'NENS'               ,config_flags%nens               , 1, ierr )
+          CALL wrf_put_dom_ti_integer( fid, 'ISEED_SPPT'         ,config_flags% ISEED_SPPT        , 1, ierr )
+       END IF
+     IF ( config_flags%perturb_bdy .NE. 0 ) THEN
+          CALL wrf_put_dom_ti_integer( fid, 'PERTURB_BDY',        config_flags%perturb_bdy, 1, ierr )
+     END IF
+     CALL wrf_put_dom_ti_integer( fid, 'SPEC_BDY_FINAL_MU',  config_flags%spec_bdy_final_mu, 1, ierr )
+     CALL wrf_put_dom_ti_integer( fid, 'USE_Q_DIABATIC',     config_flags%use_q_diabatic,    1, ierr )
     END IF
+#endif
+
+! added by SYHA (09-19-2014)
+#if ((WRF_CHEM == 1) &&  (EM_CORE == 1))
+     IF ( config_flags%perturb_chem_bdy .NE. 0 ) THEN
+          CALL wrf_put_dom_ti_integer( fid, 'PERTURB_CHEM_BDY', config_flags%perturb_chem_bdy, 1, ierr )
+     END IF
 #endif
 
 ! added this metadatum for H. Chuan, NCEP, 030417, JM
@@ -543,6 +640,7 @@ endif
     ! added netcdf-specific metadata:
     IF ( ( use_package( io_form ) == IO_NETCDF ) .OR. &
          ( use_package( io_form ) == IO_PHDF5  ) .OR. &
+         ( use_package( io_form ) == IO_PIO    ) .OR. &
          ( use_package( io_form ) == IO_PNETCDF ) ) THEN
       CALL wrf_put_dom_ti_integer ( fid, 'SURFACE_INPUT_SOURCE', surface_input_source , 1 , ierr )
       CALL wrf_put_dom_ti_integer ( fid, 'SST_UPDATE', sst_update , 1 , ierr )
@@ -554,10 +652,18 @@ endif
       CALL wrf_put_dom_ti_integer ( fid, 'SGFDDA_INTERVAL_M', sgfdda_interval_m , 1 , ierr )
       CALL wrf_put_dom_ti_integer ( fid, 'SGFDDA_END_H', sgfdda_end_h , 1 , ierr )
       CALL wrf_put_dom_ti_integer ( fid, 'HYPSOMETRIC_OPT', hypsometric_opt , 1 , ierr )
+      CALL wrf_put_dom_ti_integer ( fid, 'USE_THETA_M', use_theta_m , 1 , ierr )
+      IF ( switch .EQ. input_only) THEN
+         CALL wrf_put_dom_ti_integer ( fid, 'USE_MAXW_LEVEL', use_maxw_level , 1 , ierr )
+         CALL wrf_put_dom_ti_integer ( fid, 'USE_TROP_LEVEL', use_trop_level , 1 , ierr )
+      END IF
+    ibuf(1) = gwd_opt
+    CALL wrf_put_dom_ti_integer ( fid, 'GWD_OPT' ,  ibuf , 1 , ierr )
+    CALL wrf_put_dom_ti_integer ( fid, 'SF_URBAN_PHYSICS', sf_urban_physics , 1 , ierr )
+    CALL wrf_put_dom_ti_integer ( fid, 'SF_OCEAN_PHYSICS', config_flags%sf_ocean_physics     , 1 , ierr ) 
 #endif
 
       IF ( switch .EQ. history_only ) THEN
-      CALL wrf_put_dom_ti_integer ( fid, 'SF_URBAN_PHYSICS', sf_urban_physics , 1 , ierr )
       CALL wrf_put_dom_ti_integer ( fid, 'SHCU_PHYSICS',     config_flags%shcu_physics , 1 , ierr ) 
       CALL wrf_put_dom_ti_integer ( fid, 'MFSHCONV',         config_flags%mfshconv , 1 , ierr ) 
       CALL wrf_put_dom_ti_integer ( fid, 'FEEDBACK', feedback , 1 , ierr )
@@ -617,7 +723,7 @@ endif
         CALL wrf_put_dom_ti_real    ( fid, 'DTRAMP_MIN', dtramp_min , 1 , ierr )
       ENDIF
 
-      IF ( grid_sfdda == 1 ) THEN
+      IF ( grid_sfdda >= 1 ) THEN
         CALL wrf_put_dom_ti_real    ( fid, 'GUV_SFC', guv_sfc , 1 , ierr )
         CALL wrf_put_dom_ti_real    ( fid, 'GT_SFC', gt_sfc , 1 , ierr )
         CALL wrf_put_dom_ti_real    ( fid, 'GQ_SFC', gq_sfc , 1 , ierr )
@@ -643,7 +749,6 @@ endif
       CALL wrf_put_dom_ti_real      ( fid, 'BUCKET_MM',   config_flags%bucket_mm   , 1 , ierr ) 
       CALL wrf_put_dom_ti_real      ( fid, 'BUCKET_J',    config_flags%bucket_J    , 1 , ierr ) 
       CALL wrf_put_dom_ti_real      ( fid, 'PREC_ACC_DT', config_flags%prec_acc_dt , 1 , ierr ) 
-      CALL wrf_put_dom_ti_integer   ( fid, 'SF_OCEAN_PHYSICS',     config_flags%sf_ocean_physics     , 1 , ierr ) 
       CALL wrf_put_dom_ti_integer   ( fid, 'ISFTCFLX',    config_flags%isftcflx    , 1 , ierr ) 
       CALL wrf_put_dom_ti_integer   ( fid, 'ISHALLOW',    config_flags%ishallow    , 1 , ierr ) 
       CALL wrf_put_dom_ti_integer   ( fid, 'ISFFLX',      config_flags%isfflx      , 1 , ierr ) 
@@ -651,6 +756,7 @@ endif
       CALL wrf_put_dom_ti_integer   ( fid, 'ICLOUD_CU',   config_flags%icloud_cu   , 1 , ierr ) 
       CALL wrf_put_dom_ti_integer   ( fid, 'TRACER_PBLMIX', tracer_pblmix , 1 , ierr )
       CALL wrf_put_dom_ti_integer   ( fid, 'SCALAR_PBLMIX', scalar_pblmix , 1 , ierr )
+      CALL wrf_put_dom_ti_integer   ( fid, 'YSU_TOPDOWN_PBLMIX', ysu_topdown_pblmix , 1 , ierr )
       CALL wrf_put_dom_ti_integer   ( fid, 'GRAV_SETTLING', grav_settling , 1 , ierr )
 
 #endif
@@ -668,12 +774,26 @@ endif
         CALL wrf_put_dom_ti_integer   ( fid, 'OPT_SNF',     config_flags%opt_snf     , 1 , ierr )
         CALL wrf_put_dom_ti_integer   ( fid, 'OPT_TBOT',    config_flags%opt_tbot    , 1 , ierr )
         CALL wrf_put_dom_ti_integer   ( fid, 'OPT_STC',     config_flags%opt_stc     , 1 , ierr )
+        CALL wrf_put_dom_ti_integer   ( fid, 'OPT_GLA',     config_flags%opt_gla     , 1 , ierr )
+        CALL wrf_put_dom_ti_integer   ( fid, 'OPT_RSF',     config_flags%opt_rsf     , 1 , ierr )
       ENDIF
 
 
       CALL wrf_put_dom_ti_integer   ( fid, 'DFI_OPT',          config_flags%dfi_opt      , 1 , ierr ) 
 
       ENDIF ! history_only
+
+#if (EM_CORE == 1) && ( DA_CORE != 1)
+      IF ( ( switch .EQ. input_only   ) .OR. &
+           ( switch .EQ. history_only ) .OR. &
+           ( switch .EQ. restart_only ) ) THEN
+         IF ( grid%this_is_an_ideal_run ) THEN
+            CALL wrf_put_dom_ti_char ( fid , 'SIMULATION_INITIALIZATION_TYPE', "IDEALIZED DATA" , ierr )
+         ELSE
+            CALL wrf_put_dom_ti_char ( fid , 'SIMULATION_INITIALIZATION_TYPE', "REAL-DATA CASE" , ierr )
+         END IF
+      END IF
+#endif
     ENDIF
 
 ! added these fields for use by reassembly programs , 010831, JM
@@ -807,7 +927,7 @@ endif
     CALL wrf_put_dom_ti_integer ( fid , 'ISOILWATER' ,  config_flags%isoilwater , 1 , ierr )
 ! added these fields for restarting of moving nests, JM
 !For HWRF: zhang 
-#if defined (HWRF)
+#if ( HWRF == 1 )
     CALL wrf_put_dom_ti_integer ( fid , 'I_PARENT_START' ,  grid%i_parent_start  , 1 , ierr )
     CALL wrf_put_dom_ti_integer ( fid , 'J_PARENT_START' ,  grid%j_parent_start  , 1 , ierr )
 #elif ! defined(EM_CORE)
@@ -822,6 +942,18 @@ endif
         CALL wrf_put_dom_td_char ( fid , 'THISBDYTIME' ,  current_date(1:19), current_date(1:19), ierr )
         CALL wrf_put_dom_td_char ( fid , 'NEXTBDYTIME' ,  current_date(1:19), next_datestr(1:19), ierr )
     ENDIF
+
+    !  Add the hybrid vertical coordinate metadata.
+
+#if (EM_CORE == 1)
+# if ! ( HYBRID_COORD==1 )
+    CALL wrf_put_dom_ti_integer ( fid , 'HYBRID_OPT',          -1  , 1 , ierr )
+    CALL wrf_put_dom_ti_real    ( fid , 'ETAC'      ,           0. , 1 , ierr )
+# else
+    CALL wrf_put_dom_ti_integer ( fid , 'HYBRID_OPT',  hybrid_opt  , 1 , ierr )
+    CALL wrf_put_dom_ti_real    ( fid , 'ETAC'      ,  etac        , 1 , ierr )
+# endif
+#endif
 
     ! added grib2-specific metadata:  Todd Hutchinson 8/21/2005
     IF ( use_package( io_form ) == IO_GRIB2 ) THEN
@@ -866,6 +998,25 @@ endif
                 dname = p%DataName
                 IF (p%Ntl.GT.0.AND.switch.NE.restart_only)dname=dname(1:len(TRIM(dname))-2)
                 memord = p%MemoryOrder
+
+#if (EM_CORE == 1)
+                !  CF compliancy would have us put the string "minutes since" // simulation_start_date
+                !  as the ouput in the units attribute.  After the WRF p%Units string has the "minutes since"
+                !  substring, we wipe out the rest of the string and add the model's original (pre-restart)
+                !  starting date.  This is only for the time variable in WRF (XTIME), which is now considered
+                !  the time coordinate in netcdf.
+
+                IF (TRIM(p%DataName).EQ."XTIME") THEN
+                  WRITE ( simulation_start_date , FMT = '(I4.4,"-",I2.2,"-",I2.2," ",I2.2,":",I2.2,":",I2.2)' ) &
+                  simulation_start_year,simulation_start_month,simulation_start_day,&
+                  simulation_start_hour,simulation_start_minute,simulation_start_second
+                  IF ( TRIM(p%Description(1:14)) .EQ. 'minutes since ' ) THEN
+                    p%Description(15:33) = TRIM(simulation_start_date)
+                    p%Units      (15:33) = TRIM(simulation_start_date)
+                  ENDIF
+                ENDIF
+#endif
+
                 IF      ( p%Type .EQ. 'r' ) THEN
                   CALL wrf_ext_write_field (  &
                                     fid                     , & ! DataHandle
@@ -873,8 +1024,7 @@ endif
                                     TRIM(p%DataName)        , & ! Data Name
                                     p%rfield_0d             , & ! Field
                                     WRF_FLOAT               , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
+                                    grid                    , & ! grid
                                     grid%domdesc            , & ! Comm
                                     grid%bdy_mask           , & ! bdy_mask
                                     dryrun                  , & ! flag
@@ -897,8 +1047,7 @@ endif
                                     TRIM(p%DataName)        , & ! Data Name
                                     p%dfield_0d             , & ! Field
                                     WRF_DOUBLE              , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
+                                    grid                    , & ! grid
                                     grid%domdesc            , & ! Comm
                                     grid%bdy_mask           , & ! bdy_mask
                                     dryrun                  , & ! flag
@@ -921,8 +1070,7 @@ endif
                                     TRIM(p%DataName)        , & ! Data Name
                                     p%ifield_0d             , & ! Field
                                     WRF_INTEGER             , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
+                                    grid                    , & ! grid
                                     grid%domdesc            , & ! Comm
                                     grid%bdy_mask           , & ! bdy_mask
                                     dryrun                  , & ! flag
@@ -945,8 +1093,7 @@ endif
                                     TRIM(p%DataName)        , & ! Data Name
                                     p%lfield_0d             , & ! Field
                                     WRF_LOGICAL             , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
+                                    grid                    , & ! grid
                                     grid%domdesc            , & ! Comm
                                     grid%bdy_mask           , & ! bdy_mask
                                     dryrun                  , & ! flag
@@ -979,8 +1126,7 @@ endif
                                     TRIM(dname)             , & ! Data Name
                                     p%rfield_1d             , & ! Field
                                     WRF_FLOAT               , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
+                                    grid                    , & ! grid
                                     grid%domdesc            , & ! Comm
                                     grid%bdy_mask           , & ! bdy_mask
                                     dryrun                  , & ! flag
@@ -1003,8 +1149,7 @@ endif
                                     TRIM(dname)             , & ! Data Name
                                     p%dfield_1d             , & ! Field
                                     WRF_DOUBLE              , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
+                                    grid                    , & ! grid
                                     grid%domdesc            , & ! Comm
                                     grid%bdy_mask           , & ! bdy_mask
                                     dryrun                  , & ! flag
@@ -1027,8 +1172,7 @@ endif
                                     TRIM(dname)             , & ! Data Name
                                     p%ifield_1d             , & ! Field
                                     WRF_INTEGER             , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
+                                    grid                    , & ! grid
                                     grid%domdesc            , & ! Comm
                                     grid%bdy_mask           , & ! bdy_mask
                                     dryrun                  , & ! flag
@@ -1051,8 +1195,7 @@ endif
                                     TRIM(dname)             , & ! Data Name
                                     p%lfield_1d             , & ! Field
                                     WRF_LOGICAL             , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
+                                    grid                    , & ! grid
                                     grid%domdesc            , & ! Comm
                                     grid%bdy_mask           , & ! bdy_mask
                                     dryrun                  , & ! flag
@@ -1089,8 +1232,7 @@ endif
                                     TRIM(dname)             , & ! Data Name
                                     p%rfield_2d             , & ! Field
                                     WRF_FLOAT               , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
+                                    grid                    , & ! grid
                                     grid%domdesc            , & ! Comm
                                     grid%bdy_mask           , & ! bdy_mask
                                     dryrun                  , & ! flag
@@ -1113,8 +1255,7 @@ endif
                                     TRIM(dname)             , & ! Data Name
                                     p%dfield_2d             , & ! Field
                                     WRF_DOUBLE              , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
+                                    grid                    , & ! grid
                                     grid%domdesc            , & ! Comm
                                     grid%bdy_mask           , & ! bdy_mask
                                     dryrun                  , & ! flag
@@ -1137,8 +1278,7 @@ endif
                                     TRIM(dname)             , & ! Data Name
                                     p%ifield_2d             , & ! Field
                                     WRF_INTEGER             , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
+                                    grid                    , & ! grid
                                     grid%domdesc            , & ! Comm
                                     grid%bdy_mask           , & ! bdy_mask
                                     dryrun                  , & ! flag
@@ -1161,8 +1301,7 @@ endif
                                     TRIM(dname)             , & ! Data Name
                                     p%lfield_2d             , & ! Field
                                     WRF_LOGICAL             , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
+                                    grid                    , & ! grid
                                     grid%domdesc            , & ! Comm
                                     grid%bdy_mask           , & ! bdy_mask
                                     dryrun                  , & ! flag
@@ -1199,8 +1338,7 @@ endif
                                     TRIM(dname)             , & ! Data Name
                                     p%rfield_3d             , & ! Field
                                     WRF_FLOAT               , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
+                                    grid                    , & ! grid
                                     grid%domdesc            , & ! Comm
                                     grid%bdy_mask           , & ! bdy_mask
                                     dryrun                  , & ! flag
@@ -1223,8 +1361,7 @@ endif
                                     TRIM(dname)             , & ! Data Name
                                     p%dfield_3d             , & ! Field
                                     WRF_DOUBLE              , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
+                                    grid                    , & ! grid
                                     grid%domdesc            , & ! Comm
                                     grid%bdy_mask           , & ! bdy_mask
                                     dryrun                  , & ! flag
@@ -1247,8 +1384,7 @@ endif
                                     TRIM(dname)             , & ! Data Name
                                     p%ifield_3d             , & ! Field
                                     WRF_INTEGER             , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
+                                    grid                    , & ! grid
                                     grid%domdesc            , & ! Comm
                                     grid%bdy_mask           , & ! bdy_mask
                                     dryrun                  , & ! flag
@@ -1290,8 +1426,7 @@ endif
                                     1, 1, 1                 , & ! see comment above
                                     RWORDSIZE               , &
                                     WRF_FLOAT               , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
+                                    grid                    , & ! grid
                                     grid%domdesc            , & ! Comm
                                     grid%bdy_mask           , & ! bdy_mask
                                     dryrun                  , & ! flag
@@ -1317,8 +1452,7 @@ endif
                                     1, 1, 1                 , & ! see comment above
                                     DWORDSIZE               , &
                                     WRF_DOUBLE              , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
+                                    grid                    , & ! grid
                                     grid%domdesc            , & ! Comm
                                     grid%bdy_mask           , & ! bdy_mask
                                     dryrun                  , & ! flag
@@ -1344,8 +1478,7 @@ endif
                                     1, 1, 1                 , & ! see comment above
                                     IWORDSIZE               , &
                                     WRF_INTEGER             , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
+                                    grid                    , & ! grid
                                     grid%domdesc            , & ! Comm
                                     grid%bdy_mask           , & ! bdy_mask
                                     dryrun                  , & ! flag
@@ -1403,7 +1536,7 @@ endif
 
        IF ( switch .EQ. history_only .AND. config_flags%output_ready_flag ) THEN
           WRITE ( wrf_err_message , FMT='(I2.2)' ) grid%id
-          CALL get_nio_tasks_in_group ( nio_tasks_per_group )
+          CALL get_nio_tasks_in_group ( grid%id, nio_tasks_per_group )
           IF ( nio_tasks_per_group .EQ. 0 ) THEN
              OPEN ( UNIT   = 99 , &
                     FILE   = 'wrfoutReady_d' // wrf_err_message(1:2) // '_' // TRIM(current_date) , &

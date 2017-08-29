@@ -2049,7 +2049,7 @@
 
 ! Initialize
 
-      hvrclc = '$Revision: 1.3 $'
+!jm not thread safe      hvrclc = '$Revision: 1.3 $'
 
 ! Some of these initializations are done elsewhere
       do lay = 1, nlayers
@@ -2517,7 +2517,7 @@
 
 ! Initialize
 
-      hvrrft = '$Revision: 1.3 $'
+!jm not thread safe      hvrrft = '$Revision: 1.3 $'
 
       zsr3=sqrt(3._rb)
       zwcrit=0.9999995_rb
@@ -3266,7 +3266,7 @@
 !      real(kind=rb), intent(out) :: ssa(:,:)            ! single scattering albedo (inactive)
                                                          !   Dimensions: (nlayers,ngptsw)
 
-      hvrtau = '$Revision: 1.3 $'
+!jm not thread safe      hvrtau = '$Revision: 1.3 $'
 
 ! Calculate gaseous optical depth and planck fractions for each spectral band.
 
@@ -4607,7 +4607,7 @@
 !     BPADE    Inverse of the Pade approximation constant
 !
 
-      hvrini = '$Revision: 1.3 $'
+!jm not thread safe      hvrini = '$Revision: 1.3 $'
 
 ! Initialize model data
       call swdatinit(cpdair)
@@ -4705,7 +4705,7 @@
 
       use rrsw_con, only: heatfac, grav, planck, boltz, &
                           clight, avogad, alosmt, gascon, radcn1, radcn2, &
-                          sbcnst, secdy 
+                          sbcnst, secdy, oneminus, pi
       use rrsw_vsn
 
       save 
@@ -4751,6 +4751,11 @@
                                               ! (W cm-2 K-4)
       secdy = 8.6400e4_rb                     ! Number of seconds per day
                                               ! (s d-1)
+
+!jm 20141107 moved here for thread safety
+      oneminus = 1.0_rb - 1.e-06_rb ! zepsec
+      pi = 2._rb * asin(1._rb)
+
 !
 !     units are generally cgs
 !
@@ -9137,8 +9142,8 @@
       iout = 0 !BSINGH(PNNL) initializing iout to zero(Might be wrong!) as this variable is never initialized but used in spcvmc_sw
       zepsec = 1.e-06_rb
       zepzen = 1.e-10_rb
-      oneminus = 1.0_rb - zepsec
-      pi = 2._rb * asin(1._rb)
+!jm not thread safe      oneminus = 1.0_rb - zepsec
+!jm not thread safe      pi = 2._rb * asin(1._rb)
 
       istart = jpb1
       iend = jpb2
@@ -9168,7 +9173,7 @@
 !           input aerosol optical depth at 0.55 microns for each aerosol type (ecaer)
 ! iaer = 10, input total aerosol optical depth, single scattering albedo 
 !            and asymmetry parameter (tauaer, ssaaer, asmaer) directly
-      if ( aer_opt .eq. 0 .or. aer_opt .eq. 2 ) then
+      if ( aer_opt.eq.0 .or. aer_opt.eq.2 .or. aer_opt.eq.3) then
       iaer = 10
       else if ( aer_opt .eq. 1 ) then
       iaer = 6
@@ -9797,6 +9802,11 @@ MODULE module_ra_rrtmg_sw
 
 use module_model_constants, only : cp
 USE module_wrf_error
+#if (HWRF == 1)
+USE module_state_description, ONLY : FER_MP_HIRES, FER_MP_HIRES_ADVECT, ETAMP_HWRF 
+#else
+USE module_state_description, ONLY : FER_MP_HIRES, FER_MP_HIRES_ADVECT
+#endif
 !USE module_dm
 
 use parrrsw, only : nbndsw, ngptsw, naerec
@@ -9804,7 +9814,7 @@ use rrtmg_sw_init, only: rrtmg_sw_ini
 use rrtmg_sw_rad, only: rrtmg_sw
 use mcica_subcol_gen_sw, only: mcica_subcol_sw
 
-use module_ra_rrtmg_lw, only : inirad, o3data, relcalc, reicalc
+use module_ra_rrtmg_lw, only : inirad, o3data, relcalc, reicalc, retab
 !                               mcica_random_numbers, randomNumberSequence, &
 !                               new_RandomNumberSequence, getRandomReal
 
@@ -9846,6 +9856,7 @@ CONTAINS
 !jdfcz                 progn,prescribe,                           &
                        progn,                                     &
                        qndrop3d,f_qndrop,                         & !czhao
+                       mp_physics,                                & !wang 2014/12
                        ids,ide, jds,jde, kds,kde,                 & 
                        ims,ime, jms,jme, kms,kme,                 &
                        its,ite, jts,jte, kts,kte,                 &
@@ -9865,6 +9876,7 @@ CONTAINS
                                        its,ite, jts,jte, kts,kte
 
    INTEGER, INTENT(IN )      ::        ICLOUD
+   INTEGER, INTENT(IN )      ::        MP_PHYSICS
 !
    REAL, DIMENSION( ims:ime, kms:kme, jms:jme )                 , &
          INTENT(IN   ) ::                                   dz8w, &
@@ -9922,12 +9934,9 @@ CONTAINS
             swddif      ! All-sky broadband surface diffuse irradiance
    real, optional, intent(in) :: &
             julian      ! julian day (1-366)
-   real, dimension(ims:ime,jms:jme), optional, intent(in) :: &
+   real, dimension(ims:ime,jms:jme), intent(in) :: &
             xcoszen     ! cosine of the solar zenith angle
-  real, dimension(ims:ime,kms:kme,jms:jme,nbndsw), optional,      &
-        intent(in)                                :: tauaer3d_sw, &
-                                                     ssaaer3d_sw, &
-                                                     asyaer3d_sw
+   real, dimension(:,:,:,:), pointer :: tauaer3d_sw,ssaaer3d_sw,asyaer3d_sw
 ! ------------------------ jararias end snippet -----------------
 
    REAL, INTENT(IN  )   ::                                   R,G
@@ -10025,10 +10034,15 @@ CONTAINS
                                                             QC1D, &
                                                             QR1D, &
                                                             QI1D, &
+                                                           RHO1D, &
                                                             QS1D, &
                                                             QG1D, &
                                                             O31D, &
                                                           qndrop1d 
+
+!BSF: From eq. (5) on p. 2434 in McFarquhar & Heymsfield (1996)
+      real, parameter :: re_50C=1250.0/9.917, re_40C=1250.0/9.337,     &
+                         re_30C=1250.0/9.208, re_20C=1250.0/9.387
 
 ! Added local arrays for RRTMG
     integer ::                                              ncol, &
@@ -10110,6 +10124,9 @@ CONTAINS
                                                   snow_mass_factor
     integer ::                                            dyofyr
 
+    integer:: idx_rei
+    real:: corr
+
 ! Set trace gas volume mixing ratios, 2005 values, IPCC (2007)
 ! carbon dioxide (379 ppmv)
     real :: co2
@@ -10164,7 +10181,7 @@ CONTAINS
     real, dimension(1, 1:kte-kts+1):: recloud1d, &
                                         reice1d, &
                                        resnow1d
-    real :: gliqwp, gicewp, gsnowp, gravmks
+    real :: gliqwp, gicewp, gsnowp, gravmks, tem1,tem2,tem3
 
 !
 !    REAL   ::  TSFC,GLW0,OLR0,EMISS0,FP
@@ -10177,8 +10194,6 @@ CONTAINS
     real, dimension (1) :: landfrac, landm, snowh, icefrac
 
     integer :: pcols, pver
-
-    REAL :: XT24, TLOCTM, HRANG, XXLAT
 
     INTEGER :: i,j,K, na
     LOGICAL :: predicate
@@ -10212,42 +10227,21 @@ CONTAINS
 ! All fields are ordered vertically from bottom to top
 ! Pressures are in mb
 
-     ! jararias, 14/08/2013
-     if (present(xcoszen)) then
-         call wrf_debug(100,'coszen from radiation driver')
-     end if
-
 ! latitude loop
   j_loop: do j = jts,jte
 
 ! longitude loop
      i_loop: do i = its,ite
+         rho1d(kts:kte)=rho3d(i,kts:kte,j) ! BUG FIX (SGT): this was uninitialized
 !
 ! Do shortwave by default, deactivate below if sun below horizon
          dorrsw = .true.
 
 ! Cosine solar zenith angle for current time step
 !
-! xt24 is the fractional part of simulation days plus half of radt expressed in 
-! units of minutes
-! julian is in days
-! radt is in minutes
           ! jararias, 14/08/2013
-          if (present(xcoszen)) then
-             coszr(i,j)=xcoszen(i,j)
-             coszrs=xcoszen(i,j)
-          else
-!            da=6.2831853071795862*(julian-1)/365.
-!            eot=(0.000075+0.001868*cos(da)-0.032077*sin(da) &
-!               -0.014615*cos(2*da)-0.04089*sin(2*da))*(229.18)
-             xt24 = mod(xtime+radt*0.5,1440.)+eot
-             tloctm = gmt + xt24/60. + xlong(i,j)/15.
-             hrang = 15. * (tloctm-12.) * degrad
-             xxlat = xlat(i,j) * degrad
-             coszrs = sin(xxlat) * sin(declin) &
-                    + cos(xxlat) * cos(declin) * cos(hrang)
-             coszr(i,j) = coszrs
-          end if
+          coszr(i,j)=xcoszen(i,j)
+          coszrs=xcoszen(i,j)
 
 ! Set flag to prevent shortwave calculation when sun below horizon
          if (coszrs.le.0.0) dorrsw = .false.
@@ -10389,7 +10383,25 @@ CONTAINS
             ENDIF
 
          ENDIF
-
+! For mp option=5 or 85  (new Ferrier- Aligo or called fer_hires
+! scheme), QI3D saves all frozen water (ice+snow)
+#if (HWRF == 1)
+           IF ( mp_physics == FER_MP_HIRES .OR. &
+                mp_physics == FER_MP_HIRES_ADVECT .OR. &
+                mp_physics == ETAMP_HWRF ) THEN
+#else
+           IF ( mp_physics == FER_MP_HIRES .OR. &
+                mp_physics == FER_MP_HIRES_ADVECT) THEN
+#endif
+                  DO K=kts,kte
+                     qi1d(k) = qi3d(i,k,j)
+                     qs1d(k) = 0.0
+                     qc1d(k) = qc3d(i,k,j)
+                     qi1d(k) = max(0.,qi1d(k))
+                     qc1d(k) = max(0.,qc1d(k))
+                  ENDDO
+           ENDIF
+!
 !         EMISS0=EMISS(I,J)
 !         GLW0=0. 
 !         OLR0=0. 
@@ -10421,10 +10433,21 @@ CONTAINS
                inflgsw = 3
                DO K=kts,kte
                   recloud1D(ncol,K) = MAX(2.5, re_cloud(I,K,J)*1.E6)
+                  if (recloud1D(ncol,K).LE.2.5.AND.cldfra3d(i,k,j).gt.0. &
+     &                            .AND. (XLAND(I,J)-1.5).GT.0.) then      !--- Ocean
+                     recloud1D(ncol,K) = 10.5
+                  elseif (recloud1D(ncol,K).LE.2.5.AND.cldfra3d(i,k,j).gt.0. &
+     &                            .AND. (XLAND(I,J)-1.5).LT.0.) then      !--- Land
+                     recloud1D(ncol,K) = 7.5
+                  endif
                ENDDO
             ELSE
                DO K=kts,kte
+#if (EM_CORE==1)
                   recloud1D(ncol,K) = 5.0
+#else
+                  recloud1D(ncol,K) = 10.0  ! was 5.0
+#endif
                ENDDO
             ENDIF
 
@@ -10432,11 +10455,19 @@ CONTAINS
                inflgsw  = 4
                iceflgsw = 4
                DO K=kts,kte
-                  reice1D(ncol,K) = MAX(10., re_ice(I,K,J)*1.E6)
+                  reice1D(ncol,K) = MAX(5., re_ice(I,K,J)*1.E6)
+                  if (reice1D(ncol,K).LE.5..AND.cldfra3d(i,k,j).gt.0.) then
+                     idx_rei = int(t3d(i,k,j)-179.)
+                     idx_rei = min(max(idx_rei,1),75)
+                     corr = t3d(i,k,j) - int(t3d(i,k,j))
+                     reice1D(ncol,K) = retab(idx_rei)*(1.-corr) +      &
+     &                                 retab(idx_rei+1)*corr
+                     reice1D(ncol,K) = MAX(reice1D(ncol,K), 5.0)
+                  endif
                ENDDO
             ELSE
                DO K=kts,kte
-                  reice1D(ncol,K) = 10.0
+                  reice1D(ncol,K) = 10.
                ENDDO
             ENDIF
 
@@ -10448,9 +10479,43 @@ CONTAINS
                ENDDO
             ELSE
                DO K=kts,kte
+#if (EM_CORE==1) 
                   resnow1D(ncol,K) = 10.0
+#else
+                 tem2 = 25.0  !- was 10.0
+                 tem3=1.e3*rho1d(k)*qi1d(k)  !- IWC (g m^-3)
+                 if (tem3>thresh) then       !- Only when IWC>1.e-9 g m^-3
+                   tem1=t1d(k)-273.15
+                   if (tem1 < -50.0) then
+                     tem2 = re_50C*tem3**0.109
+                   elseif (tem1 < -40.0) then
+                      tem2 = re_40C*tem3**0.08
+                   elseif (tem1 < -30.0) then
+                      tem2 = re_30C*tem3**0.055
+                   else
+                      tem2 = re_20C*tem3**0.031
+                   endif
+                    tem2 = max(25.,tem2)
+                 endif
+                 reice1D(ncol,K) = min(tem2, 135.72)   !- 1.0315*reice <= 140 microns 
+#endif
                ENDDO
             ENDIF
+
+! special case for P3 microphysics
+! put ice into snow category for optics, then set ice to zero
+            IF ( has_reqs .eq. 0 .and. has_reqi .ne. 0 .and. has_reqc .ne. 0) THEN
+               inflgsw  = 5
+               iceflgsw = 5
+               DO K=kts,kte
+                  resnow1D(ncol,K) = MAX(10., re_ice(I,K,J)*1.E6)
+                  QS1D(K)=QI3D(I,K,J)
+                  QI1D(K)=0.
+                  reice1D(ncol,K)=10.
+               END DO
+
+            END IF
+
          ENDIF
 
 ! Set cosine of solar zenith angle
@@ -10693,7 +10758,11 @@ CONTAINS
             reliq(ncol,k) = recloud1d(ncol,k)
          end do
       endif
+#if (EM_CORE==1) 
       if (iceflgsw .ge. 4) then
+#else
+      if (iceflgsw .ge. 3) then   !BSF: was .ge. 4
+#endif
          do k = kts, kte
             reice(ncol,k) = reice1d(ncol,k)
          end do
@@ -10821,9 +10890,8 @@ CONTAINS
       end do
       end do
 
-      if ( present (tauaer3d_sw) ) then
+      if ( associated (tauaer3d_sw) ) then
 ! ---- jararias 11/2012
-         if ( aer_opt .eq. 2) then
             do nb=1,nbndsw
                do k=kts,kte
                   tauaer(ncol,k,nb)=tauaer3d_sw(i,k,j,nb)
@@ -10831,7 +10899,6 @@ CONTAINS
                   asmaer(ncol,k,nb)=asyaer3d_sw(i,k,j,nb)
                end do
             end do
-         end if
       end if
 
 #if ( WRF_CHEM == 1 )
@@ -11027,6 +11094,7 @@ CONTAINS
             swddir(i,j)    = 0.  ! jararias 2013/08/10
             swddni(i,j)    = 0.  ! jararias 2013/08/10
             swddif(i,j)    = 0.  ! jararias 2013/08/10
+            swcf(i,j)      = 0.
 
       endif
 !

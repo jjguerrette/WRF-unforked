@@ -18,7 +18,7 @@ CONTAINS
                              , ph_tendf, mu_tendf               &
                              , tke_tend                         &
                              , adapt_step_flag , curr_secs      &
-                             , psim , psih , wspd , gz1oz0 , br , chklowq &
+                             , psim , psih , wspd , gz1oz0 , chklowq &
                              , cu_act_flag , hol , th_phy        &
                              , pi_phy , p_phy , t_phy     &
                              , dz8w , p8w , t8w           &
@@ -57,8 +57,7 @@ CONTAINS
     USE module_physics_addtendc, ONLY : update_phy_ten
 
     USE module_sfs_driver !JDM
-    USE module_stoch, ONLY : update_stoch_ten, update_stoch , calculate_stoch_ten,  & 
-                             do_fftback_along_x,do_fftback_along_y,sp2gp_prep,perturb_physics_tend
+    USE module_stoch, ONLY : update_stoch_ten, perturb_physics_tend,RAND_PERT_UPDATE
 
 
     IMPLICIT NONE
@@ -93,7 +92,6 @@ CONTAINS
     REAL    ,DIMENSION(ims:ime,jms:jme), INTENT(INOUT)         :: psih
     REAL    ,DIMENSION(ims:ime,jms:jme), INTENT(INOUT)         :: wspd
     REAL    ,DIMENSION(ims:ime,jms:jme), INTENT(INOUT)         :: gz1oz0
-    REAL    ,DIMENSION(ims:ime,jms:jme), INTENT(INOUT)         :: br
     REAL    ,DIMENSION(ims:ime,jms:jme), INTENT(INOUT)         :: chklowq
     LOGICAL ,DIMENSION(ims:ime,jms:jme), INTENT(INOUT)         :: cu_act_flag
     REAL    ,DIMENSION(ims:ime,jms:jme), INTENT(INOUT)         :: hol
@@ -147,175 +145,167 @@ CONTAINS
 
    rk_step = 1
 
-   IF (grid%stoch_force_global_opt==1) then
+      IF ((grid%skebs_on==1).and.(grid%id .EQ. 1 )) then
+          ! update and backtransform T
+          CALL RAND_PERT_UPDATE(grid,'T',                                     &
+                          grid%SPTFORCS,grid%SPTFORCC,                        &
+                          grid%SPT_AMP,grid%ALPH_T,                           &
+                          ips, ipe, jps, jpe, kps, kpe,                       &
+                          ids, ide, jds, jde, kds, kde,                       &
+                          ims, ime, jms, jme, kms, kme,                       &
+                          k_start, k_end,                                     &
+                          imsx,imex,jmsx,jmex,kmsx,kmex,                      &
+                          ipsx,ipex,jpsx,jpex,kpsx,kpex,                      &
+                          imsy,imey,jmsy,jmey,kmsy,kmey,                      &
+                          ipsy,ipey,jpsy,jpey,kpsy,kpey,                      &
+                          grid%num_stoch_levels,grid%num_stoch_levels,        &
+                          grid%num_stoch_levels,grid%num_stoch_levels,        &
+                          config_flags%restart, grid%iseedarr_skebs,          &
+                          grid%DX,grid%DY,grid%skebs_vertstruc,               &
+                          grid%rt_tendf_stoch,                                &
+                          grid%stddev_cutoff_sppt,grid%gridpt_stddev_sppt, & 
+                          grid%VERTSTRUCC,grid%VERTSTRUCS,grid%VERTAMPUV      )
+          ! Update streamfunction, backtransform U
+           CALL RAND_PERT_UPDATE(grid,'U',                                    &
+                           grid%SPSTREAMFORCS,grid%SPSTREAMFORCC,             &
+                           grid%SPSTREAM_AMP,grid%ALPH_PSI,                   &
+                           ips, ipe, jps, jpe, kps, kpe,                      &
+                           ids, ide, jds, jde, kds, kde,                      &
+                           ims, ime, jms, jme, kms, kme,                      &
+                           k_start, k_end,                                    &
+                           imsx,imex,jmsx,jmex,kmsx,kmex,                     &
+                           ipsx,ipex,jpsx,jpex,kpsx,kpex,                     &
+                           imsy,imey,jmsy,jmey,kmsy,kmey,                     &
+                           ipsy,ipey,jpsy,jpey,kpsy,kpey,                     &
+                           grid% num_stoch_levels,grid% num_stoch_levels,     &
+                           grid% num_stoch_levels,grid% num_stoch_levels,     &
+                           config_flags%restart, grid%iseedarr_skebs,         &
+                           grid%DX,grid%DY,grid%skebs_vertstruc,              &
+                           grid%ru_tendf_stoch,                               &
+                           grid%stddev_cutoff_sppt,grid%gridpt_stddev_sppt, & 
+                           grid%VERTSTRUCC,grid%VERTSTRUCS,grid%VERTAMPUV     )
+          ! Don't update streamfunction, backtransform V
+           CALL RAND_PERT_UPDATE(grid,'V',                                    &
+                           grid%SPSTREAMFORCS,grid%SPSTREAMFORCC,             &
+                           grid%SPSTREAM_AMP,grid%ALPH_PSI,                   &
+                           ips, ipe, jps, jpe, kps, kpe,                      &
+                           ids, ide, jds, jde, kds, kde,                      &
+                           ims, ime, jms, jme, kms, kme,                      &
+                           k_start, k_end,                                    &
+                           imsx,imex,jmsx,jmex,kmsx,kmex,                     &
+                           ipsx,ipex,jpsx,jpex,kpsx,kpex,                     &
+                           imsy,imey,jmsy,jmey,kmsy,kmey,                     &
+                           ipsy,ipey,jpsy,jpey,kpsy,kpey,                     &
+                           grid% num_stoch_levels,grid% num_stoch_levels,     &
+                           grid% num_stoch_levels,grid% num_stoch_levels,     &
+                           config_flags%restart, grid%iseedarr_skebs,         &
+                           grid%DX,grid%DY,grid%skebs_vertstruc,              &
+                           grid%rv_tendf_stoch,                               &
+                           grid%stddev_cutoff_sppt,grid%gridpt_stddev_sppt, & 
+                           grid%VERTSTRUCC,grid%VERTSTRUCS,grid%VERTAMPT      )
+       ENDIF !skebs_on 
 
-         IF ( grid%id .EQ. 1 ) THEN
+     if ((grid%sppt_on==1).and.(grid%id .EQ. 1 )) then
+          CALL RAND_PERT_UPDATE(grid,'T',                                     &
+                          grid%SPPTFORCS,grid%SPPTFORCC,                      &
+                          grid%SPPT_AMP,grid%ALPH_SPPT,                       &
+                          ips, ipe, jps, jpe, kps, kpe,                       &
+                          ids, ide, jds, jde, kds, kde,                       &
+                          ims, ime, jms, jme, kms, kme,                       &
+                          k_start, k_end,                                     &
+                          imsx,imex,jmsx,jmex,kmsx,kmex,                      &
+                          ipsx,ipex,jpsx,jpex,kpsx,kpex,                      &
+                          imsy,imey,jmsy,jmey,kmsy,kmey,                      &
+                          ipsy,ipey,jpsy,jpey,kpsy,kpey,                      &
+                          grid%num_stoch_levels,grid%num_stoch_levels,        &
+                          grid%num_stoch_levels,grid%num_stoch_levels,        &
+                          config_flags%restart, grid%iseedarr_sppt,           &
+                          grid%DX,grid%DY,grid%sppt_vertstruc,                &
+                          grid%rstoch,                                        &
+                          grid%stddev_cutoff_sppt,grid%gridpt_stddev_sppt, & 
+                          grid%VERTSTRUCC,grid%VERTSTRUCS,grid%VERTAMPT       )
+       ENDIF !sppt_on
 
-          !$OMP PARALLEL DO   &
-          !$OMP PRIVATE ( ij )
-          DO ij = 1 , grid%num_tiles
-
-          CALL UPDATE_STOCH(grid%SPSTREAMFORCS,grid%SPSTREAMFORCC,           &
-                         grid%SPTFORCS,grid%SPTFORCC,                        &
-                         grid%SPT_AMP,grid%SPSTREAM_AMP,                     &
-                         ids, ide, jds, jde, kds, kde,                       &
-                         ims, ime, jms, jme, kms, kme,                       &
-                         grid%i_start(ij), grid%i_end(ij), grid%j_start(ij), &
-                         grid%j_end(ij), k_start, k_end                      )
-
-          call sp2gp_prep( &
-                         grid%SPSTREAMFORCS,grid%SPSTREAMFORCC,              &
-                         grid%SPTFORCS,grid%SPTFORCC,                        &
-                         grid%VERTSTRUCC,grid%VERTSTRUCS,                    &
-                         grid%VERTAMPT,grid%VERTAMPUV,                      &
-                         grid%RU_REAL,grid%RV_REAL,grid%RT_REAL,            & 
-                         grid%RU_IMAG,grid%RV_IMAG,grid%RT_IMAG,            & 
-                         grid%DX,grid%DY,grid%stoch_vertstruc_opt,           & 
-                         ids, ide, jds, jde, kds, kde,                       &
-                         ims, ime, jms, jme, kms, kme,                       &
-                         grid%i_start(ij), grid%i_end(ij), grid%j_start(ij), & 
-                         grid%j_end(ij), k_start, k_end) 
-           ENDDO
-           !$OMP END PARALLEL DO
-
-!          Roll out into latitude bands and perform FFT along latitude bands 
-#if ( defined( DM_PARALLEL ) && ( ! defined( STUBMPI ) ) )
-#include "XPOSE_STOCH_BACK_U_REAL_z2x.inc"
-#include "XPOSE_STOCH_BACK_U_IMAG_z2x.inc"
-#include "XPOSE_STOCH_BACK_V_REAL_z2x.inc"
-#include "XPOSE_STOCH_BACK_V_IMAG_z2x.inc"
-#include "XPOSE_STOCH_BACK_T_REAL_z2x.inc"
-#include "XPOSE_STOCH_BACK_T_IMAG_z2x.inc"
-
-           call do_fftback_along_x(                             & 
-                              grid%RU_REAL_xxx,grid%RU_IMAG_xxx,& 
-                              grid%RV_REAL_xxx,grid%RV_IMAG_xxx,& 
-                              grid%RT_REAL_xxx,grid%RT_IMAG_xxx,& 
-                              ids, ide, jds, jde, kds, kde,     &
-                              ims, ime, jms, jme, kms, kme,     &
-                              ips, ipe, jps, jpe, kps, kpe,     &
-                              imsx,imex,jmsx,jmex,kmsx,kmex,    &
-                              ipsx,ipex,jpsx,jpex,kpsx,kpex,    &
-                              imsy,imey,jmsy,jmey,kmsy,kmey,    &
-                              ipsy,ipey,jpsy,jpey,kpsy,kpey,    &
-                              k_start , k_end                   &
-                             )
-
-!          Reassemble fields from latitude bands into 3D arrays
-! reassemble field  X_REAL and X_IMAG
-#include "XPOSE_STOCH_BACK_U_REAL_x2z.inc"
-#include "XPOSE_STOCH_BACK_U_IMAG_x2z.inc"
-#include "XPOSE_STOCH_BACK_V_REAL_x2z.inc"
-#include "XPOSE_STOCH_BACK_V_IMAG_x2z.inc"
-#include "XPOSE_STOCH_BACK_T_REAL_x2z.inc"
-#include "XPOSE_STOCH_BACK_T_IMAG_x2z.inc"
-
-!          Roll out into longitude bands and perform FFT along longitude bands 
-#include "XPOSE_STOCH_BACK_U_REAL_z2y.inc"
-#include "XPOSE_STOCH_BACK_U_IMAG_z2y.inc"
-#include "XPOSE_STOCH_BACK_V_REAL_z2y.inc"
-#include "XPOSE_STOCH_BACK_V_IMAG_z2y.inc"
-#include "XPOSE_STOCH_BACK_T_REAL_z2y.inc"
-#include "XPOSE_STOCH_BACK_T_IMAG_z2y.inc"
-
-            call do_fftback_along_y(                            & 
-                              grid%RU_REAL_yyy,grid%RU_IMAG_yyy,& 
-                              grid%RV_REAL_yyy,grid%RV_IMAG_yyy,& 
-                              grid%RT_REAL_yyy,grid%RT_IMAG_yyy,& 
-                              ids, ide, jds, jde, kds, kde,     &
-                              ims, ime, jms, jme, kms, kme,     &
-                              ips, ipe, jps, jpe, kps, kpe,     &
-                              imsx,imex,jmsx,jmex,kmsx,kmex,    &
-                              ipsx,ipex,jpsx,jpex,kpsx,kpex,    &
-                              imsy,imey,jmsy,jmey,kmsy,kmey,    &
-                              ipsy,ipey,jpsy,jpey,kpsy,kpey,    &
-                              k_start , k_end                   &
-                             )
-
-!          Reassemble fields from longitude bands into 3D arrays
-#include "XPOSE_STOCH_BACK_U_REAL_y2z.inc"
-#include "XPOSE_STOCH_BACK_U_IMAG_y2z.inc"
-#include "XPOSE_STOCH_BACK_V_REAL_y2z.inc"
-#include "XPOSE_STOCH_BACK_V_IMAG_y2z.inc"
-#include "XPOSE_STOCH_BACK_T_REAL_y2z.inc"
-#include "XPOSE_STOCH_BACK_T_IMAG_y2z.inc"
-
-#else
-
-           call do_fftback_along_x(                             & 
-                              grid%RU_REAL,grid%RU_IMAG,& 
-                              grid%RV_REAL,grid%RV_IMAG,& 
-                              grid%RT_REAL,grid%RT_IMAG,& 
-                              ids, ide, jds, jde, kds, kde,     &
-                              ims, ime, jms, jme, kms, kme,     &
-                              ips, ipe, jps, jpe, kps, kpe,     &
-                              ims, ime, jms, jme, kms, kme,     &
-                              ips, ipe, jps, jpe, kps, kpe,     &
-                              ims, ime, jms, jme, kms, kme,     &
-                              ips, ipe, jps, jpe, kps, kpe,     &
-                              k_start , k_end                   &
-                             )
-            call do_fftback_along_y(                            & 
-                              grid%RU_REAL,grid%RU_IMAG,& 
-                              grid%RV_REAL,grid%RV_IMAG,& 
-                              grid%RT_REAL,grid%RT_IMAG,& 
-                              ids, ide, jds, jde, kds, kde,     &
-                              ims, ime, jms, jme, kms, kme,     &
-                              ips, ipe, jps, jpe, kps, kpe,     &
-                              ims, ime, jms, jme, kms, kme,     &
-                              ips, ipe, jps, jpe, kps, kpe,     &
-                              ims, ime, jms, jme, kms, kme,     &
-                              ips, ipe, jps, jpe, kps, kpe,     &
-                              k_start , k_end                   &
-                             )
-#endif
- 
-             !$OMP PARALLEL DO   &
-             !$OMP PRIVATE ( ij )
-             DO ij = 1 , grid%num_tiles
-               CALL wrf_debug ( 200 , ' call update_stoch_ten' )
-               CALL calculate_stoch_ten(ru_tendf, rv_tendf, t_tendf,            &
-                               grid%ru_tendf_stoch,                          &
-                               grid%rv_tendf_stoch,                          &
-                               grid%rt_tendf_stoch,                          &
-                               grid%RU_REAL,grid%RV_REAL,grid%RT_REAL,       & 
-                               grid%mu_2 , grid%mub,                         &
-                               ids, ide, jds, jde, kds, kde,                 &
-                               ims, ime, jms, jme, kms, kme,                 &
-                               grid%i_start(ij), grid%i_end(ij),             &
-                               grid%j_start(ij), grid%j_end(ij),             &
-                               k_start, k_end,                               &
-                               grid%dt)
-
-             ENDDO
-             !$OMP END PARALLEL DO
-         END IF !grid%id==1
-    ENDIF !toch_force_global_opt 
-
-    stoch_force_select: SELECT CASE(config_flags%stoch_force_opt)
-
-      CASE (STOCH_BACKSCATTER)
-
-          !$OMP PARALLEL DO   &
-          !$OMP PRIVATE ( ij )
-          DO ij = 1 , grid%num_tiles
-               CALL wrf_debug ( 200 , ' call update_stoch_ten' )
-                CALL update_stoch_ten(ru_tendf, rv_tendf, t_tendf,&
-                               grid%ru_tendf_stoch,                          &
-                               grid%rv_tendf_stoch,                          &
-                               grid%rt_tendf_stoch,                          &
-                               grid%mu_2 , grid%mub,                         &
-                               ids, ide, jds, jde, kds, kde,                 &
-                               ims, ime, jms, jme, kms, kme,                 &
-                               grid%i_start(ij), grid%i_end(ij),             &
-                               grid%j_start(ij), grid%j_end(ij),             &
-                               k_start, k_end,                               & 
-                               grid%dt                                       )
-
-           ENDDO
-           !$OMP END PARALLEL DO
-
-    END SELECT stoch_force_select
+      if ((grid%rand_perturb_on==1).and.(grid%id .EQ. 1 )) then
+           CALL RAND_PERT_UPDATE(grid,'T',                                     &
+                           grid%SPFORCS,grid%SPFORCC,                          &
+                           grid%SP_AMP,grid%ALPH_RAND,                         &
+                           ips, ipe, jps, jpe, kps, kpe,                       &
+                           ids, ide, jds, jde, kds, kde,                       &
+                           ims, ime, jms, jme, kms, kme,                       &
+                           k_start, k_end,                                     &
+                           imsx,imex,jmsx,jmex,kmsx,kmex,                      &
+                           ipsx,ipex,jpsx,jpex,kpsx,kpex,                      &
+                           imsy,imey,jmsy,jmey,kmsy,kmey,                      &
+                           ipsy,ipey,jpsy,jpey,kpsy,kpey,                      &
+                           grid%num_stoch_levels,grid%num_stoch_levels,        &
+                           grid%num_stoch_levels,grid%num_stoch_levels,        &
+                           config_flags%restart, grid%iseedarr_rand_pert,      &
+                           grid%DX,grid%DY,grid%rand_pert_vertstruc,           &
+                           grid%RAND_PERT,                                     &
+                           grid%stddev_cutoff_rand_pert,grid%gridpt_stddev_rand_pert, & 
+                           grid%VERTSTRUCC,grid%VERTSTRUCS,grid%VERTAMPT       )
+      ENDIF !rand_perturb_on
+      if ((grid%spp_conv==1).and.(grid%id .EQ. 1 )) then
+           CALL RAND_PERT_UPDATE(grid,'T',                                     &
+                           grid%SPFORCS2,grid%SPFORCC2,                        &
+                           grid%SP_AMP2,grid%ALPH_RAND2,                       &
+                           ips, ipe, jps, jpe, kps, kpe,                       &
+                           ids, ide, jds, jde, kds, kde,                       &
+                           ims, ime, jms, jme, kms, kme,                       &
+                           k_start, k_end,                                     &
+                           imsx,imex,jmsx,jmex,kmsx,kmex,                      &
+                           ipsx,ipex,jpsx,jpex,kpsx,kpex,                      &
+                           imsy,imey,jmsy,jmey,kmsy,kmey,                      &
+                           ipsy,ipey,jpsy,jpey,kpsy,kpey,                      &
+                           grid%num_stoch_levels,grid%num_stoch_levels,        &
+                           grid%num_stoch_levels,grid%num_stoch_levels,        &
+                           config_flags%restart, grid%iseedarr_spp_conv,          &
+                           grid%DX,grid%DY,grid%vertstruc_spp_conv,            &
+                           grid%pattern_spp_conv,                             & 
+                           grid%stddev_cutoff_spp_conv,grid%gridpt_stddev_spp_conv, & 
+                           grid%VERTSTRUCC,grid%VERTSTRUCS,grid%VERTAMPT       )
+      ENDIF !spp_conv
+      if ((grid%spp_pbl==1).and.(grid%id .EQ. 1 )) then
+           CALL RAND_PERT_UPDATE(grid,'T',                                     &
+                           grid%SPFORCS3,grid%SPFORCC3,                        &
+                           grid%SP_AMP3,grid%ALPH_RAND3,                       &
+                           ips, ipe, jps, jpe, kps, kpe,                       &
+                           ids, ide, jds, jde, kds, kde,                       &
+                           ims, ime, jms, jme, kms, kme,                       &
+                           k_start, k_end,                                     &
+                           imsx,imex,jmsx,jmex,kmsx,kmex,                      &
+                           ipsx,ipex,jpsx,jpex,kpsx,kpex,                      &
+                           imsy,imey,jmsy,jmey,kmsy,kmey,                      &
+                           ipsy,ipey,jpsy,jpey,kpsy,kpey,                      &
+                           grid%num_stoch_levels,grid%num_stoch_levels,        &
+                           grid%num_stoch_levels,grid%num_stoch_levels,        &
+                           config_flags%restart, grid%iseedarr_spp_pbl,           &
+                           grid%DX,grid%DY,grid%vertstruc_spp_pbl,             &
+                           grid%pattern_spp_pbl,                             & 
+                           grid%stddev_cutoff_spp_pbl,grid%gridpt_stddev_spp_pbl, & 
+                           grid%VERTSTRUCC,grid%VERTSTRUCS,grid%VERTAMPT       )
+      ENDIF !spp_pbl
+      if ((grid%spp_lsm==1).and.(grid%id .EQ. 1 )) then
+           CALL RAND_PERT_UPDATE(grid,'T',                                     &
+                           grid%SPFORCS4,grid%SPFORCC4,                        &
+                           grid%SP_AMP4,grid%ALPH_RAND4,                       &
+                           ips, ipe, jps, jpe, kps, kpe,                       &
+                           ids, ide, jds, jde, kds, kde,                       &
+                           ims, ime, jms, jme, kms, kme,                       &
+                           k_start, k_end,                                     &
+                           imsx,imex,jmsx,jmex,kmsx,kmex,                      &
+                           ipsx,ipex,jpsx,jpex,kpsx,kpex,                      &
+                           imsy,imey,jmsy,jmey,kmsy,kmey,                      &
+                           ipsy,ipey,jpsy,jpey,kpsy,kpey,                      &
+                           grid%num_stoch_levels,grid%num_stoch_levels,        &
+                           grid%num_stoch_levels,grid%num_stoch_levels,        &
+                           config_flags%restart, grid%iseedarr_spp_lsm,           &
+                           grid%DX,grid%DY,grid%vertstruc_spp_lsm,             &
+                           grid%pattern_spp_lsm,                             & 
+                           grid%stddev_cutoff_spp_lsm,grid%gridpt_stddev_spp_lsm, & 
+                           grid%VERTSTRUCC,grid%VERTSTRUCS,grid%VERTAMPT       )
+      ENDIF !spp_lsm
 
 ! calculate_phy_tend
 
@@ -326,7 +316,8 @@ BENCH_START(cal_phy_tend)
       DO ij = 1 , grid%num_tiles
 
         CALL wrf_debug ( 200 , ' call calculate_phy_tend' )
-        CALL calculate_phy_tend (config_flags,grid%mut,grid%muu,grid%muv,pi_phy, &
+        CALL calculate_phy_tend (config_flags,grid%c1h,grid%c2h,       &
+                     grid%mut,grid%muu,grid%muv,pi_phy,                &
                      grid%rthraten,                                    &
                      grid%rublten,grid%rvblten,grid%rthblten,          &
                      grid%rqvblten,grid%rqcblten,grid%rqiblten,        &
@@ -403,14 +394,14 @@ BENCH_START(tke_diff_bc_tim)
                                    grid%i_start(ij), grid%i_end(ij),   &
                                    grid%j_start(ij), grid%j_end(ij),   &
                                    k_start    , k_end                 )
-           CALL set_physical_bc3d( grid%zx , 'w', config_flags,             &
+           CALL set_physical_bc3d( grid%zx , 'e', config_flags,             &
                                    ids, ide, jds, jde, kds, kde,       &
                                    ims, ime, jms, jme, kms, kme,       &
                                    ips, ipe, jps, jpe, kps, kpe,       &
                                    grid%i_start(ij), grid%i_end(ij),   &
                                    grid%j_start(ij), grid%j_end(ij),   &
                                    k_start    , k_end                 )
-           CALL set_physical_bc3d( grid%zy , 'w', config_flags,             &
+           CALL set_physical_bc3d( grid%zy , 'f', config_flags,             &
                                    ids, ide, jds, jde, kds, kde,       &
                                    ims, ime, jms, jme, kms, kme,       &
                                    ips, ipe, jps, jpe, kps, kpe,       &
@@ -423,7 +414,13 @@ BENCH_START(tke_diff_bc_tim)
                                    ips, ipe, jps, jpe,                 &
                                    grid%i_start(ij), grid%i_end(ij),   &
                                    grid%j_start(ij), grid%j_end(ij)   )
-
+          CALL set_physical_bc2d( grid%ust, 't', config_flags,              &
+                                   ids, ide, jds, jde,                 &
+                                   ims, ime, jms, jme,                 &
+                                   ips, ipe, jps, jpe,                 &
+                                   grid%i_start(ij), grid%i_end(ij),   &
+                                   grid%j_start(ij), grid%j_end(ij)   )
+ 
          ENDDO
          !$OMP END PARALLEL DO
 BENCH_END(tke_diff_bc_tim)
@@ -514,7 +511,7 @@ BENCH_START(calc_tke_tim)
                                  grid%cf1, grid%cf2, grid%cf3, grid%warm_rain,          &
                                  grid%mix_upper_bound,                                  &
                                  grid%msftx, grid%msfty,                                &
-                                 grid%zx, grid%zy,                                      &
+                                 grid%zx, grid%zy,                                      & 
                                  ids,ide, jds,jde, kds,kde,                             &
                                  ims,ime, jms,jme, kms,kme,                             &
                                  grid%i_start(ij), grid%i_end(ij),                      &
@@ -548,7 +545,7 @@ BENCH_START(phy_bc_tim)
          CALL phy_bc (config_flags,grid%div,grid%defor11,grid%defor22,grid%defor33,            &
                       grid%defor12,grid%defor13,grid%defor23,      &
                       grid%xkmh,grid%xkmv,grid%xkhh,grid%xkhv,     &
-                      grid%tke_2,                                  &
+                      grid%tke_2,grid%rho,                         &
                       grid%rublten, grid%rvblten,                  &
                       grid%rucuten, grid%rvcuten,                  &
                       grid%rushten, grid%rvshten,                  &
@@ -627,8 +624,9 @@ ENDIF
        ENDIF
        IF ( config_flags%cu_physics == SASSCHEME      .or.   &
             config_flags%cu_physics == TIEDTKESCHEME  .or.   &
+            config_flags%cu_physics == NTIEDTKESCHEME .or.   &
             config_flags%cu_physics == CAMZMSCHEME    .or.   &
-            config_flags%cu_physics == MESO_SAS       .or.   &
+            config_flags%cu_physics == SCALESASSCHEME .or.   &
             config_flags%cu_physics == NSASSCHEME ) THEN
 #      include "HALO_EM_PHYS_CU.inc"
        ENDIF
@@ -707,31 +705,54 @@ BENCH_START(update_phy_ten_tim)
        !$OMP END PARALLEL DO
 BENCH_END(update_phy_ten_tim)
 
- IF (grid%stoch_force_opt== 2) then
- !CASE (PERTURB_TENDF)
-        !$OMP PARALLEL DO   &
-        !$OMP PRIVATE ( ij )
+      IF (grid%skebs_on==1) then
+          !$OMP PARALLEL DO   &
+          !$OMP PRIVATE ( ij )
+          DO ij = 1 , grid%num_tiles
+               CALL wrf_debug ( 200 , ' call update_stoch_ten' )
+                CALL update_stoch_ten(ru_tendf, rv_tendf, t_tendf,&
+                               grid%ru_tendf_stoch,                          &
+                               grid%rv_tendf_stoch,                          &
+                               grid%rt_tendf_stoch,                          &
+                               grid%mu_2, grid%mub, grid%c1h, grid%c2h,      &
+                               ids, ide, jds, jde, kds, kde,                 &
+                               ims, ime, jms, jme, kms, kme,                 &
+                               grid%i_start(ij), grid%i_end(ij),             &
+                               grid%j_start(ij), grid%j_end(ij),             &
+                               k_start, k_end,                               &
+                               grid%num_stoch_levels,grid%num_stoch_levels   )
 
-! JB comment:  P_QV is in moist_tend(ims,kms,jms,2)
-        DO ij = 1 , grid%num_tiles
-                 call perturb_physics_tend(grid%gridpointvariance,&
-                        grid%sppt_thresh_fact, grid%rt_tendf_stoch, &
-                        ru_tendf,rv_tendf,t_tendf,moist_tend(ims,kms,jms,2),        &
-                        ids, ide, jds, jde, kds, kde,                &
-                        ims, ime, jms, jme, kms, kme,                &
-                        grid%i_start(ij), grid%i_end(ij),             &
-                        grid%j_start(ij), grid%j_end(ij),             &
-                        k_start, k_end )
-        END DO
-        !$OMP END PARALLEL DO
+           ENDDO
+           !$OMP END PARALLEL DO
+      ENDIF !skebs_on
+
+      IF (grid%sppt_on==1) then
+          !$OMP PARALLEL DO   &
+          !$OMP PRIVATE ( ij )
+          ! JB comment:  P_QV is in moist_tend(ims,kms,jms,2)
+          DO ij = 1 , grid%num_tiles
+                 call perturb_physics_tend(grid%gridpt_stddev_sppt,          &
+                        grid%stddev_cutoff_sppt,grid%rstoch,                 &
+                        ru_tendf,rv_tendf,t_tendf,moist_tend(ims,kms,jms,2), &
+                        ids, ide, jds, jde, kds, kde,                        &
+                        ims, ime, jms, jme, kms, kme,                        &
+                        grid%i_start(ij), grid%i_end(ij),                    &
+                        grid%j_start(ij), grid%j_end(ij),                    &
+                        k_start, k_end,                                      &
+                        grid%num_stoch_levels,grid%num_stoch_levels          )
+           ENDDO
+          !$OMP END PARALLEL DO
   ENDIF
-BENCH_END(update_phy_ten_stoch)
-
-
 
 #ifdef PLANET
        ! do rayleigh (and zonal-average newtonian) damping during
        ! first iteration of RK loop only
+
+=============================================================
+INTENTIONALLY PLACED HERE TO BREAK COMPILE
+The DAMPTOP routine needs to have 1d column arrays c1 and c2
+to correctly use the column pressures mut, muu, and muv.
+=============================================================
 
        IF ( (config_flags%damp_opt == 101) .OR. &
             (config_flags%damp_opt == 103)      ) THEN
@@ -764,7 +785,7 @@ BENCH_START(tke_rhs_tim)
                          grid%defor33,                                &
                          grid%defor12,grid%defor13,grid%defor23,      &
                          grid%u_2,grid%v_2,grid%w_2,grid%div,         &
-                         grid%tke_2,grid%mut,                         &
+                         grid%tke_2,grid%mut,grid%c1h,grid%c2h,       &
                          th_phy,p_phy,p8w,t8w,grid%z,grid%fnm,        & 
                          grid%fnp,grid%cf1,grid%cf2,grid%cf3,         &     
                          grid%msftx,grid%msfty,grid%xkmh,             &
@@ -807,7 +828,7 @@ BENCH_START(vert_diff_tim)
                                       tracer_tend, num_tracer,                     &
                                       grid%u_2, grid%v_2,                                  &
                                       grid%t_2,grid%u_base,grid%v_base,grid%t_base,grid%qv_base,          &
-                                      grid%mut,grid%tke_2,config_flags, &
+                                      grid%tke_2, config_flags,              &
                                       grid%defor13,grid%defor23,grid%defor33,                   &
                                       nba_mij, num_nba_mij,          & !JDM
                                       grid%div, moist, chem, scalar,tracer,         &
@@ -839,7 +860,7 @@ BENCH_START(hor_diff_tim)
                                       scalar_tend, num_scalar,                 &
                                       tracer_tend, num_tracer,                 &
                                       grid%t_2, th_phy,                           &
-                                      grid%mut, grid%tke_2, config_flags,              &
+                                      grid%tke_2, config_flags,              &
                                       grid%defor11, grid%defor22, grid%defor12,             &
                                       grid%defor13, grid%defor23,   &
                                       nba_mij, num_nba_mij,         & !JDM
@@ -849,7 +870,7 @@ BENCH_START(hor_diff_tim)
                                       grid%msfty, grid%xkmh, grid%xkhh, config_flags%km_opt,     &
                                       grid%rdx, grid%rdy, grid%rdz, grid%rdzw,                   &
                                       grid%fnm, grid%fnp, grid%cf1, grid%cf2, grid%cf3,          &
-                                      grid%zx, grid%zy, grid%dn, grid%dnw,                       &
+                                      grid%zx, grid%zy, grid%dn, grid%dnw, grid%rho,             &
                                       ids, ide, jds, jde, kds, kde,          &
                                       ims, ime, jms, jme, kms, kme,          &
                                       grid%i_start(ij), grid%i_end(ij),      &
@@ -904,7 +925,7 @@ BENCH_END(hor_diff_tim)
                    model_config_rec%nobs_err_flds,                      &
                    grid%fdob%nstat, grid%fdob%varobs, grid%fdob%errf,   &
                    grid%dx, grid%KPBL,grid%HT,                          &
-                   grid%mut, grid%muu, grid%muv,                        &
+                   grid%mut, grid%muu, grid%muv, grid%c1h, grid%c2h,    &
                    grid%msftx, grid%msfty, grid%msfux, grid%msfuy, grid%msfvx, grid%msfvy, &
                    p_phy, t_tendf, t0,                                  &
                    grid%u_2, grid%v_2, grid%t_2,                        &

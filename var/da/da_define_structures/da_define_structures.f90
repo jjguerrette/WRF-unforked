@@ -19,6 +19,8 @@ module da_define_structures
       metar, ships, ssmi_rv, ssmi_tb, ssmt1, ssmt2, qscat, profiler, buoy, bogus, &
       mtgirs, tamdar, tamdar_sfc, pseudo, radar, radiance, airsr, sonde_sfc, rain, &
       trace_use_dull,comm, num_pseudo
+   use da_control, only : cloud_cv_options, use_cv_w
+   use da_control, only : pseudo_uvtpq
 
    use da_tracing, only : da_trace_entry, da_trace_exit
    use da_tools_serial, only : da_array_print
@@ -210,8 +212,13 @@ module da_define_structures
       type (stn_loc_type)     :: stn_loc
 
       real, pointer           :: model_p(:)
+      real, pointer           :: model_t(:)
       real, pointer           :: model_rho(:)
       real, pointer           :: model_qrn(:)
+      real, pointer           :: model_qcl(:)
+      real, pointer           :: model_qci(:)
+      real, pointer           :: model_qsn(:)
+      real, pointer           :: model_qgr(:)
       real                    :: model_ps
 
       real                  , pointer :: height   (:) ! Height in m
@@ -219,10 +226,18 @@ module da_define_structures
 
       type (field_type)     , pointer :: rv       (:) ! Radial Velocity
       type (field_type)     , pointer :: rf       (:) ! Reflectivity
-      type (field_type)     , pointer :: rr       (:) ! Reflectivity
-      real                  , pointer :: rro      (:)
-      real                  , pointer :: qso      (:)
-      real                  , pointer :: qco      (:)
+      type (field_type)     , pointer :: rrn      (:) ! Reflectivity
+      type (field_type)     , pointer :: rcl      (:) ! Reflectivity
+      type (field_type)     , pointer :: rci      (:) ! Reflectivity
+      type (field_type)     , pointer :: rsn      (:) ! Reflectivity
+      type (field_type)     , pointer :: rgr      (:) ! Reflectivity
+      type (field_type)     , pointer :: rqv      (:) !
+      real                  , pointer :: rrno     (:)
+      real                  , pointer :: rclo     (:)
+      real                  , pointer :: rcio     (:)
+      real                  , pointer :: rsno     (:)
+      real                  , pointer :: rgro     (:)
+      real                  , pointer :: rqvo     (:)
    end type radar_type
 
    type multi_level_type
@@ -484,6 +499,7 @@ module da_define_structures
       integer, pointer     :: tb_qc(:,:)
       real,    pointer     :: tb_error(:,:)
       real,    pointer     :: tb_xb(:,:) 
+      real,    pointer     :: tb_xb_clr(:,:) 
       real,    pointer     :: tb_sens(:,:)
       real,    pointer     :: tb_imp(:,:)
       real,    pointer     :: rad_xb(:,:)
@@ -544,7 +560,8 @@ module da_define_structures
       real,    pointer     :: soiltyp(:)
       real,    pointer     :: vegtyp(:)
       real,    pointer     :: vegfra(:)
-      real,    pointer     :: clwp(:)
+      real,    pointer     :: clwp(:) ! model/guess clwp
+      real,    pointer     :: clw(:)  ! currently AMSR2 only
       real,    pointer     :: ps_jacobian(:,:) ! only RTTOV
       real,    pointer     :: ts_jacobian(:,:) ! only over water CRTM
       real,    pointer     :: windspeed_jacobian(:,:) ! only MV and over water CRTM
@@ -668,7 +685,12 @@ module da_define_structures
       type (bad_info_type)       :: rh
       type (bad_info_type)       :: rv
       type (bad_info_type)       :: rf
-      type (bad_info_type)       :: rr
+      type (bad_info_type)       :: rrn
+      type (bad_info_type)       :: rsn
+      type (bad_info_type)       :: rgr
+      type (bad_info_type)       :: rcl
+      type (bad_info_type)       :: rci
+      type (bad_info_type)       :: rqv
       type (bad_info_type)       :: slp
       type (bad_info_type)       :: rad
       type (bad_info_type)       :: rain
@@ -803,7 +825,12 @@ module da_define_structures
    type residual_radar_type
       real, pointer :: rv(:)                    ! rv
       real, pointer :: rf(:)                    ! rf
-      real, pointer :: rr(:)                    ! rr
+      real, pointer :: rrn(:)                   ! rrain
+      real, pointer :: rcl(:)                   ! rcloud
+      real, pointer :: rci(:)                   ! rcloudice
+      real, pointer :: rsn(:)                   ! rsnow
+      real, pointer :: rgr(:)                   ! rgraupel
+      real, pointer :: rqv(:) 
    end type residual_radar_type
 
    type residual_instid_type
@@ -898,7 +925,7 @@ module da_define_structures
       real                :: qscat_u, qscat_v
       real                :: profiler_u, profiler_v
       real                :: buoy_u, buoy_v, buoy_t, buoy_p, buoy_q
-      real                :: radar_rv, radar_rf, radar_rr
+      real                :: radar_rv, radar_rf, radar_rrn,radar_rsn,radar_rgr,radar_rcl,radar_rci,radar_rqv
       real                :: bogus_u, bogus_v, bogus_t, bogus_q, bogus_slp
       real                :: airsr_t, airsr_q
       real                :: rain_r
@@ -913,6 +940,7 @@ module da_define_structures
       real             :: jp
       real             :: js
       real             :: jl
+      real             :: jd
       type (jo_type)   :: jo
    end type j_type
 
@@ -928,24 +956,28 @@ module da_define_structures
       integer :: size3c      ! Complex size of CV array of 3rd variable error.
       integer :: size4c      ! Complex size of CV array of 4th variable error.
       integer :: size5c      ! Complex size of CV array of 5th variable error.
-#ifdef CLOUD_CV
+
       integer :: size6c      ! Complex size of CV array of 6th variable error.
       integer :: size7c      ! Complex size of CV array of 7th variable error.
       integer :: size8c      ! Complex size of CV array of 8th variable error.
       integer :: size9c      ! Complex size of CV array of 9th variable error.
-#endif
+      integer :: size10c     ! Complex size of CV array of 10th variable error.
+      integer :: size11c     ! Complex size of CV array of 11th variable error.
+
       integer :: size_alphac ! Size of alpha control variable (complex).
       integer :: size1       ! Size of CV array of 1st variable error.
       integer :: size2       ! Size of CV array of 2nd variable error.
       integer :: size3       ! Size of CV array of 3rd variable error.
       integer :: size4       ! Size of CV array of 4th variable error.
       integer :: size5       ! Size of CV array of 5th variable error.
-#ifdef CLOUD_CV
+
       integer :: size6       ! Size of CV array of 6th variable error.
       integer :: size7       ! Size of CV array of 7th variable error.
       integer :: size8       ! Size of CV array of 8th variable error.
       integer :: size9       ! Size of CV array of 9th variable error.
-#endif
+      integer :: size10      ! Size of CV array of 10th variable error.
+      integer :: size11i     ! Size of CV array of 11th variable error.
+
       integer :: size1l      ! Size of CV array of 1st variable lbc error.
       integer :: size2l      ! Size of CV array of 2nd variable lbc error.
       integer :: size3l      ! Size of CV array of 3rd variable lbc error.
@@ -974,6 +1006,8 @@ module da_define_structures
    end type be_subtype
 
    type be_type
+      integer           :: ncv_mz      ! number of variables for cv_mz
+      integer, pointer  :: cv_mz(:)    ! array to hold mz of each cv
       integer           :: ne
       integer           :: max_wave           ! Smallest spectral mode (global).
       integer           :: mix
@@ -983,12 +1017,14 @@ module da_define_structures
       type (be_subtype) :: v3
       type (be_subtype) :: v4
       type (be_subtype) :: v5
-#ifdef CLOUD_CV
+
       type (be_subtype) :: v6
       type (be_subtype) :: v7
       type (be_subtype) :: v8
       type (be_subtype) :: v9
-#endif
+      type (be_subtype) :: v10
+      type (be_subtype) :: v11
+
       type (be_subtype) :: alpha
       real*8, pointer     :: pb_vert_reg(:,:,:)
 
@@ -1044,9 +1080,11 @@ module da_define_structures
 contains
 
 #include "da_allocate_background_errors.inc"
+#include "da_allocate_obs_info.inc"
 #include "da_allocate_observations.inc"
 #include "da_allocate_observations_rain.inc"
 #include "da_allocate_y.inc"
+#include "da_allocate_y_radar.inc"
 #include "da_allocate_y_rain.inc"
 #include "da_deallocate_background_errors.inc"
 #include "da_deallocate_observations.inc"

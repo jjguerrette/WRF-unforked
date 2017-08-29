@@ -10,9 +10,10 @@
     USE module_date_time
     USE module_bc_time_utilities
     USE module_utility
+
     IMPLICIT NONE
-#include <wrf_io_flags.h>
-#include <wrf_status_codes.h>
+#include "wrf_io_flags.h"
+#include "wrf_status_codes.h"
     TYPE(domain) :: grid
     TYPE(grid_config_rec_type),  INTENT(INOUT)    :: config_flags
     INTEGER, INTENT(IN) :: fid
@@ -47,8 +48,8 @@
     Type(WRFU_Time) time, currtime, currentTime
     CHARACTER*19  new_date
     CHARACTER*24  base_date
-    CHARACTER*80  fname
-    CHARACTER*80  dname, memord
+    CHARACTER*256  fname
+    CHARACTER*80  dname, memord, sim_type
     LOGICAL dryrun
     INTEGER idt
     INTEGER itmp
@@ -91,11 +92,15 @@
 
     !  Local variables: are we are using the correct hypsometric option for ARW ideal cases.
 
-    CHARACTER (LEN=80) :: input_name
-    LOGICAL :: this_is_an_ideal_run
-    INTEGER :: loop, hypsometric_opt
+    CHARACTER (LEN=256) :: input_name
+    INTEGER :: loop, hypsometric_opt, icount
 
     CHARACTER (LEN=256) :: a_message
+
+    !  Bundle up the fatal errors in one piece at the end of the file.
+
+    INTEGER :: count_fatal_error
+
 
 
 !<DESCRIPTION>
@@ -107,12 +112,16 @@
 !
 !</DESCRIPTION>
 
-    WRITE(wrf_err_message,*)'input_wrf: begin, fid = ',fid
+    WRITE(wrf_err_message,*)'input_wrf: begin'
     CALL wrf_debug( 300 , wrf_err_message )
 
     CALL modify_io_masks ( grid%id )   ! this adjusts the I/O masks according to the users run-time specs, if any
 
+    !  Initializations for error checking
+
     ierr = 0
+    count_fatal_error = 0
+
 
     CALL get_ijk_from_grid (  grid ,                        &
                               ids, ide, jds, jde, kds, kde,    &
@@ -122,11 +131,12 @@
 ! If this was not a training read (dry run) check for erroneous values.
     CALL wrf_inquire_filename ( fid , fname , filestate , ierr )
     IF ( ierr /= 0 ) THEN
-      WRITE(wrf_err_message,*)'module_io_wrf: input_wrf: wrf_inquire_filename Status = ',ierr
-      CALL wrf_error_fatal( wrf_err_message )
+      WRITE(wrf_err_message,*)'---- ERROR: module_io_wrf: input_wrf: wrf_inquire_filename Status = ',ierr
+      CALL wrf_debug ( 0, TRIM( wrf_err_message ) )
+      count_fatal_error = count_fatal_error + 1
     ENDIF
 
-    WRITE(wrf_err_message,*)'input_wrf: fid,filestate = ',fid,filestate
+    WRITE(wrf_err_message,*)'input_wrf: filestate = ',filestate
     CALL wrf_debug( 300 , wrf_err_message )
 
     dryrun        = ( filestate .EQ. WRF_FILE_OPENED_NOT_COMMITTED )
@@ -136,25 +146,9 @@
 
     check_if_dryrun : IF ( .NOT. dryrun ) THEN
 
-#if (EM_CORE == 1)
-      IF ( switch .EQ. input_only ) THEN
-
-        !  Make sure for ARW ideal cases that the hypsometric option, the
-        !  way that we integrate the heigh field, is set to 1.  This is the
-        !  method that is used in all of the "ideal" programs to get the
-        !  base-state height (phb).
-
-        CALL wrf_get_dom_ti_char ( fid , 'TITLE' , input_name , ierr )
-        grid%this_is_an_ideal_run = INDEX(TRIM(input_name) , 'IDEAL' ) .NE. 0
-        IF ( grid%this_is_an_ideal_run ) THEN
-          grid%hypsometric_opt = 1
-          config_flags%hypsometric_opt = 1
-	  DO loop = 1 , grid%max_dom
-            CALL nl_set_hypsometric_opt ( loop , 1 ) 
-          END DO
-          WRITE(wrf_err_message,*)'Ideal cases do not support the hypsometric option.'
-          CALL wrf_debug( 0 , wrf_err_message )
-        END IF
+#if ( ( EM_CORE == 1 ) && ( DA_CORE != 1 ) )
+      IF ( switch .EQ. boundary_only ) THEN
+         grid%just_read_boundary = .true.
       END IF
 #endif
 
@@ -267,6 +261,7 @@
 
       CALL wrf_get_dom_ti_char ( fid , 'SIMULATION_START_DATE' , simulation_start_date , ierr )
       CALL nl_get_reset_simulation_start ( 1, reset_simulation_start )
+
       IF ( ( ierr .EQ. 0 ) .AND. ( .NOT. reset_simulation_start ) ) THEN
         ! Overwrite simulation start date with metadata.
 #ifdef PLANET
@@ -288,11 +283,11 @@
         CALL nl_set_simulation_start_minute ( 1 , simulation_start_minute )
         CALL nl_set_simulation_start_second ( 1 , simulation_start_second )
         IF ( switch .EQ. input_only  ) THEN
-          WRITE(wrf_err_message,*)fid,' input_wrf, input_only:  SIMULATION_START_DATE = ', &
+          WRITE(wrf_err_message,*) ' input_wrf, input_only:  SIMULATION_START_DATE = ', &
                                   simulation_start_date(1:19)
           CALL wrf_debug ( 300 , TRIM(wrf_err_message ) )
         ELSE IF ( switch .EQ. restart_only  ) THEN
-          WRITE(wrf_err_message,*)fid,' input_wrf, restart_only:  SIMULATION_START_DATE = ', &
+          WRITE(wrf_err_message,*) ' input_wrf, restart_only:  SIMULATION_START_DATE = ', &
                                   simulation_start_date(1:19)
           CALL wrf_debug ( 300 , TRIM(wrf_err_message ) )
         ENDIF
@@ -354,33 +349,18 @@
        ierr = max( ierr, ierr3 )
        CALL wrf_get_dom_ti_integer ( fid , 'BOTTOM-TOP_GRID_DIMENSION' ,   kde_compare , 1 , icnt , ierr3 )
        ierr = max( ierr, ierr3 )
-       IF ( ierr3 .NE. 0 ) CALL wrf_error_fatal( 'wrf_get_dom_ti_integer getting dimension information from dataset' )
+       IF ( ierr3 .NE. 0 ) THEN
+          CALL wrf_debug ( 0, '---- ERROR: wrf_get_dom_ti_integer getting dimension information from dataset' )
+          count_fatal_error = count_fatal_error + 1
+       END IF
 
 #if (EM_CORE == 1)
-
-       IF ( ( switch .EQ. input_only ) .AND. ( config_flags%io_form_input .EQ. 2 ) ) THEN
-
-        !  For backward compatibility.  If we do not find the hypsometric_opt defined
-        !  in the input data, this is pre version 3.4.  Most likely, the hypsometric_opt
-        !  was the default value, 1.  
-
-        hypsometric_opt = -1
-        CALL wrf_get_dom_ti_integer ( fid , 'HYPSOMETRIC_OPT' , hypsometric_opt , 1 , icnt , ierr )
-        IF ( ( hypsometric_opt .NE. 1 ) .AND. ( hypsometric_opt .NE. 2 ) ) THEN
-          grid%hypsometric_opt = 1
-          config_flags%hypsometric_opt = 1
-	  DO loop = 1 , grid%max_dom
-            CALL nl_set_hypsometric_opt ( loop , 1 ) 
-          END DO
-          WRITE(wrf_err_message,*)'Resetting the hypsometric_opt from default value of 2 to 1'
-          CALL wrf_debug( 0 , wrf_err_message )
-        END IF
-       END IF
 
        !  Test to make sure that the grid distances are the right size.
 
        CALL wrf_get_dom_ti_real ( fid , 'DX' ,  dx_compare , 1 , icnt , ierr )
        CALL wrf_get_dom_ti_real ( fid , 'DY' ,  dy_compare , 1 , icnt , ierr )
+
        IF ( ( ABS ( dx_compare - config_flags%dx ) .GT. 1.E-5 * dx_compare ) .OR. &
             ( ABS ( dy_compare - config_flags%dy ) .GT. 1.E-5 * dy_compare ) ) THEN
           IF ( ( config_flags%polar ) .AND. ( config_flags%grid_id .EQ. 1 ) ) THEN
@@ -391,7 +371,8 @@
              CALL wrf_message(wrf_err_message)
              WRITE(wrf_err_message,*)'dx and dy from namelist ',config_flags%dx,config_flags%dy
              CALL wrf_message(wrf_err_message)
-             CALL wrf_error_fatal( 'DX and DY do not match comparing namelist to the input file' )
+             CALL wrf_debug ( 0, '---- ERROR: DX and DY do not match comparing namelist to the input file' )
+             count_fatal_error = count_fatal_error + 1
           END IF
        END IF
 #endif
@@ -434,7 +415,8 @@
           CALL wrf_message(wrf_err_message)
        END IF
        IF ( ierr .NE. 0 ) THEN
-          CALL wrf_error_fatal( 'Nest start locations do not match: namelist.input vs gridded input file' )
+          CALL wrf_debug ( 0, '---- ERROR: Nest start locations do not match: namelist.input vs gridded input file' )
+          count_fatal_error = count_fatal_error + 1
        END IF
     END IF
 #endif
@@ -534,19 +516,39 @@
     CALL nl_set_map_proj ( grid%id , config_flags%map_proj )
     grid%map_proj = config_flags%map_proj
 
+    mminlu = " "
     CALL wrf_get_dom_ti_char ( fid , 'MMINLU', mminlu , ierr )
-    IF ( ierr .NE. 0 ) THEN
-      WRITE(wrf_err_message,*)'MMINLU error on input'
-      mminlu = " "
-      CALL wrf_debug ( 0 , wrf_err_message )
-    ELSE IF ( ( ( mminlu(1:1) .GE. "A" ) .AND. ( mminlu(1:1) .LE. "Z" ) ) .OR. &
-              ( ( mminlu(1:1) .GE. "a" ) .AND. ( mminlu(1:1) .LE. "z" ) ) .OR. &
-              ( ( mminlu(1:1) .GE. "0" ) .AND. ( mminlu(1:1) .LE. "9" ) ) ) THEN
-       ! no-op, the mminlu field is probably OK
-    ELSE IF ( mminlu(1:1) .EQ. " " ) THEN
-       mminlu = " "
-    ELSE
-       mminlu = " "
+    IF ( ierr .NE. 0 ) mminlu = " "
+#if ( ( EM_CORE == 1 ) && ( DA_CORE != 1 ) )
+    IF ( ( ( switch .EQ. input_only ) .OR. ( switch .EQ. restart_only ) ) .AND. &
+         ( ( config_flags%io_form_input .EQ.  2 ) .OR. &
+           ( config_flags%io_form_input .EQ. 11 ) ) ) THEN
+      CALL wrf_get_dom_ti_char ( fid , 'SIMULATION_INITIALIZATION_TYPE', sim_type , icnt )
+      IF ( TRIM(sim_type) .NE. "IDEALIZED DATA" ) THEN
+        IF ( ierr .NE. 0 ) THEN
+          WRITE(wrf_err_message,*)'MMINLU error on input'
+          mminlu = " "
+          CALL wrf_debug ( 0 , wrf_err_message )
+        END IF
+      END IF
+    ELSE IF ( ( switch .EQ. input_only ) .OR. ( switch .EQ. restart_only ) ) THEN
+      IF ( ierr .NE. 0 ) THEN
+        WRITE(wrf_err_message,*)'MMINLU error on input'
+        mminlu = " "
+        CALL wrf_debug ( 0 , wrf_err_message )
+      END IF
+    END IF
+#endif
+    IF ( ierr .EQ. 0 ) THEN
+      IF ( ( ( mminlu(1:1) .GE. "A" ) .AND. ( mminlu(1:1) .LE. "Z" ) ) .OR. &
+                ( ( mminlu(1:1) .GE. "a" ) .AND. ( mminlu(1:1) .LE. "z" ) ) .OR. &
+                ( ( mminlu(1:1) .GE. "0" ) .AND. ( mminlu(1:1) .LE. "9" ) ) ) THEN
+         ! no-op, the mminlu field is probably OK
+      ELSE IF ( mminlu(1:1) .EQ. " " ) THEN
+         mminlu = " "
+      ELSE
+         mminlu = " "
+      END IF
     END IF
     call wrf_debug( 1 , "mminlu = '" // TRIM(mminlu) // "'")
     if (index(mminlu, char(0)) > 0) mminlu(index(mminlu, char(0)):) = " "
@@ -577,7 +579,8 @@
         call wrf_message(wrf_err_message)
         WRITE(wrf_err_message,'("input files : NUM_LAND_CAT = ",I10, " (from geogrid selections).")') num_land_cat_compare
         call wrf_message(wrf_err_message)
-        call wrf_error_fatal("Mismatch between namelist and wrf input files for dimension NUM_LAND_CAT")
+        CALL wrf_debug ( 0, '---- ERROR: Mismatch between namelist and wrf input files for dimension NUM_LAND_CAT')
+        count_fatal_error = count_fatal_error + 1
       endif
     ENDIF
 
@@ -593,7 +596,8 @@
 
 #if (EM_CORE == 1)
           IF ( itmp .EQ. 1 ) THEN
-             call wrf_error_fatal("NUM_METGRID_SOIL_LEVELS must be greater than 1")
+             CALL wrf_debug ( 0, "---- ERROR: NUM_METGRID_SOIL_LEVELS must be greater than 1")
+             count_fatal_error = count_fatal_error + 1
           END IF
 #endif
           WRITE(wrf_err_message,*)'input_wrf: global attribute NUM_METGRID_SOIL_LEVELS returns ', itmp
@@ -608,7 +612,8 @@
              WRITE(wrf_err_message,'("input files : NUM_METGRID_SOIL_LEVELS = ",I10, " (from met_nmm files).")') itmp
 #endif
              call wrf_message(wrf_err_message)
-             call wrf_error_fatal("Mismatch between namelist and global attribute NUM_METGRID_SOIL_LEVELS")
+             CALL wrf_debug ( 0, "---- ERROR: Mismatch between namelist and global attribute NUM_METGRID_SOIL_LEVELS")
+             count_fatal_error = count_fatal_error + 1
           END IF
        END IF
     END IF
@@ -628,12 +633,14 @@
           call wrf_message(wrf_err_message)
           WRITE(wrf_err_message,'("input files : EROSION_DIM = ",I10, " (from met_em files).")') itmp
           call wrf_message(wrf_err_message)
-          call wrf_error_fatal("Mismatch between namelist and global attribute EROSION_DIM")
+          CALL wrf_debug ( 0, "---- ERROR: Mismatch between namelist and global attribute EROSION_DIM")
+          count_fatal_error = count_fatal_error + 1
        END IF
     END IF
 #endif
 #endif
 
+#if ( DA_CORE != 1 )
     ! Test here to check that config_flags%sf_surface_physics in namelist
     ! is equal to what is in the global attributes of the wrfinput files
 
@@ -653,12 +660,78 @@
                 call wrf_message(wrf_err_message)
                 WRITE(wrf_err_message,'("input files : SF_SURFACE_PHYSICS = ",I10, " (from wrfinput files).")') itmp
                 call wrf_message(wrf_err_message)
-                call wrf_error_fatal("Mismatch between namelist and global attribute SF_SURFACE_PHYSICS")
+                CALL wrf_debug ( 0, "---- ERROR: Mismatch between namelist and global attribute SF_SURFACE_PHYSICS")
+                count_fatal_error = count_fatal_error + 1
              END IF
           END IF
        END IF
     END IF
 
+
+    ! Test here to check that config_flags%gwd_opt in namelist
+    ! is equal to what is in the global attributes of the wrfinput files
+
+    IF ( switch .EQ. input_only  ) THEN
+       CALL wrf_get_dom_ti_integer ( fid, 'GWD_OPT', itmp, 1, icnt, ierr )
+       IF ( ierr .EQ. 0 ) THEN
+          WRITE(wrf_err_message,*)'input_wrf: global attribute GWD_OPT returns ', itmp
+          CALL wrf_debug ( 300 , wrf_err_message )
+          IF ( config_flags%gwd_opt /= itmp ) THEN
+             call wrf_message("----------------- ERROR -------------------")
+             WRITE(wrf_err_message,'("namelist    : gwd_opt            = ",I10)') config_flags%gwd_opt
+             call wrf_message(wrf_err_message)
+             WRITE(wrf_err_message,'("input files : GWD_OPT            = ",I10, " (from wrfinput files).")') itmp
+             call wrf_message(wrf_err_message)
+             call wrf_debug ( 0, "---- ERROR: Mismatch between namelist and global attribute GWD_OPT")
+             count_fatal_error = count_fatal_error + 1
+          END IF
+       END IF
+    END IF
+#endif
+
+#if ( ( EM_CORE == 1 ) && ( DA_CORE != 1 ) )
+    ! Test here to check that config_flags%sf_ocean_physics in namelist
+    ! is equal to what is in the global attributes of the wrfinput files
+
+    IF ( switch .EQ. input_only  ) THEN
+       CALL wrf_get_dom_ti_integer ( fid, 'SF_OCEAN_PHYSICS', itmp, 1, icnt, ierr )
+       IF ( ierr .EQ. 0 ) THEN
+          WRITE(wrf_err_message,*)'input_wrf: global attribute SF_OCEAN_PHYSICS returns ', itmp
+          CALL wrf_debug ( 300 , wrf_err_message )
+          IF ( config_flags%sf_ocean_physics /= itmp ) THEN
+             call wrf_message("----------------- ERROR -------------------")
+             WRITE(wrf_err_message,'("namelist    : sf_ocean_physics   = ",I10)') config_flags%sf_ocean_physics
+             call wrf_message(wrf_err_message)
+             WRITE(wrf_err_message,'("input files : SF_OCEAN_PHYSICS   = ",I10, " (from wrfinput files).")') itmp
+             call wrf_message(wrf_err_message)
+             call wrf_debug ( 0, "---- ERROR: Mismatch between namelist and global attribute SF_OCEAN_PHYSICS")
+             count_fatal_error = count_fatal_error + 1
+          END IF
+       END IF
+    END IF
+#endif
+
+#if ( DA_CORE != 1 )
+    ! Test here to check that config_flags%sf_urban_physics in namelist
+    ! is equal to what is in the global attributes of the wrfinput files
+
+    IF ( switch .EQ. input_only  ) THEN
+       CALL wrf_get_dom_ti_integer ( fid, 'SF_URBAN_PHYSICS', itmp, 1, icnt, ierr )
+       IF ( ierr .EQ. 0 ) THEN
+          WRITE(wrf_err_message,*)'input_wrf: global attribute SF_URBAN_PHYSICS returns ', itmp
+          CALL wrf_debug ( 300 , wrf_err_message )
+          IF ( config_flags%sf_urban_physics /= itmp ) THEN
+             call wrf_message("----------------- ERROR -------------------")
+             WRITE(wrf_err_message,'("namelist    : sf_urban_physics   = ",I10)') config_flags%sf_urban_physics
+             call wrf_message(wrf_err_message)
+             WRITE(wrf_err_message,'("input files : SF_URBAN_PHYSICS   = ",I10, " (from wrfinput files).")') itmp
+             call wrf_message(wrf_err_message)
+             call wrf_debug ( 0, "---- ERROR: Mismatch between namelist and global attribute SF_URBAN_PHYSICS")
+             count_fatal_error = count_fatal_error + 1
+          END IF
+       END IF
+    END IF
+#endif
 
     CALL wrf_get_dom_ti_integer ( fid , 'ISWATER' ,  config_flags%iswater , 1 , icnt , ierr )
     WRITE(wrf_err_message,*)'input_wrf: wrf_get_dom_ti_integer for ISWATER returns ',config_flags%iswater
@@ -755,9 +828,12 @@
        IF ( ( ide .NE. ide_compare    ) .OR. &
             ( kde .NE. kde_compare    ) .OR. &
             ( jde .NE. jde_compare    ) ) THEN
-          WRITE(wrf_err_message,*)'input_wrf.F: SIZE MISMATCH:  namelist ide,jde,kde=',ide,jde,kde,&
-                                  '; input data ide,jde,kde=',ide_compare , jde_compare , kde_compare
-          CALL wrf_error_fatal( wrf_err_message )
+          WRITE(wrf_err_message,*)'input_wrf.F: SIZE MISMATCH:  namelist   ide,jde,kde=',ide,jde,kde
+          CALL wrf_debug ( 0, TRIM( wrf_err_message ) )
+          WRITE(wrf_err_message,*)'input_wrf.F: SIZE MISMATCH:  input file ide,jde,kde=',ide_compare , jde_compare , kde_compare
+          CALL wrf_debug ( 0, TRIM( wrf_err_message ) )
+          CALL wrf_debug ( 0, "---- ERROR: Mismatch between namelist and input file dimensions" )
+          count_fatal_error = count_fatal_error + 1
        ENDIF
 
     ELSE IF ( switch .EQ. auxinput1_only ) THEN
@@ -767,10 +843,12 @@
        IF ( ( ide                             .NE. ide_compare ) .OR. &
             ( config_flags%num_metgrid_levels .NE. kde_compare ) .OR. &
             ( jde                             .NE. jde_compare ) ) THEN
-         WRITE(wrf_err_message,*)'input_wrf.F: SIZE MISMATCH:  ',&
-                                 'namelist ide,jde,num_metgrid_levels=',ide,jde,config_flags%num_metgrid_levels,&
-                                 '; input data ide,jde,num_metgrid_levels=',ide_compare , jde_compare , kde_compare
-         CALL wrf_error_fatal( wrf_err_message )
+          WRITE(wrf_err_message,*)'input_wrf.F: SIZE MISMATCH:  namelist   ide,jde,num_metgrid_levels=',ide,jde,config_flags%num_metgrid_levels
+          CALL wrf_debug ( 0, TRIM( wrf_err_message ) )
+          WRITE(wrf_err_message,*)'input_wrf.F: SIZE MISMATCH:  input file ide,jde,kde               =',ide_compare , jde_compare , kde_compare
+          CALL wrf_debug ( 0, TRIM( wrf_err_message ) )
+          CALL wrf_debug ( 0, "---- ERROR: Mismatch between namelist and input file dimensions" )
+          count_fatal_error = count_fatal_error + 1
        ENDIF
     ENDIF
 
@@ -802,10 +880,12 @@
                  '; input data ide,jde,num_metgrid_levels=',ide_compare , jde_compare , kde_compare
                 IF (ide-1 .eq. ide_compare .AND. jde-1 .EQ. jde_compare) THEN
                   CALL wrf_message(wrf_err_message)
-                  CALL wrf_error_fatal( "appears that the vertical dimension is wrong - quitting" )
+                  CALL wrf_debug ( 0, "---- ERROR: appears that the vertical dimension is wrong - quitting" )
+                  count_fatal_error = count_fatal_error + 1
                 ELSE
                   CALL wrf_message(wrf_err_message)
-                  CALL wrf_error_fatal( "appears that I or J dimensions are wrong - quitting" )
+                  CALL wrf_debug ( 0, "---- ERROR: appears that I or J dimensions are wrong - quitting" )
+                  count_fatal_error = count_fatal_error + 1
                 ENDIF
          ENDIF
        ENDIF
@@ -827,11 +907,78 @@
              call wrf_message(wrf_err_message)
              WRITE(wrf_err_message,'("input files : HYPSOMETRIC_OPT = ",I10, " (from wrfinput files).")') itmp
              call wrf_message(wrf_err_message)
-             call wrf_error_fatal("Mismatch between namelist and global attribute HYPSOMETRIC_OPT")
+             CALL wrf_debug ( 0, "---- ERROR: Mismatch between namelist and global attribute HYPSOMETRIC_OPT")
+             count_fatal_error = count_fatal_error + 1
           END IF
+       ELSE
+          ! For WRFDA backward compatibility.  If hypsometric_opt is not defined in the fg file, it is
+          ! pre-version 3.4 WRF input data.  For older versions, hypsometric_opt should be 1.
+          hypsometric_opt = -1
+          CALL wrf_get_dom_ti_integer ( fid , 'HYPSOMETRIC_OPT' , hypsometric_opt, 1 , icnt , ierr )
+          IF ( ( hypsometric_opt .NE. 1 ) .AND. ( hypsometric_opt .NE. 2 ) ) THEN
+             grid%hypsometric_opt = 1
+             config_flags%hypsometric_opt = 1
+             DO loop = 1 , grid%max_dom
+                CALL nl_set_hypsometric_opt ( loop , 1 )
+             END DO
+             WRITE(wrf_err_message,*)'Background (fg) file appears to be from earlier than WRF V3.4;'
+             call wrf_message(wrf_err_message)
+             WRITE(wrf_err_message,*)'Resetting the hypsometric_opt from default value of 2 to 1'
+             CALL wrf_message(wrf_err_message)
+          END IF
+
        END IF
     END IF
 
+#endif
+
+#if ( ( EM_CORE == 1 ) && ( DA_CORE != 1 ) )
+      IF ( ( switch .EQ. input_only ) .OR. ( switch .EQ. restart_only ) ) THEN
+
+        !  Make sure for ARW ideal cases that the hypsometric option, the
+        !  way that we integrate the height field, is set to 1.  This is the
+        !  method that is used in all of the "ideal" programs to get the
+        !  base-state height (phb).
+
+        CALL wrf_get_dom_ti_char ( fid , 'SIMULATION_INITIALIZATION_TYPE', sim_type , ierr )
+        IF      ( TRIM(sim_type) .EQ. "IDEALIZED DATA" ) THEN
+           grid%this_is_an_ideal_run = .TRUE.
+        ELSE IF ( TRIM(sim_type) .EQ. "REAL-DATA CASE" ) THEN
+           grid%this_is_an_ideal_run = .FALSE.
+        ELSE IF ( ierr .NE. 0 ) THEN
+           CALL wrf_get_dom_ti_char ( fid , 'START_DATE' , input_name , ierr )
+           grid%this_is_an_ideal_run = INDEX(TRIM(input_name) , '0001-' ) .NE. 0
+        END IF
+
+        IF ( grid%this_is_an_ideal_run ) THEN
+          grid%hypsometric_opt = 1
+          config_flags%hypsometric_opt = 1
+	  DO loop = 1 , grid%max_dom
+            CALL nl_set_hypsometric_opt ( loop , 1 ) 
+          END DO
+          WRITE(wrf_err_message,*)'NOTE:  Ideal cases always use hypsometric_opt=1, regardless of namelist setting'
+          CALL wrf_debug( 1 , wrf_err_message )
+        END IF
+      END IF
+
+       IF ( ( switch .EQ. input_only ) .AND. ( config_flags%io_form_input .EQ. 2 ) ) THEN
+
+        !  For backward compatibility.  If we do not find the hypsometric_opt defined
+        !  in the input data, this is pre version 3.4.  Most likely, the hypsometric_opt
+        !  was the default value, 1.  
+
+        hypsometric_opt = -1
+        CALL wrf_get_dom_ti_integer ( fid , 'HYPSOMETRIC_OPT' , hypsometric_opt , 1 , icnt , ierr )
+        IF ( ( hypsometric_opt .NE. 1 ) .AND. ( hypsometric_opt .NE. 2 ) ) THEN
+          grid%hypsometric_opt = 1
+          config_flags%hypsometric_opt = 1
+	  DO loop = 1 , grid%max_dom
+            CALL nl_set_hypsometric_opt ( loop , 1 ) 
+          END DO
+          WRITE(wrf_err_message,*)'Resetting the hypsometric_opt from default value of 2 to 1'
+          CALL wrf_debug( 0 , wrf_err_message )
+        END IF
+       END IF
 #endif
 
     ENDIF check_if_dryrun
@@ -853,12 +1000,14 @@
     IF ( ierr .NE. 0 .AND. ierr .NE. WRF_WARN_NOTSUPPORTED .AND. ierr .NE. WRF_WARN_DRYRUN_READ ) THEN
       CALL wrf_message ( TRIM(wrf_err_message ) )
       IF ( switch .EQ. boundary_only ) THEN
-        WRITE(wrf_err_message,*) ' ... May have run out of valid boundary conditions in file ',TRIM(fname)
-        CALL wrf_error_fatal( TRIM(wrf_err_message) )
+        WRITE(wrf_err_message,*) '---- ERROR: Ran out of valid boundary conditions in file ',TRIM(fname)
+        CALL wrf_debug ( 0, TRIM( wrf_err_message ) )
+        count_fatal_error = count_fatal_error + 1
       ELSE
 #if ( NMM_CORE != 1 )
-        WRITE(wrf_err_message,*) '... Could not find matching time in input file ',TRIM(fname)
-        CALL wrf_error_fatal( TRIM(wrf_err_message) )
+        WRITE(wrf_err_message,*) '---- ERROR: Could not find matching time in input file ',TRIM(fname)
+        CALL wrf_debug ( 0, TRIM( wrf_err_message ) )
+        count_fatal_error = count_fatal_error + 1
 #endif
       ENDIF
     ELSE IF ( ierr .NE. WRF_WARN_NOTSUPPORTED .AND. ierr .NE. WRF_WARN_DRYRUN_READ) THEN
@@ -919,37 +1068,59 @@
           write(wrf_err_message, '(4a)') "WRF restart, LBC starts at ", &
                                      & trim(current_date), " and restart starts at ", trim(currtimestr)
           CALL wrf_debug( 0 , wrf_err_message )
+          CALL wrf_get_dom_td_char ( fid , 'THISBDYTIME' ,  current_date(1:19), this_datestr , ierr )
+          CALL wrf_atotime( this_datestr(1:19), grid%this_bdy_time )
+          CALL wrf_get_dom_td_char ( fid , 'NEXTBDYTIME' ,  current_date(1:19), next_datestr , ierr )
+          CALL wrf_atotime( next_datestr(1:19), grid%next_bdy_time )
+         
+          WRITE ( wrf_err_message , * ) 'LBC for restart: Starting valid date = ',this_datestr(1:19),', Ending valid date = ',next_datestr(1:19)
+          CALL wrf_message( TRIM(wrf_err_message) )
+          WRITE ( wrf_err_message , * ) 'LBC for restart: Restart time            = ',trim(currtimestr)
+          CALL wrf_message( TRIM(wrf_err_message) )
 
-          !  While the lateral BC time is less than the restart time, advance forward to the next LBC time.
+          IF ( ( grid%this_bdy_time .LE. currentTime ) .AND. ( grid%next_bdy_time .GT. currentTime ) ) THEN
+              WRITE ( wrf_err_message , * ) 'LBC for restart: Found the correct bounding LBC time periods'
+              CALL wrf_message( TRIM(wrf_err_message) )
+          ELSE
 
-          DO WHILE (time .lt. currentTime)
-              CALL wrf_get_next_time(fid, current_date , ierr)
-              CALL wrf_atotime(current_date(1:19), time)
-              WRITE(wrf_err_message,*) 'Advancing LBC file: wrf_get_next_time current_date: ',&
-                                      & current_date(1:19),' Status = ',ierr
-              IF ( ierr .EQ. 0 ) THEN
-                 CALL wrf_debug ( 0 , TRIM(wrf_err_message ) )
-              ELSE
-                 CALL wrf_error_fatal ( 'Cannot find a valid time to start the LBC during this restart' )
-              END IF
-          END DO
+              WRITE ( wrf_err_message , * ) 'LBC for restart: Looking for a bounding time'
+              CALL wrf_message( TRIM(wrf_err_message) )
 
-          !  Now the LBC time either matches or is beyond the restart time.  If it matches, we are at the
-          !  right time.  If we have gone too far, then back up one time period, and we are good to go.
+              !  While the lateral BC time is less than the restart time, advance forward to the next LBC time.
 
-          IF ( time .eq. currentTime ) THEN
-              CALL wrf_debug ( 0 , 'Found correct time, LBC matches the restart interval.' )
-          ELSE IF ( time .gt. currentTime ) THEN
-              CALL wrf_debug ( 0 , 'Went one LBC interval too far, backing up for restart.' )
-              CALL wrf_get_previous_time(fid, current_date , ierr)
-              IF ( ierr .EQ. 0 ) THEN
-                 CALL wrf_atotime(current_date(1:19), time)
-                 WRITE(wrf_err_message,*) 'LBC: wrf_get_prev_time current_date: ',&
-                                         & current_date(1:19),' Status = ',ierr
-                 CALL wrf_debug ( 0 , TRIM(wrf_err_message ) )
-                 CALL wrf_debug ( 0 , 'LBC is now correctly positioned for requested restart time' )
-              ELSE
-                 CALL wrf_error_fatal ( 'Problems backing up in the LBC file to find startig location for restart' )
+              icount = 0
+              DO WHILE ( ( currentTime .GE. grid%next_bdy_time ) .AND. ( icount < 10000 ) ) 
+                  CALL wrf_get_next_time(fid, current_date , ierr)
+                  IF ( ierr .NE. 0 ) THEN
+                     CALL wrf_debug ( 0, '---- ERROR: Cannot find a valid time to start the LBC during this restart, likely ran out of time periods to test' )
+                     count_fatal_error = count_fatal_error + 1
+                  END IF
+                  CALL wrf_get_dom_td_char ( fid , 'THISBDYTIME' ,  current_date(1:19), this_datestr , ierr )
+                  CALL wrf_get_dom_td_char ( fid , 'NEXTBDYTIME' ,  current_date(1:19), next_datestr , ierr )
+                  CALL wrf_atotime( next_datestr(1:19), grid%next_bdy_time )
+                  WRITE ( wrf_err_message , * ) 'LBC for restart: Starting valid date = ',this_datestr(1:19),', Ending valid date = ',next_datestr(1:19)
+                  CALL wrf_message( TRIM(wrf_err_message) )
+                  icount = icount + 1
+              END DO
+             
+              !  Now the LBC time either matches or is beyond the restart time.  If it matches, we are at the
+              !  right time.  If we have gone too far, then back up one time period, and we are good to go.
+
+              IF ( time .eq. currentTime ) THEN
+                  CALL wrf_debug ( 0 , 'Found correct time, LBC matches the restart interval.' )
+              ELSE IF ( time .gt. currentTime ) THEN
+                  CALL wrf_debug ( 0 , 'Went one LBC interval too far, backing up for restart.' )
+                  CALL wrf_get_previous_time(fid, current_date , ierr)
+                  IF ( ierr .EQ. 0 ) THEN
+                     CALL wrf_atotime(current_date(1:19), time)
+                     WRITE(wrf_err_message,*) 'LBC: wrf_get_prev_time current_date: ',&
+                                             & current_date(1:19),' Status = ',ierr
+                     CALL wrf_debug ( 0 , TRIM(wrf_err_message ) )
+                     CALL wrf_debug ( 0 , 'LBC is now correctly positioned for requested restart time' )
+                  ELSE
+                     CALL wrf_debug ( 0, '---- ERROR: Problems backing up in the LBC file to find starting location for restart' )
+                     count_fatal_error = count_fatal_error + 1
+                  END IF
               END IF
           END IF
 
@@ -957,6 +1128,8 @@
           CALL wrf_atotime( this_datestr(1:19), grid%this_bdy_time )
           CALL wrf_get_dom_td_char ( fid , 'NEXTBDYTIME' ,  current_date(1:19), next_datestr , ierr )
           CALL wrf_atotime( next_datestr(1:19), grid%next_bdy_time )
+          WRITE ( wrf_err_message , * ) 'LBC for restart: Found the correct bounding LBC time periods for restart time = ',trim(currtimestr)
+          CALL wrf_message ( TRIM(wrf_err_message) )
 
        ELSE IF ( .NOT. config_flags%restart ) THEN
           CALL domain_clock_get( grid, current_time=currentTime )
@@ -968,7 +1141,7 @@
 #if (DA_CORE != 1)
        IF( currentTime .GE. grid%next_bdy_time ) THEN
           IF ( wrf_dm_on_monitor() ) THEN
-             write(a_message,*) 'THIS TIME ',this_datestr(1:19),'NEXT TIME ',next_datestr(1:19)
+             write(a_message,*) 'THIS TIME ',this_datestr(1:19),', NEXT TIME ',next_datestr(1:19)
              CALL wrf_message ( a_message ) 
           END IF
           RETURN
@@ -985,6 +1158,15 @@
 
     n_ref_m = 0
 #endif
+
+    !  This test should go after all of the metadata is input, and before the gridded input is ingested.
+     
+    IF ( count_fatal_error .GT. 0 ) THEN
+       WRITE (wrf_err_message, FMT='(A,I6, A)') 'NOTE:  ', count_fatal_error, ' namelist vs input data inconsistencies found.'
+       CALL wrf_message ( wrf_err_message )
+       WRITE (wrf_err_message, FMT='(A,I6, A)') 'NOTE:  Please check and reset these options'
+       CALL wrf_error_fatal ( wrf_err_message )
+    END IF
 
     IF ( (first_input   .LE. switch .AND. switch .LE. last_input) .OR. &
          (first_history .LE. switch .AND. switch .LE. last_history) .OR. &
@@ -1006,9 +1188,8 @@
                                     TRIM(dname)             , & ! Data Name
                                     p%rfield_0d             , & ! Field
                                     WRF_FLOAT               , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
-                                    grid%domdesc            , & ! Comm
+                                    grid                    , & ! grid
+                                    grid%domdesc            , & ! domdesc
                                     grid%bdy_mask           , & ! bdy_mask
                                     '0'                     , & ! MemoryOrder
                                     ''                      , & ! Stagger
@@ -1024,9 +1205,8 @@
                                     TRIM(dname)             , & ! Data Name
                                     p%dfield_0d             , & ! Field
                                     WRF_DOUBLE              , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
-                                    grid%domdesc            , & ! Comm
+                                    grid                    , & ! grid
+                                    grid%domdesc            , & ! domdesc
                                     grid%bdy_mask           , & ! bdy_mask
                                     '0'                     , & ! MemoryOrder
                                     ''                      , & ! Stagger
@@ -1042,9 +1222,8 @@
                                     TRIM(dname)             , & ! Data Name
                                     p%ifield_0d             , & ! Field
                                     WRF_INTEGER             , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
-                                    grid%domdesc            , & ! Comm
+                                    grid                    , & ! grid
+                                    grid%domdesc            , & ! domdesc
                                     grid%bdy_mask           , & ! bdy_mask
                                     '0'                     , & ! MemoryOrder
                                     ''                      , & ! Stagger
@@ -1060,9 +1239,8 @@
                                     TRIM(dname)             , & ! Data Name
                                     p%lfield_0d             , & ! Field
                                     WRF_LOGICAL             , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
-                                    grid%domdesc            , & ! Comm
+                                    grid                    , & ! grid
+                                    grid%domdesc            , & ! domdesc
                                     grid%bdy_mask           , & ! bdy_mask
                                     '0'                     , & ! MemoryOrder
                                     ''                      , & ! Stagger
@@ -1105,11 +1283,10 @@
                                        fid                     , & ! DataHandle
                                        current_date(1:19)      , & ! DateStr
                                        TRIM(dname)             , & ! Data Name
-                                       f_vint_1d                , & ! Field
+                                       f_vint_1d               , & ! Field
                                        WRF_FLOAT               , & ! FieldType
-                                       grid%communicator       , & ! Comm
-                                       grid%iocommunicator     , & ! Comm
-                                       grid%domdesc            , & ! Comm
+                                       grid                    , & ! grid
+                                       grid%domdesc            , & ! domdesc
                                        grid%bdy_mask           , & ! bdy_mask
                                        TRIM(memord)            , & ! MemoryOrder
                                        p%Stagger               , & ! Stagger
@@ -1131,9 +1308,8 @@
                                        TRIM(dname)             , & ! Data Name
                                        p%rfield_1d             , & ! Field
                                        WRF_FLOAT               , & ! FieldType
-                                       grid%communicator       , & ! Comm
-                                       grid%iocommunicator     , & ! Comm
-                                       grid%domdesc            , & ! Comm
+                                       grid                    , & ! grid
+                                       grid%domdesc            , & ! domdesc
                                        grid%bdy_mask           , & ! bdy_mask
                                        TRIM(memord)            , & ! MemoryOrder
                                        p%Stagger               , & ! Stagger
@@ -1150,9 +1326,8 @@
                                     TRIM(dname)             , & ! Data Name
                                     p%dfield_1d             , & ! Field
                                     WRF_DOUBLE              , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
-                                    grid%domdesc            , & ! Comm
+                                    grid                    , & ! grid
+                                    grid%domdesc            , & ! domdesc
                                     grid%bdy_mask           , & ! bdy_mask
                                     TRIM(memord)            , & ! MemoryOrder
                                     TRIM(p%Stagger)         , & ! Stagger
@@ -1168,9 +1343,8 @@
                                     TRIM(dname)             , & ! Data Name
                                     p%ifield_1d             , & ! Field
                                     WRF_INTEGER             , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
-                                    grid%domdesc            , & ! Comm
+                                    grid                    , & ! grid
+                                    grid%domdesc            , & ! domdesc
                                     grid%bdy_mask           , & ! bdy_mask
                                     TRIM(memord)            , & ! MemoryOrder
                                     TRIM(p%Stagger)         , & ! Stagger
@@ -1186,9 +1360,8 @@
                                     TRIM(dname)             , & ! Data Name
                                     p%lfield_1d             , & ! Field
                                     WRF_LOGICAL             , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
-                                    grid%domdesc            , & ! Comm
+                                    grid                    , & ! grid
+                                    grid%domdesc            , & ! domdesc
                                     grid%bdy_mask           , & ! bdy_mask
                                     TRIM(memord)            , & ! MemoryOrder
                                     TRIM(p%Stagger)         , & ! Stagger
@@ -1218,9 +1391,8 @@
                                     TRIM(dname)             , & ! Data Name
                                     p%rfield_2d             , & ! Field
                                     WRF_FLOAT               , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
-                                    grid%domdesc            , & ! Comm
+                                    grid                    , & ! grid
+                                    grid%domdesc            , & ! domdesc
                                     grid%bdy_mask           , & ! bdy_mask
                                     TRIM(memord)            , & ! MemoryOrder
                                     TRIM(p%Stagger)         , & ! Stagger
@@ -1236,9 +1408,8 @@
                                     TRIM(dname)             , & ! Data Name
                                     p%dfield_2d             , & ! Field
                                     WRF_DOUBLE              , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
-                                    grid%domdesc            , & ! Comm
+                                    grid                    , & ! grid
+                                    grid%domdesc            , & ! domdesc
                                     grid%bdy_mask           , & ! bdy_mask
                                     TRIM(memord)            , & ! MemoryOrder
                                     TRIM(p%Stagger)         , & ! Stagger
@@ -1254,9 +1425,8 @@
                                     TRIM(dname)             , & ! Data Name
                                     p%ifield_2d             , & ! Field
                                     WRF_INTEGER             , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
-                                    grid%domdesc            , & ! Comm
+                                    grid                    , & ! grid
+                                    grid%domdesc            , & ! domdesc
                                     grid%bdy_mask           , & ! bdy_mask
                                     TRIM(memord)            , & ! MemoryOrder
                                     TRIM(p%Stagger)         , & ! Stagger
@@ -1272,9 +1442,8 @@
                                     TRIM(dname)             , & ! Data Name
                                     p%lfield_2d             , & ! Field
                                     WRF_LOGICAL             , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
-                                    grid%domdesc            , & ! Comm
+                                    grid                    , & ! grid
+                                    grid%domdesc            , & ! domdesc
                                     grid%bdy_mask           , & ! bdy_mask
                                     TRIM(memord)            , & ! MemoryOrder
                                     TRIM(p%Stagger)         , & ! Stagger
@@ -1321,9 +1490,8 @@
                                        TRIM(dname)             , & ! Data Name
                                        f_vint_3d               , & ! Field
                                        WRF_FLOAT               , & ! FieldType
-                                       grid%communicator       , & ! Comm
-                                       grid%iocommunicator     , & ! Comm
-                                       grid%domdesc            , & ! Comm
+                                       grid                    , & ! grid
+                                       grid%domdesc            , & ! domdesc
                                        grid%bdy_mask           , & ! bdy_mask
                                        TRIM(memord)            , & ! MemoryOrder
                                        TRIM(p%Stagger)         , & ! Stagger
@@ -1348,9 +1516,8 @@
                                        TRIM(dname)             , & ! Data Name
                                        p%rfield_3d             , & ! Field
                                        WRF_FLOAT               , & ! FieldType
-                                       grid%communicator       , & ! Comm
-                                       grid%iocommunicator     , & ! Comm
-                                       grid%domdesc            , & ! Comm
+                                       grid                    , & ! grid
+                                       grid%domdesc            , & ! domdesc
                                        grid%bdy_mask           , & ! bdy_mask
                                        TRIM(memord)            , & ! MemoryOrder
                                        TRIM(p%Stagger)         , & ! Stagger
@@ -1385,9 +1552,8 @@
                                     TRIM(dname)             , & ! Data Name
                                     p%ifield_3d             , & ! Field
                                     WRF_INTEGER             , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
-                                    grid%domdesc            , & ! Comm
+                                    grid                    , & ! grid
+                                    grid%domdesc            , & ! domdesc
                                     grid%bdy_mask           , & ! bdy_mask
                                     TRIM(memord)            , & ! MemoryOrder
                                     TRIM(p%Stagger)         , & ! Stagger
@@ -1439,9 +1605,8 @@
                                          1, 1, 1                 , & ! see comment above
                                          RWORDSIZE               , &
                                          WRF_FLOAT               , & ! FieldType
-                                         grid%communicator       , & ! Comm
-                                         grid%iocommunicator     , & ! Comm
-                                         grid%domdesc            , & ! Comm
+                                         grid                    , & ! grid
+                                         grid%domdesc            , & ! domdesc
                                          grid%bdy_mask           , & ! bdy_mask
                                          TRIM(memord)            , & ! MemoryOrder
                                          TRIM(p%Stagger)         , & ! Stagger
@@ -1468,9 +1633,8 @@
                                     1, 1, 1                 , & ! see comment above
                                     RWORDSIZE               , &
                                     WRF_FLOAT               , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
-                                    grid%domdesc            , & ! Comm
+                                    grid                    , & ! grid
+                                    grid%domdesc            , & ! domdesc
                                     grid%bdy_mask           , & ! bdy_mask
                                     TRIM(memord)            , & ! MemoryOrder
                                     TRIM(p%Stagger)         , & ! Stagger
@@ -1490,9 +1654,8 @@
                                     1, 1, 1                 , & ! see comment above
                                     DWORDSIZE               , &
                                     WRF_DOUBLE              , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
-                                    grid%domdesc            , & ! Comm
+                                    grid                    , & ! grid
+                                    grid%domdesc            , & ! domdesc
                                     grid%bdy_mask           , & ! bdy_mask
                                     TRIM(memord)            , & ! MemoryOrder
                                     TRIM(p%Stagger)         , & ! Stagger
@@ -1511,9 +1674,8 @@
                                     1, 1, 1                 , & ! see comment above
                                     IWORDSIZE               , &
                                     WRF_INTEGER             , & ! FieldType
-                                    grid%communicator       , & ! Comm
-                                    grid%iocommunicator     , & ! Comm
-                                    grid%domdesc            , & ! Comm
+                                    grid                    , & ! grid
+                                    grid%domdesc            , & ! domdesc
                                     grid%bdy_mask           , & ! bdy_mask
                                     TRIM(memord)            , & ! MemoryOrder
                                     TRIM(p%Stagger)         , & ! Stagger

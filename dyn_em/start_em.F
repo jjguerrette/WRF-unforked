@@ -1,3 +1,21 @@
+! sed -e "s/grid%mu/gridmu/g" -e "s/grid%Mu/gridMu/g" start_em.F | cpp -DHYBRID_COORD | sed -e "s/gridmu/grid%mu/g" -e "s/gridMu/grid%Mu/g" >> start_em.next
+#if ( HYBRID_COORD==1 )
+#  define gridmu_1(...) (grid%c1h(k)*XXPC1HXX(__VA_ARGS__))
+#  define XXPC1HXX(...) grid%mu_1(__VA_ARGS__)
+
+#  define gridmu_2(...) (grid%c1h(k)*XXPC2HXX(__VA_ARGS__))
+#  define XXPC2HXX(...) grid%mu_2(__VA_ARGS__)
+
+#  define gridmub(...) (grid%c1h(k)*XXPCBHXX(__VA_ARGS__)+grid%c2h(k))
+#  define XXPCBHXX(...) grid%mub(__VA_ARGS__)
+
+#  define gridMu_2(...) (grid%c1f(k)*XXPC2FXX(__VA_ARGS__))
+#  define XXPC2FXX(...) grid%Mu_2(__VA_ARGS__)
+
+#  define gridMub(...) (grid%c1f(k)*XXPCBFXX(__VA_ARGS__)+grid%c2f(k))
+#  define XXPCBFXX(...) grid%Mub(__VA_ARGS__)
+#endif
+
 !-------------------------------------------------------------------
 
    SUBROUTINE start_domain_em ( grid, allowed_to_read &
@@ -9,10 +27,12 @@
    USE module_domain, ONLY : domain, wrfu_timeinterval, get_ijk_from_grid, &
         domain_setgmtetc
    USE module_state_description
+   USE module_driver_constants
+   USE module_wrf_error
    USE module_model_constants
-   USE module_bc, ONLY : boundary_condition_check, set_physical_bc2d
-   USE module_bc_em
-   USE module_configure, ONLY : grid_config_rec_type
+   USE module_bc, ONLY : boundary_condition_check, set_physical_bc2d, set_physical_bc3d, bdyzone
+   USE module_bc_em, ONLY: lbc_fcx_gcx, set_w_surface
+   USE module_configure, ONLY : model_to_grid_config_rec, model_config_rec, grid_config_rec_type
    USE module_tiles, ONLY : set_tiles
 #ifdef DM_PARALLEL
    USE module_dm, ONLY : wrf_dm_min_real, wrf_dm_max_real, wrf_dm_maxval, &
@@ -22,11 +42,12 @@
    USE module_dm, ONLY : wrf_dm_min_real, wrf_dm_max_real
 #endif
    USE module_comm_dm
-
+   USE module_llxy, ONLY : proj_cassini
    USE module_physics_init
    USE module_lightning_driver, ONLY : lightning_init
    USE module_fr_fire_driver_wrf, ONLY : fire_driver_em_init
-   USE module_stoch, ONLY : SETUP_STOCH_SPPT,SETUP_STOCH_SKEBS,rand_seed, update_stoch
+   USE module_stoch, ONLY : setup_rand_perturb, rand_seed, update_stoch, initialize_stoch
+   USE module_trajectory, ONLY : trajectory_init
 #if (WRF_CHEM == 1)
    USE module_aerosols_sorgam, ONLY: sum_pm_sorgam
    USE module_gocart_aerosols, ONLY: sum_pm_gocart
@@ -35,6 +56,7 @@
    USE module_aerosols_soa_vbs, only: sum_pm_soa_vbs
 #endif
    USE module_diag_pld, ONLY : pld
+   USE module_diag_zld, ONLY : zld
 
 !!debug
 !USE module_compute_geop
@@ -69,7 +91,7 @@
 
    INTEGER     :: i_m
 
-   REAL        :: p00, t00, a, tiso, p_surf, pd_surf, temp, tiso_tmp
+   REAL        :: p_top_test, p00, t00, a, tiso, p_surf, pd_surf, temp, tiso_tmp
    REAL        :: p_strat, a_strat
 #if (WRF_CHEM == 1)
    REAL        RGASUNIV ! universal gas constant [ J/mol-K ]
@@ -93,7 +115,7 @@
    REAL :: lat1 , lat2 , lat3 , lat4
    REAL :: lon1 , lon2 , lon3 , lon4
    INTEGER :: num_points_lat_lon , iloc , jloc
-   CHARACTER (LEN=132) :: message
+   CHARACTER (LEN=256) :: message, a_message
    TYPE(WRFU_TimeInterval) :: stepTime
    REAL, DIMENSION(:,:), ALLOCATABLE :: clat_glob
    logical :: f_flux  ! flag for computing averaged fluxes in cu_gd
@@ -117,6 +139,10 @@
 !..Need to fill special height var for setting up initial condition.  G. Thompson
    REAL, ALLOCATABLE, DIMENSION(:,:,:) :: z_at_q
 
+!  CCN for MP=18 initializatio
+   REAL :: ccn_max_val
+
+   REAL :: max_mf, max_rot_angle
    CALL get_ijk_from_grid ( grid ,                              &
                            ids, ide, jds, jde, kds, kde,        &
                            ims, ime, jms, jme, kms, kme,        &
@@ -134,6 +160,36 @@
 #endif
    ALLOCATE(z_at_q(IMS:IME,KMS:KME,JMS:JME),STAT=I)  ; z_at_q = 0.
    CALL model_to_grid_config_rec ( grid%id , model_config_rec , config_flags )
+
+   !  If the rotation angle is too large, the GWD option does not do well with the assumed U and V
+   !  being close to earth relative.
+
+   IF ( ( grid%id .EQ. 1 ) .AND. ( config_flags%gwd_opt .EQ. 1 ) ) THEN
+      max_rot_angle = ASIN(ABS(grid%sina(its,jts)))/DEGRAD
+      DO j=jts,MIN(jde-1,jte)
+         DO i=its,MIN(ide-1,ite)
+            max_rot_angle = MAX ( max_rot_angle , ASIN(ABS(grid%sina(i,j)))/DEGRAD )
+         END DO
+      END DO
+#if ( defined(DM_PARALLEL)  &&   ! defined(STUBMPI) )
+      max_rot_angle = wrf_dm_max_real ( max_rot_angle )
+#endif
+      IF ( max_rot_angle .GT. ABS(config_flags%max_rot_angle_gwd) ) THEN
+         WRITE ( a_message , FMT='(A,F5.2)' ) 'Max projection rotation angle for domain 1 = ',max_rot_angle
+         CALL wrf_message ( a_message ) 
+         WRITE ( a_message , FMT='(A)'      ) 'This projection may not be appropriate for using the gravity wave drag option.'
+         CALL wrf_message ( a_message ) 
+         WRITE ( a_message , FMT='(A)'      ) 'In namelist.input make one of the two following changes:'
+         CALL wrf_message ( a_message ) 
+         WRITE ( a_message , FMT='(A)'      ) ' 1) gwd_opt = 0 '
+         CALL wrf_message ( a_message ) 
+         WRITE ( a_message , FMT='(A,F5.2)' ) ' 2) max_rot_angle_gwd > ',max_rot_angle
+         CALL wrf_message ( a_message ) 
+         WRITE ( a_message , FMT='(A)'      ) '--- ERROR: gwd_opt does not work with this domain'
+         CALL wrf_error_fatal ( a_message ) 
+      END IF
+   END IF
+
 
    IF ( ( MOD (ide-ids,config_flags%parent_grid_ratio) .NE. 0 ) .OR. &
         ( MOD (jde-jds,config_flags%parent_grid_ratio) .NE. 0 ) ) THEN
@@ -199,6 +255,10 @@
 ! here we check to see if the boundary conditions are set properly
 
    CALL boundary_condition_check( config_flags, bdyzone, error, grid%id )
+! make sure that topo_wind option has var_sso data available
+    IF ((config_flags%topo_wind .EQ. 1) .AND. (.NOT. grid%got_var_sso)) THEN
+      CALL wrf_error_fatal ("topo_wind requires VAR_SSO data")
+    ENDIF
 
 !kludge - need to stop CG from resetting precip and phys tendencies to zero
 !         when we are in here due to a nest being spawned, we want to still
@@ -215,66 +275,70 @@
        grid%itimestep=0
    ENDIF
 
-   IF ( config_flags%restart .or. grid%moved ) THEN
+   IF ( config_flags%restart .or. grid%moved .or. config_flags%cycling) THEN
        first_trip_for_this_domain = .TRUE.
    ENDIF
 
+      ! Print out the maximum map scale factor on the coarse domain 
+
+      IF ( ( first_trip_for_this_domain ) .AND. ( grid%id .EQ. 1 ) .AND. &
+           ( .NOT. config_flags%polar ) ) THEN
+         max_mf = grid%msft(its,jts)
+         DO j=jts,MIN(jde-1,jte)
+            DO i=its,MIN(ide-1,ite)
+               max_mf = MAX ( max_mf , grid%msft(i,j) )
+            END DO
+         END DO
+#if ( defined(DM_PARALLEL)  &&   ! defined(STUBMPI) )
+         max_mf = wrf_dm_max_real ( max_mf )
+#endif
+         WRITE ( a_message , FMT='(A,F5.2,A)' ) 'Max map factor in domain 1 = ',max_mf, &
+                                                '. Scale the dt in the model accordingly.'
+         CALL wrf_message ( a_message ) 
+      END IF
+
+    if(config_flags%cycling) then
+! Clear the buckets for diagnostics at initial time
+       DO j = jts,min(jte,jde-1)
+       DO i = its, min(ite,ide-1)
+            grid%prec_acc_nc(i,j) = 0.
+            grid%snow_acc_nc(i,j)  = 0.
+            grid%sfcrunoff  (i,j) = 0.
+            grid%udrunoff   (i,j) = 0.
+! acsnow, and acrunoff are run-total
+            grid%acrunoff   (i,j) = 0.
+            grid%acsnow     (i,j) = 0.
+       ENDDO
+       ENDDO
+    endif
+
 !   --- SETUP AND INITIALIZE STOCHASTIC PERTURBATION SCHEMES ---
 
-   IF ( first_trip_for_this_domain ) THEN
-     grid%did_stoch = .FALSE.
+   IF ( grid%itimestep .EQ. 0 ) THEN
+      first_trip_for_this_domain = .TRUE.
+   ELSE
+      first_trip_for_this_domain = .FALSE.
    END IF
 
-   IF ( ( grid%id == 1 ) .AND. &
-        ( grid%stoch_force_global_opt == 1 ) .AND. &
-        ( .NOT. grid%did_stoch ) ) THEN
+   IF ( .not. ( config_flags%restart .or. grid%moved .or. config_flags%hrrr_cycling) ) THEN
+       grid%itimestep=0
+   ENDIF
 
-     grid%did_stoch = .TRUE.
-     IF ( wrf_dm_on_monitor () ) THEN
-       CALL rand_seed ( config_flags, grid%SEED1, grid%SEED2, grid%NENS )
-     ENDIF
-#ifdef DM_PARALLEL
-     CALL wrf_dm_bcast_bytes ( grid%SEED1, IWORDSIZE )
-     CALL wrf_dm_bcast_bytes ( grid%SEED2, IWORDSIZE )
-#endif
+   IF ( config_flags%restart .or. grid%moved .or. config_flags%hrrr_cycling) THEN 
+       first_trip_for_this_domain = .TRUE.
+   ENDIF
 
-     IF ( (grid%stoch_force_opt==1) .or. (grid%perturb_bdy==1)) then
-     grid%SPTFORCC=0.0
-     grid%SPTFORCS=0.0
-     call SETUP_STOCH_SKEBS(grid%VERTSTRUCC,grid%VERTSTRUCS,                   &
-                      grid%SPT_AMP,grid%SPSTREAM_AMP,                    &
-                      grid%VERTAMPT,grid%VERTAMPUV,                      &
-                      grid%stoch_vertstruc_opt,                          &
-                      grid%SEED1,grid%SEED2,grid%time_step,              &
-                      grid%DX,grid%DY,                                   &
-                      grid%TOT_BACKSCAT_PSI,grid%TOT_BACKSCAT_T,         &
-                      grid%ZTAU_PSI,grid%ZTAU_T,grid%REXPONENT_PSI,grid%REXPONENT_T,               &
-                      grid%KMINFORC,grid%KMAXFORC,grid%LMINFORC,grid%LMAXFORC,     &
-                      grid%KMINFORCT,grid%KMAXFORCT,grid%LMINFORCT,grid%LMAXFORCT, &
-                      grid%KMAXFORCH,grid%LMAXFORCH,grid%KMAXFORCTH,grid%LMAXFORCTH, &
-                      grid%ZSIGMA2_EPS,grid%ZSIGMA2_ETA,                          &
-                      ids, ide, jds, jde, kds, kde,                      &
-                      ims, ime, jms, jme, kms, kme,                      &
-                      its, ite, jts, jte, kts, kte                       )
-     END IF
-     IF (grid%stoch_force_opt==2) then
+   CALL INITIALIZE_STOCH  (grid, config_flags,                  &    
+                           first_trip_for_this_domain,          &    
+                           ips, ipe, jps, jpe, kps, kpe,        &    
+                           ids, ide, jds, jde, kds, kde,        &    
+                           ims, ime, jms, jme, kms, kme,        &    
+                           its, ite, jts, jte, kts, kte,        &    
+                           imsx, imex, jmsx, jmex, kmsx, kmex,  &
+                           ipsx, ipex, jpsx, jpex, kpsx, kpex,  &
+                           imsy, imey, jmsy, jmey, kmsy, kmey,  &
+                           ipsy, ipey, jpsy, jpey, kpsy, kpey   )
 
-        call SETUP_STOCH_SPPT(grid%VERTSTRUCC,grid%VERTSTRUCS,            &
-                       grid%SPT_AMP,                                      &
-                       grid%SPTFORCC,grid%SPTFORCS,                       &
-                       grid%VERTAMPT,grid%VERTAMPUV,                      &
-                       grid%stoch_vertstruc_opt,                          &
-                       grid%SEED1,grid%SEED2,grid%time_step,              &
-                       grid%DX,grid%DY,                                   &
-                       grid%gridpointvariance,grid%l_sppt,grid%tau_sppt,  &
-                       grid%KMINFORCT,grid%KMAXFORCT,grid%LMINFORCT,grid%LMAXFORCT, &
-                       grid%KMAXFORCTH,grid%LMAXFORCTH, &
-                       ids, ide, jds, jde, kds, kde,                      &
-                       ims, ime, jms, jme, kms, kme,                      &
-                       its, ite, jts, jte, kts, kte                       )
-     ENDIF 
-
-    END IF ! ( grid%id == 1 ) .AND. ( grid%stoch_force_global_opt == 1 ) 
 !   --- END SETUP STOCHASTIC PERTURBATION SCHEMES ----------
 
 
@@ -440,13 +504,23 @@
       END IF
    END IF
 
+   !  Make sure that the base-state vales have not changed between what is in the input file
+   !  and the namelist file.
+
+   IF ( .NOT. grid%this_is_an_ideal_run ) THEN
+      CALL nl_get_p_top_requested  ( 1 , p_top_test )
+      IF ( grid%p_top .NE. p_top_test ) THEN
+         CALL wrf_error_fatal ( 'start_em: p_top from the namelist does not match p_top from the input file.' )
+      END IF
+   END IF
+
    IF ( config_flags%use_baseparam_fr_nml ) then
-      CALL nl_get_base_pres        ( 1 , p00     )
-      CALL nl_get_base_temp        ( 1 , t00     )
-      CALL nl_get_base_lapse       ( 1 , a       )
-      CALL nl_get_iso_temp         ( 1 , tiso    )
-      CALL nl_get_base_lapse_strat ( 1 , a_strat )
-      CALL nl_get_base_pres_strat  ( 1 , p_strat )
+      CALL nl_get_base_pres        ( 1 , p00        )
+      CALL nl_get_base_temp        ( 1 , t00        )
+      CALL nl_get_base_lapse       ( 1 , a          )
+      CALL nl_get_iso_temp         ( 1 , tiso       )
+      CALL nl_get_base_lapse_strat ( 1 , a_strat    )
+      CALL nl_get_base_pres_strat  ( 1 , p_strat    )
       IF ( ( t00 .LT. 100. .or. p00 .LT. 10000.) .AND. ( .NOT. grid%this_is_an_ideal_run ) ) THEN
          WRITE(wrf_err_message,*) 'start_em: BAD BASE STATE for T00 or P00 in namelist.input file'
          CALL wrf_error_fatal(TRIM(wrf_err_message))
@@ -489,6 +563,34 @@
       !  the half eta levels and the base-profile surface pressure.  Compute 1/rho
       !  from equation of state.  The potential temperature is a perturbation from t0.
 
+      DO k = 1, kte
+#if  !( HYBRID_COORD==1 )
+         grid%c1f(k) = 1.
+         grid%c2f(k) = 0.
+         grid%c3f(k) = grid%znw(k)
+         grid%c4f(k) = 0.
+         grid%c1h(k) = 1.
+         grid%c2h(k) = 0.
+         grid%c3h(k) = grid%znu(k)
+         grid%c4h(k) = 0.
+#elif ( HYBRID_COORD==1 )
+         IF ( grid%c1f(1) .NE. 1. ) THEN
+            CALL wrf_debug ( 0 , '---- WARNING : Maybe old non-HVC input, setting default 1d array values for TF' )
+            IF ( grid%hybrid_opt .NE. 0 ) THEN
+               CALL wrf_error_fatal ( '---- Error : Cannot use old input and try to use hybrid vertical coordinate option' )
+            END IF
+            grid%c1f(k) = 1.
+            grid%c2f(k) = 0.
+            grid%c3f(k) = grid%znw(k)
+            grid%c4f(k) = 0.
+            grid%c1h(k) = 1.
+            grid%c2h(k) = 0.
+            grid%c3h(k) = grid%znu(k)
+            grid%c4h(k) = 0.
+         END IF
+#endif
+      END DO
+
       DO j = jts, MIN(jte,jde-1)
          DO i = its, MIN(ite,ide-1)
 
@@ -502,19 +604,22 @@
             p_surf = p00 * EXP ( -t00/a + ( (t00/a)**2 - 2.*g*grid%ht(i,j)/a/r_d ) **0.5 )
 
             DO k = 1, kte-1
+#if  !( HYBRID_COORD==1 )
                grid%pb(i,k,j) = grid%znu(k)*(p_surf - grid%p_top) + grid%p_top
+#elif ( HYBRID_COORD==1 )
+               grid%pb(i,k,j) = grid%c3h(k)*(p_surf - grid%p_top) + grid%c4h(k) + grid%p_top
+#endif
                temp = MAX ( tiso, t00 + A*LOG(grid%pb(i,k,j)/p00) )
                IF ( grid%pb(i,k,j) .LT. p_strat ) THEN
                   temp = tiso + A_strat * LOG ( grid%pb(i,k,j)/p_strat )
                ENDIF
                grid%t_init(i,k,j) = temp*(p00/grid%pb(i,k,j))**(r_d/cp) - t0
-!              grid%t_init(i,k,j) = (t00 + A*LOG(grid%pb(i,k,j)/p00))*(p00/grid%pb(i,k,j))**(r_d/cp) - t0
                grid%alb(i,k,j) = (r_d/p1000mb)*(grid%t_init(i,k,j)+t0)*(grid%pb(i,k,j)/p1000mb)**cvpm
             END DO
 
             !  Base state mu is defined as base state surface pressure minus grid%p_top
 
-            grid%mub(i,j) = p_surf - grid%p_top
+            grid%MUB(i,j) = p_surf - grid%p_top
 
             !  Integrate base geopotential, starting at terrain elevation.  This assures that
             !  the base state is in exact hydrostatic balance with respect to the model equations.
@@ -523,14 +628,21 @@
             grid%phb(i,1,j) = grid%ht(i,j) * g
 
             IF ( config_flags%hypsometric_opt .EQ. 1 ) THEN
-               DO k  = 2,kte
-                  grid%phb(i,k,j) = grid%phb(i,k-1,j) - grid%dnw(k-1)*grid%mub(i,j)*grid%alb(i,k-1,j)
+               DO kk  = 2,kte
+                  k = kk - 1
+                  grid%phb(i,kk,j) = grid%phb(i,kk-1,j) - grid%dnw(kk-1)*grid%mub(i,j)*grid%alb(i,kk-1,j)
                END DO
             ELSE IF ( config_flags%hypsometric_opt .EQ. 2 ) THEN
                DO k  = 2,kte
+#if  !( HYBRID_COORD==1 )
                   pfu = grid%mub(i,j)*grid%znw(k)   + grid%p_top
                   pfd = grid%mub(i,j)*grid%znw(k-1) + grid%p_top
                   phm = grid%mub(i,j)*grid%znu(k-1) + grid%p_top
+#elif ( HYBRID_COORD==1 )
+                  pfu = grid%c3f(k  )*grid%MUB(i,j) + grid%c4f(k  ) + grid%p_top
+                  pfd = grid%c3f(k-1)*grid%MUB(i,j) + grid%c4f(k-1) + grid%p_top
+                  phm = grid%c3h(k-1)*grid%MUB(i,j) + grid%c4h(k-1) + grid%p_top
+#endif
                   grid%phb(i,k,j) = grid%phb(i,k-1,j) + grid%alb(i,k-1,j)*phm*LOG(pfd/pfu)
                END DO
             END IF
@@ -569,7 +681,7 @@
        DO j = jts,min(jte,jde-1)
        DO i = its, min(ite,ide-1)
            IF ( grid%imask_nostag(i,j) .EQ. 1 ) THEN
-             grid%mu_1(i,j)=grid%mu_2(i,j)
+             grid%MU_1(i,j)=grid%MU_2(i,j)
            ENDIF
        ENDDO
        ENDDO
@@ -583,46 +695,157 @@
      DO k = kts,kte-1
      DO i = its, min(ite,ide-1)
        IF ( grid%imask_nostag(i,j) .EQ. 1 ) THEN
+#if  !( HYBRID_COORD==1 )
          grid%pb(i,k,j) = grid%znu(k)*grid%mub(i,j)+grid%p_top
+#elif ( HYBRID_COORD==1 )
+         grid%pb(i,k,j) = grid%c3h(k  )*grid%MUB(i,j) + grid%c4h(k  ) + grid%p_top
+#endif
          grid%alb(i,k,j) = (r_d/p1000mb)*(grid%t_init(i,k,j)+t0)*(grid%pb(i,k,j)/p1000mb)**cvpm
        ENDIF
      ENDDO
      ENDDO
      ENDDO
-    ELSE
-! with nests, grid%t_init generally needs recomputations (since it is not interpolated)
-     IF ( .NOT. grid%this_is_an_ideal_run ) THEN
+    ELSE ! there is more than 1 domain
+     IF ( .NOT. grid%this_is_an_ideal_run ) THEN ! this is a real run
         DO j = jts,min(jte,jde-1)
         DO k = kts,kte-1
         DO i = its, min(ite,ide-1)
           IF ( grid%imask_nostag(i,j) .EQ. 1 ) THEN
+#if  !( HYBRID_COORD==1 )
             grid%pb(i,k,j) = grid%znu(k)*grid%mub(i,j)+grid%p_top
+#elif ( HYBRID_COORD==1 )
+            grid%pb(i,k,j) = grid%c3h(k  )*grid%MUB(i,j) + grid%c4h(k  ) + grid%p_top
+#endif
             temp = MAX ( tiso, t00 + A*LOG(grid%pb(i,k,j)/p00) )
             IF ( grid%pb(i,k,j) .LT. p_strat ) THEN
                temp = tiso + A_strat * LOG ( grid%pb(i,k,j)/p_strat )
             ENDIF
             grid%t_init(i,k,j) = temp*(p00/grid%pb(i,k,j))**(r_d/cp) - t0
             grid%alb(i,k,j) = (r_d/p1000mb)*(grid%t_init(i,k,j)+t0)*(grid%pb(i,k,j)/p1000mb)**cvpm
-          ENDIF
-        ENDDO
-        ENDDO
-        ENDDO
-     ELSE
-        DO j = jts,min(jte,jde-1)
-        DO k = kts,kte-1
-        DO i = its, min(ite,ide-1)
-          IF ( grid%imask_nostag(i,j) .EQ. 1 ) THEN
-            grid%pb(i,k,j) = grid%znu(k)*grid%mub(i,j)+grid%p_top
-            grid%alb(i,k,j) = -grid%rdnw(k)*(grid%phb(i,k+1,j)-grid%phb(i,k,j))/grid%mub(i,j)
-            grid%t_init(i,k,j) = grid%alb(i,k,j)*(p1000mb/r_d)/((grid%pb(i,k,j)/p1000mb)**cvpm) - t0
-          ENDIF
-        ENDDO
-        ENDDO
-        ENDDO
-     END IF
-    ENDIF
+       ENDIF
+      ENDDO
+      ENDDO
+      ENDDO
 
-! Use equations from calc_p_rho_phi to derive p and al from ph: linear in log p
+      IF ( ( config_flags%rebalance .EQ. 1 ) .OR. &
+           ( ( config_flags%rebalance .EQ. 2 ) .AND. ( config_flags%vert_refine_method .EQ. 2 ) ) ) THEN
+        !  Integrate base geopotential, starting at terrain elevation.  This assures that
+        !  the base state is in exact hydrostatic balance with respect to the model equations.
+        !  This field is on full levels.
+       DO j = jts,min(jte,jde-1)
+       DO i = its, min(ite,ide-1)               
+        grid%phb(i,1,j) = grid%ht(i,j) * g
+        IF ( config_flags%hypsometric_opt .EQ. 1 ) THEN
+           DO kk  = 2,kte
+              k = kk - 1
+              grid%phb(i,kk,j) = grid%phb(i,kk-1,j) - grid%dnw(kk-1)*grid%mub(i,j)*grid%alb(i,kk-1,j)
+           END DO
+        ELSE IF ( config_flags%hypsometric_opt .EQ. 2 ) THEN
+           DO k  = 2,kte
+#if  !( HYBRID_COORD==1 )
+              pfu = grid%mub(i,j)*grid%znw(k)   + grid%p_top
+              pfd = grid%mub(i,j)*grid%znw(k-1) + grid%p_top
+              phm = grid%mub(i,j)*grid%znu(k-1) + grid%p_top
+#elif ( HYBRID_COORD==1 )
+              pfu = grid%c3f(k  )*grid%MUB(i,j) + grid%c4f(k  ) + grid%p_top
+              pfd = grid%c3f(k-1)*grid%MUB(i,j) + grid%c4f(k-1) + grid%p_top
+              phm = grid%c3h(k-1)*grid%MUB(i,j) + grid%c4h(k-1) + grid%p_top
+#endif
+              grid%phb(i,k,j) = grid%phb(i,k-1,j) + grid%alb(i,k-1,j)*phm*LOG(pfd/pfu)
+            END DO
+          ENDIF
+       ENDDO
+       ENDDO
+       END IF
+
+     ELSE
+        IF ( config_flags%ideal_init_method .EQ. 1 ) THEN
+           DO j = jts,min(jte,jde-1)
+           DO k = kts,kte-1
+           DO i = its, min(ite,ide-1)
+             IF ( grid%imask_nostag(i,j) .EQ. 1 ) THEN
+#if  !( HYBRID_COORD==1 )
+               grid%pb(i,k,j) = grid%znu(k)*grid%mub(i,j)+grid%p_top
+#elif ( HYBRID_COORD==1 )
+               grid%pb(i,k,j) = grid%c3h(k  )*grid%MUB(i,j) + grid%c4h(k  ) + grid%p_top
+#endif
+               grid%alb(i,k,j) = -grid%rdnw(k)*(grid%phb(i,k+1,j)-grid%phb(i,k,j))/grid%mub(i,j)
+               grid%t_init(i,k,j) = grid%alb(i,k,j)*(p1000mb/r_d)/((grid%pb(i,k,j)/p1000mb)**cvpm) - t0
+             ENDIF
+           ENDDO
+           ENDDO
+           ENDDO
+        ELSE IF ( config_flags%ideal_init_method .EQ. 2 ) THEN
+           DO j = jts,min(jte,jde-1)
+           DO k = kts,kte-1
+           DO i = its, min(ite,ide-1)
+             IF ( grid%imask_nostag(i,j) .EQ. 1 ) THEN
+#if  !( HYBRID_COORD==1 )
+               grid%pb(i,k,j) = grid%znu(k)*grid%mub(i,j)+grid%p_top
+#elif ( HYBRID_COORD==1 )
+               grid%pb(i,k,j) = grid%c3h(k  )*grid%MUB(i,j) + grid%c4h(k  ) + grid%p_top
+#endif
+               grid%alb(i,k,j) = (r_d/p1000mb)*(grid%t_init(i,k,j)+t0)*(grid%pb(i,k,j)/p1000mb)**cvpm
+             ENDIF
+           ENDDO
+           ENDDO
+           ENDDO
+           !  Integrate base geopotential, starting at terrain elevation.  This assures that
+           !  the base state is in exact hydrostatic balance with respect to the model equations.
+           !  This field is on full levels.
+           DO j = jts,min(jte,jde-1)
+           DO i = its, min(ite,ide-1)
+            grid%phb(i,1,j) = grid%ht(i,j) * g 
+            DO kk  = 2,kte
+              k = kk - 1 
+              grid%phb(i,kk,j) = grid%phb(i,kk-1,j) - grid%dnw(kk-1)*grid%mub(i,j)*grid%alb(i,kk-1,j)
+            END DO
+           ENDDO
+           ENDDO
+        END IF  ! end if initialization for ideal, use method 1 or 2
+     END IF ! end if this is a real or ideal run
+    END IF ! end if there is more than 1 domain
+     
+!------base state is finished, perturbation values are recalculated below-----
+
+  ! For the HRRR application, we want to go through this rebalancing.  They 
+  ! have a clunky way of testig on this, but it is operational, so no need to
+  ! cause them troubles.
+
+  IF ( ( grid%dfi_opt .EQ. DFI_NODFI ) .and. ( config_flags%cycling ) ) THEN
+       call rebalance_driver_cycl (grid )
+
+       DO j = jts,min(jte,jde-1)
+       DO k = kts,kte
+       DO i = its, min(ite,ide-1)
+          grid%ph_1(i,k,j)=grid%ph_2(i,k,j)
+       ENDDO
+       ENDDO
+       ENDDO
+
+  !  Everyone else runs thorugh here.  NOTE that we might also want to call the
+  !  rebalancing ourselves for different set ups.  It does not impact HRRR, so 
+  !  it is an easy decision.
+
+  ELSE
+
+     ! We request rebalancing for vertical grid nesting, or when the user asks for rebalancing.
+     ! Rebalance recomputes 1/rho, p, ph_2, ph0, p_hyd
+
+     IF ( ( config_flags%rebalance .EQ. 1 ) .OR. &
+        ( ( config_flags%rebalance .EQ. 2 ) .AND. ( config_flags%vert_refine_method .EQ. 2 ) ) ) THEN
+       call rebalance_driver_cycl (grid )
+
+       DO j = jts,min(jte,jde-1)
+       DO k = kts,kte
+       DO i = its, min(ite,ide-1)
+          grid%ph_1(i,k,j)=grid%ph_2(i,k,j)
+       ENDDO
+       ENDDO
+       ENDDO
+     END IF
+
+     ! Use equations from calc_p_rho_phi to derive p and al from ph: linear in log p
 
     IF ( config_flags%hypsometric_opt .EQ. 1 ) THEN
        DO j=jts,min(jte,jde-1)
@@ -637,15 +860,21 @@
        DO j=jts,min(jte,jde-1)
        DO k=kts,kte-1
        DO i=its,min(ite,ide-1)
+#if  !( HYBRID_COORD==1 )
           pfu = (grid%mub(i,j)+grid%mu_1(i,j))*grid%znw(k+1)+grid%p_top
           pfd = (grid%mub(i,j)+grid%mu_1(i,j))*grid%znw(k)  +grid%p_top
           phm = (grid%mub(i,j)+grid%mu_1(i,j))*grid%znu(k)  +grid%p_top
+#elif ( HYBRID_COORD==1 )
+          pfu = grid%c3f(k+1)*(grid%MUB(i,j)+grid%MU_1(i,j)) + grid%c4f(k+1) + grid%p_top
+          pfd = grid%c3f(k  )*(grid%MUB(i,j)+grid%MU_1(i,j)) + grid%c4f(k  ) + grid%p_top
+          phm = grid%c3h(k  )*(grid%MUB(i,j)+grid%MU_1(i,j)) + grid%c4h(k  ) + grid%p_top
+#endif
           grid%al(i,k,j) = (grid%ph_1(i,k+1,j)-grid%ph_1(i,k,j)+grid%phb(i,k+1,j)-grid%phb(i,k,j)) &
                             /phm/LOG(pfd/pfu)-grid%alb(i,k,j)
        ENDDO
        ENDDO
        ENDDO
-    END IF
+    END IF ! which hypsometric option
     DO j=jts,min(jte,jde-1)
     DO k=kts,kte-1
     DO i=its,min(ite,ide-1)
@@ -658,12 +887,17 @@
     ENDDO
     ENDDO
     ENDDO
+  ENDIF ! Various rebalancing options
 
     IF ( .NOT. grid%this_is_an_ideal_run ) THEN
        DO j=jts,min(jte,jde-1)
           DO i=its,min(ite,ide-1)
              p_surf = p00 * EXP ( -t00/a + ( (t00/a)**2 - 2.*g*grid%ht(i,j)/a/r_d ) **0.5 )
+#if  !( HYBRID_COORD==1 )
              grid%p_hyd_w(i,1,j) = grid%p(i,1,j) + grid%znw(1)*(p_surf - grid%p_top) + grid%p_top
+#elif ( HYBRID_COORD==1 )
+             grid%p_hyd_w(i,1,j) = grid%p(i,1,j) + grid%c3f(1)*(p_surf - grid%p_top) + grid%c4f(1) + grid%p_top
+#endif
              DO k=kts+1,kte
                 grid%p_hyd_w(i,k,j) = ( 2.*(grid%p(i,k-1,j)+grid%pb(i,k-1,j)) - grid%p_hyd_w(i,k-1,j) )
              ENDDO
@@ -672,8 +906,12 @@
     ELSE
        DO j=jts,min(jte,jde-1)
           DO i=its,min(ite,ide-1)
-             p_surf = grid%mub(i,j)+grid%p_top
+             p_surf = grid%MUB(i,j)+grid%p_top
+#if  !( HYBRID_COORD==1 )
              grid%p_hyd_w(i,1,j) = grid%p(i,1,j) + grid%znw(1)*(p_surf - grid%p_top) + grid%p_top
+#elif ( HYBRID_COORD==1 )
+             grid%p_hyd_w(i,1,j) = grid%p(i,1,j) + grid%c3f(1)*(p_surf - grid%p_top) + grid%c4f(1) + grid%p_top
+#endif
              DO k=kts+1,kte
                 grid%p_hyd_w(i,k,j) = ( 2.*(grid%p(i,k-1,j)+grid%pb(i,k-1,j)) - grid%p_hyd_w(i,k-1,j) )
              ENDDO
@@ -681,7 +919,7 @@
        ENDDO
     END IF
 
-   ENDIF
+   ENDIF ! first trip for this domain
 
    DO j=jts,min(jte,jde-1)
       DO k = kts,kte
@@ -695,13 +933,13 @@
        ( ( config_flags%input_from_hires ) .OR. ( config_flags%input_from_file ) ) ) THEN
       DO j = jts, MIN(jte,jde-1)
          DO i = its, MIN(ite,ide-1)
-            grid%mu_2(i,j) = grid%mu_2(i,j) + grid%al(i,1,j) / ( grid%alt(i,1,j) * grid%alb(i,1,j) ) * &
+            grid%MU_2(i,j) = grid%MU_2(i,j) + grid%al(i,1,j) / ( grid%alt(i,1,j) * grid%alb(i,1,j) ) * &
                                     g * ( grid%ht(i,j) - grid%ht_fine(i,j) )
          END DO
        END DO
        DO j = jts,min(jte,jde-1)
        DO i = its, min(ite,ide-1)
-          grid%mu_1(i,j)=grid%mu_2(i,j)
+          grid%MU_1(i,j)=grid%MU_2(i,j)
        ENDDO
        ENDDO
 
@@ -719,10 +957,12 @@
 ! MPDT is the call frequency for microphysics in minutes (0 means every step)
    MPDT = 0.
 
-!tgs
-   IF(config_flags%cycling) start_of_simulation = .true.
+   IF(config_flags%cycling) THEN
+       start_of_simulation = .true.
 !  print *,'cycling, start_of_simulation -->',config_flags%cycling, start_of_simulation
-
+       grid%xtime=0.
+!   print *,'xtime=',grid%xtime
+   ENDIF
 !-----------------------------------------------------------------------------
 ! Adaptive time step: Added by T. Hutchinson, WSI  11/6/07
 !
@@ -732,17 +972,38 @@
         ( ( grid%dfi_opt .EQ. DFI_NODFI ) .OR. ( grid%dfi_stage .EQ. DFI_FST ) ) ) THEN
 
 !  Calculate any variables that were not set
+!BPR BEGIN
+!     This subroutine is called more than once at the first time step for a
+!     given domain.  The following if statement is to prevent the code in
+!     the if statement from executing more than once per domain at the
+!     beginning of the model run (since last_step_update=-1 the first time
+!     this is reached and should be =0 after this).
+!     Without this if statement, when this code was executed for the second
+!     time it can result in grid%dt being set incorrectly.
+!     -This is because grid%dt will be set equal to grid%starting_time_step
+!      which ignores a possible denominator in the starting time step.
+!     -The first time this code is reached is also does this, but then the
+!      call to adapt_timestep correct this
+!     -Subsequent times this code is reached adapt_timestep will not correct
+!      this because it will recognize that it has already been executed for
+!      this timestep and exit out before doing the calculation.
+
+      if (grid%last_step_updated .NE. grid%itimestep) then
 
       if (grid%starting_time_step == -1) then
-         grid%starting_time_step = NINT(6 * MIN(grid%dx,grid%dy) / 1000)
+         grid%starting_time_step = NINT(4 * MIN(grid%dx,grid%dy) / 1000)
       endif
 
+      grid%time_step = grid%starting_time_step
+      config_flags%time_step = grid%starting_time_step
+      model_config_rec%time_step = grid%starting_time_step
+
       if (grid%max_time_step == -1) then
-         grid%max_time_step = 3*grid%starting_time_step
+         grid%max_time_step = NINT(8 * MIN(grid%dx,grid%dy) / 1000)
       endif
 
       if (grid%min_time_step == -1) then
-         grid%min_time_step = 0.5*grid%starting_time_step
+         grid%min_time_step = NINT(3 * MIN(grid%dx,grid%dy) / 1000)
       endif
 
 !     Set a starting timestep.
@@ -765,6 +1026,8 @@
       CALL wrf_dm_maxval(grid%max_msftx, idex, jdex)
       CALL wrf_dm_maxval(grid%max_msfty, idex, jdex)
 #endif
+      end if
+!BPR END
 
 !     This first call just initializes variables.
 !     If a restart, get initialized variables from restart file
@@ -774,7 +1037,7 @@
       END IF
 
 
-   END IF
+   END IF  ! adaptive computations
 
 ! End of adaptive time step modifications
 !-----------------------------------------------------------------------------
@@ -800,12 +1063,11 @@ if(config_flags%sf_surface_physics.eq.NOAHMPSCHEME.and.config_flags%opt_run.eq.5
 endif
 #endif
 
-   DO ij = 1, grid%num_tiles
-
-!tgs do not need physics initialization for backward DFI integration
     IF ( ( grid%dfi_opt .EQ. DFI_NODFI ) .or. &
           ( ( grid%dfi_stage .NE. DFI_BCK ) .and. &
-          ( grid%dfi_stage .NE. DFI_STARTBCK ) ) ) THEN    !tgs, mods by tah
+          ( grid%dfi_stage .NE. DFI_STARTBCK ) ) ) THEN
+
+   DO ij = 1, grid%num_tiles
 
      CALL phy_init (  grid%id , config_flags, grid%DT, grid%RESTART, grid%znw, grid%znu,   &
                       grid%p_top, grid%tsk, grid%RADT,grid%BLDT,grid%CUDT, MPDT, &
@@ -818,6 +1080,11 @@ endif
                       grid%rublten,grid%rvblten,grid%rthblten,               &
                       grid%rqvblten,grid%rqcblten,grid%rqiblten,             &
                       grid%rthraten,grid%rthratenlw,grid%rthratensw,         &
+                      !BSINGH - For WRFCuP scheme(11/12/2013)
+                      grid%cupflag,grid%cldfra_cup,grid%cldfratend_cup,      & !wig, 18-Sep-2006
+                      grid%shall,                                            & !wig, 18-Sep-2006
+                      grid%tcloud_cup,                                       & !rce, 18-apr-2012
+                      !BSINGH - ENDS
                       grid%stepbl,grid%stepra,grid%stepcu,                   &
                       grid%w0avg, grid%rainnc, grid%rainc, grid%raincv, grid%rainncv,  &
                       grid%snownc, grid%snowncv, grid%graupelnc, grid%graupelncv,  &
@@ -871,6 +1138,8 @@ endif
                       grid%m_ps_1,grid%m_ps_2,grid%m_hybi,aerosolc_1,aerosolc_2,&  ! Optional
                       grid%rundgdten,grid%rvndgdten,grid%rthndgdten,         &     ! Optional
                       grid%rphndgdten,grid%rqvndgdten,grid%rmundgdten,       &     ! Optional
+                      grid%SDA_HFX, grid%SDA_QFX, grid%QNORM, grid%HFX_BOTH,grid%QFX_BOTH,      &   ! fasdas
+                      grid%HFX_FDDA,                                                            &   ! fasdas
                       grid%FGDT,grid%stepfg,                        &     ! Optional
                       grid%cugd_tten,grid%cugd_ttens,grid%cugd_qvten,        &   ! Optional
                       grid%cugd_qvtens,grid%cugd_qcten,                 &   ! Optional
@@ -880,11 +1149,14 @@ endif
                       grid%CHXY, grid%FWETXY, grid%SNEQVOXY, grid%ALBOLDXY, grid%QSNOWXY,       &   ! Optional Noah-MP
                       grid%WSLAKEXY, grid%ZWTXY, grid%WAXY, grid%WTXY, grid%LFMASSXY, grid%RTMASSXY, & ! Optional Noah-MP
                       grid%STMASSXY, grid%WOODXY, grid%STBLCPXY, grid%FASTCPXY,                 &   ! Optional Noah-MP
-                      grid%XSAIXY,                                                              &   ! Optional Noah-MP
+                      grid%GRAINXY, grid%GDDXY,                                                 &   ! Optional Noah-MP
+                      grid%CROPTYPE, grid%CROPCAT,                                                 &   ! Optional Noah-MP
+                      grid%XSAIXY,grid%LAI,                                                     &   ! Optional Noah-MP
                       grid%T2MVXY, grid%T2MBXY, grid%CHSTARXY,                                  &   ! Optional Noah-MP
                       grid%SMOISEQ  ,grid%SMCWTDXY ,grid%RECHXY, grid%DEEPRECHXY, grid%AREAXY,  & ! Optional Noah-MP
                       config_flags%wtddt ,grid%stepwtd ,grid%QRFSXY ,grid%QSPRINGSXY ,grid%QSLATXY, & ! Optional Noah-MP
                       grid%FDEPTHXY, grid%RIVERBEDXY, grid%EQZWT, grid%RIVERCONDXY, grid%PEXPXY, & ! Optional Noah-MP
+                      grid%rechclim  ,                                                           & ! Optional Noah-MP
                       grid%msftx, grid%msfty,                              &
                       grid%DZR, grid%DZB, grid%DZG,                          & !Optional urban
                       grid%TR_URB2D,grid%TB_URB2D,grid%TG_URB2D,grid%TC_URB2D,    & !Optional urban
@@ -893,6 +1165,9 @@ endif
                       grid%TRL_URB3D, grid%TBL_URB3D, grid%TGL_URB3D,        & !Optional urban
                       grid%SH_URB2D, grid%LH_URB2D, grid%G_URB2D, grid%RN_URB2D,  & !Optional urban
                       grid%TS_URB2D, grid%FRC_URB2D, grid%UTYPE_URB2D,      & !Optional urban
+                      grid%CMCR_URB2D,grid%TGR_URB2D,grid%TGRL_URB3D,grid%SMR_URB3D, & !Optional urban   
+                      grid%DRELR_URB2D,grid%DRELB_URB2D,grid%DRELG_URB2D,    & !Optional urban
+                      grid%FLXHUMR_URB2D,grid%FLXHUMB_URB2D,grid%FLXHUMG_URB2D,   & !Optional urban
                       grid%TRB_URB4D,grid%TW1_URB4D,grid%TW2_URB4D,grid%TGB_URB4D,grid%TLEV_URB3D,  & !multi-layer urban
                       grid%QLEV_URB3D,grid%TW1LEV_URB3D,grid%TW2LEV_URB3D,        & !multi-layer urban
                       grid%TGLEV_URB3D,grid%TFLEV_URB3D,grid%SF_AC_URB3D,         & !multi-layer urban 
@@ -979,7 +1254,9 @@ endif
                       config_flags%nssl_cnoh, config_flags%nssl_cnohl,        &
                       config_flags%nssl_cnor, config_flags%nssl_cnos,         &
                       config_flags%nssl_rho_qh, config_flags%nssl_rho_qhl,    &
-                      config_flags%nssl_rho_qs                                &
+                      config_flags%nssl_rho_qs,                               &
+                      config_flags%nssl_ipelec,                               &
+                      config_flags%nssl_isaund                               & 
                       ,grid%RQCNCUTEN, grid%RQINCUTEN,grid%rliq             &      !mchen add for cammpmg
                       ,grid%cldfra_dp,grid%cldfra_sh                        & ! ckay for subgrid cloud
                       ,grid%te_temf,grid%cf3d_temf,grid%wm_temf        & ! WA
@@ -1003,9 +1280,8 @@ endif
                       ,grid%TS_URB2D_mosaic                                                          & ! danli mosaic 
                       ,grid%TS_RUL2D_mosaic                                                          & ! danli mosaic
                       )
-       ENDIF   !tgs
-
-   ENDDO
+       ENDDO ! loop of tiles for phy_init
+    ENDIF   ! no phy_init for the backwards part of the DFI
 
    CALL wrf_debug ( 100 , 'start_domain_em: After call to phy_init' )
 
@@ -1061,7 +1337,7 @@ endif
 
     call wrf_debug(100,'start_em: after calling lightning_init')
 
-   END IF
+   END IF ! restart
 
 #if 0
 #include "CYCLE_TEST.inc"
@@ -1443,6 +1719,31 @@ endif
 
    ENDIF
 
+! Some initializations for the simple ccn field.
+
+   IF ( f_qnn ) THEN
+      IF ( config_flags%mp_physics == wdm5scheme .or. config_flags%mp_physics == wdm6scheme ) THEN
+         ! NO OP
+      ELSE IF ( config_flags%mp_physics == nssl_2momccn ) THEN
+         grid%ccn_conc =  config_flags%nssl_cccn/1.225
+      ELSE
+         ! NO OP
+      END IF
+      ccn_max_val = MAXVAL(scalar(its:MIN(ite,ide-1),kts:kte-1,jts:MIN(jte,jde-1),p_qnn))
+#if ( defined( DM_PARALLEL ) && ( ! defined( STUBMPI ) ) )
+      ccn_max_val = wrf_dm_max_real ( ccn_max_val )
+#endif
+      IF ( ccn_max_val < 1.0 ) THEN ! initialization of ccn not already done
+         DO j=jts,MIN(jte,jde-1)
+            DO k=kts,kte
+               DO i=its,MIN(ite,ide-1)
+                  scalar(i,k,j,p_qnn) = grid%ccn_conc
+               END DO
+            END DO
+         END DO
+      END IF
+   END IF
+
    IF (num_scalar > 0) THEN
 
 ! use of (:,:,:,loop) not efficient on DEC, but (ims,kms,jms,loop) not portable to SGI/Cray
@@ -1505,6 +1806,7 @@ endif
                          grid%dgnum4d, grid%dgnumwet4d, grid%dgnum_a1, grid%dgnum_a2,           & 
                          grid%dgnum_a3, grid%dgnumwet_a1, grid%dgnumwet_a2, grid%dgnumwet_a3,   &
                          grid%pm2_5_dry,grid%pm2_5_water,grid%pm2_5_dry_ec,                &
+                         grid%tsoa,grid%asoa,grid%bsoa,                                    &
                          grid%last_chem_time_year,grid%last_chem_time_month,               &
                          grid%last_chem_time_day,grid%last_chem_time_hour,                 &
                          grid%last_chem_time_minute,grid%last_chem_time_second,            &
@@ -1518,7 +1820,7 @@ endif
 !
 !       print *,'calculating initial pm'
         select case (config_flags%chem_opt)
-        case (GOCART_SIMPLE,GOCARTRACM_KPP,GOCARTRADM2,GOCARTRADM2_KPP)
+        case (GOCART_SIMPLE,GOCARTRACM_KPP,GOCARTRADM2)
            call sum_pm_gocart (                                             &
                 grid%alt, chem, grid%pm2_5_dry, grid%pm2_5_dry_ec,grid%pm10,&
                 ids,ide, jds,jde, kds,kde,                                  &
@@ -1532,7 +1834,7 @@ endif
                 grid%dust_opt,ids,ide, jds,jde, kds,kde,                    &
                 ims,ime, jms,jme, kms,kme,                                  &
                 its,ite, jts,jte, kts,kte-1                                 )
-         case (RACM_SOA_VBS_KPP)
+         case (RACM_SOA_VBS_KPP,RACM_SOA_VBS_AQCHEM_KPP)
              call sum_pm_soa_vbs (                                           &
                  grid%alt, chem, grid%h2oaj, grid%h2oai,                                   &
                  grid%pm2_5_dry, grid%pm2_5_water, grid%pm2_5_dry_ec, grid%pm10,                &
@@ -1558,6 +1860,7 @@ endif
                     grid%pm2_5_water(i,k,j)  = 0.
                     grid%pm2_5_dry_ec(i,k,j) = 0.
                     grid%pm10(i,k,j)         = 0.
+                    grid%tsoa(i,k,j)         = 0.
                  enddo
               enddo
            enddo
@@ -1705,6 +2008,54 @@ DEALLOCATE(z_at_q)
                  ,ITS=its,ITE=ite, JTS=jts,JTE=jte, KTS=kts,KTE=kte    )
    ENDIF
 
+   IF (config_flags%z_lev_diags == Z_DIAGS ) THEN
+     CALL wrf_debug ( 200 , ' ZLD: height level and AGL diags' )
+     CALL zld (                                  &
+                 !  Input data for computing
+                  U=grid%u_2                    &
+                 ,V=grid%v_2                    &
+                 ,W=grid%w_2                    &
+                 ,t=grid%t_2                    &
+                 ,qv=moist(:,:,:,P_QV)          &
+                 ,zp=grid%ph_2                  &
+                 ,zb=grid%phb                   &
+                 ,pp=grid%p                     &
+                 ,pb=grid%pb                    &
+                 ,p=grid%p_hyd                  &
+                 ,pw=grid%p_hyd_w               &
+                 !  Map factors, coriolis for diags
+                 ,msfux=grid%msfux              &
+                 ,msfuy=grid%msfuy              &
+                 ,msfvx=grid%msfvx              &
+                 ,msfvy=grid%msfvy              &
+                 ,msftx=grid%msftx              &
+                 ,msfty=grid%msfty              &
+                 ,f=grid%f                      &
+                 ,e=grid%e                      &
+                 ,ht=grid%ht                    &
+                 !  Namelist info
+                 ,use_tot_or_hyd_p=config_flags%use_tot_or_hyd_p &
+                 ,extrap_below_grnd=config_flags%extrap_below_grnd &
+                 ,missing=config_flags%z_lev_missing &
+                 !  The diagnostics, mostly output variables
+                 ,num_z_levels=config_flags%num_z_levels &
+                 ,max_z_levels=max_zlevs    &
+                 ,z_levels=model_config_rec%z_levels &
+                 ,z_zl  = grid%z_zl             &  
+                 ,u_zl  = grid%u_zl             &  
+                 ,v_zl  = grid%v_zl             &  
+                 ,t_zl  = grid%t_zl             &  
+                 ,rh_zl = grid%rh_zl            & 
+                 ,ght_zl= grid%ght_zl           &
+                 ,s_zl  = grid%s_zl             &  
+                 ,td_zl = grid%td_zl            &
+                 ,q_zl = grid%q_zl              &
+                 !  Dimension arguments
+                 ,IDS=ids,IDE=ide, JDS=jds,JDE=jde, KDS=kds,KDE=kde    &
+                 ,IMS=ims,IME=ime, JMS=jms,JME=jme, KMS=kms,KME=kme    &
+                 ,ITS=its,ITE=ite, JTS=jts,JTE=jte, KTS=kts,KTE=kte    )
+   ENDIF
+ 
 
 !  FIRE
 if(config_flags%ifire.eq.2)then
@@ -1717,6 +2068,12 @@ if(config_flags%ifire.eq.2)then
    CALL wrf_debug ( 100 , 'start_domain_em: After call to fire_driver_em_init' )
 endif
 
+if( grid%traj_opt /= no_trajectory ) then
+     call trajectory_init( grid, config_flags, &
+                           ims,ime, jms,jme, kms,kme )
+     CALL wrf_debug ( 100 , 'start_domain_em: After call to trajectory_init' )
+endif
+
 
      CALL wrf_debug ( 100 , 'start_domain_em: Returning' )
 
@@ -1724,3 +2081,317 @@ endif
 
    END SUBROUTINE start_domain_em
 
+!-------------------------------------------------------------------
+
+   SUBROUTINE rebalance_driver_cycl ( grid )
+
+      USE module_domain, ONLY : domain
+      IMPLICIT NONE
+
+      TYPE (domain)          :: grid
+
+      CALL rebalance_cycl( grid &
+!
+#include "actual_new_args.inc"
+!
+      )
+
+   END SUBROUTINE rebalance_driver_cycl
+
+!---------------------------------------------------------------------
+
+   SUBROUTINE rebalance_cycl ( grid  &
+!
+#include "dummy_new_args.inc"
+!
+                        )
+      USE module_domain, ONLY : domain
+      USE module_configure, ONLY : grid_config_rec_type, model_config_rec
+      USE module_model_constants
+      USE module_state_description
+      USE module_driver_constants, ONLY: DATA_ORDER_XYZ, DATA_ORDER_YXZ, DATA_ORDER_ZXY, &
+                                         DATA_ORDER_ZYX, DATA_ORDER_XZY, DATA_ORDER_YZX, &
+                                         DATA_ORDER_XY, DATA_ORDER_YX, model_data_order
+
+#ifdef DM_PARALLEL
+      USE module_comm_dm, ONLY : &
+                           HALO_EM_INIT_1_sub   &
+                          ,HALO_EM_INIT_2_sub   &
+                          ,HALO_EM_INIT_3_sub   &
+                          ,HALO_EM_INIT_4_sub   &
+                          ,HALO_EM_INIT_5_sub   &
+                          ,HALO_EM_VINTERP_UV_1_sub
+#endif
+#if ( defined( DM_PARALLEL ) && ( ! defined( STUBMPI ) ) )
+   USE module_dm, ONLY : ntasks_x, ntasks_y, ntasks, mytask, local_communicator
+#endif
+
+      IMPLICIT NONE
+
+      TYPE (domain)          :: grid
+
+#include "dummy_new_decl.inc"
+
+      TYPE (grid_config_rec_type)              :: config_flags
+
+      REAL :: p_surf ,  pd_surf, p_surf_int , pb_int , ht_hold
+      REAL :: qvf , qvf1 , qvf2, qtot
+      REAL :: pfu, pfd, phm
+      REAL :: z0, z1, z2, w1, w2
+
+      !  Local domain indices and counters.
+
+      INTEGER :: n_moist
+
+      INTEGER                             ::                       &
+                                     ids, ide, jds, jde, kds, kde, &
+                                     ims, ime, jms, jme, kms, kme, &
+                                     its, ite, jts, jte, kts, kte, &
+                                     ips, ipe, jps, jpe, kps, kpe, &
+                                     i, j, k, kk, ispe, ktf
+
+      SELECT CASE ( model_data_order )
+         CASE ( DATA_ORDER_ZXY )
+            kds = grid%sd31 ; kde = grid%ed31 ;
+            ids = grid%sd32 ; ide = grid%ed32 ;
+            jds = grid%sd33 ; jde = grid%ed33 ;
+
+            kms = grid%sm31 ; kme = grid%em31 ;
+            ims = grid%sm32 ; ime = grid%em32 ;
+            jms = grid%sm33 ; jme = grid%em33 ;
+
+            kts = grid%sp31 ; kte = grid%ep31 ;   ! note that tile is entire patch
+            its = grid%sp32 ; ite = grid%ep32 ;   ! note that tile is entire patch
+            jts = grid%sp33 ; jte = grid%ep33 ;   ! note that tile is entire patch
+
+         CASE ( DATA_ORDER_XYZ )
+            ids = grid%sd31 ; ide = grid%ed31 ;
+            jds = grid%sd32 ; jde = grid%ed32 ;
+            kds = grid%sd33 ; kde = grid%ed33 ;
+
+            ims = grid%sm31 ; ime = grid%em31 ;
+            jms = grid%sm32 ; jme = grid%em32 ;
+            kms = grid%sm33 ; kme = grid%em33 ;
+
+            its = grid%sp31 ; ite = grid%ep31 ;   ! note that tile is entire patch
+            jts = grid%sp32 ; jte = grid%ep32 ;   ! note that tile is entire patch
+            kts = grid%sp33 ; kte = grid%ep33 ;   ! note that tile is entire patch
+
+         CASE ( DATA_ORDER_XZY )
+            ids = grid%sd31 ; ide = grid%ed31 ;
+            kds = grid%sd32 ; kde = grid%ed32 ;
+            jds = grid%sd33 ; jde = grid%ed33 ;
+
+            ims = grid%sm31 ; ime = grid%em31 ;
+            kms = grid%sm32 ; kme = grid%em32 ;
+            jms = grid%sm33 ; jme = grid%em33 ;
+
+            its = grid%sp31 ; ite = grid%ep31 ;   ! note that tile is entire patch
+            kts = grid%sp32 ; kte = grid%ep32 ;   ! note that tile is entire patch
+            jts = grid%sp33 ; jte = grid%ep33 ;   ! note that tile is entire patch
+
+      END SELECT
+
+            ktf=MIN(kte,kde-1)
+
+      DO j=jts,jte
+         DO i=its,ite
+            grid%ph_2(i,1,j) = 0.
+         END DO
+      END DO
+
+      !  Base state potential temperature and inverse density (alpha = 1/rho) from
+      !  the half eta levels and the base-profile surface pressure.  Compute 1/rho
+      !  from equation of state.  The potential temperature is a perturbation from t0.
+
+         n_moist = num_moist
+
+      print *,'n_moist,PARAM_FIRST_SCALAR',n_moist,PARAM_FIRST_SCALAR
+
+       DO j = jts, MIN(jte,jde-1)
+         DO i = its, MIN(ite,ide-1)
+
+        IF (n_moist >= PARAM_FIRST_SCALAR ) THEN
+       
+               !  Integrate the hydrostatic equation (from the RHS of the bigstep vertical momentum
+               !  equation) down from the top to get the pressure perturbation.  First get the pressure
+               !  perturbation, moisture, and inverse density (total and perturbation) at the top-most level.
+
+               kk = kte - 1
+               k=kk+1
+
+               qtot = 0.
+               DO ispe=PARAM_FIRST_SCALAR,n_moist
+                 qtot = qtot + 0.5*(moist(i,kk,j,ispe)+moist(i,kk,j,ispe))
+               ENDDO
+               qvf2 = 1./(1.+qtot)
+               qvf1 = qtot*qvf2
+
+               grid%p(i,kk,j) = - 0.5*(grid%Mu_2(i,j)+qvf1*grid%Mub(i,j))/grid%rdnw(kk)/qvf2
+               qvf = 1.+rvovrd*moist(i,kk,j,P_QV)
+               grid%alt(i,kk,j) = (r_d/p1000mb)*(grid%t_2(i,kk,j)+t0)*qvf*         &
+                      (((grid%p(i,kk,j)+grid%pb(i,kk,j))/p1000mb)**cvpm)
+               grid%al(i,kk,j) = grid%alt(i,kk,j) - grid%alb(i,kk,j)
+               grid%p_hyd(i,kk,j) = grid%p(i,kk,j) + grid%pb(i,kk,j)
+
+
+               !  Now, integrate down the column to compute the pressure perturbation, and diagnose the two
+               !  inverse density fields (total and perturbation).
+
+        DO kk=kte-2,kts,-1
+             k = kk + 1
+
+             qtot = 0.
+             DO ispe=PARAM_FIRST_SCALAR,n_moist
+               qtot = qtot + 0.5*(  moist(i,kk  ,j,ispe) + moist(i,kk+1,j,ispe) )
+             ENDDO
+               qvf2 = 1./(1.+qtot)
+               qvf1 = qtot*qvf2
+               grid%p(i,kk,j) = grid%p(i,kk+1,j) - (grid%Mu_2(i,j) +       &
+                               qvf1*grid%Mub(i,j))/qvf2/grid%rdn(kk+1)
+               qvf = 1. + rvovrd*moist(i,kk,j,P_QV)
+               grid%alt(i,kk,j) = (r_d/p1000mb)*(grid%t_2(i,kk,j)+t0)*qvf* &
+                           (((grid%p(i,kk,j)+grid%pb(i,kk,j))/p1000mb)**cvpm)
+               grid%al(i,kk,j) = grid%alt(i,kk,j) - grid%alb(i,kk,j)
+               grid%p_hyd(i,kk,j) = grid%p(i,kk,j) + grid%pb(i,kk,j)
+        ENDDO
+
+               !  This is the hydrostatic equation used in the model after the
+               !  small timesteps.  In
+               !  the model, grid%al (inverse density) is computed from the
+               !  geopotential.
+
+            IF (grid%hypsometric_opt == 1) THEN
+                  DO kk  = 2,kte
+                     k = kk - 1
+                     grid%ph_2(i,kk,j) = grid%ph_2(i,kk-1,j) - &
+                                   grid%dnw(kk-1) * ( (grid%mub(i,j)+grid%mu_2(i,j))*grid%al(i,kk-1,j) &
+                                 + grid%mu_2(i,j)*grid%alb(i,kk-1,j) )
+                     grid%ph0(i,kk,j) = grid%ph_2(i,kk,j) + grid%phb(i,kk,j)
+                  END DO
+            ELSE IF (grid%hypsometric_opt == 2) THEN
+                ! Alternative hydrostatic eq.: dZ = -al*p*dLOG(p), where p is
+                ! dry pressure.
+                ! Note that al*p approximates Rd*T and dLOG(p) does z.
+                ! Here T varies mostly linear with z, the first-order
+                ! integration produces better result.
+
+                  grid%ph_2(i,1,j) = grid%phb(i,1,j)
+                  DO k = 2,kte
+#if  !( HYBRID_COORD==1 )
+                     pfu = ( grid%mub(i,j)+grid%mu_2(i,j))*grid%znw(k)   + grid%p_top
+                     pfd = ( grid%mub(i,j)+grid%mu_2(i,j))*grid%znw(k-1) + grid%p_top
+                     phm = ( grid%mub(i,j)+grid%mu_2(i,j))*grid%znu(k-1) + grid%p_top
+#elif ( HYBRID_COORD==1 )
+                     pfu = grid%c3f(k  )*(grid%MUB(i,j)+grid%MU_2(i,j)) + grid%c4f(k  ) + grid%p_top
+                     pfd = grid%c3f(k-1)*(grid%MUB(i,j)+grid%MU_2(i,j)) + grid%c4f(k-1) + grid%p_top
+                     phm = grid%c3h(k-1)*(grid%MUB(i,j)+grid%MU_2(i,j)) + grid%c4h(k-1) + grid%p_top
+#endif
+                     grid%ph_2(i,k,j) = grid%ph_2(i,k-1,j) + grid%alt(i,k-1,j)*phm*LOG(pfd/pfu)
+                  END DO
+
+                  DO k = 1,kte
+                     grid%ph_2(i,k,j) = grid%ph_2(i,k,j) - grid%phb(i,k,j)
+                  END DO
+
+               DO k = 1,kte
+                  grid%ph0(i,k,j) = grid%ph_2(i,k,j) + grid%phb(i,k,j)
+               END DO
+            END IF ! hypsometric option
+
+       ELSE  ! n_moist
+
+         kk = kte - 1
+               k = kk + 1 
+
+               qvf1 = 0.5*(moist(i,kk,j,P_QV)+moist(i,kk,j,P_QV))
+               qvf2 = 1./(1.+qvf1)
+               qvf1 = qvf1*qvf2
+
+               grid%p(i,kk,j) = - 0.5*(grid%Mu_2(i,j)+qvf1*grid%Mub(i,j))/grid%rdnw(kk)/qvf2
+               qvf = 1. + rvovrd*moist(i,kk,j,P_QV)
+               grid%alt(i,kk,j) = (r_d/p1000mb)*(grid%t_2(i,kk,j)+t0)*qvf    &
+                           *(((grid%p(i,kk,j)+grid%pb(i,kk,j))/p1000mb)**cvpm)
+               grid%al(i,kk,j) = grid%alt(i,kk,j) - grid%alb(i,kk,j)
+               grid%p_hyd(i,kk,j) = grid%p(i,kk,j) + grid%pb(i,kk,j)
+
+            !  Now, integrate down the column to compute the pressure perturbation, and diagnose the two
+            !  inverse density fields (total and perturbation).
+
+           DO kk=kte-2,kts,-1
+               k = kk + 1 
+               qvf1 = 0.5*(moist(i,kk,j,P_QV)+moist(i,kk+1,j,P_QV))
+               qvf2 = 1./(1.+qvf1)
+               qvf1 = qvf1*qvf2
+               grid%p(i,kk,j) = grid%p(i,kk+1,j) - (grid%Mu_2(i,j) + qvf1*grid%Mub(i,j))/qvf2/grid%rdn(kk+1)
+               qvf = 1. + rvovrd*moist(i,kk,j,P_QV)
+               grid%alt(i,kk,j) = (r_d/p1000mb)*(grid%t_2(i,kk,j)+t0)*qvf* &
+                           (((grid%p(i,kk,j)+grid%pb(i,kk,j))/p1000mb)**cvpm)
+               grid%al(i,kk,j) = grid%alt(i,kk,j) - grid%alb(i,kk,j)
+               grid%p_hyd(i,kk,j) = grid%p(i,kk,j) + grid%pb(i,kk,j)
+           ENDDO
+               !  This is the hydrostatic equation used in the model after the small timesteps.  In
+               !  the model, grid%al (inverse density) is computed from the geopotential.
+
+            IF (grid%hypsometric_opt == 1) THEN
+               DO k  = 2,kte
+                  grid%ph_2(i,k,j) = grid%ph_2(i,k-1,j) - &
+                                grid%dnw(k-1) * ( (grid%mub(i,j)+grid%mu_2(i,j))*grid%al(i,k-1,j) &
+                              + grid%mu_2(i,j)*grid%alb(i,k-1,j) )
+                  grid%ph0(i,k,j) = grid%ph_2(i,k,j) + grid%phb(i,k,j)
+               END DO
+            ELSE IF (grid%hypsometric_opt == 2) THEN
+
+             ! Alternative hydrostatic eq.: dZ = -al*p*dLOG(p), where p is dry
+             ! pressure.
+             ! Note that al*p approximates Rd*T and dLOG(p) does z.
+             ! Here T varies mostly linear with z, the first-order integration
+             ! produces better result.
+
+               grid%ph_2(i,1,j) = grid%phb(i,1,j)
+               DO k = 2,kte
+#if  !( HYBRID_COORD==1 )
+                  pfu = ( grid%mub(i,j)+grid%mu_2(i,j))*grid%znw(k)   + grid%p_top
+                  pfd = ( grid%mub(i,j)+grid%mu_2(i,j))*grid%znw(k-1) + grid%p_top
+                  phm = ( grid%mub(i,j)+grid%mu_2(i,j))*grid%znu(k-1) + grid%p_top
+#elif ( HYBRID_COORD==1 )
+                  pfu = grid%c3f(k  )*(grid%MUB(i,j)+grid%MU_2(i,j)) + grid%c4f(k  ) + grid%p_top
+                  pfd = grid%c3f(k-1)*(grid%MUB(i,j)+grid%MU_2(i,j)) + grid%c4f(k-1) + grid%p_top
+                  phm = grid%c3h(k-1)*(grid%MUB(i,j)+grid%MU_2(i,j)) + grid%c4h(k-1) + grid%p_top
+#endif
+                  grid%ph_2(i,k,j) = grid%ph_2(i,k-1,j) + grid%alt(i,k-1,j)*phm*LOG(pfd/pfu)
+               END DO
+
+               DO k = 1,kte
+                  grid%ph_2(i,k,j) = grid%ph_2(i,k,j) - grid%phb(i,k,j)
+               END DO
+
+               DO k = 1,kte
+                  grid%ph0(i,k,j) = grid%ph_2(i,k,j) + grid%phb(i,k,j)
+               END DO
+
+            END IF ! hypsometric
+       ENDIF ! nmoist
+
+! update surface pressure PSFC (needed for post-processing):
+               z0 = grid%ph0(i,1,j)/g
+               z1 = 0.5*(grid%ph0(i,1,j)+grid%ph0(i,2,j))/g
+               z2 = 0.5*(grid%ph0(i,2,j)+grid%ph0(i,3,j))/g
+               w1 = (z0 - z2)/(z1 - z2)
+               w2 = 1. - w1
+               grid%psfc(i,j) = w1*(grid%p(i,1,j)+grid%pb(i,1,j))+w2*(grid%p(i,2,j)+grid%pb(i,2,j))
+
+         END DO !i
+        ENDDO !j
+
+      ips = its ; ipe = ite ; jps = jts ; jpe = jte ; kps = kts ; kpe = kte
+#if ( defined( DM_PARALLEL ) && ( ! defined( STUBMPI ) ) )
+#   include "HALO_EM_INIT_1.inc"
+#   include "HALO_EM_INIT_2.inc"
+#   include "HALO_EM_INIT_3.inc"
+#   include "HALO_EM_INIT_4.inc"
+#   include "HALO_EM_INIT_5.inc"
+#endif
+   END SUBROUTINE rebalance_cycl
+
+!---------------------------------------------------------------------

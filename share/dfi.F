@@ -1,3 +1,18 @@
+! sed -e "s/grid%mu/gridmu/g" -e "s/grid%Mu/gridMu/g" dfi.F | cpp -DHYBRID_COORD | sed -e "s/gridmu/grid%mu/g" -e "s/gridMu/grid%Mu/g" >> dfi.next
+#if ( HYBRID_COORD==1 )
+#  define gridmu_2(...) (grid%c1h(k)*XXPC2HXX(__VA_ARGS__))
+#  define XXPC2HXX(...) grid%mu_2(__VA_ARGS__)
+
+#  define gridmub(...) (grid%c1h(k)*XXPCBHXX(__VA_ARGS__)+grid%c2h(k))
+#  define XXPCBHXX(...) grid%mub(__VA_ARGS__)
+
+#  define gridMu_2(...) (grid%c1f(k)*XXPC2FXX(__VA_ARGS__))
+#  define XXPC2FXX(...) grid%Mu_2(__VA_ARGS__)
+
+#  define gridMub(...) (grid%c1f(k)*XXPCBFXX(__VA_ARGS__)+grid%c2f(k))
+#  define XXPCBFXX(...) grid%Mub(__VA_ARGS__)
+#endif
+
    SUBROUTINE dfi_accumulate( grid )
 
       USE module_domain, ONLY : domain
@@ -25,7 +40,7 @@
       hn = grid%hcoeff(grid%itimestep+1)
 
       ! accumulate dynamic variables
-       grid%dfi_mu(:,:)    = grid%dfi_mu(:,:)    + grid%mu_2(:,:)    * hn
+       grid%dfi_mu(:,:)    = grid%dfi_mu(:,:)    + grid%MU_2(:,:)    * hn
        grid%dfi_u(:,:,:)   = grid%dfi_u(:,:,:)   + grid%u_2(:,:,:)   * hn
        grid%dfi_v(:,:,:)   = grid%dfi_v(:,:,:)   + grid%v_2(:,:,:)   * hn
        grid%dfi_w(:,:,:)   = grid%dfi_w(:,:,:)   + grid%w_2(:,:,:)   * hn
@@ -40,9 +55,6 @@
        grid%dfi_al(:,:,:)  = grid%dfi_al(:,:,:)  + grid%al(:,:,:)    * hn
        grid%dfi_alt(:,:,:) = grid%dfi_alt(:,:,:) + grid%alt(:,:,:)   * hn
        grid%dfi_pb(:,:,:)  = grid%dfi_pb(:,:,:)  + grid%pb(:,:,:)    * hn
-      ! neg. check on hydrometeor and scalar variables
-       grid%moist(:,:,:,:) = max(0.,grid%moist(:,:,:,:))
-       grid%dfi_scalar(:,:,:,:) = max(0.,grid%dfi_scalar(:,:,:,:))
       ! dfi_savehydmeteors is a namelist parameter, default =0  which means hydrometeor
       ! and scalar fields will be spinning up in DFI; if dfi_savehydmeteors=1 then 
       ! hydrometeor fields will stay unchanged in DFI, but water vapor mixing ratio 
@@ -50,6 +62,9 @@
      IF ( grid%dfi_savehydmeteors .EQ. 0 ) then  
        grid%dfi_moist(:,:,:,:)  = grid%dfi_moist(:,:,:,:)  + grid%moist(:,:,:,:)  * hn
        grid%dfi_scalar(:,:,:,:) = grid%dfi_scalar(:,:,:,:) + grid%scalar(:,:,:,:) * hn
+       grid%dfi_re_cloud(:,:,:) = grid%dfi_re_cloud(:,:,:) + grid%re_cloud(:,:,:) * hn
+       grid%dfi_re_ice(:,:,:)   = grid%dfi_re_ice(:,:,:)   + grid%re_ice(:,:,:)   * hn
+       grid%dfi_re_snow(:,:,:)  = grid%dfi_re_snow(:,:,:)  + grid%re_snow(:,:,:)  * hn
      ELSE
        grid%dfi_moist(:,:,:,P_QV) = grid%dfi_moist(:,:,:,P_QV) + grid%moist(:,:,:,P_QV) * hn
      ENDIF
@@ -132,6 +147,13 @@
 
       grid%dfi_stage = DFI_BCK
 
+#if (EM_CORE == 1)
+      if(grid%cycling) then
+!         print *,'   Rebalancing is on '
+         CALL rebalance_driver_dfi ( grid )
+      endif
+#endif
+
       ! Negate time step
       IF ( grid%time_step_dfi .gt. 0 ) THEN
         CALL nl_set_time_step ( 1, -grid%time_step_dfi )
@@ -145,6 +167,7 @@
       !tgs 7apr11 - need to call start_domain here to reset bc initialization for negative dt
       CALL start_domain ( grid , .TRUE. )
       !tgs 7apr11 - save arrays should be done after start_domain to get correct grid%p field
+      !             used in computation of initial RH.
       CALL dfi_save_arrays ( grid )
 
       ! set physics options to zero
@@ -190,9 +213,7 @@
       CALL nl_set_km_opt( grid%id, 1) 
       CALL nl_set_diff_opt( grid%id, 0) 
       CALL nl_set_moist_adv_dfi_opt( grid%id, grid%moist_adv_dfi_opt)
-      IF ( grid%moist_adv_opt == 2 ) THEN
-         CALL nl_set_moist_adv_opt( grid%id, 0)
-      ENDIF
+      CALL nl_set_moist_adv_opt( grid%id,grid%moist_adv_dfi_opt)
 #endif
 
       ! If a request to do pressure level diags, then shut it off
@@ -245,14 +266,6 @@
 
       !tgs need to call start_domain here to reset bc initialization for negative dt
       CALL start_domain ( grid , .TRUE. )
-      !tgs need to call rebalance here to remove imbalances in initial fields
-      ! when config_flags%cycling=.true.
-#if (EM_CORE == 1)
-      if(grid%cycling) then
-!         print *,'   Rebalancing is on '
-         CALL rebalance_driver_dfi ( grid )
-      endif
-#endif
 
    END SUBROUTINE dfi_bck_init
 
@@ -268,6 +281,7 @@
       TYPE (domain) , POINTER                 :: grid
       INTEGER rc
       CHARACTER*80 mess
+      INTEGER n_moist,nm,n_scalar,ns
 
       INTERFACE
          SUBROUTINE Setup_Timekeeping(grid)
@@ -412,6 +426,19 @@
       !tgs need to call it here to reset bc initialization for positive time_step
       CALL start_domain ( grid , .TRUE. )
 
+      !tgs  After start_domain moist and scalar arrays are fully dimentioned,
+      !and initial values should be restored here if grid%dfi_savehydmeteors .EQ. 1:
+    IF ( grid%dfi_savehydmeteors .EQ. 1 ) then
+!       print *,'FWD n_moist,PARAM_FIRST_SCALAR,P_QV,P_QC,P_QR,P_QI,P_QS,P_QG', &
+!                n_moist,PARAM_FIRST_SCALAR,P_QV,P_QC,P_QR,P_QI,P_QS,P_QG
+!       print *,'FWD num_scalar,P_QNC,P_QNI,P_QNR,P_QNWFA,P_QNIFA',P_QNC,P_QNI,P_QNR,P_QNWFA,P_QNIFA
+        n_moist = num_moist
+         DO nm=PARAM_FIRST_SCALAR+1,n_moist
+             grid%moist(:,:,:,nm)=grid%dfi_moist(:,:,:,nm)
+         ENDDO
+        grid%scalar(:,:,:,:) = grid%dfi_scalar(:,:,:,:)
+    ENDIF
+
    END SUBROUTINE dfi_fwd_init
 
    SUBROUTINE dfi_fst_init ( grid )
@@ -423,6 +450,7 @@
 
       TYPE (domain) , POINTER :: grid
       CHARACTER (LEN=80)      :: wrf_error_message
+      INTEGER n_moist,nm
 
       INTERFACE
          SUBROUTINE Setup_Timekeeping(grid)
@@ -531,7 +559,7 @@
       TYPE (domain) , POINTER :: grid
       INTEGER             :: fid, ierr
       CHARACTER (LEN=80)  :: wrf_error_message
-      CHARACTER (LEN=80)  :: rstname
+      CHARACTER (LEN=256) :: rstname
       CHARACTER (LEN=132) :: message
 
       TYPE (grid_config_rec_type) :: config_flags
@@ -564,7 +592,7 @@
       TYPE (domain) , POINTER :: grid
       INTEGER             :: fid, ierr
       CHARACTER (LEN=80)  :: wrf_error_message
-      CHARACTER (LEN=80)  :: rstname
+      CHARACTER (LEN=256) :: rstname
       CHARACTER (LEN=132) :: message
 
       TYPE (grid_config_rec_type) :: config_flags
@@ -623,6 +651,7 @@
 
       INTEGER :: its, ite, jts, jte, kts, kte, &
                  i, j, k
+      INTEGER :: n_moist, nm, n_scalar, ns
 
       !  Input data.
       TYPE(domain) , POINTER          :: grid
@@ -646,7 +675,7 @@
       ! divide by total DFI coefficient
 
 #if (EM_CORE == 1)
-      grid%mu_2(:,:)    = grid%dfi_mu(:,:)      / grid%hcoeff_tot
+      grid%MU_2(:,:)    = grid%dfi_mu(:,:)      / grid%hcoeff_tot
       grid%u_2(:,:,:)   = grid%dfi_u(:,:,:)     / grid%hcoeff_tot
       grid%v_2(:,:,:)   = grid%dfi_v(:,:,:)     / grid%hcoeff_tot
       grid%w_2(:,:,:)   = grid%dfi_w(:,:,:)     / grid%hcoeff_tot
@@ -665,6 +694,9 @@
 !    print *,'Normal DFI'
       grid%moist(:,:,:,:)  = max(0.,grid%dfi_moist(:,:,:,:)  / grid%hcoeff_tot)
       grid%scalar(:,:,:,:) = max(0.,grid%dfi_scalar(:,:,:,:) / grid%hcoeff_tot)
+      grid%re_cloud(:,:,:) = max(0.,grid%dfi_re_cloud(:,:,:) / grid%hcoeff_tot)
+      grid%re_ice(:,:,:)   = max(0.,grid%dfi_re_ice(:,:,:)   / grid%hcoeff_tot)
+      grid%re_snow(:,:,:)  = max(0.,grid%dfi_re_snow(:,:,:)  / grid%hcoeff_tot)
     ELSE
 !    print *,'In dfi_array_reset, QV comp, dfi_save_hydrometeors=1'
       grid%moist(:,:,:,P_QV)  = max(0.,grid%dfi_moist(:,:,:,P_QV)  / grid%hcoeff_tot)
@@ -730,12 +762,16 @@
     IF ( grid%dfi_savehydmeteors .EQ. 1 ) then
 !    print *,'In dfi_array_reset - restore initial hydrometeors'
 !      grid%moist(:,:,:,:)      = grid%dfi_moist(:,:,:,:)    !tgs
-      grid%moist(:,:,:,P_QC)      = grid%dfi_moist(:,:,:,P_QC)    !tgs
-      grid%moist(:,:,:,P_QR)      = grid%dfi_moist(:,:,:,P_QR)    !tgs
-      grid%moist(:,:,:,P_QI)      = grid%dfi_moist(:,:,:,P_QI)    !tgs
-      grid%moist(:,:,:,P_QS)      = grid%dfi_moist(:,:,:,P_QS)    !tgs
-      grid%moist(:,:,:,P_QG)      = grid%dfi_moist(:,:,:,P_QG)    !tgs
-      grid%scalar(:,:,:,:)        = grid%dfi_scalar(:,:,:,:)
+        n_moist  = num_moist
+      if (grid%dfi_stage .EQ. DFI_BCK) then
+!tgs - backward integration changed only QV
+        n_moist        = P_QV
+        n_scalar       = PARAM_FIRST_SCALAR - 1
+      endif
+         DO nm=PARAM_FIRST_SCALAR+1,n_moist
+             grid%moist(:,:,:,nm)=grid%dfi_moist(:,:,:,nm)
+         ENDDO
+        grid%scalar(:,:,:,:)     = grid%dfi_scalar(:,:,:,:)
 
        if(grid%dfi_stage .EQ. DFI_FWD) then
 !tgs change QV to restore initial RH field after the diabatic DFI
@@ -925,6 +961,9 @@ call wrf_message(mess)
 !    print *,'normal DFI'
       grid%dfi_moist(:,:,:,:)  = 0.
       grid%dfi_scalar(:,:,:,:) = 0.
+      grid%dfi_re_cloud(:,:,:) = 0.
+      grid%dfi_re_ice(:,:,:)   = 0.
+      grid%dfi_re_snow(:,:,:)  = 0.
     ELSE
 !    print *,'In dfi_clear_accumulation, clear dfi_QV - dfi_savehydmeteors=1'
       grid%dfi_moist(:,:,:,P_QV) = 0.
@@ -966,7 +1005,7 @@ call wrf_message(mess)
       IMPLICIT NONE
 
       INTEGER :: its, ite, jts, jte, kts, kte, &
-                 i, j, k
+                 i, j, k, n_moist, nm
 
       !  Input data.
       TYPE(domain) , POINTER          :: grid
@@ -1014,13 +1053,13 @@ call wrf_message(mess)
       ! save hydrometeor and scalar fields 
     IF ( grid%dfi_savehydmeteors .EQ. 1 ) then    !tgs
 !    print *,'In dfi_save_arrays - save initial hydrometeors'
-!!      grid%dfi_moist(:,:,:,:)  =   grid%moist(:,:,:,:)
-      grid%dfi_moist(:,:,:,P_QC)  =   grid%moist(:,:,:,P_QC)
-      grid%dfi_moist(:,:,:,P_QR)  =   grid%moist(:,:,:,P_QR)
-      grid%dfi_moist(:,:,:,P_QI)  =   grid%moist(:,:,:,P_QI)
-      grid%dfi_moist(:,:,:,P_QS)  =   grid%moist(:,:,:,P_QS)
-      grid%dfi_moist(:,:,:,P_QG)  =   grid%moist(:,:,:,P_QG)
-      grid%dfi_scalar(:,:,:,:)    =   grid%scalar(:,:,:,:)
+!       print *,'SAVE n_moist,PARAM_FIRST_SCALAR,P_QV,P_QC,P_QR,P_QI,P_QS,P_QG', &
+!                n_moist,PARAM_FIRST_SCALAR,P_QV,P_QC,P_QR,P_QI,P_QS,P_QG
+        n_moist = num_moist
+         DO nm=PARAM_FIRST_SCALAR+1,n_moist
+             grid%dfi_moist(:,:,:,nm)=max(0.,grid%moist(:,:,:,nm))
+         ENDDO
+        grid%dfi_scalar(:,:,:,:) = max(0.,grid%scalar(:,:,:,:))
     ENDIF
 
        if(grid%dfi_stage .EQ. DFI_BCK) then
@@ -2849,9 +2888,7 @@ call wrf_message(mess)
       CALL nl_set_km_opt( grid%id, grid%km_opt_dfi)
       CALL nl_set_diff_opt( grid%id, grid%diff_opt_dfi)
       CALL nl_set_moist_adv_dfi_opt( grid%id, grid%moist_adv_dfi_opt)
-      IF ( grid%moist_adv_opt == 2 ) THEN
-         CALL nl_set_moist_adv_opt( grid%id, 0)
-      ENDIF
+      CALL nl_set_moist_adv_opt( grid%id,grid%moist_adv_dfi_opt)
 #endif
 
       ! If a request to do pressure level diags, then shut it off
@@ -3262,6 +3299,7 @@ call wrf_message(mess)
       REAL :: p_surf ,  pd_surf, p_surf_int , pb_int , ht_hold
       REAL :: qvf , qvf1 , qvf2, qtot
       REAL :: pfu, pfd, phm
+      REAL :: z0, z1, z2, w1, w2
 
       !  Local domain indices and counters.
 
@@ -3272,7 +3310,7 @@ call wrf_message(mess)
                                      ims, ime, jms, jme, kms, kme, &
                                      its, ite, jts, jte, kts, kte, &
                                      ips, ipe, jps, jpe, kps, kpe, &
-                                     i, j, k, ispe, ktf
+                                     i, j, k, kk, ispe, ktf
 
       SELECT CASE ( model_data_order )
          CASE ( DATA_ORDER_ZXY )
@@ -3328,7 +3366,8 @@ call wrf_message(mess)
       !  the half eta levels and the base-profile surface pressure.  Compute 1/rho
       !  from equation of state.  The potential temperature is a perturbation from t0.
 
-         n_moist = num_moist-1
+         n_moist = num_moist
+!         n_moist = num_moist-1
 
 !       print *,'n_moist,PARAM_FIRST_SCALAR',n_moist,PARAM_FIRST_SCALAR
 
@@ -3338,50 +3377,53 @@ call wrf_message(mess)
                !  Integrate the hydrostatic equation (from the RHS of the bigstep vertical momentum
                !  equation) down from the top to get the pressure perturbation.  First get the pressure
                !  perturbation, moisture, and inverse density (total and perturbation) at the top-most level.
-               k = kte-1
+               kk = kte-1
+               k=kk+1
 
                qtot = 0.
                DO ispe=PARAM_FIRST_SCALAR,n_moist
-                 qtot = qtot + 0.5*(moist(i,k,j,ispe)+moist(i,k,j,ispe))
+                 qtot = qtot + 0.5*(moist(i,kk,j,ispe)+moist(i,kk,j,ispe))
                ENDDO
                qvf2 = 1./(1.+qtot)
                qvf1 = qtot*qvf2
 
-               grid%p(i,k,j) = - 0.5*(grid%mu_2(i,j)+qvf1*grid%mub(i,j))/grid%rdnw(k)/qvf2
-               qvf = 1.+rvovrd*moist(i,k,j,P_QV)
-               grid%alt(i,k,j) = (r_d/p1000mb)*(grid%t_2(i,k,j)+t0)*qvf*         &
-                      (((grid%p(i,k,j)+grid%pb(i,k,j))/p1000mb)**cvpm)
-               grid%al(i,k,j) = grid%alt(i,k,j) - grid%alb(i,k,j)
-               grid%p_hyd(i,k,j) = grid%p(i,k,j) + grid%pb(i,k,j)
+               grid%p(i,kk,j) = - 0.5*(grid%Mu_2(i,j)+qvf1*grid%Mub(i,j))/grid%rdnw(kk)/qvf2
+               qvf = 1.+rvovrd*moist(i,kk,j,P_QV)
+               grid%alt(i,kk,j) = (r_d/p1000mb)*(grid%t_2(i,kk,j)+t0)*qvf*         &
+                      (((grid%p(i,kk,j)+grid%pb(i,kk,j))/p1000mb)**cvpm)
+               grid%al(i,kk,j) = grid%alt(i,kk,j) - grid%alb(i,kk,j)
+               grid%p_hyd(i,kk,j) = grid%p(i,kk,j) + grid%pb(i,kk,j)
 
                !  Now, integrate down the column to compute the pressure perturbation, and diagnose the two
                !  inverse density fields (total and perturbation).
 
-           DO k=kte-2,1,-1
+           DO kk=kte-2,1,-1
+               k = kk + 1
                qtot = 0.
                DO ispe=PARAM_FIRST_SCALAR,n_moist
-               qtot = qtot + 0.5*(  moist(i,k  ,j,ispe) + moist(i,k+1,j,ispe) )
+               qtot = qtot + 0.5*(  moist(i,kk  ,j,ispe) + moist(i,kk+1,j,ispe) )
                ENDDO
                qvf2 = 1./(1.+qtot)
                qvf1 = qtot*qvf2
-               grid%p(i,k,j) = grid%p(i,k+1,j) - (grid%mu_2(i,j) +       &
-                               qvf1*grid%mub(i,j))/qvf2/grid%rdn(k+1)
-               qvf = 1. + rvovrd*moist(i,k,j,P_QV)
-               grid%alt(i,k,j) = (r_d/p1000mb)*(grid%t_2(i,k,j)+t0)*qvf* &
-                           (((grid%p(i,k,j)+grid%pb(i,k,j))/p1000mb)**cvpm)
-               grid%al(i,k,j) = grid%alt(i,k,j) - grid%alb(i,k,j)
-               grid%p_hyd(i,k,j) = grid%p(i,k,j) + grid%pb(i,k,j)
+               grid%p(i,kk,j) = grid%p(i,kk+1,j) - (grid%Mu_2(i,j) +       &
+                               qvf1*grid%Mub(i,j))/qvf2/grid%rdn(kk+1)
+               qvf = 1. + rvovrd*moist(i,kk,j,P_QV)
+               grid%alt(i,kk,j) = (r_d/p1000mb)*(grid%t_2(i,kk,j)+t0)*qvf* &
+                           (((grid%p(i,kk,j)+grid%pb(i,kk,j))/p1000mb)**cvpm)
+               grid%al(i,kk,j) = grid%alt(i,kk,j) - grid%alb(i,kk,j)
+               grid%p_hyd(i,kk,j) = grid%p(i,kk,j) + grid%pb(i,kk,j)
            ENDDO
 
                !  This is the hydrostatic equation used in the model after the small timesteps.  In
                !  the model, grid%al (inverse density) is computed from the geopotential.
 
                IF (grid%hypsometric_opt == 1) THEN
-                  DO k  = 2,kte
-                     grid%ph_2(i,k,j) = grid%ph_2(i,k-1,j) - &
-                                   grid%dnw(k-1) * ( (grid%mub(i,j)+grid%mu_2(i,j))*grid%al(i,k-1,j) &
-                                 + grid%mu_2(i,j)*grid%alb(i,k-1,j) )
-                     grid%ph0(i,k,j) = grid%ph_2(i,k,j) + grid%phb(i,k,j)
+                  DO kk  = 2,kte
+                     k = kk - 1 
+                     grid%ph_2(i,kk,j) = grid%ph_2(i,kk-1,j) - &
+                                   grid%dnw(kk-1) * ( (grid%mub(i,j)+grid%mu_2(i,j))*grid%al(i,kk-1,j) &
+                                 + grid%mu_2(i,j)*grid%alb(i,kk-1,j) )
+                     grid%ph0(i,kk,j) = grid%ph_2(i,kk,j) + grid%phb(i,kk,j)
                   END DO
                ELSE IF (grid%hypsometric_opt == 2) THEN
                 ! Alternative hydrostatic eq.: dZ = -al*p*dLOG(p), where p is
@@ -3392,9 +3434,15 @@ call wrf_message(mess)
 
                   grid%ph_2(i,1,j) = grid%phb(i,1,j)
                   DO k = 2,kte
+#if  !( HYBRID_COORD==1 )
                      pfu = ( grid%mub(i,j)+grid%mu_2(i,j))*grid%znw(k)   + grid%p_top
                      pfd = ( grid%mub(i,j)+grid%mu_2(i,j))*grid%znw(k-1) + grid%p_top
                      phm = ( grid%mub(i,j)+grid%mu_2(i,j))*grid%znu(k-1) + grid%p_top
+#elif ( HYBRID_COORD==1 )
+                     pfu = grid%c3f(k  )*(grid%MUB(i,j)+grid%MU_2(i,j)) + grid%c4f(k  ) + grid%p_top
+                     pfd = grid%c3f(k-1)*(grid%MUB(i,j)+grid%MU_2(i,j)) + grid%c4f(k-1) + grid%p_top
+                     phm = grid%c3h(k-1)*(grid%MUB(i,j)+grid%MU_2(i,j)) + grid%c4h(k-1) + grid%p_top
+#endif
                      grid%ph_2(i,k,j) = grid%ph_2(i,k-1,j) + grid%alt(i,k-1,j)*phm*LOG(pfd/pfu)
                   END DO
 
@@ -3402,7 +3450,18 @@ call wrf_message(mess)
                      grid%ph_2(i,k,j) = grid%ph_2(i,k,j) - grid%phb(i,k,j)
                   END DO
 
+                  DO k = 1,kte
+                     grid%ph0(i,k,j) = grid%ph_2(i,k,j) + grid%phb(i,k,j)
+                  END DO
+
                END IF
+! update surface pressure PSFC:
+                  z0 = grid%ph0(i,1,j)/g
+                  z1 = 0.5*(grid%ph0(i,1,j)+grid%ph0(i,2,j))/g
+                  z2 = 0.5*(grid%ph0(i,2,j)+grid%ph0(i,3,j))/g
+                  w1 = (z0 - z2)/(z1 - z2)
+                  w2 = 1. - w1
+                  grid%psfc(i,j) = w1*(grid%p(i,1,j)+grid%pb(i,1,j))+w2*(grid%p(i,2,j)+grid%pb(i,2,j))
 
          ENDDO  !i
         ENDDO  !j
