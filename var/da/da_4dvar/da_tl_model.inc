@@ -183,7 +183,9 @@ subroutine da_tl_model ()
    call nl_set_var4d_run (head_grid%id, .true.)
 
    ! WRF model time-stepping.  Calls integrate().
-   IF ( checkpoint_interval .GT. 0 ) THEN
+   IF ( checkpoint_interval .LE. 0 ) THEN
+      call wrf_run_tl
+   ELSE
       end_year0 = model_config_rec%end_year(head_grid%id)
       end_month0 = model_config_rec%end_month(head_grid%id)
       end_day0 = model_config_rec%end_day(head_grid%id)
@@ -219,8 +221,6 @@ subroutine da_tl_model ()
          call Setup_Timekeeping ( head_grid )
 
       end if
-   ELSE
-      call wrf_run_tl
    ENDIF
 
    ! restore the physics options to the originals

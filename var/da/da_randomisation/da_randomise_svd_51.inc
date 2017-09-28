@@ -71,7 +71,10 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
    integer, allocatable         :: nobs(:)
    
    integer                      :: iens, jens, i, j, ccount, itype, np
+   integer                      :: je_start, je_end       ! Start/end indices of Je.
    integer                      :: jp_start, jp_end       ! Start/end indices of Jp.
+   integer                      :: jl_start, jl_end       ! Start/end indices of Jl.
+
    real                         :: ghat(1:cv_size)        ! cv copy.
    integer                      :: info
 
@@ -89,9 +92,12 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
    !-------------------------------------------------------------------------
    ! [1.0] Initialization:
    !-------------------------------------------------------------------------
-
+   je_start   = be % cv % size_jb + 1
+   je_end     = be % cv % size_jb + be % cv % size_je
    jp_start   = be % cv % size_jb + be % cv % size_je + 1
    jp_end     = be % cv % size_jb + be % cv % size_je + be % cv % size_jp
+   jl_start   = be % cv % size_jb + be % cv % size_je + be % cv % size_jp + 1
+   jl_end     = be % cv % size_jb + be % cv % size_je + be % cv % size_jp + be % cv % size_jl
 
    xhat = 0.D0
 
@@ -101,7 +107,7 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
       write(cens,fmt='(i4.4)') ensmember
 
       if ( ensmember .eq. nens+1 ) then 
-         ! Calculate grad J for xhat = 0
+         ! Calculate J and grad J (ghat)
          use_randomsvd = .false.
          call da_calculate_j(svd_outer, 0, cv_size, be%cv%size_jb, be%cv%size_je, be%cv%size_jp, &
                              be%cv%size_jl, xbx, be, iv, xhat, cv, re, y, j_cost, ghat, grid, config_flags)
@@ -139,6 +145,9 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
          else
             write(unit=stdout,fmt='("Generating omega ensemble member : ",i3)') ensmember
             call da_set_randomcv(cv_size, omega(:,1))
+            if ( be%cv%size_jp.gt.0) omega(jp_start:jp_end,1) = 0.D0
+            if ( be%cv%size_je.gt.0) omega(je_start:je_end,1) = 0.D0
+            if ( .not. var4d_lbc .and. be%cv%size_jl.gt.0) omega(jl_start:jl_end,1) = 0.D0
          end if
 
          call da_transform_vtoy(cv_size, be, grid%ep, omega(1:cv_size,1), iv, grid%vp, &

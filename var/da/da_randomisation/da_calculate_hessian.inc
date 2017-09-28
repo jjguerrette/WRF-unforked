@@ -64,6 +64,7 @@ subroutine da_calculate_hessian(grid, mz, config_flags, &
    
    integer                      :: iens, jens, nyobs, i, j, ccount, itype, np
    integer                      :: jp_start, jp_end       ! Start/end indices of Jp.
+
    real*8                       :: ghat(1:cv_size)        ! cv copy.
    integer                      :: info
 
@@ -123,6 +124,8 @@ subroutine da_calculate_hessian(grid, mz, config_flags, &
 
 !da_force_grad_hess needs non-chem observations before it and da_calculate_hessian are generalizable
          call da_force_grad_hess (iv, y, nall, ensmember, jo_grad_y)
+
+         grad_jo = 0.D0
 
          call da_transform_vtoy_adj(cv_size, be, grid%ep, grad_jo, iv, &
                  grid%vp, grid%vv, grid%vp6, grid%vv6, &

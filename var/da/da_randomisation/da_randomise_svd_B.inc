@@ -47,7 +47,10 @@ subroutine da_randomise_svd_B(grid, mz, config_flags,            &
    real(wp)                     :: dot_cv
   
    integer                      :: iens, jens, nens, i, j, ccount, p
+   integer                      :: je_start, je_end       ! Start/end indices of Je.
    integer                      :: jp_start, jp_end       ! Start/end indices of Jp.
+   integer                      :: jl_start, jl_end       ! Start/end indices of Jl.
+
    real                         :: ghat(1:cv_size)        ! cv copy.
    real(wp)                     :: F1(ensdim_svd, ensdim_svd) ! intermediate matrix
    real(wp)                     :: F2(ensdim_svd, ensdim_svd) ! intermediate matrix
@@ -77,8 +80,12 @@ subroutine da_randomise_svd_B(grid, mz, config_flags,            &
    !-------------------------------------------------------------------------
    ! [1.0] Initialization:
    !-------------------------------------------------------------------------
+   je_start   = be % cv % size_jb + 1
+   je_end     = be % cv % size_jb + be % cv % size_je
    jp_start   = be % cv % size_jb + be % cv % size_je + 1
    jp_end     = be % cv % size_jb + be % cv % size_je + be % cv % size_jp
+   jl_start   = be % cv % size_jb + be % cv % size_je + be % cv % size_jp + 1
+   jl_end     = be % cv % size_jb + be % cv % size_je + be % cv % size_jp + be % cv % size_jl
 
    nens = ensdim_svd
 
@@ -87,6 +94,7 @@ subroutine da_randomise_svd_B(grid, mz, config_flags,            &
    if ( svd_stage .eq. 1 .and. ensmember .gt. 0) then
       ! Generate vectors in Y = A*OMEGA (Halko, Algorithm 4.1), where A = U^T * H^T * R^-1 * H * U 
       allocate(yhat(1:cv_size,1))
+      yhat = 0.D0
 
       write(cproc,fmt='(i4.4)') myproc
       write(cens,fmt='(i4.4)') ensmember
@@ -114,6 +122,9 @@ subroutine da_randomise_svd_B(grid, mz, config_flags,            &
             call da_cv_io ('r', filename, cv_size, omega(1:cv_size,1))
          else
             call da_set_randomcv(cv_size, omega(:,1))
+            if ( be%cv%size_jp.gt.0) omega(jp_start:jp_end,1) = 0.D0
+            if ( be%cv%size_je.gt.0) omega(je_start:je_end,1) = 0.D0
+            if ( .not. var4d_lbc .and. be%cv%size_jl.gt.0) omega(jl_start:jl_end,1) = 0.D0
          end if
 
 #if (WRF_CHEM == 1)
