@@ -747,6 +747,7 @@
                ! Ensures bit-for-bit consistency across outer loops for MET variables -JJG
                call da_init_model_input
             else
+#endif
                call kj_swap (grid%u_2, model_grid%u_2, &
                              grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, grid%xp%kms, grid%xp%kme)
                call kj_swap (grid%v_2, model_grid%v_2, &
@@ -773,36 +774,9 @@
                   call kj_swap (grid%moist(:,:,:,i), model_grid%moist(:,:,:,i), &
                                 grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, grid%xp%kms, grid%xp%kme)
                enddo
-            end if
-#else
-            call kj_swap (grid%u_2, model_grid%u_2, &
-                          grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, grid%xp%kms, grid%xp%kme)
-            call kj_swap (grid%v_2, model_grid%v_2, &
-                          grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, grid%xp%kms, grid%xp%kme)
-            call kj_swap (grid%w_2, model_grid%w_2, &
-                          grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, grid%xp%kms, grid%xp%kme)
-            call kj_swap (grid%t_2, model_grid%t_2, &
-                          grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, grid%xp%kms, grid%xp%kme)
-            call kj_swap (grid%ph_2, model_grid%ph_2, &
-                          grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, grid%xp%kms, grid%xp%kme)
-            call kj_swap (grid%p, model_grid%p, &
-                          grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, grid%xp%kms, grid%xp%kme)
-            model_grid%mu_2 = grid%mu_2
-            model_grid%t2 = grid%t2
-            model_grid%th2 = grid%th2
-            model_grid%q2 = grid%q2
-            model_grid%u10 = grid%u10
-            model_grid%v10 = grid%v10
-            model_grid%tsk = grid%tsk
-            model_grid%psfc = grid%psfc
-
-            do i = PARAM_FIRST_SCALAR, num_moist
-               call kj_swap (grid%moist(:,:,:,i), model_grid%moist(:,:,:,i), &
-                             grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, grid%xp%kms, grid%xp%kme)
-            enddo
-#endif
-
 #if (WRF_CHEM == 1)
+            end if
+
             ! Transferring chem from grid to model_grid 
             ! --> Gives same result as da_init_model_input, unless chem is included
             !      as a control variable, in which case the code below is correct.
@@ -896,7 +870,7 @@
 
             ! Turn off model boundary reading as we already provide a new one.
             if ( checkpoint_interval .eq. 0 ) call da_model_lbc_off
-         endif
+         endif !end it>1 test
 
          run_hours0 = adtl_run_hours
 
@@ -905,19 +879,16 @@
          !Restore default trajectory setting
          write_checkpoints = 0
 
-         if ( checkpoint_interval .gt. 0 &
+         if ( checkpoint_interval .gt. 0) then
+            write_checkpoints = 1
 #if defined(LAPACK)
-              .and. .not.(use_randomsvd .and. svd_stage.gt.0) &
-#endif
-            ) then
-             write_checkpoints = 1
-#if defined(LAPACK)
-         else
-            if (quick_svd) adtl_run_hours = interval_seconds / 3600
-            write_checkpoints = 2
+            if (use_randomsvd .and. svd_stage.gt.0) then
+               if (quick_svd) adtl_run_hours = interval_seconds / 3600
+               write_checkpoints = 2
+            end if
 #endif
          end if
-!         if ( checkpoint_interval .gt. 0 ) write_checkpoints = 1
+
          call da_nl_model(it)
 
 #if (WRF_CHEM == 1)
@@ -945,9 +916,8 @@
          ! Use this to exit after writing chem hx values
          ! or after stage 1 of randomised svd
          ii=0
-#if (WRF_CHEM == 1)
+
          if(config_flags%calc_hx_only) ii = ii + 1
-#endif
 #if defined(LAPACK)
          if (use_randomsvd .and. svd_type.ne.11 .and. svd_stage.le.0) ii = ii + 1
 #endif
@@ -957,9 +927,8 @@
             if (use_background_errors) call da_deallocate_background_errors (be)
 
             call da_wrfvar_finalize
-#ifdef VAR4D
+
             if (var4d) call da_finalize_model
-#endif
 
 #ifdef DM_PARALLEL
             IF ( rootproc ) CALL end_timing('da_end_timing: CHEM_HX')
@@ -974,17 +943,16 @@
             stop
 
          end if
-#endif
+#endif !end WRF_CHEM test
 
          !Restore default trajectory setting
          write_checkpoints = 0
-
 
 !      elseif (var4d .and. multi_inc == 2 ) then
 #else
          write(unit=message(1),fmt='(A)')'Please re-compile the code with 4dvar option'
          call da_error(__FILE__,__LINE__,message(1:1))
-#endif
+#endif !end VAR4D test
       end if
 
       ! [8.2] Calculate innovation vector (O-B):
