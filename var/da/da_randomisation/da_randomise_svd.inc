@@ -159,6 +159,10 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
 
       write(cproc,fmt='(i4.4)') myproc
 
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
+
       ! Read gradient
       filename = 'ghat.p'//trim(adjustl(cproc))
       call da_cv_io ('r', filename, cv_size, ghat, grid, mz)
@@ -173,6 +177,10 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
          filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
          call da_cv_io ('r', filename, cv_size, omega(1:cv_size,iens), grid, mz)
       end do
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: READ_ghat_yhat_omega')
+#endif
 
       if (prepend_rsvd_basis(svd_outer) .eq. 1) then
          qhat(:,2:nens)  = yhat(:,1:nens-1) 

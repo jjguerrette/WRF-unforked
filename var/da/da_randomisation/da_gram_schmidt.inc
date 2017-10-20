@@ -3,7 +3,7 @@ subroutine da_gram_schmidt(grid,mz,jp_start,jp_end, &
 
    !-------------------------------------------------------------------------
    ! Purpose:        Perform Gram-Schmidt Orthogonalization 
-   ! Input: qhat
+   ! Input: qhat(:,1:nvec) = yhat
    ! Output: qhat
    !
    ! History: 02/22/2017  Creation (JJ Guerrette)
@@ -23,6 +23,10 @@ subroutine da_gram_schmidt(grid,mz,jp_start,jp_end, &
  
    if (trace_use) call da_trace_entry("da_gram_schmidt")
 
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
+
       qhat(:,0) = 0.D0
       ! Generate qhat basis vectors by Modified Gram-Schmidt orthonormalization
       do ivec = 1, nvec
@@ -41,6 +45,12 @@ subroutine da_gram_schmidt(grid,mz,jp_start,jp_end, &
                                  grid, mz, jp_start, jp_end))
          qhat(:,ivec) = qhat(:,ivec) / beta
       end do
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: gram_schmidt')
+#endif
+
+   if (trace_use) call da_trace_exit("da_gram_schmidt")
 
 end subroutine da_gram_schmidt
 

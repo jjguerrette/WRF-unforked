@@ -7,6 +7,7 @@ module da_randomisation
    use module_configure, only : grid_config_rec_type
    use module_dm, only : wrf_dm_sum_real, wrf_dm_sum_integer
    use module_domain, only : domain !&
+   use module_timing
    use module_state_description, only : &
 #if (WRF_CHEM == 1)
       num_scaleant, num_scalebb, &

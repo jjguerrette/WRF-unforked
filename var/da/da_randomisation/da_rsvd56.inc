@@ -6,7 +6,14 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
    !-------------------------------------------------------------------------
    ! Purpose:         Second stage of RSVD 5.6
    !
-   ! Called from da_randomise_svd
+   ! Called from da_randomise_svd and da_compare_decomp_methods
+   !
+   ! Solve nearly-symmetric low-dimensional system A * x = b, &
+   !  where KMAT * F1^T = F2^T, F1^T = Q^T * OMEGA, F2^T = Q^T * Y
+   !  or    F1 * KMAT^T = F1 * KMAT = F2
+   !  D = F1
+   !  b = F2(:,iens)
+   !  x = KMAT(iens,:)
    !
    ! History: 02/22/2017  Creation (JJ Guerrette)
    !
@@ -27,25 +34,22 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
    real(wp), intent(in)    :: omega(1:cv_size, 1:nens) ! Gaussian draw
    real(wp), intent(in)    :: qhat(1:cv_size, 0:nens)  ! orthonormal basis set 
 
-   real*8, intent(out)     :: eignvec(nens, nens)
-   real*8, intent(out)     :: eignval(nens)
+   real(wp), intent(out)   :: eignvec(nens, nens)
+   real(wp), intent(out)   :: eignval(nens)
    integer, intent(out)    :: neign                    ! Number of non-truncated eigenpairs
    logical, optional, intent(in) :: print_messages
 
-   real(wp), dimension(1:nens) :: LAM
- 
+   real(wp), dimension(1:nens) :: LAM 
    integer                      :: iens, jens, i, j, p1
-
    real(wp)                     :: F1(nens, nens) ! intermediate matrix
    real(wp)                     :: F2(nens, nens) ! intermediate matrix
    real(wp)                     :: U(nens, nens)
    real(wp)                     :: VT(nens, nens)
    real(wp)                     :: SIG(nens)
-   real(wp), allocatable        :: TEMP1(:,:), TEMP2(:,:)
-
-
+   real(wp), allocatable        :: UTF2(:,:), SIGinvVT(:,:)
    real(wp)                     :: KMAT(nens, nens)  ! KMAT = Q^T * A * Q
-   real(wp)                     :: KMAT_(nens, nens)  ! KMAT = Q^T * A * Q
+
+!   real(wp)                     :: KMAT_(nens, nens)  ! KMAT = Q^T * A * Q
    integer                      :: piv(nens)
    integer                      :: info, cyc
 
@@ -56,17 +60,17 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
   
    if (trace_use) call da_trace_entry("da_rsvd56")
 
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
+
    if(.not.present(print_messages)) write(unit=stdout,fmt='(A)') 'Performing Stage 2 of RSVD5.6'
    if(.not.present(print_messages)) write(unit=stdout,fmt=*) ' '
 
-   !-------------------------------------------------------------------------
-   ! [1.0] ADD SECTION TITLES:
-   !-------------------------------------------------------------------------
-
    do iens = 1, nens
       do jens = 1, nens
-         F1(jens,iens) = da_dot_cv(cv_size, qhat(:,iens), omega(:,jens), grid, mz, jp_start, jp_end)
-         F2(jens,iens) = da_dot_cv(cv_size, qhat(:,iens), yhat(:,jens), grid, mz, jp_start, jp_end)
+         F1(iens,jens) = da_dot_cv(cv_size, qhat(:,jens), omega(:,iens), grid, mz, jp_start, jp_end)
+         F2(iens,jens) = da_dot_cv(cv_size, qhat(:,jens), yhat(:,iens), grid, mz, jp_start, jp_end)
       end do
    end do
 
@@ -81,12 +85,6 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
 !
 !REMOVE EVENTUALLY
 
- ! Solve system D * x = b, &
- !  where KMAT * F1^T = F2^T, F1^T = Q^T * OMEGA, F2^T = Q^T * Y
- !  D = F1
- !  b = F2(:,iens)
- !  x = KMAT(iens,:)
- !-----------------------------------------------------------
    write(cnens,fmt='(I0)') nens
 
    info = 0
@@ -111,23 +109,23 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
                  VT = VT(1:nens-p1,1:nens-p1), &
                  INFO = info)
 
-      allocate(TEMP1(1:nens-p1,1:nens-p1))
-      allocate(TEMP2(1:nens-p1,1:nens-p1))
+      allocate(UTF2(1:nens-p1,1:nens-p1))
+      allocate(SIGinvVT(1:nens-p1,1:nens-p1))
       do iens = 1, nens-p1
-         TEMP2(iens,:) = (1.D0 / SIG(iens)) * VT(iens,:)
+         SIGinvVT(iens,:) = (1.D0 / SIG(iens)) * VT(iens,:)
          do jens = 1, nens-p1
-            TEMP1(jens,iens) = sum(F2(1:nens,iens) * U(1:nens,jens))
+            UTF2(iens,jens) = sum(U(1:nens,iens) * F2(1:nens,jens))
          end do
       end do
 
 
       do iens = 1, nens-p1
          do jens = 1, nens-p1
-               KMAT(iens,jens) = sum(TEMP1(:,iens) * TEMP2(:,jens))
+               KMAT(iens,jens) = sum(SIGinvVT(:,iens) * UTF2(:,jens))
          end do
       end do
-      deallocate(TEMP1)
-      deallocate(TEMP2)
+      deallocate(UTF2)
+      deallocate(SIGinvVT)
    end if
    if (info /=0) then
       write(stdout,*) 'Error in randomised SVD: GESV returned ',info
@@ -151,7 +149,7 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
  ! Determine eigenvalues and eigenvectors of the symmetric KMAT matrix
  !-----------------------------------------------------------------
    info = 0
-   KMAT_ = KMAT
+!   KMAT_ = KMAT
    call SYEV(KMAT, LAM, JOBZ = 'V' , INFO = info) !F95
 
    if (info /=0) then
@@ -223,6 +221,9 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
 !   write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'Eigenvalues: ',eignval(1:nens)
 !REMOVE EVENTUALLY
 
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: rsvd56')
+#endif
 
    if (trace_use) call da_trace_exit("da_rsvd56")
 
