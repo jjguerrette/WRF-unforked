@@ -3,7 +3,7 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, it, nens, neign, eign
    !-------------------------------------------------------------------------
    ! Purpose:        Read / Write Hessian eigenpairs
    !
-   ! Called from da_solve
+   ! Called from da_hessian_io
    !
    ! History: 04/19/2017  Modified from da_lanczos_io (JJ Guerrette)
    !
@@ -31,7 +31,8 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, it, nens, neign, eign
 
    real*8, allocatable             :: dumcv(:)
    real*8, allocatable             :: dumcv_g(:)
-   real*8                          :: temp, tempa(nens)
+   real*8, dimension(1:nens)       :: temp
+   real*8, dimension(1:nens,1:nens):: tempa
 
 
    if (trace_use) call da_trace_entry("da_hessian_io_global")
@@ -80,8 +81,8 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, it, nens, neign, eign
       if (present(eignvec) .and. present(eignval) .and. present(qhat)) then
          do i = 1, nens
             if (rootproc) then
-               read(unit=ep_unit) temp
-               read(unit=ep_unit) tempa
+               read(unit=ep_unit) temp(i)
+               read(unit=ep_unit) tempa(:,i)
                read(unit=ep_unit) dumcv_g
             else
                temp = 0.D0
@@ -92,15 +93,18 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, it, nens, neign, eign
             call mpi_barrier(comm, ierr)
             call da_global_to_cv(cv_size, cv_size_domain, dumcv, grid, mz, dumcv_g)
             qhat(1:cv_size,i) = dumcv
-         
-            call wrf_dm_bcast_real(temp,1)
-            eignval(i) = temp
-            call wrf_dm_bcast_real(tempa,nens)
-            eignvec(1:nens,i) = tempa
+
+            call wrf_dm_bcast_real(tempa(:,i),nens)
 #else
             qhat(1:cv_size,i) = dumcv_g
 #endif
+            eignvec(:,i) = tempa(:,i)
          end do
+#ifdef DM_PARALLEL        
+         call wrf_dm_bcast_real(temp,nens)
+#endif
+         eignval = temp
+
          if (present(ghat)) then
             if (rootproc) then
                read(unit=ep_unit) dumcv_g

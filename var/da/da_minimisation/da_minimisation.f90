@@ -58,9 +58,10 @@ module da_minimisation
       osse_chem, &
 #endif
 #if defined(LAPACK)
-      use_randomsvd, svd_stage, &
+      use_randomsvd, svd_stage, ensdim_svd, rotate_omega, &
 #endif
-      info_stop, grm_shmt_order, &
+      use_global_cv_io, &
+      use_lanczos, spectral_precon, ntused, info_stop, grm_shmt_order, &
       sound, mtgirs, sonde_sfc, synop, profiler, gpsref, gpspw, polaramv, geoamv, ships, metar, &
       satem, radar, ssmi_rv, ssmi_tb, ssmt1, ssmt2, airsr, pilot, airep,tamdar, tamdar_sfc, rain, &
       bogus, buoy, qscat,pseudo, radiance, monitor_on, max_ext_its, use_rttov_kmatrix,&
@@ -100,7 +101,7 @@ module da_minimisation
    use da_pilot, only : da_calculate_grady_pilot, da_ao_stats_pilot, &
       da_oi_stats_pilot, da_get_innov_vector_pilot, da_residual_pilot, &
       da_jo_and_grady_pilot
-   use da_par_util, only : da_system,da_cv_to_global
+   use da_par_util, only : da_system,da_cv_to_global, da_global_to_cv
    use da_par_util1, only : da_proc_sum_real,da_proc_sum_ints
    use da_polaramv, only : da_calculate_grady_polaramv, da_ao_stats_polaramv, &
       da_oi_stats_polaramv, da_get_innov_vector_polaramv, da_residual_polaramv, &
@@ -149,7 +150,7 @@ module da_minimisation
       da_calculate_grady_chem_surf, da_calculate_grady_chem_acft
 #endif
 
-   use da_reporting, only : da_message, da_warning, da_error
+   use da_reporting, only : da_message, da_warning, da_error, message
    use da_satem, only : da_calculate_grady_satem, da_ao_stats_satem, &
       da_oi_stats_satem, da_get_innov_vector_satem, da_residual_satem, &
       da_jo_and_grady_satem
@@ -229,8 +230,13 @@ contains
 #include "da_adjoint_sensitivity.inc"
 #include "da_sensitivity.inc"
 #include "da_amat_mul.inc"
+#include "da_amat_mul_trunc.inc"
 #include "da_kmat_mul.inc"
 #include "da_lanczos_io.inc"
+#include "da_spectral_precon.inc"
+#include "da_hessian_io.inc"
+#include "da_hessian_io_global.inc"
+
 #if (WRF_CHEM == 1)
 #include "da_calculate_aminusb.inc"
 #endif

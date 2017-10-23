@@ -242,6 +242,16 @@ subroutine da_minimise_lz(grid, config_flags,            &
    write(stdout,*) 'Number of converged eigenpairs: ', neign
    neign = iter
 
+   if (spectral_precon) then
+      call da_hessian_io ('w',grid, cv_size,it,neign,neign,&
+                         eignvec(1:neign,1:neign),eignval(1:neign),qhat(:,0:neign),mz)
+      ntused(it) = neign
+
+      if (it.gt.1) &
+         call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
+                                 it-1, xhat, xhat, 'TL' )
+   end if
+
    if (trace_use) call da_trace_exit("da_minimise_lz")
 
 end subroutine da_minimise_lz

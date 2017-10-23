@@ -31,10 +31,9 @@ subroutine da_amat_mul_trunc(grid, mz, jp_start, jp_end, cv_size, &
    logical, intent(in), optional :: nuflag
 
    real*8                     :: nuhat(1:cv_size,1:ntrunc)
-!   real*8                     :: QTs(1:neign)
-!   real*8                     :: ETQTs(1:neign_trunc)
    real*8                     :: gam(ntrunc), gam_(ntrunc), temp_l, temp_e(cv_size)
-   integer                    :: i, j, start, fin, step, order(ntrunc), temp_i
+   integer                    :: i, j, order(ntrunc), temp_i
+!   integer                    :: start, fin, step
    real*8                     :: dot_cv
    logical                    :: swapped
 
@@ -43,21 +42,21 @@ subroutine da_amat_mul_trunc(grid, mz, jp_start, jp_end, cv_size, &
    if (present(nuflag)) then
       nuhat = qhat(1:cv_size,1:ntrunc)
    else
-      ! Is this slow due to non-parallel da_dot across cv_size?
+      nuhat = 0.D0
       do j = 1, ntrunc
+         ! Is this slow due to non-parallel da_dot across cv_size?
          do i = 1, cv_size
             nuhat(i,j) = da_dot(neign, qhat(i,1:neign), eignvec(1:neign,j))
+
+          ! Is this any faster? Same precision?
+!            nuhat(i,j) = SUM( qhat(i,1:neign) * eignvec(1:neign,j) )
+
+          ! Is this any faster? Same precision?
+!         do i = 1, neign
+!            nuhat(:,j) = nuhat(:,j) + qhat(:,i) * eignvec(i,j)
+
          end do
       end do
-
-!      do i = 1, neign
-!         QTs(i) = da_dot_cv(cv_size, qhat(:,i), shat, grid, mz, jp_start, jp_end)
-!      end do
-!      do i = 1, ntrunc
-!         ETQTs(i) = da_dot(neign,QTs(1:neign),eignvec(1:neign,i)
-!         gam(i) = eignval(i) * ETQTs(i)
-!         order(i) = i
-!      end do
    end if
 
    !Sort gamma values in descending order to improve mat-vec precision
@@ -68,7 +67,7 @@ subroutine da_amat_mul_trunc(grid, mz, jp_start, jp_end, cv_size, &
    end do
    gam_ = gam
 
-! This ordering significantly improves numerical precision
+   ! This summation reordering significantly improves numerical precision
    do j = ntrunc-1, 1, -1
      swapped = .false.
      do i = 1, j
@@ -81,11 +80,6 @@ subroutine da_amat_mul_trunc(grid, mz, jp_start, jp_end, cv_size, &
          order(i) = order(i+1)
          order(i+1) = temp_i
 
-!! Many more reassignments
-!         temp_e = nuhat(:,i)
-!         nuhat(:,i) = nuhat(:,i+1)
-!         nuhat(:,i+1) = temp_e
-
          swapped = .true.
        end if
      end do
@@ -94,14 +88,10 @@ subroutine da_amat_mul_trunc(grid, mz, jp_start, jp_end, cv_size, &
 
    !!Initial xhat value defined in calling subroutine
    do i = ntrunc, 1, -1 !From smallest to largest gamma
-!      write(unit=stdout,fmt='(A,I0,A,E25.15)') 'gamma_', i, ' = ', gam(i)
-!      write(unit=stdout,fmt='(A,I0,A,2E25.15)') 'gamma_', i, ' = ', gam(i), gam(i)*minval(nuhat(:,i))
-!      write(unit=stdout,fmt='(A,I0,A,2E25.15,I4)') 'gamma_', i, ' = ', gam(i), gam(i)*minval(nuhat(:,i)), order(i)
-
       xhat = xhat + gam(order(i)) * nuhat(:,order(i))
    end do
 
-!   !!Initial xhat value defined in calling subroutine
+!   !This summation reordering eliminates some precision issues when lam_k>lam_k+1 or lam_k<lam_k+1. Not as precise as above, but slightly faster.
 !   if (eignval(1) .lt. eignval(ntrunc)) then
 !      start = 1
 !      fin = ntrunc
@@ -112,10 +102,7 @@ subroutine da_amat_mul_trunc(grid, mz, jp_start, jp_end, cv_size, &
 !      step = -1
 !   end if
 !
-!!   do i = start, fin, step
-!!!   do i = 1, ntrunc !What about when lam_k < lam_k+1
-!   do i = ntrunc, 1, -1 !This ordering eliminates some precision issues when lam_k>lam_k+1
-!
+!   do i = start, fin, step 
 !      dot_cv = da_dot_cv(cv_size, nuhat(:,i), shat, grid, mz, jp_start, jp_end)
 !      xhat = xhat + eignval(i) * nuhat(:,i) * dot_cv
 !

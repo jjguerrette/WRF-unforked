@@ -128,10 +128,19 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
             call da_cv_io ('r', filename, cv_size, omega(1:cv_size,1), grid, mz)
          else
             ! call da_set_randomcv(cv_size, omega(:,1)) << LT
-            call da_gen_omega(omega(:,:), cv_size, 1, grid, mz)
+            call da_gen_omega(omega, cv_size, 1, grid, mz)
             if ( be%cv%size_jp.gt.0) omega(jp_start:jp_end,1) = 0.D0
             if ( be%cv%size_je.gt.0) omega(je_start:je_end,1) = 0.D0
             if ( .not. var4d_lbc .and. be%cv%size_jl.gt.0) omega(jl_start:jl_end,1) = 0.D0
+         end if
+
+         if (rotate_omega .and. spectral_precon .and. svd_outer.gt.1) then
+            call da_rotate_omega(grid, cv_size, mz, jp_start, jp_end, &
+                                    svd_outer-1, omega(:,1), omega(:,1))
+
+!            !Included in da_rotate_omega to save I/O time
+!            call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
+!                                    svd_outer-1, omega(:,1), omega(:,1), 'IT' )
          end if
 
          call da_calculate_gradj(svd_outer, 1, cv_size,be%cv%size_jb,be%cv%size_je,be%cv%size_jp, &
@@ -249,7 +258,11 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
          xhat = xhat + ghat
       end if
 
-      if (riot_precon.ge.1) &
+      if (spectral_precon .and. svd_outer.gt.1) &
+         call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
+                                 svd_outer-1, xhat, xhat, 'TL' )
+
+      if (riot_precon.ge.1 .or. spectral_precon) &
          call da_hessian_io ('w',grid, cv_size,svd_outer,nens,neign,&
                             eignvec,eignval,qhat,mz,ghat)
 

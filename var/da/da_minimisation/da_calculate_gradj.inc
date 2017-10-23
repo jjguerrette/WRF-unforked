@@ -54,6 +54,9 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
    real             :: gnorm_j, gnorm_jo, gnorm_jb, gnorm_je, gnorm_jd, gnorm_jp, gnorm_js, gnorm_jl
    logical          :: jcdf_flag
 
+    real            :: cv_dummy(cv_size)
+    real            :: cv_spectral(cv_size)
+
    ! Variables for VarBC background constraint
    integer                           :: jp_start, jp_end       ! Start/end indices of Jp.
    integer                           :: inst, ichan, npred, ipred, id
@@ -116,7 +119,20 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
 #endif
               )
    else
-      call da_transform_vtoy(cv_size, be, grid%ep, cv, iv, grid%vp, &
+
+      if (( &
+#if defined(LAPACK)
+            use_randomsvd .or. &
+#endif
+            use_lanczos) .and. spectral_precon .and. it.gt.1) then
+         call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
+                                 it-1, cv, cv_spectral, 'TL' )
+         cv_dummy = cv_spectral
+      else
+         cv_dummy = cv
+      end if
+
+      call da_transform_vtoy(cv_size, be, grid%ep, cv_dummy, iv, grid%vp, &
               grid%vv, grid%vp6, grid%vv6, xbx, y, grid, config_flags &
 #if (WRF_CHEM == 1)
               , grid%vch &
@@ -132,7 +148,22 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
               )
       grad_jo = - grad_jo    !! Compensate for sign in calculation of grad_v (Jo)
    end if
-      
+
+   if (( &
+#if defined(LAPACK)
+         use_randomsvd .or. &
+#endif
+         use_lanczos) .and. spectral_precon .and. it.gt.1) then
+      if (.not.present(re)) grad_jo = cv_spectral + grad_jo !Not entirely sure on relative sign of grad_jo here due to compensation above
+
+      call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
+                              it-1, grad_jo, grad_jo, 'AD' )
+
+      if (.not.present(re)) then
+         grad_jo = grad_jo - cv !Not entirely sure on relative sign of grad_jo here due to compensation above
+      end if
+   end if
+     
    call da_deallocate_y(jo_grad_y)
 
 #if defined(LAPACK)

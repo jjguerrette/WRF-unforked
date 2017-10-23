@@ -3,7 +3,7 @@ subroutine da_hessian_io (io_config, grid, cv_size, it, nens, neign, eignvec, ei
    !-------------------------------------------------------------------------
    ! Purpose:        Read / Write Hessian eigenpairs
    !
-   ! Called from da_solve
+   ! Called from da_minimise_lz, da_randomise_svd, da_spectral_precon, and others
    !
    ! History: 04/19/2017  Modified from da_lanczos_io (JJ Guerrette)
    !
