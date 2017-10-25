@@ -145,7 +145,7 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
          else
             write(unit=stdout,fmt='("Generating omega ensemble member : ",i3)') ensmember
 !            call da_set_randomcv(cv_size, omega(:,1))
-            call da_gen_omega(omega(:,:), cv_size, 1, grid, mz)
+            call da_gen_omega(omega, cv_size, 1, grid, mz)
             if ( be%cv%size_jp.gt.0) omega(jp_start:jp_end,1) = 0.D0
             if ( be%cv%size_je.gt.0) omega(je_start:je_end,1) = 0.D0
             if ( .not. var4d_lbc .and. be%cv%size_jl.gt.0) omega(jl_start:jl_end,1) = 0.D0
