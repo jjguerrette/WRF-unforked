@@ -60,7 +60,7 @@ module da_minimisation
 #if defined(LAPACK)
       use_randomsvd, svd_stage, ensdim_svd, rotate_omega, &
 #endif
-      use_global_cv_io, &
+      use_global_cv_io, var4d_inc_by_mode, inc_out_interval, &
       use_lanczos, spectral_precon, ntused, info_stop, grm_shmt_order, &
       sound, mtgirs, sonde_sfc, synop, profiler, gpsref, gpspw, polaramv, geoamv, ships, metar, &
       satem, radar, ssmi_rv, ssmi_tb, ssmt1, ssmt2, airsr, pilot, airep,tamdar, tamdar_sfc, rain, &
@@ -79,7 +79,7 @@ module da_minimisation
       da_allocate_y_chem, da_zero_xch_type, &
 #endif
       xbx_type, jo_type, da_allocate_y,da_zero_x,da_zero_y,da_deallocate_y, &
-      da_zero_vp_type, qhat_type
+      da_zero_vp_type, qhat_type, hessian_type, hessian_eig_type
    use da_dynamics, only : da_wpec_constraint_lin,da_wpec_constraint_adj
    use da_obs, only : da_transform_xtoy_adj,da_transform_xtoy, &
       da_add_noise_to_ob,da_random_omb_all, da_obs_sensitivity
@@ -236,6 +236,7 @@ contains
 #include "da_spectral_precon.inc"
 #include "da_hessian_io.inc"
 #include "da_hessian_io_global.inc"
+#include "da_output_increment_by_modes.inc"
 
 #if (WRF_CHEM == 1)
 #include "da_calculate_aminusb.inc"

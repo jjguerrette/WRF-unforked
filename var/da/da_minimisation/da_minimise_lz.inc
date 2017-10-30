@@ -1,7 +1,8 @@
 subroutine da_minimise_lz(grid, config_flags,            &
                            it, cv_size, xbx, be, iv,     &
                            j_grad_norm_target, xhat, qhat, cv, &
-                           re, y, j_cost, eignvec, eignval, neign, j0_total)
+                           re, y, j_cost, eignvec, eignval, neign, j0_total, &
+                           hessian_info)
 
    !-------------------------------------------------------------------------
    ! Purpose:         Main Lanczos minimisation routine 
@@ -38,7 +39,8 @@ subroutine da_minimise_lz(grid, config_flags,            &
    real*8, intent(out)               :: eignval(ntmax(it))
    integer, intent(out)              :: neign
    real, intent(out)                 :: j0_total
-  
+   type(hessian_type), intent(inout), optional :: hessian_info
+ 
    integer                           :: i, j, k, n, inst, iter
 #if (WRF_CHEM != 1)
 #ifdef CLOUD_CV
@@ -145,7 +147,7 @@ subroutine da_minimise_lz(grid, config_flags,            &
          end do
       else
          do j = 1,2 !Second iteration improves orthogonalization for numerical precision (Bjorck, 1994)
-         do i = 1, iter
+         do i = 1, iter !Reordering reduces numerical error (maybe not always?)
             gdot = da_dot_cv(cv_size, ghat, qhat(:,i), grid, mz, jp_start, jp_end)
             ghat = ghat - gdot * qhat(:,i)
          end do
@@ -216,6 +218,23 @@ subroutine da_minimise_lz(grid, config_flags,            &
       end do
       write(unit=stdout,fmt='(A,I5)') 'Number of converged eigenpairs: ', neign
 
+      if ( var4d_inc_by_mode &
+           .and. present(hessian_info) &
+           .and. allocated(hessian_info%ghat) ) then
+
+          if (iter .eq. 1) hessian_info%ghat = - ghat0
+
+          hessian_info%qhat(:,iter) = qhat(:,iter)
+
+          allocate(hessian_info%eigs(iter)%eignval(1:iter))
+          allocate(hessian_info%eigs(iter)%eignvec(1:iter,1:iter))
+
+          hessian_info%eigs(iter)%eignval = eignval(1:iter)
+          hessian_info%eigs(iter)%eignvec = eignvec(1:iter,1:iter)
+          hessian_info%eigs(iter)%neign = iter
+
+          hessian_info%nmodes_max = hessian_info%nmodes_max + 1
+      end if
    end do
 
    !-------------------------------------------------------------------------

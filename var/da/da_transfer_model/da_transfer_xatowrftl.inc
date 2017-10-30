@@ -1,4 +1,4 @@
-subroutine da_transfer_xatowrftl(grid, config_flags, filnam, timestr)
+subroutine da_transfer_xatowrftl(grid, config_flags, filnam, timestr, imode_out)
 
    !---------------------------------------------------------------------------
    !  Purpose: Convert analysis increments into WRFTL increments 
@@ -11,6 +11,7 @@ subroutine da_transfer_xatowrftl(grid, config_flags, filnam, timestr)
    type(grid_config_rec_type), intent(inout) :: config_flags
    character*4, intent(in) :: filnam
    character(len=256), intent(in) :: timestr
+   logical, optional, intent(in) :: imode_out
 
 #ifdef VAR4D
 
@@ -381,8 +382,8 @@ subroutine da_transfer_xatowrftl(grid, config_flags, filnam, timestr)
    end do
 #endif
 
-   if ( .not. trajectory_io .or. var4d_detail_out ) &
-      call  med_hist_out ( grid , AUXHIST8_ALARM , config_flags )
+   if ( .not. trajectory_io .or. var4d_detail_out .or. present(imode_out)) &
+      call  med_hist_out ( grid , AUXHIST18_ALARM , config_flags )
 
    if (trace_use) call da_trace_exit("da_transfer_xatowrftl")
 

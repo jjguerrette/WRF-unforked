@@ -1,7 +1,7 @@
 subroutine da_randomise_svd_51(grid, mz, config_flags,     &
                            cv_size, xbx, be, iv, cv,   &
                            re, y, xhat, nens, j_cost,  &
-                           qhat, eignval, eignvec, neign)
+                           qhat, eignval, eignvec, neign, hessian_info)
 
    !-------------------------------------------------------------------------
    ! Purpose:         Main randomized SVD routine, separated into 4 stages 
@@ -40,6 +40,7 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
    real*8, optional, intent(out)     :: eignvec(nens, nens)
    real*8, optional, intent(out)     :: eignval(nens)
    integer, optional, intent(out)    :: neign                         ! Number of non-truncated eigenpairs
+   type(hessian_type), optional, intent(inout) :: hessian_info
 
 
 #if defined(LAPACK)

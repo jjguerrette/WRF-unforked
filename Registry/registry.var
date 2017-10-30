@@ -614,6 +614,9 @@ rconfig   real    jcdfi_penalty             namelist,perturbation  1  10.      -
 rconfig   logical enable_identity           namelist,perturbation  1  .false.  -   "enable identity AD/TL model"        ""      ""
 rconfig   logical trajectory_io             namelist,perturbation  1  .true.   -  "0:disk IO;1:memory IO"   ""  ""
 rconfig   logical boundary_io               namelist,perturbation  1  .true.   -  "choice for boundary I/O during checkpointed AD/TL"  ""      ""
+rconfig   logical var4d_inc_by_mode         namelist,perturbation  1  .false.  -  "true:output increment for all mode counts in Lanczos and RSVD"   ""  ""
+rconfig   integer inc_out_interval           namelist,perturbation  1  1        -   "inc_out_interval" ""      ""
+
 rconfig   logical var4d_detail_out          namelist,perturbation  1  .false.  -  "true:output perturbation, gradient to disk"   ""  ""
 rconfig   logical var4d_run                 namelist,perturbation  1  .true.  -  "true: exlcude the P calculation in start_em"   ""  ""
 rconfig   integer adtl_run_hours            namelist,wrfvar23      1  0        -  "adtl_run_hours"      "NUMBER OF HOURS TO RUN AD/TL" ""

@@ -86,14 +86,14 @@ module da_wrfvar_top
 #if (WRF_CHEM == 1)
       da_zero_xch_type, da_allocate_y_chem, &
 #endif
-      da_deallocate_y, da_zero_x
+      da_deallocate_y, da_zero_x, hessian_type
    use da_minimisation, only : da_get_innov_vector,da_minimise_cg, &
       da_minimise_lz, da_write_diagnostics, da_calculate_residual, &
       da_calculate_grady, da_sensitivity, da_lanczos_io, da_calculate_j, &
 #if (WRF_CHEM == 1)
       da_calculate_aminusb, &
 #endif
-      da_kmat_mul
+      da_kmat_mul, da_output_increment_by_modes
 #if defined(LAPACK)
    use da_randomisation, only: &
       da_randomise_svd, da_randomise_svd_B, da_randomise_svd_B11, &

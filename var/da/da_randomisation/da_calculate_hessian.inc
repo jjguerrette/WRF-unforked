@@ -1,7 +1,7 @@
 subroutine da_calculate_hessian(grid, mz, config_flags, &
                                 cv_size, xbx, be, iv, cv, &
                                 re, y, xhat, j_cost, &
-                                qhat, eignval, eignvec, neign)
+                                qhat, eignval, eignvec, neign, hessian_info)
 
    !-------------------------------------------------------------------------
    ! Purpose: Direct Hessian calculation, separated into 2 stages 
@@ -39,6 +39,7 @@ subroutine da_calculate_hessian(grid, mz, config_flags, &
    real*8, optional, intent(out)     :: eignvec(ensdim_svd, ensdim_svd)
    real*8, optional, intent(out)     :: eignval(ensdim_svd)
    integer, optional, intent(out)    :: neign                         ! Number of non-truncated eigenpairs
+   type(hessian_type), optional, intent(inout) :: hessian_info
 
 
 #if defined(LAPACK)

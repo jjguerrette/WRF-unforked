@@ -67,10 +67,10 @@ subroutine da_transfer_wrftltoxa(grid, config_flags, filnam, timestr)
       enddo
 
       if ( var4d_detail_out ) &
-         call  med_hist_out ( grid , AUXHIST8_ALARM , config_flags )
+         call  med_hist_out ( grid , AUXHIST18_ALARM , config_flags )
    else
-      config_flags%auxinput8_inname = "tl_d<domain>_<date>"
-      call med_auxinput_in ( grid, AUXINPUT8_ALARM, config_flags )
+      config_flags%auxinput18_inname = "tl_d<domain>_<date>"
+      call med_auxinput_in ( grid, AUXINPUT18_ALARM, config_flags )
    endif
 
    !---------------------------------------------------------------------------

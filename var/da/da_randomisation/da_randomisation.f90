@@ -19,7 +19,7 @@ module da_randomisation
        var4d_lbc, stdout, trace_use, adapt_svd, prepend_rsvd_basis, &
        num_ob_indexes, read_omega, svd_p, ierr, comm, &
        use_randomsvd, nens_compare, tsvd_compare, cglz_compare, rsvd_compare, &
-       use_global_cv_io, ntmax, &
+       use_global_cv_io, ntmax, var4d_inc_by_mode, &
        spectral_precon, riot_precon, rotate_omega, &
        hess_comp_x, &
        hess_comp_Pav_LRU, hess_comp_Pav_LRA, &
@@ -50,7 +50,7 @@ module da_randomisation
 #if (WRF_CHEM == 1)
       da_allocate_y_chem, &
 #endif
-      da_allocate_y, da_deallocate_y
+      da_allocate_y, da_deallocate_y, hessian_type
    use da_par_util, only : da_cv_to_global, da_global_to_cv, da_cv_to_vv, da_vv_to_cv
    use da_reporting, only : da_message, da_warning, da_error, message
    use da_tools_serial, only : da_get_unit,da_free_unit

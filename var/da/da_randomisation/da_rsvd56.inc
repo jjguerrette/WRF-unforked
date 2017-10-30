@@ -23,11 +23,11 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
 
    implicit none
 
-   type(domain), intent(inout)       :: grid
-   integer, intent(in)     :: jp_start, jp_end
-   integer, intent(in)     :: mz(:)
+   type(domain), intent(in) :: grid
+   integer, intent(in)      :: jp_start, jp_end
+   integer, intent(in)      :: mz(:)
 
-   integer, intent(in)               :: cv_size        ! Total cv size
+   integer, intent(in)      :: cv_size        ! Total cv size
 
    integer, intent(in)     :: nens                     ! Number of total eigenpairs
    real(wp), intent(in)    :: yhat(1:cv_size, 1:nens)  ! yhat = A * omega
@@ -39,7 +39,8 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
    integer, intent(out)    :: neign                    ! Number of non-truncated eigenpairs
    logical, optional, intent(in) :: print_messages
 
-   real(wp), dimension(1:nens) :: LAM 
+!!   real(wp), dimension(1:nens) :: LAM 
+   real(wp)                     :: LAM(nens)
    integer                      :: iens, jens, i, j, p1
    real(wp)                     :: F1(nens, nens) ! intermediate matrix
    real(wp)                     :: F2(nens, nens) ! intermediate matrix
@@ -49,12 +50,12 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
    real(wp), allocatable        :: UTF2(:,:), SIGinvVT(:,:)
    real(wp)                     :: KMAT(nens, nens)  ! KMAT = Q^T * A * Q
 
-!   real(wp)                     :: KMAT_(nens, nens)  ! KMAT = Q^T * A * Q
+!   real(wp)                    :: KMAT_(nens, nens)  ! KMAT = Q^T * A * Q
    integer                      :: piv(nens)
    integer                      :: info, cyc
 
-   real                         :: gdot, beta, temp_l
-   real                         :: temp_e(nens)
+   real(wp)                     :: gdot, beta, temp_l
+   real(wp)                     :: temp_e(nens)
    character(len=3) :: cnens=""
    logical          :: swapped
   
@@ -201,14 +202,17 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
    end do
 
    neign = nens
-   eignval = LAM
+!   eignval = LAM
    do iens = 1, nens
-      if (neign .eq. nens .and. LAM(iens) .lt. 0.D0) then
-         if (iens .gt. 1) then
-            neign = iens - 1
-         end if
-      end if
+      LAM(iens) = max(LAM(iens),0.D0)
+!      if (neign.eq.nens .and. LAM(iens).lt.0.D0) then
+!         if (iens .gt. 1) then
+!!            LAM(iens) = 0.D0
+!            neign = iens - 1
+!         end if
+!      end if
    end do
+   eignval = LAM
 
 
 !REMOVE EVENTUALLY or add option

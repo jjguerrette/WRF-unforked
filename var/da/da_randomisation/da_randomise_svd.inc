@@ -1,7 +1,7 @@
 subroutine da_randomise_svd(grid, mz, config_flags,        &
                            cv_size, xbx, be, iv, cv,   &
                            re, y, xhat, nens, j_cost,  &
-                           qhat, eignval, eignvec, neign)
+                           qhat, eignval, eignvec, neign, hessian_info)
 
    !-------------------------------------------------------------------------
    ! Purpose:         Main randomized SVD routine, separated into 2 stages 
@@ -38,11 +38,12 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
    real*8, optional, intent(out)     :: eignvec(nens, nens)
    real*8, optional, intent(out)     :: eignval(nens)
    integer, optional, intent(out)    :: neign                         ! Number of non-truncated eigenpairs
+   type(hessian_type), optional, intent(inout) :: hessian_info
 
 
 #if defined(LAPACK)
 
-   real(wp), dimension(1:nens) :: LAM
+   real(wp)                     :: LAM(nens)
    real(wp), allocatable        :: yhat(:,:)  ! yhat = A * omega
    real(wp), allocatable        :: omega(:,:) ! Gaussian draw
   
@@ -52,15 +53,6 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
    integer                      :: jl_start, jl_end       ! Start/end indices of Jl.
 
    real*8                       :: ghat(1:cv_size)        ! cv copy.
-   real(wp)                     :: F1(nens, nens) ! intermediate matrix
-   real(wp)                     :: F2(nens, nens) ! intermediate matrix
-   real(wp)                     :: U(nens, nens)
-   real(wp)                     :: VT(nens, nens)
-   real(wp)                     :: SIG(nens)
-   real(wp), allocatable        :: TEMP1(:,:), TEMP2(:,:)
-
-
-   real(wp)                     :: KMAT(nens, nens)  ! B = Q^T * A * Q
 
    real*8                       :: beta
    real*8                       :: j0_total
@@ -87,7 +79,7 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
    xhat = 0.D0
 
    if ( svd_stage .eq. 1 .and. ensmember .gt. 0) then
-      ! Generate vectors in Y = A*OMEGA (Halko, Algorithm 4.1), where A = U^T * H^T * R^-1 * H * U 
+      ! Generate vectors in Y = A*OMEGA (Halko, Algorithm 4.1), where A = L^T * H^T * R^-1 * H * L 
       allocate(yhat(1:cv_size,1))
       yhat = 0.D0
 
@@ -210,6 +202,29 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
 !         call da_cv_io ('w', filename, cv_size, qhat(1:cv_size,iens), grid, mz)
 !      end do
 !REMOVE EVENTUALLY or add option
+
+      if ( var4d_inc_by_mode &
+           .and. present(hessian_info) &
+           .and. allocated(hessian_info%ghat) ) then
+
+         hessian_info%ghat = ghat
+
+         hessian_info%nmodes_max = nens
+
+         do iens = 1, nens
+            hessian_info%qhat(:,iens) = qhat(:,iens)
+
+            allocate(hessian_info%eigs(iens)%eignval(1:iens))
+            allocate(hessian_info%eigs(iens)%eignvec(1:iens,1:iens))
+
+            call da_rsvd56(grid, mz, jp_start, jp_end, &
+                          omega(:,1:iens), yhat(:,1:iens), qhat(:,0:iens), cv_size, &
+                          hessian_info%eigs(iens)%eignval, hessian_info%eigs(iens)%eignvec, &
+                          iens, hessian_info%eigs(iens)%neign)
+
+            hessian_info%eigs(iens)%eignval = hessian_info%eigs(iens)%eignval + 1.D0
+         end do
+      end if
 
       call da_rsvd56(grid, mz, jp_start, jp_end, &
                      omega, yhat, qhat, cv_size, &

@@ -1167,6 +1167,20 @@ module da_define_structures
       integer                      :: i, j
    end type maxmin_field_type
 
+   type hessian_eig_type
+      integer :: neign
+      real, allocatable :: eignval(:)
+      real, allocatable :: eignvec(:,:)
+   end type hessian_eig_type
+
+   type hessian_type
+      integer :: nmodes_max
+      real, allocatable :: ghat(:)
+      real, allocatable :: qhat(:,:)
+      type(hessian_eig_type), allocatable :: eigs(:)
+   end type hessian_type
+
+
    ! vp_type is defined in the Registry
    ! x_type  is defined in the Registry
    ! The framework allocates the (local-grid) xa structure.

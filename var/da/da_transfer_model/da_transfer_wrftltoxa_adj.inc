@@ -280,28 +280,28 @@ subroutine da_transfer_wrftltoxa_adj(grid, config_flags, filnam, timestr)
          call push_ad_forcing (timestr)
 
       else
-         config_flags%auxhist8_outname = "af_d<domain>_<date>"
-         call  med_hist_out ( grid , AUXHIST8_ALARM , config_flags )
+         config_flags%auxhist18_outname = "af_d<domain>_<date>"
+         call  med_hist_out ( grid , AUXHIST18_ALARM , config_flags )
          WRITE(message(1), FMT='(A,A)') 'Save  ad. forcing time_stamp:', TRIM(timestr)
          CALL da_message ( message(1:1) )
-         config_flags%auxhist8_outname = "auxhist8_d<domain>_<date>"
+         config_flags%auxhist18_outname = "auxhist18_d<domain>_<date>"
       endif
 
       if ( var4d_detail_out ) then
-         config_flags%auxhist8_outname = "af_d<domain>_<date>"
-         call  med_hist_out ( grid , AUXHIST8_ALARM , config_flags )
+         config_flags%auxhist18_outname = "af_d<domain>_<date>"
+         call  med_hist_out ( grid , AUXHIST18_ALARM , config_flags )
          WRITE(message(1), FMT='(A,A)') 'Save  ad. forcing time_stamp:', TRIM(timestr)
          CALL da_message ( message(1:1) )
-         config_flags%auxhist8_outname = "auxhist8_d<domain>_<date>"
+         config_flags%auxhist18_outname = "auxhist18_d<domain>_<date>"
       endif
 #endif
    else
-      if ( grid%auxinput7_oid .NE. 0 ) then
-         call close_dataset ( grid%auxinput7_oid , config_flags , "DATASET=AUXINPUT7" )
+      if ( grid%auxinput17_oid .NE. 0 ) then
+         call close_dataset ( grid%auxinput17_oid , config_flags , "DATASET=AUXINPUT17" )
       endif
 
-      call open_w_dataset (grid%auxinput7_oid, trim(filnam), grid, config_flags, &
-                            output_auxinput7, "DATASET=AUXINPUT7", ierr)
+      call open_w_dataset (grid%auxinput17_oid, trim(filnam), grid, config_flags, &
+                            output_auxinput17, "DATASET=AUXINPUT17", ierr)
       if ( ierr .NE. 0 ) CALL wrf_error_fatal('Error opening '//trim(filnam))
 
       start_date=current_date
@@ -311,9 +311,9 @@ subroutine da_transfer_wrftltoxa_adj(grid, config_flags, filnam, timestr)
       config_flags%julyr = julyr
       config_flags%julday = julday
 
-      call output_auxinput7 (grid%auxinput7_oid, grid , config_flags , ierr)
-      if ( ierr .NE. 0 ) CALL wrf_error_fatal('Error writing Gradient in auxinput7')
-      call close_dataset (grid%auxinput7_oid, config_flags, "DATASET=AUXINPUT7")
+      call output_auxinput17 (grid%auxinput17_oid, grid , config_flags , ierr)
+      if ( ierr .NE. 0 ) CALL wrf_error_fatal('Error writing Gradient in auxinput17')
+      call close_dataset (grid%auxinput17_oid, config_flags, "DATASET=AUXINPUT17")
    endif
 
    if (trace_use) call da_trace_exit("da_transfer_wrftltoxa_adj")

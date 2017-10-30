@@ -84,6 +84,7 @@
    character(len=2) :: itc
    integer          :: cv_s, cv_e, cv_s_ant, cv_e_ant, cv_s_bb, cv_e_bb
 #endif
+   type(hessian_type) :: hessian_info
 
    if (trace_use) call da_trace_entry("da_solve")
 
@@ -1034,8 +1035,15 @@
                              be%cv%size_jl, xbx, be, iv, xhat, cvt, re, y, j, xhat, grid, config_flags )
 
          else
+            if (var4d_inc_by_mode) then
+               hessian_info%nmodes_max = 0
+               allocate(hessian_info%eigs(ntmax(it)))
+               allocate(hessian_info%qhat(cv_size,0:ntmax(it)))
+               allocate(hessian_info%ghat(cv_size))
+            end if
+
             call da_minimise_lz(grid, config_flags, it, cv_size, xbx,& 
-                             be, iv, j_grad_norm_target, xhat, qhat, cvt, re, y, j, eignvec, eignval, neign, j0_total)
+                             be, iv, j_grad_norm_target, xhat, qhat, cvt, re, y, j, eignvec, eignval, neign, j0_total, hessian_info=hessian_info)
 #if (WRF_CHEM == 1)
             if (calc_aminusb) call da_calculate_aminusb(grid,config_flags,it,cv_size,xbx, &
                                 be,qhat,eignvec,eignval,neign,ntmax(it))
@@ -1087,11 +1095,18 @@
 !Need proper obs handling for non-chem vars still
                   case(1)
                      if (svd_stage .eq. 4) then
+!                        if (var4d_inc_by_mode) then
+!                           allocate(hessian_info%eigs(nens))
+!                           allocate(hessian_info%qhat(cv_size,0:nens))
+!                           allocate(hessian_info%ghat(cv_size))
+!                        end if
+
                         call da_randomise_svd_51( &
                               grid, mz, config_flags, cv_size, xbx, &
                               be, iv, cvt, re, y, xhat, nens, &
                               qhat=qhat, eignval=eignval, &
-                              eignvec=eignvec, neign=neign)
+                              eignvec=eignvec, neign=neign)!, &
+!                              hessian_info=hessian_info)
                      else
                         call da_randomise_svd_51( &
                               grid, mz, config_flags, cv_size, xbx, &
@@ -1100,11 +1115,18 @@
 #endif
                   case(6)
                      if (svd_stage .eq. 2) then
+                        if (var4d_inc_by_mode) then
+                           allocate(hessian_info%eigs(nens))
+                           allocate(hessian_info%qhat(cv_size,0:nens))
+                           allocate(hessian_info%ghat(cv_size))
+                        end if
+
                         call da_randomise_svd( &
                               grid, mz, config_flags, cv_size, xbx, &
                               be, iv, cvt, re, y, xhat, nens, &
                               qhat=qhat, eignval=eignval, &
-                              eignvec=eignvec, neign=neign)
+                              eignvec=eignvec, neign=neign, &
+                              hessian_info=hessian_info)
                      else
                         call da_randomise_svd( &
                               grid, mz, config_flags, cv_size, xbx, &
@@ -1132,11 +1154,18 @@
 !Need proper obs handling for non-chem vars still
                   case(2)
                      if (svd_stage .eq. 2) then
+!                        if (var4d_inc_by_mode) then
+!                           allocate(hessian_info%eigs(nens))
+!                           allocate(hessian_info%qhat(cv_size,0:nens))
+!                           allocate(hessian_info%ghat(cv_size))
+!                        end if
+
                         call da_calculate_hessian( &
                               grid, mz, config_flags, cv_size, xbx, &
                               be, iv, cvt, re, y, xhat, &
                               qhat=qhat, eignval=eignval, &
-                              eignvec=eignvec, neign=neign)
+                              eignvec=eignvec, neign=neign) !, &
+!                              hessian_info=hessian_info)
                      else
                         call da_calculate_hessian( &
                               grid, mz, config_flags, cv_size, xbx, &
@@ -1311,6 +1340,23 @@
       if (.not. var4d) then
          call da_transform_vtox (grid,cv_size,xbx,be,grid%ep,xhat,grid%vv,grid%vp)
       else
+         if ( var4d_inc_by_mode .and. allocated(hessian_info%ghat) ) then
+            call da_output_increment_by_modes(grid,config_flags,mz, &
+                                               max(it,svd_outer),cv_size,xbx,be, &
+                                               hessian_info)
+
+            do ii = 1, hessian_info%nmodes_max
+               if(allocated(hessian_info%eigs(ii)%eignval)) &
+                  deallocate(hessian_info%eigs(ii)%eignval)
+               if(allocated(hessian_info%eigs(ii)%eignvec)) &
+                  deallocate(hessian_info%eigs(ii)%eignvec)
+            end do
+
+            deallocate(hessian_info%eigs)
+            deallocate(hessian_info%qhat)
+            deallocate(hessian_info%ghat)
+         end if
+
          call da_transform_vtox (grid,be%cv%size_jb,xbx,be,grid%ep,xhat(1:be%cv%size_jb),grid%vv,grid%vp &
 #if (WRF_CHEM == 1)
          , grid%vch &
