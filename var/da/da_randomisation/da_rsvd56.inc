@@ -65,7 +65,7 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
    IF ( rootproc ) CALL start_timing
 #endif
 
-   if(.not.present(print_messages)) write(unit=stdout,fmt='(A)') 'Performing Stage 2 of RSVD5.6'
+   if(.not.present(print_messages)) write(unit=stdout,fmt='(A,I5,A)') 'Performing Stage 2 of RSVD5.6 for ', nens ,' ensembles'
    if(.not.present(print_messages)) write(unit=stdout,fmt=*) ' '
 
    do iens = 1, nens

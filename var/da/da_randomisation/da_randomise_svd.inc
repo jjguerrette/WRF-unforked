@@ -210,19 +210,20 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
          hessian_info%ghat = ghat
 
          hessian_info%nmodes_max = nens
-
          do iens = 1, nens
             hessian_info%qhat(:,iens) = qhat(:,iens)
+         end do
 
+         do iens = nens, 1, -inc_out_interval
             allocate(hessian_info%eigs(iens)%eignval(1:iens))
             allocate(hessian_info%eigs(iens)%eignvec(1:iens,1:iens))
 
             call da_rsvd56(grid, mz, jp_start, jp_end, &
                           omega(:,1:iens), yhat(:,1:iens), qhat(:,0:iens), cv_size, &
-                          hessian_info%eigs(iens)%eignval, hessian_info%eigs(iens)%eignvec, &
+                          eignval(1:iens), hessian_info%eigs(iens)%eignvec, &
                           iens, hessian_info%eigs(iens)%neign)
 
-            hessian_info%eigs(iens)%eignval = hessian_info%eigs(iens)%eignval + 1.D0
+            hessian_info%eigs(iens)%eignval = eignval(1:iens) + 1.D0
          end do
       end if
 

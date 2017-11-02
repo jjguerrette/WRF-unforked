@@ -19,7 +19,7 @@ module da_randomisation
        var4d_lbc, stdout, trace_use, adapt_svd, prepend_rsvd_basis, &
        num_ob_indexes, read_omega, svd_p, ierr, comm, &
        use_randomsvd, nens_compare, tsvd_compare, cglz_compare, rsvd_compare, &
-       use_global_cv_io, ntmax, var4d_inc_by_mode, &
+       use_global_cv_io, ntmax, var4d_inc_by_mode, inc_out_interval, &
        spectral_precon, riot_precon, rotate_omega, &
        hess_comp_x, &
        hess_comp_Pav_LRU, hess_comp_Pav_LRA, &

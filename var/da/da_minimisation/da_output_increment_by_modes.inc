@@ -30,7 +30,7 @@ subroutine da_output_increment_by_modes(grid,config_flags,mz, &
    integer                      :: jp_start, jp_end       ! Start/end indices of Jp.
 !   integer                      :: jl_start, jl_end       ! Start/end indices of Jl.
 
-   integer :: i, imode, nmodes, neign, itype, endtype, icount
+   integer :: i, imode, nmodes, neign, itype, iend, icount
    real*8, allocatable :: LAM(:)
    real*8, allocatable :: eignval(:)
    real*8, allocatable :: eignvec(:,:)
@@ -40,6 +40,7 @@ subroutine da_output_increment_by_modes(grid,config_flags,mz, &
    real*8 :: xhat_REF(1:cv_size)
    real*8 :: dvnorm_(1:cv_size)
    real*8 :: EUCNORM_xPa(2)
+   real*8 :: minlam(1:1)
    type(hessian_eig_type) :: hess_REF
 
    character(len=10) :: PREFIX
@@ -65,9 +66,12 @@ subroutine da_output_increment_by_modes(grid,config_flags,mz, &
    allocate(LAM(1:nmodes))
 
    dummy_name = trim(config_flags%auxhist18_outname)
+   call nl_set_io_form_auxhist18 ( grid%id, 2 )
+   config_flags%io_form_auxhist18 = 2
+   config_flags%frames_per_auxhist18 = 1
 
-   endtype = 2
-   if (use_lanczos) endtype = 1
+   iend = 2
+   if (use_lanczos) iend = 1
 
    do imode = 1, nmodes
       qhat(:,imode) = hessian_info%qhat(:,imode)
@@ -82,8 +86,10 @@ subroutine da_output_increment_by_modes(grid,config_flags,mz, &
       neign = hessian_info%eigs(imode)%neign
       eignval = hessian_info%eigs(imode)%eignval
       eignvec = hessian_info%eigs(imode)%eignvec
+
+      EUCNORM_xPa = 0.D0
    
-      do itype = 1, endtype
+      do itype = 1, iend
          icount = icount+ 1
 !!!      if ((minval(eignval(1:np)) .lt. 2.D0 .and. adapt_svd.eq.1) .or. adapt_svd.gt.1) then
          if (itype .eq. 2) then
@@ -99,11 +105,10 @@ subroutine da_output_increment_by_modes(grid,config_flags,mz, &
             end do
 
             PREFIX = 'LRA'
-
             if (use_lanczos) PREFIX = 'CGLZ'
 
          end if
-         write(unit=filnam,fmt='(2a,i2.2,a,i4.4)') trim(PREFIX),'_increment_iouter',it,'_imode',imode
+         write(unit=filnam,fmt='(2a,i2.2,a,i4.4)') trim(PREFIX),'inc_it',it,'_nmode',imode
 
          xhat = 0.D0
 
@@ -126,7 +131,6 @@ subroutine da_output_increment_by_modes(grid,config_flags,mz, &
          call domain_clock_get( grid, current_timestr=timestr )
          config_flags%auxhist18_outname = trim(filnam)
          call da_transfer_xatowrftl(grid, config_flags, 'DUMM', timestr, .true.)
-
 
          !-----------------------------------------
          ! Calculate ||dx - dx_REF||^2_{Pa_REF^-1}
@@ -168,9 +172,11 @@ subroutine da_output_increment_by_modes(grid,config_flags,mz, &
          deallocate(eignvec)
       end do
 
+      minlam = minval(eignval)
+
       write(unit=stdout,fmt='(A,2I6,3E27.16E3)') &
          'imode,neign,min(lambda),EUCNORM_xPa[LRA,LRU] = ',&
-         imode,neign,minval(eignval),EUCNORM_xPa
+         imode,neign,minlam(1),EUCNORM_xPa
 
    end do
 
@@ -180,6 +186,8 @@ subroutine da_output_increment_by_modes(grid,config_flags,mz, &
    deallocate(qhat)
 
    config_flags%auxhist18_outname = trim(dummy_name)
+   call nl_set_io_form_auxhist18 ( grid%id, 0 )
+   config_flags%io_form_auxhist18 = 0
 
    if (trace_use) call da_trace_exit("da_output_increment_by_modes")
 
