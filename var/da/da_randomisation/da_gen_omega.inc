@@ -7,7 +7,7 @@ subroutine da_gen_omega(omega_mat, vec_len, nvec, grid, mz )
    !-------------------------------------------------------------------------
 
    implicit none
-   real(wp), allocatable, intent(out) :: omega_mat(:,:) ! Gaussian draw
+   real(wp), allocatable, intent(inout) :: omega_mat(:,:) ! Gaussian draw
    integer, intent(in)                :: vec_len, nvec
    type (domain),  intent(inout)      :: grid
    integer, intent(in)                :: mz(:)

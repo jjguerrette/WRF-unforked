@@ -40,7 +40,7 @@ subroutine da_output_increment_by_modes(grid,config_flags,mz, &
    real*8 :: xhat_REF(1:cv_size)
    real*8 :: dvnorm_(1:cv_size)
    real*8 :: EUCNORM_xPa(2)
-   real*8 :: minlam(1:1)
+!   real*8 :: minlam(1:1)
    type(hessian_eig_type) :: hess_REF
 
    character(len=10) :: PREFIX
@@ -168,15 +168,16 @@ subroutine da_output_increment_by_modes(grid,config_flags,mz, &
          !Multiply (dv - dv_REF)^T * Pav_REF^-1 * (dv - dv_REF) = ||dx - dx_REF||^2_{Pa_REF^-1}
          EUCNORM_xPa(itype) = da_dot_cv(cv_size, xhat, dvnorm_, grid, mz, jp_start, jp_end)
 
-         deallocate(eignval)
-         deallocate(eignvec)
       end do
 
-      minlam = minval(eignval)
+!      minlam = minval(eignval)
 
       write(unit=stdout,fmt='(A,2I6,3E27.16E3)') &
          'imode,neign,min(lambda),EUCNORM_xPa[LRA,LRU] = ',&
-         imode,neign,minlam(1),EUCNORM_xPa
+         imode,neign,minval(eignval),EUCNORM_xPa
+
+      deallocate(eignval)
+      deallocate(eignvec)
 
    end do
 

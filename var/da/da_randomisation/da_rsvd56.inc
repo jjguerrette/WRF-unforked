@@ -47,7 +47,7 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
    real(wp)                     :: U(nens, nens)
    real(wp)                     :: VT(nens, nens)
    real(wp)                     :: SIG(nens)
-   real(wp), allocatable        :: UTF2(:,:), SIGinvVT(:,:)
+   real(wp), allocatable        :: UTF2(:,:), VSIGinv(:,:)
    real(wp)                     :: KMAT(nens, nens)  ! KMAT = Q^T * A * Q
 
 !   real(wp)                    :: KMAT_(nens, nens)  ! KMAT = Q^T * A * Q
@@ -70,8 +70,11 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
 
    do iens = 1, nens
       do jens = 1, nens
-         F1(iens,jens) = da_dot_cv(cv_size, qhat(:,jens), omega(:,iens), grid, mz, jp_start, jp_end)
-         F2(iens,jens) = da_dot_cv(cv_size, qhat(:,jens), yhat(:,iens), grid, mz, jp_start, jp_end)
+         !F1 = OMEGA^T * Q
+         F1(iens,jens) = da_dot_cv(cv_size, omega(:,iens), qhat(:,jens), grid, mz, jp_start, jp_end)
+
+         !F2 = Y^T * Q
+         F2(iens,jens) = da_dot_cv(cv_size, yhat(:,iens), qhat(:,jens), grid, mz, jp_start, jp_end)
       end do
    end do
 
@@ -90,9 +93,10 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
 
    info = 0
 
+   ! Solve F1*KMAT = F2
    ! p1 = 0  !--> Works for a perfectly numerically symmetric Hessian
    p1 = -1 !--> Works for at least nearly symmetric Hessian (most general, default)
-   ! p1 > 0  !--> Use p1 for alternative method of oversampling to svd_p
+   ! p1 > 0  !--> Use p1 for oversampling method alternative to svd_p
    if (p1 .eq. 0) then
       call GESV(F1, F2, piv, info) !F95
 
@@ -104,34 +108,37 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
       end do
    else !NEED TO ADJUST OVERSAMPLING METHOD!!!
       if (p1 .lt. 0) p1 = 0
-      call GESVD(F1(1:nens,1:nens-p1), &
+
+      ! DECOMPOSE F1 = U * SIG * VT 
+      call GESVD(F1(1:nens-p1,1:nens), &
                  SIG(1:nens-p1), &
-                 U = U(1:nens,1:nens-p1), &
-                 VT = VT(1:nens-p1,1:nens-p1), &
+                 U = U(1:nens-p1,1:nens-p1), &
+                 VT = VT(1:nens-p1,1:nens), &
                  INFO = info)
 
-      allocate(UTF2(1:nens-p1,1:nens-p1))
-      allocate(SIGinvVT(1:nens-p1,1:nens-p1))
+      ! KMAT = VT^T * SIG^-1 * U^T * F2 
+      allocate(UTF2(1:nens-p1,1:nens))
+      allocate(VSIGinv(1:nens,1:nens-p1))
       do iens = 1, nens-p1
-         SIGinvVT(iens,:) = (1.D0 / SIG(iens)) * VT(iens,:)
-         do jens = 1, nens-p1
-            UTF2(iens,jens) = sum(U(1:nens,iens) * F2(1:nens,jens))
+         VSIGinv(:,iens) = VT(iens,:) * (1.D0 / SIG(iens))
+         do jens = 1, nens
+            UTF2(iens,jens) = sum(U(:,iens) * F2(1:nens-p1,jens))
          end do
       end do
 
-
-      do iens = 1, nens-p1
-         do jens = 1, nens-p1
-               KMAT(iens,jens) = sum(SIGinvVT(:,iens) * UTF2(:,jens))
+      do iens = 1, nens
+         do jens = 1, nens
+            KMAT(iens,jens) = sum(VSIGinv(iens,:) * UTF2(:,jens))
          end do
       end do
       deallocate(UTF2)
-      deallocate(SIGinvVT)
+      deallocate(VSIGinv)
    end if
    if (info /=0) then
       write(stdout,*) 'Error in randomised SVD: GESV returned ',info
       CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
    end if
+
    ! Force symmetry in KMAT
    do iens = 1, nens
       do jens = min(iens+1,nens), nens
