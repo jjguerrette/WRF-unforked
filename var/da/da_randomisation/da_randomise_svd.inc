@@ -130,7 +130,7 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
             call da_rotate_omega(grid, cv_size, mz, jp_start, jp_end, &
                                     svd_outer-1, omega(:,1), omega(:,1))
 
-!            !Included in da_rotate_omega to save I/O time
+!            !Included in da_rotate_omega to save hessian I/O time
 !            call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
 !                                    svd_outer-1, omega(:,1), omega(:,1), 'IT' )
          end if
@@ -237,7 +237,7 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
       ! Print current eigenpairs
       ! ----------------------------------------------
       write(cnens,fmt='(I0)') nens
-      write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'Eigenvalues(r): ',eignval(1:nens)-1.D0
+      write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'Eigenvalues(r): ',eignval(1:nens)
 
       do iens = 1, nens
          write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'EIGENVECTOR_MATRIX: ',eignvec(iens,1:nens)

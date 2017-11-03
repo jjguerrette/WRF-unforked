@@ -239,26 +239,34 @@ fi
 NPpJ_grad=$((NODES_grad*PPN))
 if [ $NPpJ_grad -gt $NPpJMAX ]; then NPpJ_grad=$(($((NPpJMAX/PPN))*PPN)); fi
 NODES_grad=$((NPpJ_grad/PPN))
+
+if [ "$GLOBAL_OPT" == "false" ] && [ $NPpJ_grad -ne $NPpJ ]; then
+    echo "ERROR: nproc_local and nproc_local_grad must be equal when GLOBAL_OPT==false"
+    echo "NPpJ=$NPpJ"
+    echo "NPpJ_grad=$NPpJ_grad"
+    echo 8; exit 8
+fi
+
 echo "Cores per ensemble job: "$NPpJ
 echo "Cores per non-global gradient job: "$NPpJ_grad
 if [ $((NPpJ % PPN)) -ne 0 ] || [ $((NPpJ_grad % PPN)) -ne 0 ] || [ $NPpJ -eq 0 ] || [ $NPpJ_grad -eq 0 ]; then
     echo "ERROR: cores per ensemble must be equal to PPN times a positive integer multiplier"
+    echo "NPpJ=$NPpJ"
+    echo "NPpJ_grad=$NPpJ_grad"
     echo "PPN=$PPN"
-    echo 8; exit 8
+    echo 9; exit 9
 fi
 
 # Set processor counts for: 
 #(1) stage 0
-nproc0=$NUMPROC
-if [ $nproc0 -gt $NPpJMAX ]; then nproc0=$NPpJMAX; fi
+nproc_max=$NUMPROC
+if [ $nproc_max -gt $NPpJMAX ]; then nproc_max=$NPpJMAX; fi
 
 #(2) ensemble members
 nproc_local=$NPpJ
-echo "LOCAL PROCS = $nproc_local"
 
 #(3) gradient member
 nproc_local_grad=$NPpJ_grad
-echo "GRAD PROCS = $nproc_local_grad"
 
 #(4) global gathering stages
 if [ "$GLOBAL_OPT" == "false" ]; then
@@ -266,9 +274,12 @@ if [ "$GLOBAL_OPT" == "false" ]; then
    nproc_global=$nproc_local
 else if [ "$GLOBAL_OPT" == "true" ]; then
    #FOR GLOBAL ENABLED SIM
-   nproc_global=$nproc0
+   nproc_global=$nproc_max
 fi
 fi
+
+echo "LOCAL PROCS = $nproc_local"
+echo "GRAD PROCS = $nproc_local_grad"
 echo "GLOBAL PROCS = $nproc_global"
 
 # Set number of parallel jobs
@@ -461,7 +472,7 @@ do
          if [ $OSSE -eq 1 ]; then
             ex -c :"/osse_chem" +:":s/=.*,/=false,/g" +:wq namelist.input
             ex -c :"/init_osse_chem" +:":s/=.*,/=true,/g" +:wq namelist.input
-            mpistring="mpiexec $DEBUGSTR -np $nproc0 $EXECUTABLE"
+            mpistring="mpiexec $DEBUGSTR -np $nproc_max $EXECUTABLE"
             #COULD MAKE THIS FASTER (MORE MEMORY) by distributing across more nodes (currently chooses first $npiens processors in $PBS_NODEFILE)
 
             echo "$mpistring"
@@ -481,7 +492,7 @@ do
 
       if [ $CPDT -gt 0 ]; then
          echo "Generating checkpoint files..."
-         mpistring="mpiexec $DEBUGSTR -np $nproc0 $EXECUTABLE"
+         mpistring="mpiexec $DEBUGSTR -np $nproc_max $EXECUTABLE"
          #COULD MAKE THIS FASTER (MORE MEMORY) by distributing across more nodes (currently chooses first $npiens processors in $PBS_NODEFILE)
 
          echo "$mpistring"
@@ -492,7 +503,7 @@ do
    fi
 
    if [ $STAGE1 -le 0 ] || [ $svd_type -eq 11 ]; then
-      echo "EXIT: STAGE1 > 0 required for multiple outer iterations"; echo 9; exit 9;
+      echo "EXIT: STAGE1 > 0 required for multiple outer iterations"; echo 10; exit 10;
    fi
 
 #====================================================================================
@@ -504,12 +515,12 @@ do
 
    # Check for presence of checkpoint and obs output files (CHEM only)
    if [ $CPDT -gt 0 ]; then
-      if [ $(ls "$CWD"/wrf_checkpoint_d01* | wc -l) -eq 0 ]; then echo "ERROR: Missing checkpoint files"; echo 10; exit 10; fi
+      if [ $(ls "$CWD"/wrf_checkpoint_d01* | wc -l) -eq 0 ]; then echo "ERROR: Missing checkpoint files"; echo 11; exit 11; fi
    fi
    if [ $WRF_CHEM -gt 0 ]; then
-      if [ $(ls "$CWD"/SURFACE_Hx_y* | wc -l) -eq 0 ]; then echo "ERROR: Missing SURFACE_Hx_y files"; echo 11; exit 11; fi
+      if [ $(ls "$CWD"/SURFACE_Hx_y* | wc -l) -eq 0 ]; then echo "ERROR: Missing SURFACE_Hx_y files"; echo 12; exit 12; fi
 
-      if [ $(ls "$CWD"/AIRCRAFT_Hx_y* | wc -l) -eq 0 ]; then echo "ERROR: Missing AIRCRAFT_Hx_y files"; echo 12; exit 12; fi
+      if [ $(ls "$CWD"/AIRCRAFT_Hx_y* | wc -l) -eq 0 ]; then echo "ERROR: Missing AIRCRAFT_Hx_y files"; echo 13; exit 13; fi
 # Something like this would allow storing checkpoint files in a temporary directory (hard disk, not memory due to size)
 #         if [ $it -gt $itstart ]; then
 #            pbsdsh -- rm $TMPDIR/wrf_checkpoint_d01*
@@ -603,7 +614,7 @@ do
             ex -c :"/ensmember" +:":s/=.*/=$iENS,/" +:wq namelist.input   
 
             #Test for the presence of cvt
-            if [ $(ls "$CWD"/cvt.it"$it0_last".* | wc -l) -eq 0 ]; then echo "ERROR: Missing cvt.*"; echo 13; exit 13; fi
+            if [ $(ls "$CWD"/cvt.it"$it0_last".* | wc -l) -eq 0 ]; then echo "ERROR: Missing cvt.*"; echo 14; exit 14; fi
             ln -sf $CWD/cvt.* ./
             mkdir oldrsl_$it0_last
             mv -v rsl.* oldrsl_$it0_last
@@ -651,7 +662,7 @@ do
 
             cd ../run.$jj
             ls $diri/omega_precon.e$jj.p*
-            if [ $? -ne 0 ]; then echo "ERROR: Missing run.$ii/omega.e$jj.p*"; echo 14; exit 14; fi
+            if [ $? -ne 0 ]; then echo "ERROR: Missing run.$ii/omega.e$jj.p*"; echo 15; exit 15; fi
 
             for file in $diri/omega_precon.e$jj.p*
             do
@@ -691,7 +702,7 @@ do
          if [ $((NPpJ/PPN)) -eq 0 ]; then
             echo "ERROR: cores per ensemble less than cores per node"
             echo "$NUMPROC, $NODES_ens, $PPN, $NPpJ"
-            echo 15; exit 15
+            echo 16; exit 16
          fi
          if [ $NPpJ -gt $NPpJMAX ]; then NPpJ=$(($((NPpJMAX/PPN))*PPN)); fi
 
@@ -700,7 +711,7 @@ do
 
          dummy=$(($((nproc_local*NENS))+$(($((NJOBS-NENS))*nproc_local_grad))))
          if [ $dummy -gt $NUMPROC ]; then
-            echo "ERROR: Too many processors requested in it=$it, NUMPROC_request=$dummy, NUMPROC_avail=$NUMPROC"; echo 16; exit 16
+            echo "ERROR: Too many processors requested in it=$it, NUMPROC_request=$dummy, NUMPROC_avail=$NUMPROC"; echo 17; exit 17
          fi
       fi
       ##--------------------------------------------------------------------------
@@ -739,7 +750,7 @@ do
       ex -c :"/ensmember" +:":s/=.*/=$iENS,/" +:wq namelist.input   
       if [ $it -gt 1 ] && ([ $RIOT_RESTART -eq 0 ] || [ $RIOT_RESTART -eq 2 ]); then
          #Test for the presence of cvt
-         if [ $(ls "$CWD"/cvt.it"$it0_last".* | wc -l) -eq 0 ]; then echo "ERROR: Missing cvt.*"; echo 17; exit 17; fi
+         if [ $(ls "$CWD"/cvt.it"$it0_last".* | wc -l) -eq 0 ]; then echo "ERROR: Missing cvt.*"; echo 18; exit 18; fi
          ln -sf $CWD/cvt.* ./
          mkdir oldrsl_$it0_last
          mv -v rsl.* oldrsl_$it0_last
@@ -810,7 +821,7 @@ do
    export PBS_NODEFILE=$PBSNODE0
 
    if [ $STAGE2 -le 0 ]; then
-      echo "EXIT: STAGE2 > 0 required for multiple outer iterations"; echo 18; exit 18;
+      echo "EXIT: STAGE2 > 0 required for multiple outer iterations"; echo 19; exit 19;
    fi
 #===================================================================================
 #===================================================================================
@@ -871,7 +882,7 @@ do
       echo "$dummy present of ${nvec[$vcount]} $var files"
       if [ $dummy -ne ${nvec[$vcount]} ]; then 
          echo "ERROR: Missing or extra $var""0000"
-         echo 19; exit 19
+         echo 20; exit 20
       fi
       mv -v ../run.*/$var* ../vectors_$it0
       ln -sf ../vectors_$it0/$var* ./
@@ -937,7 +948,7 @@ do
          do
             echo "Working on $var files"
             #Test for the presence of qhat_obs for this ensemble
-            if [ $(ls ../run/$var"$ii."* | wc -l) -eq 0 ]; then echo "ERROR: Missing $var$ii.*"; echo 20; exit 20; fi
+            if [ $(ls ../run/$var"$ii."* | wc -l) -eq 0 ]; then echo "ERROR: Missing $var$ii.*"; echo 21; exit 21; fi
             mv -v ../run/$var$ii.* ../vectors_$it0
 
             ln -sf ../vectors_$it0/$var$ii.* ./
@@ -991,7 +1002,7 @@ do
          echo "$dummy present of ${nvec[$vcount]} $var files"
          if [ $dummy -ne ${nvec[$vcount]} ]; then 
             echo "ERROR: Missing or extra $var"
-            echo 21; exit 21
+            echo 22; exit 22
          fi
          mv -v ../run.*/$var* ../vectors_$it0
          ln -sf ../vectors_$it0/$var* ./

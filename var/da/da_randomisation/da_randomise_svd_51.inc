@@ -410,9 +410,6 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
 
       neign = nens
 
-      write(cnens,fmt='(I0)') neign
-      write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'Eigenvalues(r): ',LAM(1:nens)
-
 !REMOVE EVENTUALLY or add option
 !      ! Write nuhat vectors to disk
 !      do i = 1, neign
@@ -430,6 +427,16 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
          eignval(i) = LAM(i) + 1.D0
       end do
       qhat(1:cv_size,1:nens) = TRANSPOSE(nuhat_T)
+
+
+      ! Print current eigenvalues
+      ! ----------------------------------------------
+      write(cnens,fmt='(I0)') nens
+      write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'Eigenvalues(r): ',eignval(1:nens)
+
+      write(unit=stdout,fmt='(A)') ' '
+      write(unit=stdout,fmt='(A,I5,A,I5,A)') 'Using ', neign, ' of ', nens, ' eigenpairs'
+      write(unit=stdout,fmt='(A)') ' '
 
       ! (2) Construct low rank estimate of A^-1 * ghat with leading neign modes of A
       np = neign
