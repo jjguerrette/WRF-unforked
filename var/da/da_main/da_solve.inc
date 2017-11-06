@@ -55,11 +55,15 @@
    character(len=8) :: cvtfile
    logical :: ex
 #if defined(LAPACK)
-   character*10                 :: cproc,cmember
+   character*10                 :: cproc,cens
    character*10                 :: cit
    character(len=filename_len)  :: cvtfile_svd
+   character(len=filename_len)  :: filename
    integer                      :: run_hours0
-   integer                      :: nens
+   integer                      :: iens, nens
+   real*8, allocatable          :: omega(:,:) ! Gaussian draw
+#endif
+
 #if (WRF_CHEM != 1)
 #ifdef CLOUD_CV
    integer                           :: mz(13), info, nsstwrk
@@ -72,8 +76,6 @@
 #else
    integer                           :: mz(9), info, nsstwrk
 #endif
-#endif
-
 #endif
 
    real :: j0_total
@@ -699,6 +701,24 @@
    j_grad_norm_target = 1.0
    do it = 1, max_ext_its
 
+#if (WRF_CHEM != 1)
+#ifdef CLOUD_CV
+         mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
+                 be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne /)
+#else
+         mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne /)
+#endif
+#else
+#ifdef CLOUD_CV
+         mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
+                 be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne, &
+                 be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
+#else
+         mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne, &
+                 be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
+#endif
+#endif
+
 #ifdef DM_PARALLEL
    IF ( rootproc ) CALL start_timing
 #endif
@@ -719,6 +739,42 @@
             end if
          else
             nens = ensdim_svd
+         end if
+         if ( svd_stage.eq.0 .and. read_omega ) then
+            call da_gen_omega(omega, cv_size, nens, grid, mz)
+
+            !Write omega to file
+            write(cproc,fmt='(i4.4)') myproc
+            do iens = 1, nens
+               write(cens,fmt='(i4.4)') iens
+
+               filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+               call da_cv_io ('w', filename, cv_size, omega(1:cv_size,1), grid, mz)
+            end do
+            deallocate(omega)
+
+            if (checkpoint_interval .le. 0) then
+               call da_deallocate_observations (iv)
+               call da_deallocate_y (ob)
+               if (use_background_errors) call da_deallocate_background_errors (be)
+
+               call da_wrfvar_finalize
+
+               if (var4d) call da_finalize_model
+
+#ifdef DM_PARALLEL
+               IF ( rootproc ) CALL end_timing('da_end_timing: GEN_OMEGA')
+#endif
+
+               call wrf_message("*** WRF-Var-RIOT generated OMEGA successfully ***")
+               if (trace_use) call da_trace_exit("da_wrfvar_main")
+               if (trace_use) call da_trace_report
+
+               call wrfu_finalize
+               call wrf_shutdown
+               stop
+
+            end if
          end if
          allocate (qhat(1:cv_size, 0:nens))
          allocate (eignvec(nens, nens))
@@ -1004,23 +1060,6 @@
       call da_allocate_y_chem (iv, y)
 #endif
 
-#if (WRF_CHEM != 1)
-#ifdef CLOUD_CV
-         mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
-                 be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne /)
-#else
-         mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne /)
-#endif
-#else
-#ifdef CLOUD_CV
-         mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, &
-                 be%v6%mz, be%v7%mz, be%v8%mz, be%v9%mz, be%v10%mz, be%v11%mz, be%alpha%mz, be%ne, &
-                 be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
-#else
-         mz = (/ be%v1%mz, be%v2%mz, be%v3%mz, be%v4%mz, be%v5%mz, be%alpha%mz, be%ne, &
-                 be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
-#endif
-#endif
       !=======================================================
       ! 3 options (use_lanczos, use_randomsvd, default - cg)
       !=======================================================
@@ -1197,8 +1236,8 @@
 #endif
 
 
-               write(unit=message(1),fmt='(A,I2,A)') &
-                 "***Completed Stage ",svd_stage," of Randomized SVD***"
+               write(unit=message(1),fmt='(A,I2,A,I2,A)') &
+                 "***Completed Stage ",svd_stage," of Randomized SVD in outer iteration",svd_outer,"***"
                call wrf_message(message(1))
 
                if (trace_use) call da_trace_exit("da_wrfvar_main")

@@ -51,10 +51,11 @@ echo ""
 #export svd_type=6 # 1-RSVD5.1 (chem only); 6-RSVD5.6 (default); 2-HESS(SVDN=Nobs, chem only); 10-B-cov debug
 #export prepend_rsvd_basis=0 #If ==1, prepend RSVD basis with gradient vector in 
 #                            # all outer iterations after the first
-#export RIOT_PRECON=0  #Set to 0 (default), 1, 2, 3, or 4 to control preconditioning for it > 1
+#export GRAD_PRECON=0  #Set to 0 (default), 1, 2, 3, or 4 to control preconditioning for it > 1
 #export ADAPT_SVD="1" #0, 1 (default), or 2
 #export svd_p=0 #some small value (e.g., 5) between [0,min(SVDN)), only used for adaptive
 #export GLOBAL_OPT="true" #"true" or "false"
+#export GLOBAL_OMEGA="false" #"true" or "false"
 
 #export RIOT_RESTART=0 #If ==1, set nout_RIOT to the number of outer iterations 
 #                      # to complete after start file "ALT_START" 
@@ -79,7 +80,7 @@ export WRF_CHEM=1
 # - limited by WRF patch overlap
 # - depends on domain (nx x ny) and PPN
 # - critical for speeding up single-job (serial) portions of RIOT 
-#    (e.g., RIOT_PRECON=1, STAGE 2 of RSVD5.6 and RSVD5.1, and STAGE 4 of RSVD5.1)
+#    (e.g., GRAD_PRECON=1, STAGE 2 of RSVD5.6 and RSVD5.1, and STAGE 4 of RSVD5.1)
 # - A good rule of thumb is (nx/10 * ny/10) <= NPpJMAX << (nx/5 * ny/5)
 # - Requirement: NPpJMAX <= NUMPROC (see below)
 export NPpJMAX=64
@@ -163,10 +164,10 @@ echo "(7) LRA-LRU Adaptation: ADAPT_SVD=$ADAPT_SVD"
 #   echo "ERROR: ADAPT_SVD must either be true or false"; echo 2; exit 2
 #fi
 echo ""
-echo "(8) Preconditioning Option: RIOT_PRECON=$RIOT_PRECON"
-if [ "$RIOT_PRECON" -lt 0 ]; then
-#if [ "$RIOT_PRECON" -lt 0 ] || [ "$RIOT_PRECON" -gt 4 ]; then
-   echo "ERROR: RIOT_PRECON must be >= 0"; echo 3; exit 3
+echo "(8) Preconditioning Option: GRAD_PRECON=$GRAD_PRECON"
+if [ "$GRAD_PRECON" -lt 0 ]; then
+#if [ "$GRAD_PRECON" -lt 0 ] || [ "$GRAD_PRECON" -gt 4 ]; then
+   echo "ERROR: GRAD_PRECON must be >= 0"; echo 3; exit 3
 fi
 echo ""
 if [ -z $GLOBAL_OPT ]; then
@@ -325,7 +326,7 @@ fi
 
 # Add or modify RIOT namelist options
 SVD_VARS=("svd_outer" "svd_minimise" "ensmember" "ensdim_svd" "svd_stage" "use_randomsvd" "svd_type" "quick_svd" "adapt_svd" "svd_p" "riot_precon" "read_omega" "use_global_cv_io" "prepend_rsvd_basis")
-SVD_VALS=("1" "true" "0" "$NENS" "0" "true" "$svd_type" "$quick_svd" "$ADAPT_SVD" "$svd_p" "$RIOT_PRECON" "false" "$GLOBAL_OPT" "0")
+SVD_VALS=("1" "true" "0" "$NENS" "0" "true" "$svd_type" "$quick_svd" "$ADAPT_SVD" "$svd_p" "$GRAD_PRECON" "$GLOBAL_OMEGA" "$GLOBAL_OPT" "0")
 ivar=0
 for var in ${SVD_VARS[@]}
 do
@@ -393,7 +394,7 @@ else if [ $RIOT_RESTART ] && [ $RIOT_RESTART -eq 2 ]; then
    ln -sf $ALT_CVT ./cvt.it"$ii".p0000
    ln -sf $ALT_XHAT ./xhat.it"$ii".p0000
 
-   if [ $RIOT_PRECON -gt 0 ]; then
+   if [ $GRAD_PRECON -gt 0 ]; then
       cd ../
       ln -sf $ALT_hess_dir/hessian_eigenpairs.it* ./
 #      ln -sf $ALT_hess ./hessian_eigenpairs.it"$ii".0000
@@ -456,6 +457,13 @@ do
    it0=$it
    if [ $it -lt 10 ]; then it0="0"$it0; fi
 
+   cd $CWD
+
+   if [ $(ls -d "../vectors_$it0" | wc -l) -gt 0 ]; then rm -rv ../vectors_$it0; fi
+   mkdir -v ../vectors_$it0
+   rm omega.e*.p*
+   rm yhat.e*.p*
+
    it0_last=$((it-1))
    if [ $it0_last -lt 10 ]; then it0_last="0"$it0_last; fi
    if [ $STAGE0 -gt 0 ]; then
@@ -490,15 +498,22 @@ do
          ex -c :"/init_osse_chem" +:":s/=.*,/=false,/g" +:wq namelist.input
       fi
 
-      if [ $CPDT -gt 0 ]; then
-         echo "Generating checkpoint files..."
-         mpistring="mpiexec $DEBUGSTR -np $nproc_max $EXECUTABLE"
-         #COULD MAKE THIS FASTER (MORE MEMORY) by distributing across more nodes (currently chooses first $npiens processors in $PBS_NODEFILE)
+      if [ $CPDT -gt 0 ] || [ "$GLOBAL_OMEGA" == "true"  ] ; then
+         echo "Generating checkpoint files and/or global omega..."
 
+         if [ "$GLOBAL_OMEGA" == "true" ] && [ "$GLOBAL_OPT" == "false" ]; then
+            npiens=$nproc_local
+         else
+            npiens=$nproc_global
+               #COULD MAKE THIS FASTER (MORE MEMORY) by distributing across more nodes (currently chooses first $npiens processors in $PBS_NODEFILE)
+         fi
+
+         mpistring="mpiexec $DEBUGSTR -np $npiens $EXECUTABLE"
+#         mpistring="mpiexec $DEBUGSTR -np $nproc_max $EXECUTABLE"
          echo "$mpistring"
          eval "$mpistring"
 
-         if [ $SUBTIMING -eq 1 ]; then grep da_end_timing rsl.out.0000 > ../bench_time_checkpoint-write.it$it0; fi
+         if [ $SUBTIMING -eq 1 ]; then grep da_end_timing rsl.out.0000 > ../bench_time_stage0.it$it0; fi
       fi
    fi
 
@@ -556,7 +571,7 @@ do
          NJOBS=$((NENS+1))
       fi
 
-      if [ $RIOT_PRECON -gt 0 ] && ([ $RIOT_RESTART -eq 0 ] || [ $RIOT_RESTART -eq 2 ]); then
+      if [ $GRAD_PRECON -gt 0 ] && ([ $RIOT_RESTART -eq 0 ] || [ $RIOT_RESTART -eq 2 ]); then
 #====================================================================================
          echo ""
          echo "------------------------------------------------------"
@@ -575,18 +590,18 @@ do
 
          ii_grad=$ii
 
-         # This test avoids extra wall time when RIOT_PRECON=[1,3] and NENS in 
+         # This test avoids extra wall time when GRAD_PRECON=[1,3] and NENS in 
          # current iteration is larger than number of potential preconditioning vectors
          dependent_grad=0
          if [ $NENS_PREV -gt $NENS ] && \
-           ([ $RIOT_PRECON -eq 1 ] || [ $RIOT_PRECON -eq 3 ]); then dependent_grad=1; fi
-         if [ $RIOT_PRECON -eq 2 ] || [ $RIOT_PRECON -eq 4 ]; then dependent_grad=1; fi
+           ([ $GRAD_PRECON -eq 1 ] || [ $GRAD_PRECON -eq 3 ]); then dependent_grad=1; fi
+         if [ $GRAD_PRECON -eq 2 ] || [ $GRAD_PRECON -eq 4 ]; then dependent_grad=1; fi
 
 #         if ([ $NENS_PREV -gt $NENS ] \
-#            && ([ $RIOT_PRECON -eq 1 ] \
-#             || [ $RIOT_PRECON -eq 3 ])) \
-#             || [ $RIOT_PRECON -eq 2 ] \
-#             || [ $RIOT_PRECON -eq 4 ] ; then
+#            && ([ $GRAD_PRECON -eq 1 ] \
+#             || [ $GRAD_PRECON -eq 3 ])) \
+#             || [ $GRAD_PRECON -eq 2 ] \
+#             || [ $GRAD_PRECON -eq 4 ] ; then
 #            dependent_grad=1; else dependent_grad=0; fi
 
          if [ $dependent_grad -eq 1 ]; then
@@ -647,8 +662,8 @@ do
 
             diri=../run.$ii
          else
-            #RIOT_PRECON=12,13,14,15 --> EXTRACT omega_precon.e*.p* only
-            diri=../run
+            #GRAD_PRECON=12,13,14,15 --> EXTRACT omega_precon.e*.p* only
+            diri=$CWD
          fi
 
          echo ""
@@ -672,7 +687,7 @@ do
             done
          done
       else
-         ex -c :"/read_omega" +:":s/=.*/=false,/" +:wq namelist.input
+         ex -c :"/read_omega" +:":s/=.*/=$GLOBAL_OMEGA,/" +:wq namelist.input
          ex -c :"/ensdim_svd" +:":s/=.*/=$NENS,/" +:wq namelist.input
       fi
 #====================================================================================
@@ -724,6 +739,25 @@ do
       #2 and #3 are possible only with global CV I/O in WRFDA (GLOBAL_OPT="true")
    fi
 
+   if [ "$GLOBAL_OMEGA" == "true" ]; then
+      if [ $it -eq 1 ] || [ $GRAD_PRECON -eq 0 ]; then
+         echo "Distributing global omega files"
+
+         #Test for the presence of each vector type
+         cd $CWD
+         ls omega.e*.p0000
+         dummy=`ls omega.e"*.p0000" | wc -l`
+         echo "$dummy present of $NENS omega files"
+         if [ $dummy -ne $NENS ]; then 
+            echo "ERROR: Missing or extra omega.e*.p""0000"
+            echo 18; exit 18
+         fi
+         mv -v omega.e*.p* ../vectors_$it0
+      else
+         rm omega.e*.p*
+      fi
+   fi
+
    #==============================================
    # INITIATE STAGE1 ENSEMBLE FOR ALL SVD TYPES
    #==============================================
@@ -746,11 +780,23 @@ do
          ln -sf $CWD/AIRCRAFT_Hx_y* ./
       fi
 
+      if [ "$GLOBAL_OMEGA" == "true" ] && ([ $it -eq 1 ] || [ $GRAD_PRECON -eq 0 ]); then
+         #Distribute omega vectors
+         #Test for the presence of each vector type
+         ls ../$CWD/omega.e$ii"*.p0000"
+         dummy=`ls ../$CWD/omega.e$ii"*.p0000" | wc -l`
+         if [ $dummy -lt 1 ]; then 
+            echo "ERROR: Missing global omega.e*.p""0000"
+            echo 19; exit 19
+         fi
+         mv -v ../vectors_$it0/omega.e$ii* ./
+      fi
+
       cp $CWD/namelist.input ./
       ex -c :"/ensmember" +:":s/=.*/=$iENS,/" +:wq namelist.input   
       if [ $it -gt 1 ] && ([ $RIOT_RESTART -eq 0 ] || [ $RIOT_RESTART -eq 2 ]); then
          #Test for the presence of cvt
-         if [ $(ls "$CWD"/cvt.it"$it0_last".* | wc -l) -eq 0 ]; then echo "ERROR: Missing cvt.*"; echo 18; exit 18; fi
+         if [ $(ls "$CWD"/cvt.it"$it0_last".* | wc -l) -eq 0 ]; then echo "ERROR: Missing cvt.*"; echo 20; exit 20; fi
          ln -sf $CWD/cvt.* ./
          mkdir oldrsl_$it0_last
          mv -v rsl.* oldrsl_$it0_last
@@ -807,8 +853,8 @@ do
 #         fi
 
    done   
-#   if [ $RIOT_PRECON -eq 0 ] || [ $it -eq $itstart ]; then ii_grad=$ii; fi
-   if [ $RIOT_PRECON -eq 0 ] || [ $it -eq 1 ]; then ii_grad=$ii; fi
+#   if [ $GRAD_PRECON -eq 0 ] || [ $it -eq $itstart ]; then ii_grad=$ii; fi
+   if [ $GRAD_PRECON -eq 0 ] || [ $it -eq 1 ]; then ii_grad=$ii; fi
 
 
    #WAIT for all ensembles to finish
@@ -821,7 +867,7 @@ do
    export PBS_NODEFILE=$PBSNODE0
 
    if [ $STAGE2 -le 0 ]; then
-      echo "EXIT: STAGE2 > 0 required for multiple outer iterations"; echo 19; exit 19;
+      echo "EXIT: STAGE2 > 0 required for multiple outer iterations"; echo 21; exit 21;
    fi
 #===================================================================================
 #===================================================================================
@@ -849,8 +895,6 @@ do
    cd $CWD
 
    #Collect relevant vectors into single directory
-   if [ $(ls -d "../vectors_$it0" | wc -l) -gt 0 ]; then rm -rv ../vectors_$it0; fi
-   mkdir -v ../vectors_$it0
    if [ $svd_type -eq 1 ]; then
       #Gather yhat_obs vectors (obs space)
       vectors=("yhat_obs.e*.p")
@@ -882,7 +926,7 @@ do
       echo "$dummy present of ${nvec[$vcount]} $var files"
       if [ $dummy -ne ${nvec[$vcount]} ]; then 
          echo "ERROR: Missing or extra $var""0000"
-         echo 20; exit 20
+         echo 22; exit 22
       fi
       mv -v ../run.*/$var* ../vectors_$it0
       ln -sf ../vectors_$it0/$var* ./
@@ -948,7 +992,7 @@ do
          do
             echo "Working on $var files"
             #Test for the presence of qhat_obs for this ensemble
-            if [ $(ls ../run/$var"$ii."* | wc -l) -eq 0 ]; then echo "ERROR: Missing $var$ii.*"; echo 21; exit 21; fi
+            if [ $(ls ../run/$var"$ii."* | wc -l) -eq 0 ]; then echo "ERROR: Missing $var$ii.*"; echo 23; exit 23; fi
             mv -v ../run/$var$ii.* ../vectors_$it0
 
             ln -sf ../vectors_$it0/$var$ii.* ./
@@ -1002,7 +1046,7 @@ do
          echo "$dummy present of ${nvec[$vcount]} $var files"
          if [ $dummy -ne ${nvec[$vcount]} ]; then 
             echo "ERROR: Missing or extra $var"
-            echo 22; exit 22
+            echo 24; exit 24
          fi
          mv -v ../run.*/$var* ../vectors_$it0
          ln -sf ../vectors_$it0/$var* ./
