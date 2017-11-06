@@ -30,16 +30,16 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
    integer, intent(in)      :: cv_size        ! Total cv size
 
    integer, intent(in)     :: nens                     ! Number of total eigenpairs
-   real(wp), intent(in)    :: yhat(1:cv_size, 1:nens)  ! yhat = A * omega
-   real(wp), intent(in)    :: omega(1:cv_size, 1:nens) ! Gaussian draw
-   real(wp), intent(in)    :: qhat(1:cv_size, 0:nens)  ! orthonormal basis set 
+   real, intent(in)        :: yhat(1:cv_size, 1:nens)  ! yhat = A * omega
+   real, intent(in)        :: omega(1:cv_size, 1:nens) ! Gaussian draw
+   real, intent(in)        :: qhat(1:cv_size, 0:nens)  ! orthonormal basis set 
 
-   real(wp), intent(out)   :: eignvec(nens, nens)
-   real(wp), intent(out)   :: eignval(nens)
+   real, intent(out)       :: eignvec(nens, nens)
+   real, intent(out)       :: eignval(nens)
+
    integer, intent(out)    :: neign                    ! Number of non-truncated eigenpairs
    logical, optional, intent(in) :: print_messages
 
-!!   real(wp), dimension(1:nens) :: LAM 
    real(wp)                     :: LAM(nens)
    integer                      :: iens, jens, i, j, p1
    real(wp)                     :: F1(nens, nens) ! intermediate matrix
@@ -47,14 +47,13 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
    real(wp)                     :: U(nens, nens)
    real(wp)                     :: VT(nens, nens)
    real(wp)                     :: SIG(nens)
-   real(wp), allocatable        :: UTF2(:,:), VSIGinv(:,:)
+   real(wp)                     :: UTF2(nens,nens), VSIGinvT(nens,nens)
    real(wp)                     :: KMAT(nens, nens)  ! KMAT = Q^T * A * Q
 
-!   real(wp)                    :: KMAT_(nens, nens)  ! KMAT = Q^T * A * Q
    integer                      :: piv(nens)
-   integer                      :: info, cyc
+   integer                      :: info
 
-   real(wp)                     :: gdot, beta, temp_l
+   real(wp)                     :: temp_l
    real(wp)                     :: temp_e(nens)
    character(len=3) :: cnens=""
    logical          :: swapped
@@ -78,86 +77,44 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
       end do
    end do
 
-!REMOVE EVENTUALLY or add option
-!   write(cnens,fmt='(I0)') nens
-!   do iens = 1, nens
-!      write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'F1: ',F1(iens,1:nens)
-!   end do
-!   do iens = 1, nens
-!      write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'F2: ',F2(iens,1:nens)
-!   end do
-!
-!REMOVE EVENTUALLY
-
    write(cnens,fmt='(I0)') nens
 
    info = 0
 
-   ! Solve F1*KMAT = F2
-   ! p1 = 0  !--> Works for a perfectly numerically symmetric Hessian
-   p1 = -1 !--> Works for at least nearly symmetric Hessian (most general, default)
-   ! p1 > 0  !--> Use p1 for oversampling method alternative to svd_p
-   if (p1 .eq. 0) then
-      call GESV(F1, F2, piv, info) !F95
+   !! Solve F1*KMAT = F2
 
-      ! GESV returns KMAT^T in F2
-      do iens = 1, nens
-         do jens = 1, nens
-            KMAT(iens,jens) = F2(jens,iens)
-         end do
+   ! DECOMPOSE F1 = U * SIG * VT 
+   call GESVD(F1(1:nens,1:nens), &
+              SIG(1:nens), &
+              U = U(1:nens,1:nens), &
+              VT = VT(1:nens,1:nens), &
+              INFO = info)
+
+   ! KMAT = VT^T * SIG^-1 * U^T * F2 
+   do iens = 1, nens
+      VSIGinvT(iens,1:nens) = VT(iens,1:nens) / SIG(iens)
+      do jens = 1, nens
+         UTF2(iens,jens) = da_dot(nens,U(1:nens,iens),F2(1:nens,jens))
       end do
-   else !NEED TO ADJUST OVERSAMPLING METHOD!!!
-      if (p1 .lt. 0) p1 = 0
+   end do
 
-      ! DECOMPOSE F1 = U * SIG * VT 
-      call GESVD(F1(1:nens-p1,1:nens), &
-                 SIG(1:nens-p1), &
-                 U = U(1:nens-p1,1:nens-p1), &
-                 VT = VT(1:nens-p1,1:nens), &
-                 INFO = info)
-
-      ! KMAT = VT^T * SIG^-1 * U^T * F2 
-      allocate(UTF2(1:nens-p1,1:nens))
-      allocate(VSIGinv(1:nens,1:nens-p1))
-      do iens = 1, nens-p1
-         VSIGinv(:,iens) = VT(iens,:) * (1.D0 / SIG(iens))
-         do jens = 1, nens
-            UTF2(iens,jens) = sum(U(:,iens) * F2(1:nens-p1,jens))
-         end do
+   do iens = 1, nens
+      do jens = 1, nens
+         KMAT(jens,iens) = da_dot(nens,VSIGinvT(:,iens),UTF2(:,jens))
       end do
+   end do
 
-      do iens = 1, nens
-         do jens = 1, nens
-            KMAT(iens,jens) = sum(VSIGinv(iens,:) * UTF2(:,jens))
-         end do
-      end do
-      deallocate(UTF2)
-      deallocate(VSIGinv)
-   end if
    if (info /=0) then
       write(stdout,*) 'Error in randomised SVD: GESV returned ',info
       CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
    end if
 
    ! Force symmetry in KMAT
-   do iens = 1, nens
-      do jens = min(iens+1,nens), nens
-         KMAT(iens,jens) = (KMAT(iens,jens) + KMAT(jens,iens)) / 2.D0
-         KMAT(jens,iens) = KMAT(iens,jens)
-      end do
-   end do
-
-!REMOVE EVENTUALLY or add option
-!   write(cnens,fmt='(I0)') nens
-!   do iens = 1, nens
-!      write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'KMAT: ',KMAT(iens,1:nens)
-!   end do
-!REMOVE EVENTUALLY
+   KMAT = (KMAT + TRANSPOSE(KMAT)) / 2.D0
 
  ! Determine eigenvalues and eigenvectors of the symmetric KMAT matrix
  !-----------------------------------------------------------------
    info = 0
-!   KMAT_ = KMAT
    call SYEV(KMAT, LAM, JOBZ = 'V' , INFO = info) !F95
 
    if (info /=0) then
@@ -176,20 +133,13 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
       if(.not.present(print_messages)) write(unit=stdout,fmt='(A)') &
          'WARNING: Preconditioned Hessian: all(eigs <= 0), setting them positive.'
       LAM = - LAM
-
-! This doesn't really work for Hessian with poor symmetry.  Really want to know how many eigenvalues are positive and how many are negative
-!   else if ( abs(maxval(LAM)) .lt. abs(minval(LAM)) ) then
-!      if(.not.present(print_messages)) write(unit=stdout,fmt='(A)') &
-!         'WARNING: Preconditioned Hessian: ABS(MAX(eigs)) < ABS(MIN(eigs)), setting LAM=-LAM'
-!      LAM = - LAM
-
    else if ( sum(sign(temp_e,LAM)) .lt. 0.D0 ) then
       if(.not.present(print_messages)) write(unit=stdout,fmt='(A,F10.1,A)') &
          'WARNING: Preconditioned Hessian: More negative than positive eigenvalues,', sum(sign(temp_e,LAM)), ', setting LAM=-LAM'
       LAM = - LAM
    end if
   
-   !First sort eigenvalues and eigenvectors in descending order
+   !Sort eigenvalues and eigenvectors in descending order
    do j = nens-1, 1, -1
      swapped = .false.
      do i = 1, j
@@ -208,29 +158,12 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
      if (.NOT. swapped) exit
    end do
 
+   !Preconditioned observation Hessian should be positive semi-definite
    neign = nens
-!   eignval = LAM
    do iens = 1, nens
       LAM(iens) = max(LAM(iens),0.D0)
-!      if (neign.eq.nens .and. LAM(iens).lt.0.D0) then
-!         if (iens .gt. 1) then
-!!            LAM(iens) = 0.D0
-!            neign = iens - 1
-!         end if
-!      end if
    end do
    eignval = LAM
-
-
-!REMOVE EVENTUALLY or add option
-!   if (cyc .eq. 1) then
-!      write(cnens,fmt='(I0)') nens
-!      do iens = 1, nens
-!         write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'KMAT: ',KMAT_(iens,1:nens)
-!      end do
-!   end if
-!   write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'Eigenvalues: ',eignval(1:nens)
-!REMOVE EVENTUALLY
 
 #ifdef DM_PARALLEL
    IF ( rootproc ) CALL end_timing('da_end_timing: rsvd56')

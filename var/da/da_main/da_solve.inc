@@ -61,7 +61,7 @@
    character(len=filename_len)  :: filename
    integer                      :: run_hours0
    integer                      :: iens, nens
-   real*8, allocatable          :: omega(:,:) ! Gaussian draw
+   real(wp), allocatable        :: omega(:,:) ! Gaussian draw
 #endif
 
 #if (WRF_CHEM != 1)
@@ -741,6 +741,7 @@
             nens = ensdim_svd
          end if
          if ( svd_stage.eq.0 .and. read_omega ) then
+            call wrf_message("Generating global omega")
             call da_gen_omega(omega, cv_size, nens, grid, mz)
 
             !Write omega to file
@@ -749,7 +750,7 @@
                write(cens,fmt='(i4.4)') iens
 
                filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
-               call da_cv_io ('w', filename, cv_size, omega(1:cv_size,1), grid, mz)
+               call da_cv_io ('w', filename, cv_size, omega(1:cv_size,iens), grid, mz)
             end do
             deallocate(omega)
 
@@ -759,21 +760,12 @@
                if (use_background_errors) call da_deallocate_background_errors (be)
 
                call da_wrfvar_finalize
-
-               if (var4d) call da_finalize_model
-
 #ifdef DM_PARALLEL
                IF ( rootproc ) CALL end_timing('da_end_timing: GEN_OMEGA')
 #endif
-
                call wrf_message("*** WRF-Var-RIOT generated OMEGA successfully ***")
                if (trace_use) call da_trace_exit("da_wrfvar_main")
-               if (trace_use) call da_trace_report
-
-               call wrfu_finalize
-               call wrf_shutdown
-               stop
-
+               return
             end if
          end if
          allocate (qhat(1:cv_size, 0:nens))
@@ -1000,7 +992,8 @@
             stop
 
          end if
-#endif !end WRF_CHEM test
+#endif
+!end WRF_CHEM test
 
          !Restore default trajectory setting
          write_checkpoints = 0
@@ -1009,7 +1002,8 @@
 #else
          write(unit=message(1),fmt='(A)')'Please re-compile the code with 4dvar option'
          call da_error(__FILE__,__LINE__,message(1:1))
-#endif !end VAR4D test
+#endif
+!end VAR4D test
       end if
 
       ! [8.2] Calculate innovation vector (O-B):
@@ -1074,7 +1068,7 @@
                              be%cv%size_jl, xbx, be, iv, xhat, cvt, re, y, j, xhat, grid, config_flags )
 
          else
-            if (var4d_inc_by_mode) then
+            if (var4d_inc_out) then
                hessian_info%nmodes_max = 0
                allocate(hessian_info%eigs(ntmax(it)))
                allocate(hessian_info%qhat(cv_size,0:ntmax(it)))
@@ -1101,7 +1095,7 @@
                write(cproc,fmt='(i4.4)') myproc
                write(cit,fmt='(i2.2)') svd_outer-1
                cvtfile_svd = 'cvt.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
-               call da_cv_io ('r', cvtfile_svd, cv_size, cvt(1:cv_size), grid, mz)
+               call da_cv_io ('r', cvtfile_svd, cv_size, cvt(1:cv_size), grid, mz, .true.)
             end if
             if (svd_stage .eq. 1 .and. &
                 (ensmember .eq. nens+1)) then
@@ -1134,7 +1128,7 @@
 !Need proper obs handling for non-chem vars still
                   case(1)
                      if (svd_stage .eq. 4) then
-!                        if (var4d_inc_by_mode) then
+!                        if (var4d_inc_out) then
 !                           allocate(hessian_info%eigs(nens))
 !                           allocate(hessian_info%qhat(cv_size,0:nens))
 !                           allocate(hessian_info%ghat(cv_size))
@@ -1154,7 +1148,7 @@
 #endif
                   case(6)
                      if (svd_stage .eq. 2) then
-                        if (var4d_inc_by_mode) then
+                        if (var4d_inc_out) then
                            allocate(hessian_info%eigs(nens))
                            allocate(hessian_info%qhat(cv_size,0:nens))
                            allocate(hessian_info%ghat(cv_size))
@@ -1193,7 +1187,7 @@
 !Need proper obs handling for non-chem vars still
                   case(2)
                      if (svd_stage .eq. 2) then
-!                        if (var4d_inc_by_mode) then
+!                        if (var4d_inc_out) then
 !                           allocate(hessian_info%eigs(nens))
 !                           allocate(hessian_info%qhat(cv_size,0:nens))
 !                           allocate(hessian_info%ghat(cv_size))
@@ -1268,23 +1262,21 @@
    IF ( rootproc ) CALL end_timing('da_end_timing: HESS_vector_multiply')
 #endif
 
-#ifdef DM_PARALLEL
-   IF ( rootproc ) CALL start_timing
-#endif
-
 #if (WRF_CHEM == 1)
    if (cv_options .eq. 10) then
+#ifdef DM_PARALLEL
+      IF ( rootproc ) CALL start_timing
+#endif
       if ( dgn_emiss .eq. 1 .and. eta_emiss .lt. 1.D0 .and. eta_emiss .gt. 0.D0 ) then
          call da_hdgn(it, cv_size, be, xhat)
 
       else if (dgn_emiss .eq. 2) then
          call da_dgn(grid, cv_size, xbx, be, iv, xhat, cvt, ob, config_flags, j0_total)
       end if
-   end if
-#endif
-
 #ifdef DM_PARALLEL
-   IF ( rootproc ) CALL end_timing('da_end_timing: LINESEARCH')
+      IF ( rootproc ) CALL end_timing('da_end_timing: LINESEARCH')
+#endif
+   end if
 #endif
 
 #ifdef DM_PARALLEL
@@ -1299,7 +1291,7 @@
          write(cproc,fmt='(i4.4)') myproc
          write(cit,fmt='(i2.2)') svd_outer
          cvtfile_svd = 'cvt.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
-         call da_cv_io ('w', cvtfile_svd, cv_size, cvt(1:cv_size), grid, mz)
+         call da_cv_io ('w', cvtfile_svd, cv_size, cvt(1:cv_size), grid, mz, .true.)
 !      end if
 #endif
 
@@ -1379,8 +1371,8 @@
       if (.not. var4d) then
          call da_transform_vtox (grid,cv_size,xbx,be,grid%ep,xhat,grid%vv,grid%vp)
       else
-         if ( var4d_inc_by_mode .and. allocated(hessian_info%ghat) ) then
-            call da_output_increment_by_modes(grid,config_flags,mz, &
+         if ( var4d_inc_out .and. allocated(hessian_info%ghat) ) then
+            call da_output_increments(grid,config_flags,mz, &
                                                max(it,svd_outer),cv_size,xbx,be, &
                                                hessian_info)
 

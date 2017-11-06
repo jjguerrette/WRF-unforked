@@ -29,14 +29,14 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
    type (xbx_type),intent(inout)     :: xbx                      ! Header & non-gridded vars.
    type (be_type), intent(in)        :: be                       ! background error structure.
    type (iv_type), intent(inout)     :: iv                       ! ob. increment vector.
-   real*8, intent(inout)             :: cv(1:cv_size)            ! control variable (local).
+   real,   intent(inout)             :: cv(1:cv_size)            ! control variable (local).
    type (y_type), intent(inout)      :: re                       ! residual (o-a) structure.
    type (y_type), intent(inout)      :: y                        ! y = H(x_inc) structure.
-   real*8, intent(out)               :: xhat(1:cv_size)          ! control variable (local).
+   real,   intent(out)               :: xhat(1:cv_size)          ! control variable (local).
    integer, intent(in)               :: nens                     ! Total number of eigenpairs
    type (j_type), optional, intent(out) :: j_cost                ! cost function
 
-   real*8, optional, intent(out)       :: qhat(1:cv_size, 0:nens) ! orthonormal basis set of A = Q * B * Q^T
+   real,   optional, intent(out)       :: qhat(1:cv_size, 0:nens) ! orthonormal basis set of A = Q * B * Q^T
    real*8, optional, intent(out)     :: eignvec(nens, nens)
    real*8, optional, intent(out)     :: eignval(nens)
    integer, optional, intent(out)    :: neign                         ! Number of non-truncated eigenpairs
@@ -66,7 +66,7 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
 
 
    type (y_type)                :: jo_grad_y    ! Grad_y(jo)
-   real*8                       :: grad_jo(cv_size)
+   real                         :: grad_jo(cv_size)
 
    integer                      :: nall(num_ob_indexes)
    integer, allocatable         :: nobs(:)
@@ -79,8 +79,8 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
    real                         :: ghat(1:cv_size)        ! cv copy.
    integer                      :: info
 
-   real*8                       :: gdot, beta
-   real*8                       :: j0_total
+   real                        :: gdot, beta
+   real                        :: j0_total
    character*10                 :: cproc, cens
    character(len=filename_len)  :: filename
    character(len=3) :: cnens=""

@@ -93,7 +93,10 @@ module da_wrfvar_top
 #if (WRF_CHEM == 1)
       da_calculate_aminusb, &
 #endif
-      da_kmat_mul, da_output_increment_by_modes
+      da_kmat_mul
+
+   use da_linear_ops, only: da_output_increments, da_cv_io
+
 #if defined(LAPACK)
    use da_randomisation, only: &
       da_randomise_svd, da_randomise_svd_B, da_randomise_svd_B11, &
@@ -101,8 +104,9 @@ module da_wrfvar_top
       da_randomise_svd_51, da_calculate_hessian, &
       da_evaluate_increment, da_evaluate_hessian, &
 #endif
-      da_cv_io
+      da_gen_omega
 
+   use f95_precision, only: WP => DP
 #endif
    use da_obs, only : da_transform_xtoy_adj 
    use da_obs_io, only : da_write_filtered_obs, da_write_obs, da_final_write_obs , &

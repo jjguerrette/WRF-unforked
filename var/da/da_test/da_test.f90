@@ -52,6 +52,7 @@ module da_test
    use da_ffts, only : da_solve_poissoneqn_fct
    use da_minimisation, only : da_transform_vtoy_adj,da_transform_vtoy, da_swap_xtraj, &
        da_read_basicstates, da_calculate_j
+   use da_linear_ops, only: da_dot_cv
    use da_obs, only : da_transform_xtoy,da_transform_xtoy_adj
    use da_par_util, only : da_patch_to_global, da_system, da_cv_to_global
 #ifdef DM_PARALLEL
@@ -91,7 +92,7 @@ module da_test
 
    implicit none
 
-   private :: da_dot_cv, da_dot
+!   private :: da_dot_cv, da_dot
 
 #ifdef DM_PARALLEL
    include 'mpif.h'
@@ -130,8 +131,8 @@ contains
 #include "da_check_xtoy_adjoint_rad.inc"
 #include "da_transform_xtovp.inc"
 #include "da_check.inc"
-#include "da_dot.inc"
-#include "da_dot_cv.inc"
+!#include "da_dot.inc"
+!#include "da_dot_cv.inc"
 #include "da_check_xtoy_adjoint_pseudo.inc"
 #include "da_check_xtoy_adjoint_qscat.inc"
 #include "da_check_xtoy_adjoint_ssmt1.inc"

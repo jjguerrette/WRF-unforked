@@ -29,9 +29,9 @@ subroutine da_minimise_lz(grid, config_flags,            &
    type (be_type), intent(in)        :: be                            ! background error structure.
    type (iv_type), intent(inout)     :: iv                            ! ob. increment vector.
    real, intent(inout)               :: j_grad_norm_target            ! Target norm.
-   real*8, intent(out)                 :: xhat(1:cv_size)               ! control variable (local).
-   real*8, intent(out)                 :: qhat(1:cv_size, 0:ntmax(it))  ! cv copy.
-   real*8, intent(inout)               :: cv(1:cv_size)                 ! control variable (local).
+   real, intent(out)                 :: xhat(1:cv_size)               ! control variable (local).
+   real, intent(out)                 :: qhat(1:cv_size, 0:ntmax(it))  ! cv copy.
+   real, intent(inout)               :: cv(1:cv_size)                 ! control variable (local).
    type (y_type), intent(inout)      :: re                            ! residual (o-a) structure.
    type (y_type), intent(inout)      :: y                             ! y = H(x_inc) structure.
    type (j_type), intent(out)        :: j_cost                        ! cost function
@@ -57,14 +57,14 @@ subroutine da_minimise_lz(grid, config_flags,            &
 #endif
    integer                           :: npred, ipred
    integer                           :: jp_start, jp_end       ! Start/end indices of Jp.
-   real*8                              :: fhat(1:cv_size)        ! cv copy.
-   real*8                              :: ghat(1:cv_size)        ! cv copy.
-   real*8                              :: ghat0(1:cv_size)       ! cv copy.
-   real*8                              :: shat(1:cv_size)        ! cv copy.
-   real*8                              :: gdot, rho, mu, bndlm
-   real*8                              :: alpha(ntmax(it)), beta(0:ntmax(it))
+   real                              :: fhat(1:cv_size)        ! cv copy.
+   real                              :: ghat(1:cv_size)        ! cv copy.
+   real                              :: ghat0(1:cv_size)       ! cv copy.
+   real                              :: shat(1:cv_size)        ! cv copy.
+   real                              :: gdot, rho, mu, bndlm
+   real                              :: alpha(ntmax(it)), beta(0:ntmax(it))
    real*8                            :: subdiag(ntmax(it))
-   real*8                              :: c(cv_size), d(ntmax(it))
+   real                              :: c(cv_size), d(ntmax(it))
    real*8                            :: sstwrk(2*ntmax(it)-2)
    real                              :: bnds(ntmax(it))
    real                              :: adj_rhs, adj_sum_rhs ! < cv, cv >
@@ -218,7 +218,7 @@ subroutine da_minimise_lz(grid, config_flags,            &
       end do
       write(unit=stdout,fmt='(A,I5)') 'Number of converged eigenpairs: ', neign
 
-      if ( var4d_inc_by_mode &
+      if ( var4d_inc_out &
            .and. present(hessian_info) &
            .and. allocated(hessian_info%ghat) ) then
 

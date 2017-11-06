@@ -11,6 +11,7 @@ WRFVAR_OBJS = \
    da_transfer_model.o \
    da_minimisation.o \
    da_randomisation.o \
+   da_linear_ops.o \
    da_vtox_transforms.o \
    da_obs.o \
    da_chem.o \
@@ -469,6 +470,18 @@ da_varbc.o :
 	  $(FC) -c $(FCFLAGS) $(PROMOTION) $(CRTM_SRC) $(RTTOV_SRC) $*.f ; \
         fi
 
+da_linear_ops.o :
+	$(RM) $@
+	$(SED_FTN) $*.f90 > $*.b
+	$(CPP) $(CPPFLAGS) $(OMPCPP) $(FPPFLAGS) $*.b  > $*.f
+	$(RM) $*.b
+	@ if echo $(ARCHFLAGS) | $(FGREP) 'DVAR4D'; then \
+          echo COMPILING $*.f90 for 4DVAR ; \
+          $(WRF_SRC_ROOT_DIR)/var/build/da_name_space.pl $*.f > $*.f.tmp ; \
+          mv $*.f.tmp $*.f ; \
+        fi
+	$(FC) -c $(FCFLAGS) $(PROMOTION) $*.f
+
 da_test.o \
 da_transfer_model.o \
 da_minimisation.o :
@@ -489,7 +502,8 @@ da_minimisation.o :
 	  $(FC) -c $(FCFLAGS) $(PROMOTION) $(CRTM_SRC) $(RTTOV_SRC) $(WRFPLUS_INC) $(HDF5_INC) $*.f ; \
         fi
 
-da_randomisation.o da_chem_tools.o :
+da_randomisation.o \
+da_chem_tools.o :
 	$(RM) $@
 	$(SED_FTN) $*.f90 > $*.b
 	$(CPP) $(CPPFLAGS) $(OMPCPP) $(FPPFLAGS) $*.b  > $*.f

@@ -1,6 +1,6 @@
-subroutine da_output_increment_by_modes(grid,config_flags,mz, &
-                                        it,cv_size,xbx,be, &
-                                        hessian_info)
+subroutine da_output_increments(grid,config_flags,mz, &
+                                it,cv_size,xbx,be, &
+                                hessian_info)
 
    !-------------------------------------------------------------------------
    ! Purpose:   Output increment for all inner loop truncations using Hessian
@@ -8,7 +8,7 @@ subroutine da_output_increment_by_modes(grid,config_flags,mz, &
    !            diagnostic purposes and should not be used when computational
    !            expense need be minimized.
    !
-   ! Called from da_main
+   ! Called from da_solve
    !
    ! History: 10/31/2017  Creation (JJ Guerrette)
    !
@@ -49,7 +49,7 @@ subroutine da_output_increment_by_modes(grid,config_flags,mz, &
    character(len=256) :: dummy_name
   
 
-   if (trace_use) call da_trace_entry("da_output_increment_by_modes")
+   if (trace_use) call da_trace_entry("da_output_increments")
 
 !   je_start   = be % cv % size_jb + 1
 !   je_end     = be % cv % size_jb + be % cv % size_je
@@ -98,7 +98,6 @@ subroutine da_output_increment_by_modes(grid,config_flags,mz, &
             end do
 
             PREFIX = 'LRU'
-
          else
             do i = 1, neign
                LAM(i) = 1.D0 / eignval(i)
@@ -106,7 +105,6 @@ subroutine da_output_increment_by_modes(grid,config_flags,mz, &
 
             PREFIX = 'LRA'
             if (use_lanczos) PREFIX = 'CGLZ'
-
          end if
          write(unit=filnam,fmt='(2a,i2.2,a,i4.4)') trim(PREFIX),'inc_it',it,'_nmode',imode
 
@@ -190,6 +188,6 @@ subroutine da_output_increment_by_modes(grid,config_flags,mz, &
    call nl_set_io_form_auxhist18 ( grid%id, 0 )
    config_flags%io_form_auxhist18 = 0
 
-   if (trace_use) call da_trace_exit("da_output_increment_by_modes")
+   if (trace_use) call da_trace_exit("da_output_increments")
 
-end subroutine da_output_increment_by_modes
+end subroutine da_output_increments

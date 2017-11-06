@@ -19,7 +19,7 @@ module da_randomisation
        var4d_lbc, stdout, trace_use, adapt_svd, prepend_rsvd_basis, &
        num_ob_indexes, read_omega, svd_p, ierr, comm, &
        use_randomsvd, nens_compare, tsvd_compare, cglz_compare, rsvd_compare, &
-       use_global_cv_io, ntmax, var4d_inc_by_mode, inc_out_interval, &
+       use_global_cv_io, ntmax, var4d_inc_out, inc_out_interval, &
        spectral_precon, riot_precon, rotate_omega, &
        hess_comp_x, &
        hess_comp_Pav_LRU, hess_comp_Pav_LRA, &
@@ -36,12 +36,11 @@ module da_randomisation
        satem, radar, ssmi_rv, ssmi_tb, ssmt1, ssmt2, airsr, pilot, airep,tamdar, tamdar_sfc, rain, &
        bogus, buoy, qscat, pseudo, radiance, &
        its, ite, jts, jte
-
    use da_minimisation, only: da_transform_vtoy, da_transform_vtoy_adj, &
-       da_calculate_grady, da_calculate_j, da_calculate_gradj, &
-       da_amat_mul, da_amat_mul_trunc, da_hessian_io, da_hessian_io_global, &
-       da_spectral_precon
-
+       da_calculate_grady, da_calculate_j, da_calculate_gradj
+   use da_linear_ops, only:  da_gram_schmidt, da_amat_mul_trunc, &
+       da_cv_io, da_cv_io_global, da_spectral_precon, da_hessian_io, &
+       da_dot_cv, da_dot
    use da_vtox_transforms, only : da_transform_vtox, da_transform_vtox_adj
    use da_define_structures, only : iv_type, y_type, j_type, be_type, xbx_type, &
 #if defined(LAPACK)
@@ -108,17 +107,16 @@ module da_randomisation
     include 'mpif.h'
 #endif
 
-   private :: da_dot, da_dot_cv, da_dot_z, da_dot_cv_z, da_dot_obs
+!   private :: da_dot, da_dot_cv, da_dot_obs
+   private :: da_dot_obs
 
 contains
 
-#include "da_dot.inc"
-#include "da_dot_cv.inc"     
-#include "da_dot_z.inc"
-#include "da_dot_cv_z.inc"
+!#include "da_dot.inc"
+!#include "da_dot_cv.inc"     
 #include "da_dot_obs.inc"
-#include "da_cv_io.inc"
 #include "da_yhat_io.inc"
+#include "da_gen_omega.inc"
 #include "da_precon_omega.inc"
 #include "da_rotate_omega.inc"
 #if defined(LAPACK)
@@ -128,8 +126,6 @@ contains
 #include "da_randomise_svd.inc"
 #include "da_randomise_svd_51.inc"
 #include "da_force_grad_hess.inc"
-#include "da_gram_schmidt.inc"
-#include "da_rsvd56.inc"
 
 #include "da_calculate_hessian.inc"
 #include "da_compare_decomp_methods.inc"
@@ -141,11 +137,8 @@ contains
 #include "da_evaluate_increment.inc"
 #include "da_evaluate_hessian.inc"
 #endif
-#include "da_gen_omega.inc"
-
 #include "da_randomise_svd_B.inc"
 #include "da_randomise_svd_B11.inc"
-
-#include "da_cv_io_global.inc"
+#include "da_rsvd56.inc"
 
 end module da_randomisation

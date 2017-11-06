@@ -47,7 +47,7 @@ module da_chem_tools
 #endif
    use da_minimisation, only:   da_get_innov_vector, &
                              da_calculate_residual, da_jo_and_grady
-   use da_randomisation, only:   da_cv_io
+   use da_linear_ops, only:   da_cv_io, da_dot_cv
    use da_par_util, only : da_cv_to_global
    use da_wrf_interfaces, only : wrf_dm_bcast_real
 !!WRFPLUS domain type
@@ -66,9 +66,9 @@ module da_chem_tools
 #ifdef DM_PARALLEL
     include 'mpif.h'
 #endif
-#if (WRF_CHEM == 1)
-   private :: da_dot, da_dot_cv
-#endif
+!#if (WRF_CHEM == 1)
+!   private :: da_dot, da_dot_cv
+!#endif
 
 contains
 
@@ -77,8 +77,8 @@ contains
 #include "da_hdgn.inc"
 #include "da_dgn.inc"
 #include "da_evaluate_j.inc"
-#include "da_dot.inc"
-#include "da_dot_cv.inc"
+!#include "da_dot.inc"
+!#include "da_dot_cv.inc"
 #include "da_setup_osse_chem.inc"
 
 

@@ -71,7 +71,7 @@ subroutine da_setup_cv(be)
 
    be % cv % size_jl = 0
 
-   if ( .not. global .and. var4d ) then
+   if ( .not. global .and. var4d .and. var4d_lbc ) then
       be % cv % size1l = be % cv % size1
       be % cv % size2l = be % cv % size2
       be % cv % size3l = be % cv % size3
@@ -121,7 +121,7 @@ subroutine da_setup_cv(be)
                                  be % v4 % mz + be % v5 % mz)
 #endif
       cv_size_domain_je = ij * be % alpha % mz * be % ne
-      if ( var4d ) then
+      if ( var4d .and. var4d_lbc ) then
          cv_size_domain_jl = cv_size_domain_jb 
       end if
    end if

@@ -28,6 +28,9 @@ echo ""
 # 
 #=======================================================================================
 
+#Check the manual for your compute system in order to choose either:
+MPIFUNC=mpiexec
+#MPIFUNC=mpirun
 
 #=======================================================================================
 # Begin User Options
@@ -74,7 +77,7 @@ echo ""
 #export ALT_hess_dir='/nobackupp8/jjguerr1/wrf/DA/SVD6_N=40_no=8_40-PRECON0_adap0/'
 
 #Set to 0 (default) or 1 to conduct chemical emission inversion (requires WRFDA-Chem)
-export WRF_CHEM=1
+#export WRF_CHEM=0
 
 #Manually set the maximum number of processes per job 
 # - limited by WRF patch overlap
@@ -480,7 +483,7 @@ do
          if [ $OSSE -eq 1 ]; then
             ex -c :"/osse_chem" +:":s/=.*,/=false,/g" +:wq namelist.input
             ex -c :"/init_osse_chem" +:":s/=.*,/=true,/g" +:wq namelist.input
-            mpistring="mpiexec $DEBUGSTR -np $nproc_max $EXECUTABLE"
+            mpistring="$MPIFUNC $DEBUGSTR -np $nproc_max $EXECUTABLE"
             #COULD MAKE THIS FASTER (MORE MEMORY) by distributing across more nodes (currently chooses first $npiens processors in $PBS_NODEFILE)
 
             echo "$mpistring"
@@ -508,8 +511,8 @@ do
                #COULD MAKE THIS FASTER (MORE MEMORY) by distributing across more nodes (currently chooses first $npiens processors in $PBS_NODEFILE)
          fi
 
-         mpistring="mpiexec $DEBUGSTR -np $npiens $EXECUTABLE"
-#         mpistring="mpiexec $DEBUGSTR -np $nproc_max $EXECUTABLE"
+         mpistring="$MPIFUNC $DEBUGSTR -np $npiens $EXECUTABLE"
+#         mpistring="$MPIFUNC $DEBUGSTR -np $nproc_max $EXECUTABLE"
          echo "$mpistring"
          eval "$mpistring"
 
@@ -656,7 +659,7 @@ do
             export PBS_NODEFILE=$(pwd)/hostlist #.$ii
 
             #Run in foreground; result needed for remaining script in this iteration
-            mpistring="mpiexec $DEBUGSTR -np $npiens $EXECUTABLE"
+            mpistring="$MPIFUNC $DEBUGSTR -np $npiens $EXECUTABLE"
             echo "$mpistring"
             eval "$mpistring"
 
@@ -746,10 +749,10 @@ do
          #Test for the presence of each vector type
          cd $CWD
          ls omega.e*.p0000
-         dummy=`ls omega.e"*.p0000" | wc -l`
+         dummy=`ls omega.e*.p0000 | wc -l`
          echo "$dummy present of $NENS omega files"
          if [ $dummy -ne $NENS ]; then 
-            echo "ERROR: Missing or extra omega.e*.p""0000"
+            echo "ERROR: Missing or extra omega.e*.p0000"
             echo 18; exit 18
          fi
          mv -v omega.e*.p* ../vectors_$it0
@@ -780,13 +783,13 @@ do
          ln -sf $CWD/AIRCRAFT_Hx_y* ./
       fi
 
-      if [ "$GLOBAL_OMEGA" == "true" ] && ([ $it -eq 1 ] || [ $GRAD_PRECON -eq 0 ]); then
+      if [ $iENS -le $NENS ] && [ "$GLOBAL_OMEGA" == "true" ] && ([ $it -eq 1 ] || [ $GRAD_PRECON -eq 0 ]); then
          #Distribute omega vectors
          #Test for the presence of each vector type
-         ls ../$CWD/omega.e$ii"*.p0000"
-         dummy=`ls ../$CWD/omega.e$ii"*.p0000" | wc -l`
+         ls ../vectors_$it0/omega.e$ii.p0000
+         dummy=`ls ../vectors_$it0/omega.e$ii.p0000 | wc -l`
          if [ $dummy -lt 1 ]; then 
-            echo "ERROR: Missing global omega.e*.p""0000"
+            echo "ERROR: Missing global omega.e$ii.p0000"
             echo 19; exit 19
          fi
          mv -v ../vectors_$it0/omega.e$ii* ./
@@ -820,15 +823,15 @@ do
       echo "export PBS_NODEFILE=$(pwd)/hostlist"
       export PBS_NODEFILE=$(pwd)/hostlist #.$ii
       #Redirected input necessary to run in background, output for clean log files
-      mpistring="mpiexec $DEBUGSTR -np $npiens $EXECUTABLE $BACKG_STRING"
+      mpistring="$MPIFUNC $DEBUGSTR -np $npiens $EXECUTABLE $BACKG_STRING"
 
       # 2 - Generic solution for Intel MPI implmentations
       #      (may need earlier calls to mpdallexit and mpdboot)
-      #mpistring="mpiexec -np $npiens -machinefile $(pwd)/hostlist $EXECUTABLE $BACKG_STRING"
+      #mpistring="$MPIFUNC -np $npiens -machinefile $(pwd)/hostlist $EXECUTABLE $BACKG_STRING"
  
       # 3 - Generic solution for Open MPI implmentations
       #      (may need earlier calls to mpdallexit and mpdboot)
-      #mpistring="mpiexec -np $npiens --hostfile $(pwd)/hostlist $EXECUTABLE $BACKG_STRING"
+      #mpistring="$MPIFUNC -np $npiens --hostfile $(pwd)/hostlist $EXECUTABLE $BACKG_STRING"
 
       if [ $svd_type -eq 1 ] && [ $iENS -eq $NJOBS ] && [ $NENS -lt $NJOBS ]; then
          eval "$mpistring"
@@ -841,12 +844,12 @@ do
 
 ### Use these if eval above doesn't work
 #         if [ $svd_type -eq 1 ] && [ $iENS -eq $NJOBS ]; then
-#            mpiexec $DEBUGSTR -np $npiens $EXECUTABLE $BACKG_STRING
+#            $MPIFUNC $DEBUGSTR -np $npiens $EXECUTABLE $BACKG_STRING
 #
 #            echo "PID = "$!
 #            echo "$mpistring"
 #         else
-#            mpiexec $DEBUGSTR -np $npiens $EXECUTABLE $BACKG_STRING wait_pids+=($!)
+#            $MPIFUNC $DEBUGSTR -np $npiens $EXECUTABLE $BACKG_STRING wait_pids+=($!)
 #
 #            echo "PID = "$!
 #            echo "$mpistring"
@@ -942,7 +945,7 @@ do
    fi
 
    #Perform Eigen Decomp + Calculate Increment and Analysis
-   mpistring="mpiexec $DEBUGSTR -np $npiens $EXECUTABLE"
+   mpistring="$MPIFUNC $DEBUGSTR -np $npiens $EXECUTABLE"
    #COULD MAKE THIS FASTER (MORE MEMORY) by distributing across more nodes (currently chooses first $npiens processors in $PBS_NODEFILE)
 
    echo "$mpistring"
@@ -1005,14 +1008,14 @@ do
          # 1 - NASA Pleiades for SGI MPT
          echo "export PBS_NODEFILE=$(pwd)/hostlist"
          export PBS_NODEFILE=$(pwd)/hostlist #.$ii
-         mpistring="mpiexec $DEBUGSTR -np $npiens $EXECUTABLE $BACKG_STRING"
+         mpistring="$MPIFUNC $DEBUGSTR -np $npiens $EXECUTABLE $BACKG_STRING"
          # 2 - Generic solution for Intel MPI implmentations
          #      (may need earlier calls to mpdallexit and mpdboot)
-         #mpistring="mpiexec -np $npiens -machinefile $(pwd)/hostlist $EXECUTABLE $BACKG_STRING"
+         #mpistring="$MPIFUNC -np $npiens -machinefile $(pwd)/hostlist $EXECUTABLE $BACKG_STRING"
  
          # 3 - Generic solution for Open MPI implmentations
          #      (may need earlier calls to mpdallexit and mpdboot)
-         #mpistring="mpiexec -np $npiens --hostfile $(pwd)/hostlist $EXECUTABLE $BACKG_STRING"
+         #mpistring="$MPIFUNC -np $npiens --hostfile $(pwd)/hostlist $EXECUTABLE $BACKG_STRING"
 
          eval "$mpistring"
          echo "$mpistring"
@@ -1056,7 +1059,7 @@ do
       ex -c :"/svd_stage" +:":s/=.*/=4,/" +:wq namelist.input
 
       #Perform Eigen Decomp + Calculate Increment and Analysis
-      mpistring="mpiexec $DEBUGSTR -np $nproc_global $EXECUTABLE"
+      mpistring="$MPIFUNC $DEBUGSTR -np $nproc_global $EXECUTABLE"
       #COULD MAKE THIS FASTER (MORE MEMORY) by distributing across more nodes (currently chooses first $npiens processors in $PBS_NODEFILE)
 
       echo "$mpistring"

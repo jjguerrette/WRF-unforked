@@ -16,10 +16,9 @@ subroutine da_gram_schmidt(grid,mz,jp_start,jp_end, &
    integer, intent(in)             :: jp_start, jp_end
    integer, intent(in)             :: mz(:)
    integer, intent(in)             :: cv_size, nvec
-   real(wp), intent(inout)         :: qhat(1:cv_size,0:nvec)               ! control variable
- 
+   real*8, intent(inout)           :: qhat(1:cv_size,0:nvec)  ! orthogonal basis
    integer                         :: ivec, jvec, i
-   real(wp)                        :: gdot, beta
+   real*8                          :: gdot, beta
  
    if (trace_use) call da_trace_entry("da_gram_schmidt")
 

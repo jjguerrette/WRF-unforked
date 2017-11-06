@@ -27,35 +27,33 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
    type (xbx_type),intent(inout)     :: xbx                    ! Header & non-gridded vars.
    type (be_type), intent(in)        :: be                     ! background error structure.
    type (iv_type), intent(inout)     :: iv                     ! ob. increment vector.
-   real*8, intent(inout)             :: cv(1:cv_size)          ! control variable (local).
+   real,   intent(inout)             :: cv(1:cv_size)          ! control variable (local).
    type (y_type), intent(inout)      :: re                     ! residual (o-a) structure.
    type (y_type), intent(inout)      :: y                      ! y = H(x_inc) structure.
-   real*8, intent(out)               :: xhat(1:cv_size)        ! control variable (local).
+   real,   intent(out)               :: xhat(1:cv_size)        ! control variable (local).
    integer, intent(in)               :: nens                   ! Total number of eigenpairs
-   type (j_type), optional, intent(out) :: j_cost                        ! cost function
 
-   real*8, optional, intent(out)     :: qhat(1:cv_size, 0:nens) ! orthonormal basis set of A = Q * B * Q^T
-   real*8, optional, intent(out)     :: eignvec(nens, nens)
-   real*8, optional, intent(out)     :: eignval(nens)
-   integer, optional, intent(out)    :: neign                         ! Number of non-truncated eigenpairs
+   type (j_type), optional, intent(out) :: j_cost                        ! cost function
+   real,      optional, intent(out) :: qhat(1:cv_size, 0:nens) ! orthonormal basis set of A = Q * B * Q^T
+   real,      optional, intent(out) :: eignvec(nens, nens)
+   real,      optional, intent(out) :: eignval(nens)
+   integer,   optional, intent(out) :: neign                         ! Number of non-truncated eigenpairs
    type(hessian_type), optional, intent(inout) :: hessian_info
 
-
 #if defined(LAPACK)
-
-   real(wp)                     :: LAM(nens)
-   real(wp), allocatable        :: yhat(:,:)  ! yhat = A * omega
-   real(wp), allocatable        :: omega(:,:) ! Gaussian draw
+   real                         :: LAM(1:nens)
+   real, allocatable            :: yhat(:,:)  ! yhat = A * omega
+   real, allocatable            :: omega(:,:) ! Gaussian draw
   
    integer                      :: iens, jens, i, j, itype, np
    integer                      :: je_start, je_end       ! Start/end indices of Je.
    integer                      :: jp_start, jp_end       ! Start/end indices of Jp.
    integer                      :: jl_start, jl_end       ! Start/end indices of Jl.
 
-   real*8                       :: ghat(1:cv_size)        ! cv copy.
+   real                         :: ghat(1:cv_size)        ! cv copy.
 
-   real*8                       :: beta
-   real*8                       :: j0_total
+   real                         :: beta
+   real                         :: j0_total
    character*10                 :: cproc, cens
    character(len=filename_len)  :: filename
    character(len=3) :: cnens=""
@@ -77,13 +75,10 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
    jl_end     = be % cv % size_jb + be % cv % size_je + be % cv % size_jp + be % cv % size_jl
 
    xhat = 0.D0
+   write(cproc,fmt='(i4.4)') myproc
 
    if ( svd_stage .eq. 1 .and. ensmember .gt. 0) then
       ! Generate vectors in Y = A*OMEGA (Halko, Algorithm 4.1), where A = L^T * H^T * R^-1 * H * L 
-      allocate(yhat(1:cv_size,1))
-      yhat = 0.D0
-
-      write(cproc,fmt='(i4.4)') myproc
       write(cens,fmt='(i4.4)') ensmember
 
       if ( ensmember .eq. nens+1 ) then 
@@ -112,19 +107,19 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
             call da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat)
 
       else if (ensmember .gt. 0 .and. ensmember .le. nens) then
+         allocate(omega(1:cv_size,1))
          if (read_omega) then
-            ! Read in omega vector from this ensemble on each processor
-            allocate(omega(1:cv_size,1))
-            write(unit=stdout,fmt='("Reading omega ensemble member ",i3," of ",i3)') iens,nens
+            ! Read in omega vector for this ensemble member
+            write(unit=stdout,fmt='("Reading omega ensemble member ",i3," of ",i3)') ensmember,nens
             filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
             call da_cv_io ('r', filename, cv_size, omega(1:cv_size,1), grid, mz)
          else
-            ! call da_set_randomcv(cv_size, omega(:,1)) << LT
-            call da_gen_omega(omega, cv_size, 1, grid, mz) !Includes omega allocation
-            if ( be%cv%size_jp.gt.0) omega(jp_start:jp_end,1) = 0.D0
-            if ( be%cv%size_je.gt.0) omega(je_start:je_end,1) = 0.D0
-            if ( .not. var4d_lbc .and. be%cv%size_jl.gt.0) omega(jl_start:jl_end,1) = 0.D0
+            call da_set_randomcv(cv_size, omega(:,1))
+!            call da_gen_omega(omega, cv_size, 1, grid, mz) !Includes omega allocation
          end if
+         if ( be%cv%size_jp.gt.0) omega(jp_start:jp_end,1) = 0.D0
+         if ( be%cv%size_je.gt.0) omega(je_start:je_end,1) = 0.D0
+         if ( .not. var4d_lbc .and. be%cv%size_jl.gt.0) omega(jl_start:jl_end,1) = 0.D0
 
          if (rotate_omega .and. spectral_precon .and. svd_outer.gt.1) then
             call da_rotate_omega(grid, cv_size, mz, jp_start, jp_end, &
@@ -135,30 +130,32 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
 !                                    svd_outer-1, omega(:,1), omega(:,1), 'IT' )
          end if
 
+         allocate(yhat(1:cv_size,1))
+         yhat = 0.D0
+
          call da_calculate_gradj(svd_outer, 1, cv_size,be%cv%size_jb,be%cv%size_je,be%cv%size_jp, &
                                  be%cv%size_jl, xbx,be,iv,omega(1:cv_size,1),y,yhat(1:cv_size,1),grid,config_flags)
 
-         !Write omega to file
-         filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
-         call da_cv_io ('w', filename, cv_size, omega(1:cv_size,1), grid, mz)
+         if (.not. read_omega) then
+            !Write omega to file
+            filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+            call da_cv_io ('w', filename, cv_size, omega(1:cv_size,1), grid, mz)
+         end if
          deallocate(omega)
 
          ! Write yhat to file
          filename = 'yhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
          call da_cv_io ('w', filename, cv_size, yhat(1:cv_size,1), grid, mz)
+
+         deallocate(yhat)
       else
          write(unit=stdout,fmt='(A,I4)') 'FATAL ERROR: ensmember should be between 1 and nens+1, not ',ensmember
          CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
-
       end if
-
-      deallocate(yhat)
-
    else if ( svd_stage .eq. 2 ) then
       allocate(yhat(1:cv_size,nens))
       allocate(omega(1:cv_size,nens))
 
-      write(cproc,fmt='(i4.4)') myproc
 
 #ifdef DM_PARALLEL
    IF ( rootproc ) CALL start_timing
@@ -178,6 +175,9 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
          filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
          call da_cv_io ('r', filename, cv_size, omega(1:cv_size,iens), grid, mz)
       end do
+      if ( be%cv%size_jp.gt.0) omega(jp_start:jp_end,:) = 0.D0
+      if ( be%cv%size_je.gt.0) omega(je_start:je_end,:) = 0.D0
+      if ( .not. var4d_lbc .and. be%cv%size_jl.gt.0) omega(jl_start:jl_end,:) = 0.D0
 
 #ifdef DM_PARALLEL
    IF ( rootproc ) CALL end_timing('da_end_timing: READ_ghat_yhat_omega')
@@ -193,24 +193,24 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
       call da_gram_schmidt(grid,mz,jp_start,jp_end, &
                             qhat,cv_size,nens)
 
-!REMOVE EVENTUALLY or add option
+!REMOVE EVENTUALLY or add option since very useful for debugging
 !      ! Write qhat vectors to disk
 !      do iens = 1, nens
 !         write(unit=stdout,fmt='("Writing qhat vectors to disk: ",i3)') iens
 !         write(cens,fmt='(i4.4)') iens
 !         filename = 'qhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
-!         call da_cv_io ('w', filename, cv_size, qhat(1:cv_size,iens), grid, mz)
+!         call da_cv_io ('w', filename, cv_size, qhat(1:cv_size,iens), grid, mz, .true.)
 !      end do
-!REMOVE EVENTUALLY or add option
+!REMOVE EVENTUALLY or add option since very useful for debugging
 
-      if ( var4d_inc_by_mode &
+      if ( var4d_inc_out &
            .and. present(hessian_info) &
            .and. allocated(hessian_info%ghat) ) then
 
          hessian_info%ghat = ghat
 
          hessian_info%nmodes_max = nens
-         do iens = 1, nens
+         do iens = 0, nens
             hessian_info%qhat(:,iens) = qhat(:,iens)
          end do
 
@@ -220,10 +220,10 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
 
             call da_rsvd56(grid, mz, jp_start, jp_end, &
                           omega(:,1:iens), yhat(:,1:iens), qhat(:,0:iens), cv_size, &
-                          eignval(1:iens), hessian_info%eigs(iens)%eignvec, &
+                          hessian_info%eigs(iens)%eignval, hessian_info%eigs(iens)%eignvec, &
                           iens, hessian_info%eigs(iens)%neign)
 
-            hessian_info%eigs(iens)%eignval = eignval(1:iens) + 1.D0
+            hessian_info%eigs(iens)%eignval = hessian_info%eigs(iens)%eignval + 1.D0
          end do
       end if
 
