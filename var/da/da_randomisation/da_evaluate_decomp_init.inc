@@ -34,7 +34,7 @@ subroutine da_evaluate_decomp_init(grid, xbx, be, mz, jp_start, jp_end, cv_size,
    integer, intent(in)        :: jp_start, jp_end
    integer, intent(in)        :: mz(:)
 
-   real(wp), allocatable, intent(out)        :: omega_Pav(:,:) ! Gaussian draw
+   real(wp), allocatable, intent(in)      :: omega_Pav(:,:) ! Gaussian draw
 
    real(wp), allocatable, intent(out)        :: yhat_Pav_LRU(:,:)  ! yhat = Pav * omega_Pa
    real(wp), allocatable, intent(out)        :: yhat_Pav_LRA(:,:)  ! yhat = Pav * omega_Pa
@@ -60,9 +60,6 @@ subroutine da_evaluate_decomp_init(grid, xbx, be, mz, jp_start, jp_end, cv_size,
 
    if (trace_use) call da_trace_entry("da_evaluate_decomp_init")
    write(unit=stdout,fmt='(A)') 'Initialize Comparison'
-
-   write(unit=stdout,fmt='(A)') 'Initialize OMEGA_Pa'
-   call da_gen_omega(omega_Pav, cv_size, rank_rsvd_Pa, grid, mz)
 
    !--------------------------------------------
    !  Initialize dv and dx direction comparison

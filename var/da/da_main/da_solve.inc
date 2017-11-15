@@ -742,6 +742,7 @@
          end if
          if ( svd_stage.eq.0 .and. read_omega ) then
             call wrf_message("Generating global omega")
+            allocate(omega(cv_size,nens))
             call da_gen_omega(omega, cv_size, nens, grid, mz)
 
             !Write omega to file
@@ -1095,7 +1096,7 @@
                write(cproc,fmt='(i4.4)') myproc
                write(cit,fmt='(i2.2)') svd_outer-1
                cvtfile_svd = 'cvt.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
-               call da_cv_io ('r', cvtfile_svd, cv_size, cvt(1:cv_size), grid, mz, .true.)
+               call da_cv_io ('r', cvtfile_svd, cv_size, cvt(1:cv_size), grid, mz)
             end if
             if (svd_stage .eq. 1 .and. &
                 (ensmember .eq. nens+1)) then
@@ -1291,7 +1292,7 @@
          write(cproc,fmt='(i4.4)') myproc
          write(cit,fmt='(i2.2)') svd_outer
          cvtfile_svd = 'cvt.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
-         call da_cv_io ('w', cvtfile_svd, cv_size, cvt(1:cv_size), grid, mz, .true.)
+         call da_cv_io ('w', cvtfile_svd, cv_size, cvt(1:cv_size), grid, mz)
 !      end if
 #endif
 

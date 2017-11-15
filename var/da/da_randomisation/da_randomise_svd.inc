@@ -115,7 +115,6 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
             call da_cv_io ('r', filename, cv_size, omega(1:cv_size,1), grid, mz)
          else
             call da_set_randomcv(cv_size, omega(:,1))
-!            call da_gen_omega(omega, cv_size, 1, grid, mz) !Includes omega allocation
          end if
          if ( be%cv%size_jp.gt.0) omega(jp_start:jp_end,1) = 0.D0
          if ( be%cv%size_je.gt.0) omega(je_start:je_end,1) = 0.D0
