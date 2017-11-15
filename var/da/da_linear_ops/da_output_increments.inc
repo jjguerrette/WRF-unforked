@@ -30,11 +30,11 @@ subroutine da_output_increments(grid,config_flags,mz, &
    integer                      :: jp_start, jp_end       ! Start/end indices of Jp.
 !   integer                      :: jl_start, jl_end       ! Start/end indices of Jl.
 
-   integer :: i, imode, nmodes, neign, itype, iend, icount
+   integer :: i, imode, nmodes, nmodes_REF, neign, itype, iend, icount
    real*8, allocatable :: LAM(:)
    real*8, allocatable :: eignval(:)
    real*8, allocatable :: eignvec(:,:)
-   real*8, allocatable :: qhat(:,:)
+   real*8, allocatable, target :: qhat(:,:)
    real*8 :: ghat(1:cv_size)
    real*8 :: xhat(1:cv_size)
    real*8 :: xhat_REF(1:cv_size)
@@ -42,12 +42,16 @@ subroutine da_output_increments(grid,config_flags,mz, &
    real*8 :: EUCNORM_xPa(2)
 !   real*8 :: minlam(1:1)
    type(hessian_eig_type) :: hess_REF
+   real*8, pointer :: qhat_REF(:,:)
+   real*8, allocatable :: LAM_REF(:)
 
    character(len=10) :: PREFIX
-   character(len=256) :: filnam
    character(len=256) :: timestr
    character(len=256) :: dummy_name
-  
+   character(len=filename_len)     :: filename
+   character*10                    :: cproc
+   character*10                    :: cmode
+   character*10                    :: cit
 
    if (trace_use) call da_trace_entry("da_output_increments")
 
@@ -106,7 +110,7 @@ subroutine da_output_increments(grid,config_flags,mz, &
             PREFIX = 'LRA'
             if (use_lanczos) PREFIX = 'CGLZ'
          end if
-         write(unit=filnam,fmt='(2a,i2.2,a,i4.4)') trim(PREFIX),'inc_it',it,'_nmode',imode
+         write(unit=filename,fmt='(2a,i2.2,a,i4.4)') trim(PREFIX),'inc_it',it,'_nmode',imode
 
          xhat = 0.D0
 
@@ -127,37 +131,72 @@ subroutine da_output_increments(grid,config_flags,mz, &
                                  )
 
          call domain_clock_get( grid, current_timestr=timestr )
-         config_flags%auxhist18_outname = trim(filnam)
+         config_flags%auxhist18_outname = trim(filename)
          call da_transfer_xatowrftl(grid, config_flags, 'DUMM', timestr, .true.)
 
          !-----------------------------------------
          ! Calculate ||dx - dx_REF||^2_{Pa_REF^-1}
          !-----------------------------------------
-         !Define reference case (alternatively, could read in from file)
+         !Define reference case
          if (icount .eq. 1) then
             xhat_REF = xhat
 
-            allocate(hess_REF%eignval(1:nmodes))
-            allocate(hess_REF%eignvec(1:nmodes,1:nmodes))
-            hess_REF%neign = neign
-            hess_REF%eignval = eignval
-            hess_REF%eignvec = eignvec
+            write(cproc,fmt='(i4.4)') myproc
+            write(cit,fmt='(i2.2)') it
+            write(cmode,fmt='(i4.4)') nmodes
+            filename = '../hess_REF_out.nmodes'//trim(adjustl(cmode))//'.it'//trim(adjustl(cit))//'.'//trim(adjustl(cproc))
+            call da_hessian_io ('w',grid,cv_size,it,nmodes,neign, &
+                         eignvec,eignval,qhat,mz, &
+                         xhat_REF,hess_file=filename)
+
+            nmodes_REF = nmodes
+
+            if (read_hess_REF.gt.0) then
+               !Allows hess_REF and xhat_REF to be defined in a separate inversion scenario
+               ! (read in from file)
+               if (read_hess_REF.eq.1) then
+                  nmodes_REF = nmodes_hess_REF
+                  filename = 'hess_REF_in'
+!               else
+!                  !Debug setting to compare against read_hess_REF==0
+!                  !Unchanged filename and nmodes_REF
+               end if
+
+               allocate(qhat_REF(1:cv_size,0:nmodes_REF))
+               allocate(hess_REF%eignval(1:nmodes_REF))
+               allocate(hess_REF%eignvec(1:nmodes_REF,1:nmodes_REF))
+
+               qhat_REF(:,0) = 0.D0
+               call da_hessian_io ('r',grid,cv_size,it,nmodes_REF,hess_REF%neign, &
+                            hess_REF%eignvec,hess_REF%eignval,qhat_REF,mz, &
+                            xhat_REF,hess_file=filename)
+            else
+               qhat_REF => qhat
+               allocate(hess_REF%eignval(1:nmodes_REF))
+               allocate(hess_REF%eignvec(1:nmodes_REF,1:nmodes_REF))
+
+               hess_REF%neign = neign
+               hess_REF%eignval = eignval
+               hess_REF%eignvec = eignvec
+            end if
+
+            allocate(LAM_REF(1:nmodes_REF))
+            do i = 1, hess_REF%neign
+               LAM_REF(i) = hess_REF%eignval(i) - 1.D0
+            end do
          end if
 
          !diffvec
          xhat = xhat - xhat_REF
 
-         do i = 1, hess_REF%neign
-            LAM(i) = hess_REF%eignval(i) - 1.D0
-         end do
 
          !Multiply Pav_REF^-1 * (dv - dv_REF) in two steps
          !(1) (L^T H^T R^-1 H L)_REF * diffvec
          dvnorm_ = 0.D0
 
-         call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size,&
-                                nmodes,nmodes,hess_REF%neign, &
-                                LAM,hess_REF%eignvec,qhat,&
+         call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
+                                nmodes_REF,nmodes_REF,hess_REF%neign, &
+                                LAM_REF,hess_REF%eignvec,qhat_REF, &
                                 xhat,dvnorm_)
 
          !(2) (I + L^T H^T R^-1 H L) * diffvec
@@ -165,10 +204,7 @@ subroutine da_output_increments(grid,config_flags,mz, &
 
          !Multiply (dv - dv_REF)^T * Pav_REF^-1 * (dv - dv_REF) = ||dx - dx_REF||^2_{Pa_REF^-1}
          EUCNORM_xPa(itype) = da_dot_cv(cv_size, xhat, dvnorm_, grid, mz, jp_start, jp_end)
-
       end do
-
-!      minlam = minval(eignval)
 
       write(unit=stdout,fmt='(A,2I6,3E27.16E3)') &
          'imode,neign,min(lambda),EUCNORM_xPa[LRA,LRU] = ',&
@@ -180,9 +216,17 @@ subroutine da_output_increments(grid,config_flags,mz, &
    end do
 
    deallocate(LAM)
+   deallocate(qhat)
+
+   deallocate(LAM_REF)
    deallocate(hess_REF%eignval)
    deallocate(hess_REF%eignvec)
-   deallocate(qhat)
+   if (ASSOCIATED(qhat_REF,qhat)) then
+      NULLIFY(qhat_REF)
+   else
+      deallocate(qhat_REF)
+   end if
+
 
    config_flags%auxhist18_outname = trim(dummy_name)
    call nl_set_io_form_auxhist18 ( grid%id, 0 )

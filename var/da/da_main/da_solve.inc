@@ -227,6 +227,8 @@
    !---------------------------------------------------------------------------
    ! [1.0] Initial checks
    !---------------------------------------------------------------------------
+   call wrf_message("*** WRF-Var Part 1.0 ***")
+
 
    if (cv_options_hum /= cv_options_hum_specific_humidity .and. &
        cv_options_hum /= cv_options_hum_relative_humidity) then
@@ -277,6 +279,7 @@
    !---------------------------------------------------------------------------
    ! [2.0] Initialise wrfvar parameters:
    !---------------------------------------------------------------------------
+   call wrf_message("*** WRF-Var Part 2.0 ***")
 
    if ( anal_type_hybrid_dual_res ) then
 
@@ -367,6 +370,7 @@
    !---------------------------------------------------------------------------
    ! [3.0] Set up first guess field (grid%xb):
    !---------------------------------------------------------------------------
+   call wrf_message("*** WRF-Var Part 3.0 ***")
 
    call da_setup_firstguess(xbx, grid, config_flags, .false.)
 
@@ -446,6 +450,8 @@
    !---------------------------------------------------------------------------
    ! [4.0] Set up observations (ob):
    !---------------------------------------------------------------------------
+   call wrf_message("*** WRF-Var Part 4.0 ***")
+
    call da_setup_obs_structures (grid, ob, iv, j)
    if (use_rad) then
       allocate (j % jo % rad(1:iv%num_inst))
@@ -458,6 +464,7 @@
    !---------------------------------------------------------------------------
    ! [4.1] Observer (ANAL_TYPE="VERIFY")
    !---------------------------------------------------------------------------
+   call wrf_message("*** WRF-Var Part 4.1 ***")
 
    if (anal_type_verify) then
       check_max_iv = .false.
@@ -503,6 +510,8 @@
    !---------------------------------------------------------------------------
    ! [5.0] Set up control variable:
    !---------------------------------------------------------------------------
+   call wrf_message("*** WRF-Var Part 5.0 ***")
+
    be % cv % size_jb = 0
    be % cv % size_je = 0
    be % cv % size_jp = 0
@@ -512,6 +521,8 @@
    !---------------------------------------------------------------------------
    ! [5.1] Set up background errors (be):
    !---------------------------------------------------------------------------
+   call wrf_message("*** WRF-Var Part 5.1 ***")
+
    if (use_background_errors .and. multi_inc /= 1) then
       call da_setup_background_errors (grid, be)
    else
@@ -541,6 +552,7 @@
    !---------------------------------------------------------------------------
    ! [5.2] Set up observation bias correction (VarBC):
    !---------------------------------------------------------------------------
+   call wrf_message("*** WRF-Var Part 5.2 ***")
 #if defined(RTTOV) || defined(CRTM)
    if (use_rad .and. (use_varbc.or.freeze_varbc)) call da_varbc_init(iv, be)
 #endif
@@ -548,6 +560,8 @@
    !---------------------------------------------------------------------------
    ! [5.3] Set up satellite control variable:
    !---------------------------------------------------------------------------
+   call wrf_message("*** WRF-Var Part 5.3 ***")
+
 #if defined(RTTOV) || defined(CRTM)
    if (ANY(use_satcv)) call da_setup_satcv(iv, be)
 #endif
@@ -555,12 +569,15 @@
    !---------------------------------------------------------------------------
    ! [5.4] Total control variable:
    !---------------------------------------------------------------------------   
+   call wrf_message("*** WRF-Var Part 5.4 ***")
+
    be % cv % size = be%cv%size_jb + be%cv%size_je + be%cv%size_jp + be%cv%size_js + be%cv%size_jl
    cv_size = be % cv % size
 
    !---------------------------------------------------------------------------
    ! [6.0] Set up ensemble perturbation input:
    !---------------------------------------------------------------------------
+   call wrf_message("*** WRF-Var Part 6.0 ***")
 
       grid % ep % ne = be % ne
       if (use_background_errors .and. be % ne > 0) then
@@ -573,6 +590,7 @@
    !---------------------------------------------------------------------------
    ! [7.0] Setup control variable (cv):
    !---------------------------------------------------------------------------
+   call wrf_message("*** WRF-Var Part 7.0 ***")
 
 !  Dynamically allocate the variables which don't rely on ntmax
       allocate (cvt(1:cv_size))
@@ -627,8 +645,9 @@
    !---------------------------------------------------------------------------
    ! [7.1] Setup CHEM OSSE w/ existing observation locations:
    !---------------------------------------------------------------------------
-
    if (init_osse_chem) then
+      call wrf_message("*** WRF-Var Part 7.1 ***")
+
       !Generate perturbed first guess and perturbed "true" observations
 #if defined(LAPACK)
       if (.not.use_randomsvd .or. (svd_stage.eq.0 .and. svd_outer.eq.1) ) then
@@ -694,6 +713,8 @@
    !---------------------------------------------------------------------------
    ! [8] Outerloop and chem Sensitivity
    !---------------------------------------------------------------------------
+   call wrf_message("*** WRF-Var Part 8.0 ***")
+
 #if (WRF_CHEM == 1)
    if (.not. chem_sens) then
 #endif
@@ -742,6 +763,7 @@
          end if
          if ( svd_stage.eq.0 .and. read_omega ) then
             call wrf_message("Generating global omega")
+            allocate(omega(cv_size,nens))
             call da_gen_omega(omega, cv_size, nens, grid, mz)
 
             !Write omega to file
@@ -786,6 +808,7 @@
       call da_initialize_cv (cv_size, xhat)
 
       ! [8.1] Calculate nonlinear model trajectory 
+      call wrf_message("*** WRF-Var Part 8.1 ***")
 
 !     if (var4d .and. multi_inc /= 2 ) then
       if (var4d) then
@@ -1007,6 +1030,7 @@
       end if
 
       ! [8.2] Calculate innovation vector (O-B):
+      call wrf_message("*** WRF-Var Part 8.2 ***")
 
       num_qcstat_conv=0
       call da_get_innov_vector (it, num_qcstat_conv, ob, iv, grid , config_flags)
@@ -1046,6 +1070,7 @@
 #endif
 
       ! [8.4] Minimize cost function:
+      call wrf_message("*** WRF-Var Part 8.4 ***")
 
       call da_allocate_y (iv, re)
       call da_allocate_y (iv, y)
@@ -1095,7 +1120,7 @@
                write(cproc,fmt='(i4.4)') myproc
                write(cit,fmt='(i2.2)') svd_outer-1
                cvtfile_svd = 'cvt.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
-               call da_cv_io ('r', cvtfile_svd, cv_size, cvt(1:cv_size), grid, mz, .true.)
+               call da_cv_io ('r', cvtfile_svd, cv_size, cvt(1:cv_size), grid, mz)
             end if
             if (svd_stage .eq. 1 .and. &
                 (ensmember .eq. nens+1)) then
@@ -1291,7 +1316,7 @@
          write(cproc,fmt='(i4.4)') myproc
          write(cit,fmt='(i2.2)') svd_outer
          cvtfile_svd = 'cvt.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
-         call da_cv_io ('w', cvtfile_svd, cv_size, cvt(1:cv_size), grid, mz, .true.)
+         call da_cv_io ('w', cvtfile_svd, cv_size, cvt(1:cv_size), grid, mz)
 !      end if
 #endif
 
@@ -1367,7 +1392,8 @@
       end if
 
       ! [8.5] Update latest analysis solution:
-  
+      call wrf_message("*** WRF-Var Part 8.5 ***")
+
       if (.not. var4d) then
          call da_transform_vtox (grid,cv_size,xbx,be,grid%ep,xhat,grid%vv,grid%vp)
       else
@@ -1398,8 +1424,9 @@
 
       ! [8.6] Only when use_radarobs = .false. and calc_w_increment =.true.,
       !       the w_increment need to be diagnosed:
-
       if (calc_w_increment .and. .not. use_radarobs .and. .not. var4d) then
+         call wrf_message("*** WRF-Var Part 8.6 ***")
+
          call da_uvprho_to_w_lin (grid)
 
 #ifdef DM_PARALLEL
@@ -1408,6 +1435,7 @@
       end if
 
       ! [8.7] Write out diagnostics
+      call wrf_message("*** WRF-Var Part 8.7 ***")
 
       call da_write_diagnostics (it, grid, num_qcstat_conv, ob, iv, re, y, j)
 
@@ -1450,6 +1478,7 @@
       !------------------------------------------------------------------------
       ! [8.10] Output WRFVAR analysis and analysis increments:
       !------------------------------------------------------------------------
+      call wrf_message("*** WRF-Var Part 8.10 ***")
 
       call da_transfer_xatoanalysis (it, xbx, grid, config_flags)
 
@@ -1550,6 +1579,8 @@
    !---------------------------------------------------------------------------
    ! [9.0] Tidy up:
    !---------------------------------------------------------------------------
+   call wrf_message("*** WRF-Var Part 9.0 ***")
+
 
    deallocate (cvt)
    deallocate (xhat)

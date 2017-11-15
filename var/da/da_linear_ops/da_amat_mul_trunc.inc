@@ -31,8 +31,6 @@ subroutine da_amat_mul_trunc(grid, mz, jp_start, jp_end, cv_size, &
    logical, intent(in), optional :: nuflag
 
    real                     :: nuhat(1:cv_size,1:ntrunc)
-   real                     :: cv_dummy(1:cv_size)
-
    real                     :: gam(ntrunc), gam_(ntrunc), temp_l, temp_e(cv_size)
    integer                    :: i, j, order(ntrunc), temp_i
 !   integer                    :: start, fin, step
@@ -47,7 +45,7 @@ subroutine da_amat_mul_trunc(grid, mz, jp_start, jp_end, cv_size, &
    write(cproc,fmt='(i4.4)') myproc
 
    if (present(nuflag)) then
-      nuhat = qhat(1:cv_size,1:ntrunc)
+      nuhat = qhat(:,1:ntrunc)
    else
       nuhat = 0.D0
       do j = 1, ntrunc
@@ -58,10 +56,10 @@ subroutine da_amat_mul_trunc(grid, mz, jp_start, jp_end, cv_size, &
 !          ! Is this faster? Same precision?
 !          nuhat(i,j) = SUM( qhat(i,1:neign) * eignvec(1:neign,j) )
 
-!         nuhat(1:cv_size,j) = 0.D0
+!         nuhat(:,j) = 0.D0
          ! Is this faster? Same precision?
          do i = 1, neign
-            nuhat(1:cv_size,j) = nuhat(1:cv_size,j) + qhat(1:cv_size,i) * eignvec(i,j)
+            nuhat(:,j) = nuhat(:,j) + qhat(:,i) * eignvec(i,j)
          end do
       end do
    end if
@@ -70,7 +68,7 @@ subroutine da_amat_mul_trunc(grid, mz, jp_start, jp_end, cv_size, &
 
    !Sort gamma values in descending order to improve mat-vec precision
    do i = 1, ntrunc 
-      dot_cv = da_dot_cv(cv_size, shat, nuhat(1:cv_size,i), grid, mz, jp_start, jp_end)
+      dot_cv = da_dot_cv(cv_size, shat, nuhat(:,i), grid, mz, jp_start, jp_end)
       gam(i) = eignval(i) * dot_cv
       order(i) = i
    end do

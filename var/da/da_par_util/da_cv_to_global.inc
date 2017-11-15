@@ -16,7 +16,8 @@ subroutine da_cv_to_global(cv_size, cv_size_global, x, grid, mzs, xg )
    type(domain),     intent(in)    :: grid
    integer,          intent(in)    :: mzs(:)  ! mz for each variable
                                          ! (to identify empty or 2D arrays)
-   real,             intent(inout) :: xg(1:cv_size_global) ! global cv-array
+!   real,             intent(inout) :: xg(1:cv_size_global) ! global cv-array
+   real,             intent(inout) :: xg(:) ! global cv-array (needs to be dimension cv_size_global on rootproc, else dimension 1)
 
 #ifdef DM_PARALLEL
 

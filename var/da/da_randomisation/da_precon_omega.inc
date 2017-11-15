@@ -146,7 +146,6 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
       nouter_seed = nens-eig_count
 
       allocate(qhat_prev(cv_size,nouter_seed))
-
       call da_gen_omega(qhat_prev, cv_size, nouter_seed, grid, mz)
 
       omega(:,eig_count+1:nens) = qhat_prev

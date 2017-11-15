@@ -67,6 +67,7 @@ subroutine da_evaluate_hessian(grid, xbx, be, mz, cv_size, &
    !---------------
    write(unit=stdout,fmt='(A)') 'Initialize OMEGA_Pa'
 
+   allocate(omega_Pa(cv_size,rankA))
    call da_gen_omega(omega_Pa, cv_size, rankA, grid, mz)
 
    allocate(yhat_Pa(cv_size,1:rankA))

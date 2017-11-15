@@ -19,18 +19,39 @@ echo ""
 # Ensure that you are able to successfully run da_wrfvar.exe for a 4D-Var inversion in 
 #   that directory, including generation of cost_fn and wrfvar_output files.
 # The same namelist.input file used for standard 4D-Var will be used for RIOT 4D-Var,
-#   with additional modifications automated by this script.
-# Fill in the User Options section. 
-#   - max_ext_its in namelist.input is replaced by nout_RIOT
+#   with additional modifications automated by this script. You must have access to the
+#   parent directory within which this working directory is located.  This script will
+#   generate directories such as ../run.0001, ../run.0002, etc. that are essential.
+# Fill in the environment variables in the User Options section. 
+#   - nout_RIOT takes the place of max_ext_its in namelist.input as the # outer iterations
 #   - ntmax(1) in namelist.input is replaced by SVDN
 #   - ntmax(2:nout_RIOT) should be set in namelist.input
 #   - Follow the instructions for individual options below
 # 
+# Disclaimer: This script has been tested on a very small number of platforms. Each
+#  platform will have a unique combination of MPI/MPT implementations and job queue 
+#  management tools (e.g., PBS).  Specific solutions may be required for your 
+#  environment. For questions/comments, please contact:
+#
+#  JJ Guerrette 
+#  jonathan.guerrette@noaa.gov
+#  jonathan.guerrette@colorado.edu
+#
 #=======================================================================================
 
-#Check the manual for your compute system in order to choose either:
-MPIFUNC=mpiexec
-#MPIFUNC=mpirun
+if [ -z $MPICALL ]; then #Could be defined externally
+   ##Check the manual for your compute system in order to choose one of the following:
+   #MPICALL=mpiexec #(e.g., NASA Pleiades)
+   MPICALL=mpirun #(e.g., NOAA Theia)
+
+   # Note: the script performance has been verified on the platforms in parentheses;
+   #        add more as they are confirmed
+fi
+echo "MPI Calling Wrapper = "
+echo "==> "$MPICALL
+
+#Set to 0 (default) or 1 to conduct chemical emission inversion (requires WRFDA-Chem)
+#export WRF_CHEM=0
 
 #=======================================================================================
 # Begin User Options
@@ -76,9 +97,6 @@ MPIFUNC=mpiexec
 #export ALT_XHAT="/nobackupp8/jjguerr1/wrf/DA/SVD6_N=40_no=8_40-PRECON0_adap0/run/xhat.it"$ii".p0000"
 #export ALT_hess_dir='/nobackupp8/jjguerr1/wrf/DA/SVD6_N=40_no=8_40-PRECON0_adap0/'
 
-#Set to 0 (default) or 1 to conduct chemical emission inversion (requires WRFDA-Chem)
-#export WRF_CHEM=0
-
 #Manually set the maximum number of processes per job 
 # - limited by WRF patch overlap
 # - depends on domain (nx x ny) and PPN
@@ -86,7 +104,9 @@ MPIFUNC=mpiexec
 #    (e.g., GRAD_PRECON=1, STAGE 2 of RSVD5.6 and RSVD5.1, and STAGE 4 of RSVD5.1)
 # - A good rule of thumb is (nx/10 * ny/10) <= NPpJMAX << (nx/5 * ny/5)
 # - Requirement: NPpJMAX <= NUMPROC (see below)
-export NPpJMAX=64
+if [ -z $NPpJMAX ]; then
+   export NPpJMAX=64
+fi
 
 #Manually turn on/off gathering of subprocedure times
 export SUBTIMING=1 #0 or 1
@@ -483,7 +503,7 @@ do
          if [ $OSSE -eq 1 ]; then
             ex -c :"/osse_chem" +:":s/=.*,/=false,/g" +:wq namelist.input
             ex -c :"/init_osse_chem" +:":s/=.*,/=true,/g" +:wq namelist.input
-            mpistring="$MPIFUNC $DEBUGSTR -np $nproc_max $EXECUTABLE"
+            mpistring="$MPICALL $DEBUGSTR -np $nproc_max $EXECUTABLE"
             #COULD MAKE THIS FASTER (MORE MEMORY) by distributing across more nodes (currently chooses first $npiens processors in $PBS_NODEFILE)
 
             echo "$mpistring"
@@ -511,8 +531,8 @@ do
                #COULD MAKE THIS FASTER (MORE MEMORY) by distributing across more nodes (currently chooses first $npiens processors in $PBS_NODEFILE)
          fi
 
-         mpistring="$MPIFUNC $DEBUGSTR -np $npiens $EXECUTABLE"
-#         mpistring="$MPIFUNC $DEBUGSTR -np $nproc_max $EXECUTABLE"
+         mpistring="$MPICALL $DEBUGSTR -np $npiens $EXECUTABLE"
+#         mpistring="$MPICALL $DEBUGSTR -np $nproc_max $EXECUTABLE"
          echo "$mpistring"
          eval "$mpistring"
 
@@ -659,7 +679,7 @@ do
             export PBS_NODEFILE=$(pwd)/hostlist #.$ii
 
             #Run in foreground; result needed for remaining script in this iteration
-            mpistring="$MPIFUNC $DEBUGSTR -np $npiens $EXECUTABLE"
+            mpistring="$MPICALL $DEBUGSTR -np $npiens $EXECUTABLE"
             echo "$mpistring"
             eval "$mpistring"
 
@@ -823,15 +843,15 @@ do
       echo "export PBS_NODEFILE=$(pwd)/hostlist"
       export PBS_NODEFILE=$(pwd)/hostlist #.$ii
       #Redirected input necessary to run in background, output for clean log files
-      mpistring="$MPIFUNC $DEBUGSTR -np $npiens $EXECUTABLE $BACKG_STRING"
+      mpistring="$MPICALL $DEBUGSTR -np $npiens $EXECUTABLE $BACKG_STRING"
 
       # 2 - Generic solution for Intel MPI implmentations
       #      (may need earlier calls to mpdallexit and mpdboot)
-      #mpistring="$MPIFUNC -np $npiens -machinefile $(pwd)/hostlist $EXECUTABLE $BACKG_STRING"
+      #mpistring="$MPICALL -np $npiens -machinefile $(pwd)/hostlist $EXECUTABLE $BACKG_STRING"
  
       # 3 - Generic solution for Open MPI implmentations
       #      (may need earlier calls to mpdallexit and mpdboot)
-      #mpistring="$MPIFUNC -np $npiens --hostfile $(pwd)/hostlist $EXECUTABLE $BACKG_STRING"
+      #mpistring="$MPICALL -np $npiens --hostfile $(pwd)/hostlist $EXECUTABLE $BACKG_STRING"
 
       if [ $svd_type -eq 1 ] && [ $iENS -eq $NJOBS ] && [ $NENS -lt $NJOBS ]; then
          eval "$mpistring"
@@ -844,12 +864,12 @@ do
 
 ### Use these if eval above doesn't work
 #         if [ $svd_type -eq 1 ] && [ $iENS -eq $NJOBS ]; then
-#            $MPIFUNC $DEBUGSTR -np $npiens $EXECUTABLE $BACKG_STRING
+#            $MPICALL $DEBUGSTR -np $npiens $EXECUTABLE $BACKG_STRING
 #
 #            echo "PID = "$!
 #            echo "$mpistring"
 #         else
-#            $MPIFUNC $DEBUGSTR -np $npiens $EXECUTABLE $BACKG_STRING wait_pids+=($!)
+#            $MPICALL $DEBUGSTR -np $npiens $EXECUTABLE $BACKG_STRING wait_pids+=($!)
 #
 #            echo "PID = "$!
 #            echo "$mpistring"
@@ -945,7 +965,7 @@ do
    fi
 
    #Perform Eigen Decomp + Calculate Increment and Analysis
-   mpistring="$MPIFUNC $DEBUGSTR -np $npiens $EXECUTABLE"
+   mpistring="$MPICALL $DEBUGSTR -np $npiens $EXECUTABLE"
    #COULD MAKE THIS FASTER (MORE MEMORY) by distributing across more nodes (currently chooses first $npiens processors in $PBS_NODEFILE)
 
    echo "$mpistring"
@@ -1008,14 +1028,14 @@ do
          # 1 - NASA Pleiades for SGI MPT
          echo "export PBS_NODEFILE=$(pwd)/hostlist"
          export PBS_NODEFILE=$(pwd)/hostlist #.$ii
-         mpistring="$MPIFUNC $DEBUGSTR -np $npiens $EXECUTABLE $BACKG_STRING"
+         mpistring="$MPICALL $DEBUGSTR -np $npiens $EXECUTABLE $BACKG_STRING"
          # 2 - Generic solution for Intel MPI implmentations
          #      (may need earlier calls to mpdallexit and mpdboot)
-         #mpistring="$MPIFUNC -np $npiens -machinefile $(pwd)/hostlist $EXECUTABLE $BACKG_STRING"
+         #mpistring="$MPICALL -np $npiens -machinefile $(pwd)/hostlist $EXECUTABLE $BACKG_STRING"
  
          # 3 - Generic solution for Open MPI implmentations
          #      (may need earlier calls to mpdallexit and mpdboot)
-         #mpistring="$MPIFUNC -np $npiens --hostfile $(pwd)/hostlist $EXECUTABLE $BACKG_STRING"
+         #mpistring="$MPICALL -np $npiens --hostfile $(pwd)/hostlist $EXECUTABLE $BACKG_STRING"
 
          eval "$mpistring"
          echo "$mpistring"
@@ -1059,7 +1079,7 @@ do
       ex -c :"/svd_stage" +:":s/=.*/=4,/" +:wq namelist.input
 
       #Perform Eigen Decomp + Calculate Increment and Analysis
-      mpistring="$MPIFUNC $DEBUGSTR -np $nproc_global $EXECUTABLE"
+      mpistring="$MPICALL $DEBUGSTR -np $nproc_global $EXECUTABLE"
       #COULD MAKE THIS FASTER (MORE MEMORY) by distributing across more nodes (currently chooses first $npiens processors in $PBS_NODEFILE)
 
       echo "$mpistring"

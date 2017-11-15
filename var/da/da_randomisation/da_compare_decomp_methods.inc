@@ -98,6 +98,9 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
 
    rank_rsvd_Pa=floor(scale_hcheck*real(rankA,8))
 
+   write(unit=stdout,fmt='(A)') 'Initialize OMEGA_Pa'
+   call da_gen_omega(omega_Pav, cv_size, rank_rsvd_Pa, grid, mz)
+
    call da_evaluate_decomp_init(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
                                    rank_rsvd_Pa, rankA, &
                                    eignval_hess, eignvec_hess, qhat_hess, &
@@ -250,6 +253,7 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
       allocate(qhat(1:cv_size,0:nens))
       allocate(yhat(1:cv_size,1:nens))
 
+      allocate(omega(cv_size,nens))
       call da_gen_omega(omega, cv_size, nens, grid, mz)
 
       !Multiply obs Hessian by omega (Y=A_obs * omega)

@@ -1,4 +1,4 @@
-subroutine da_hessian_io (io_config, grid, cv_size, it, nens, neign, eignvec, eignval, qhat, mz, ghat)
+subroutine da_hessian_io (io_config, grid, cv_size, it, nens, neign, eignvec, eignval, qhat, mz, ghat, hess_file)
 
    !-------------------------------------------------------------------------
    ! Purpose:        Read / Write Hessian eigenpairs
@@ -22,6 +22,7 @@ subroutine da_hessian_io (io_config, grid, cv_size, it, nens, neign, eignvec, ei
    real*8, optional, intent(inout) :: qhat(1:cv_size, 0:nens)
    integer, optional,intent(in)    :: mz(:)
    real*8, optional, intent(inout) :: ghat(1:cv_size)
+   character(len=filename_len), optional, intent(in)  :: hess_file  ! I/O filename
 
    character(len=filename_len)     :: filename               ! I/O filename
    character*10                    :: cproc
@@ -31,22 +32,27 @@ subroutine da_hessian_io (io_config, grid, cv_size, it, nens, neign, eignvec, ei
 
    if (trace_use) call da_trace_entry("da_hessian_io")
 
-   if (use_global_cv_io) then
-      if (present(eignvec) .and. present(eignval) .and. present(qhat)) then
-         if (present(ghat)) then
-            call da_hessian_io_global(io_config, grid, cv_size, it, nens, neign,&
-                                      eignvec,eignval,qhat,mz,ghat)
-         else
-            call da_hessian_io_global(io_config, grid, cv_size, it, nens, neign,&
-                                      eignvec,eignval,qhat,mz)
-         end if
-      else
-         call da_hessian_io_global(io_config, grid, cv_size, it, nens, neign)
-      end if
+   if ( present(hess_file) ) then
+      filename = hess_file
    else
       write(cproc,fmt='(i4.4)') myproc
       write(cit,fmt='(i2.2)') it
       filename = '../hessian_eigenpairs.it'//trim(adjustl(cit))//'.'//trim(adjustl(cproc))
+   end if
+
+   if (use_global_cv_io) then
+      if (present(eignvec) .and. present(eignval) .and. present(qhat)) then
+         if (present(ghat)) then
+            call da_hessian_io_global(io_config, grid, cv_size, nens, neign, filename, &
+                                      eignvec,eignval,qhat,mz,ghat)
+         else
+            call da_hessian_io_global(io_config, grid, cv_size, nens, neign, filename, &
+                                      eignvec,eignval,qhat,mz)
+         end if
+      else
+         call da_hessian_io_global(io_config, grid, cv_size, nens, neign, filename)
+      end if
+   else
 
       call da_get_unit (ep_unit)
 

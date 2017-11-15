@@ -1,4 +1,4 @@
-subroutine da_hessian_io_global (io_config, grid, cv_size, it, nens, neign, eignvec, eignval, qhat, mz, ghat)
+subroutine da_hessian_io_global (io_config, grid, cv_size, nens, neign, filename, eignvec, eignval, qhat, mz, ghat)
 
    !-------------------------------------------------------------------------
    ! Purpose:        Read / Write Hessian eigenpairs
@@ -13,9 +13,9 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, it, nens, neign, eign
    type(domain), intent(inout)     :: grid
    character,        intent(in)    :: io_config              ! 'r' = Read; 'w' = Write
    integer,          intent(in)    :: cv_size
-   integer,          intent(in)    :: it
    integer,          intent(in)    :: nens
    integer,          intent(inout) :: neign
+   character(len=filename_len), intent(in)  :: filename               ! I/O filename
 
    real*8, optional, intent(inout) :: eignvec(nens, nens)
    real*8, optional, intent(inout) :: eignval(nens)
@@ -23,7 +23,6 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, it, nens, neign, eign
    integer, optional,intent(in)    :: mz(:)
    real*8, optional, intent(inout) :: ghat(1:cv_size)
 
-   character(len=filename_len)     :: filename               ! I/O filename
    character*10                    :: cproc
    character*10                    :: cit
    integer                         :: ep_unit
@@ -37,10 +36,6 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, it, nens, neign, eign
 
    if (trace_use) call da_trace_entry("da_hessian_io_global")
    
-   write(cproc,fmt='(i4.4)') myproc
-   write(cit,fmt='(i2.2)') it
-   filename = '../hessian_eigenpairs.it'//trim(adjustl(cit))//'.'//trim(adjustl(cproc))
-
 #ifdef DM_PARALLEL
    cv_size_domain = wrf_dm_sum_integer(cv_size)
 
@@ -48,7 +43,11 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, it, nens, neign, eign
 #else
    cv_size_domain = cv_size
 #endif
-   allocate(dumcv_g(1:cv_size_domain))
+   if (rootproc) then
+      allocate(dumcv_g(1:cv_size_domain))
+   else
+      allocate(dumcv_g(1))
+   end if
    allocate(dumcv(cv_size))
 
    call da_get_unit (ep_unit)

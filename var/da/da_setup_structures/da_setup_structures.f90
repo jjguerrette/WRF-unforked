@@ -24,7 +24,7 @@ module da_setup_structures
       use_ssmiretrievalobs,use_radarobs,use_ssmitbobs,use_qscatobs, num_procs, use_rainobs, &
 #if (WRF_CHEM == 1)
       num_surf_obs, num_acft_obs, num_ts, num_platform, &
-      use_chem_surfobs, use_chem_acftobs, chem_surf, chem_acft, &
+      use_chem_surfobs, use_chem_acftobs, chem_surf, chem_acft, use_nonchemobs, &
       num_ant_steps, num_bb_steps, &
       rf_lengthscale_ant, rf_lengthscale_bb, &
       sigma_ant, sigma_bb, scaleant_frq, scalebb_frq, &

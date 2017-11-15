@@ -30,8 +30,12 @@ subroutine da_cv_io_global (io_config, grid, filename, cv_size, rcv, mz, ascii_b
    if (.not.rootproc) cv_size_domain = 1
 #else
    cv_size_domain = cv_size
-#endif 
-   allocate(cv_global(1:cv_size_domain))
+#endif
+   if (rootproc) then
+      allocate(cv_global(1:cv_size_domain))
+   else
+      allocate(cv_global(1))
+   end if
 
    call da_get_unit (svd_unit)
 

@@ -21,11 +21,13 @@ subroutine da_setup_obs_structures_chem(grid, ob, iv)
    if (trace_use) call da_trace_entry("da_setup_obs_structures_chem")
 
    !--------------------------------------------------------------------------
-   ! [1.0] Scan data - only necessary if an alternative format is implemented
+   ! [1.0] Scan data - additional subroutine may be necessary if an alternative 
+   !                    file format is implemented
    !--------------------------------------------------------------------------
 
    iv%info(chem_surf)%ntotal = num_surf_obs
    iv%info(chem_surf)%nlocal = num_surf_obs
+   iv%info(chem_surf)%max_lev=1 !Only a single level
 
 !   if (num_acft_obs(1) <= 0) then
 !      num_ts = 0
