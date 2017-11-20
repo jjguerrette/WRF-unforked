@@ -2234,7 +2234,7 @@ END SUBROUTINE bdy_chem_value_ghg
      case (GOCART_BCCO)
         get_last_gas = p_co
      case (GOCART_BC)
-        get_last_gas = 0
+        get_last_gas = 1
 #endif
      case (CBM4_KPP)
         get_last_gas = p_ho2
