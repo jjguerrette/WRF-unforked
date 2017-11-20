@@ -130,17 +130,19 @@ subroutine da_setup_cv(be)
    ! [4] Define and add chem emiss cv sizes
    !--------------------------------------------------------------
 #if (WRF_CHEM == 1)
-   if (chem_opt .gt. 0) then
+   if(cv_options_chem == 1 .and. chem_opt(1) .gt. 0) then
       iy = ite - its + 1
       jx = jte - jts + 1
 
       ij = iy * jx              ! cv space size same as state space size
 
+      allocate (be%cv%sizeant (num_scaleant) )
       be % cv % sizeant (:) = 0
       do ic = PARAM_FIRST_SCALAR, num_scaleant
          be % cv % sizeant (ic) = ij * be % alpha_ant_chem(ic) % mz
       end do
 
+      allocate (be%cv%sizebb (num_scalebb) )
       be % cv % sizebb (:) = 0
       do ic = PARAM_FIRST_SCALAR, num_scalebb
          be % cv % sizebb (ic) = ij * be % alpha_bb_chem(ic) % mz

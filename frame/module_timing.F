@@ -84,7 +84,7 @@ CONTAINS
 #endif
       elapsed_seconds_total = elapsed_seconds_total + elapsed_seconds
 
-3031 format("Timing for ",A,": ",F10.5," elapsed seconds")
+3031 format("Timing for ",A,": ",F15.5," elapsed seconds")
       if(buffered/=0) then
          write(buf,3031) TRIM(string),elapsed_seconds
          call wrf_message(buf)

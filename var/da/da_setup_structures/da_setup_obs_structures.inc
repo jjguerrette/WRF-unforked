@@ -249,7 +249,7 @@ subroutine da_setup_obs_structures( grid, ob, iv, j_cost)
    end if
 
 #if (WRF_CHEM == 1)
-   if ( (use_chem_surfobs .or. use_chem_acftobs) .and. var4d ) then
+   if ( use_chemobs .and. var4d ) then
       call da_message((/'Using ASCII format chem observation input'/))
       call da_setup_obs_structures_chem (grid, ob, iv) 
    end if

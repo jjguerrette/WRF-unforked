@@ -23,7 +23,7 @@ module da_define_structures
       metar, ships, ssmi_rv, ssmi_tb, ssmt1, ssmt2, qscat, profiler, buoy, bogus, &
       mtgirs, tamdar, tamdar_sfc, pseudo, radar, radiance, airsr, sonde_sfc, rain, &
 #if (WRF_CHEM == 1)
-      num_platform, chem_surf, chem_acft, &
+      num_platform, chem_surf, chem_acft, cv_options_chem, &
 #endif
       trace_use_dull,comm, num_pseudo
 

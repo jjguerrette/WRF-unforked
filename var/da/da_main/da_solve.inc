@@ -135,17 +135,23 @@
 
 #if (WRF_CHEM == 1)
    if (use_nonchemobs) then
-      use_nonchemobs =  (use_synopobs .or. use_shipsobs .or. use_metarobs .or. use_soundobs .or. &
-              use_mtgirsobs .or. use_tamdarobs .or. use_bogusobs .or. use_pilotobs .or. &
-              use_airepobs .or. use_geoamvobs .or. use_polaramvobs .or. use_buoyobs .or. &
-              use_profilerobs .or. use_satemobs .or. use_gpspwobs .or. use_gpsztdobs .or. &
-              use_gpsrefobs .or. use_ssmiretrievalobs .or. use_ssmitbobs .or. &
-              use_ssmt1obs .or. use_ssmt2obs .or. use_qscatobs .or. use_hirs2obs .or. &
-              use_hirs3obs .or. use_hirs4obs .or. use_mhsobs .or. use_msuobs .or. &
-              use_amsuaobs .or. use_amsubobs .or. use_mwtsobs .or. use_mwhsobs .or. &
-              use_atmsobs .or. use_airsobs .or. use_eos_amsuaobs .or. use_hsbobs .or. &
-              use_airsretobs .or. use_rainobs .or. &
-              use_iasiobs .or. use_radarobs .or. use_radar_rv .or. use_radar_rf)
+      use_nonchemobs =  any((/use_synopobs, use_shipsobs, use_metarobs, use_soundobs, &
+              use_mtgirsobs, use_tamdarobs, use_bogusobs, use_pilotobs, &
+              use_airepobs, use_geoamvobs, use_polaramvobs, use_buoyobs, &
+              use_profilerobs, use_satemobs, use_gpspwobs, use_gpsztdobs, &
+              use_gpsrefobs, use_ssmiretrievalobs, use_ssmitbobs, &
+              use_ssmt1obs, use_ssmt2obs, use_qscatobs, use_hirs2obs, &
+              use_hirs3obs, use_hirs4obs, use_mhsobs, use_msuobs, &
+              use_amsuaobs, use_amsubobs, use_mwtsobs, use_mwhsobs, &
+              use_atmsobs, use_airsobs, use_eos_amsuaobs, use_hsbobs, &
+              use_airsretobs, use_rainobs, &
+              use_iasiobs, use_radarobs, use_radar_rv, use_radar_rf/))
+   end if
+   if (use_chemobs) then
+      use_chemobs = any((/use_chem_surfobs,use_chem_acftobs/))
+   end if
+   if ( .not.any((/use_nonchemobs,use_chemobs/)) ) then
+      CALL wrf_error_fatal('Must use either meteorological or chemical observations to conduct DA')
    end if
 #endif
 
@@ -815,7 +821,7 @@
 #ifdef VAR4D
          if (it > 1) then
 #if (WRF_CHEM == 1)
-            if ( .not. use_nonchemobs ) then
+            if ( .not.use_nonchemobs .or. cv_options.eq.0) then
                ! Ensures bit-for-bit consistency across outer loops for MET variables -JJG
                call da_init_model_input
             else
@@ -849,23 +855,25 @@
 #if (WRF_CHEM == 1)
             end if
 
-            ! Transferring chem from grid to model_grid 
-            ! --> Gives same result as da_init_model_input, unless chem is included
-            !      as a control variable, in which case the code below is correct.
-            do i = PARAM_FIRST_SCALAR, num_chem
-               call kj_swap (grid%chem(:,:,:,i), model_grid%chem(:,:,:,i), &
-                             grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, grid%xp%kms, grid%xp%kme)
-            enddo
+            if (cv_options_chem == 1 .and. chem_opt(1) .gt. 0) then
+               ! Transferring chem from grid to model_grid 
+               ! --> Gives same result as da_init_model_input, unless chem is included
+               !      as a control variable, in which case the code below is correct.
+               do i = PARAM_FIRST_SCALAR, num_chem
+                  call kj_swap (grid%chem(:,:,:,i), model_grid%chem(:,:,:,i), &
+                                grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, grid%xp%kms, grid%xp%kme)
+               enddo
 
-            ! Transfer updated scaling factors to model_grid
-            do i = PARAM_FIRST_SCALAR, num_scaleant
-               call kj_swap (grid%scaleant(:,:,:,i), model_grid%scaleant(:,:,:,i), &
-                             grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, 1, num_ant_steps)
-            enddo
-            do i = PARAM_FIRST_SCALAR, num_scalebb
-               call kj_swap (grid%scalebb(:,:,:,i), model_grid%scalebb(:,:,:,i), &
-                             grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, 1, num_bb_steps)
-            enddo
+               ! Transfer updated scaling factors to model_grid
+               do i = PARAM_FIRST_SCALAR, num_scaleant
+                  call kj_swap (grid%scaleant(:,:,:,i), model_grid%scaleant(:,:,:,i), &
+                                grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, 1, num_ant_steps)
+               enddo
+               do i = PARAM_FIRST_SCALAR, num_scalebb
+                  call kj_swap (grid%scalebb(:,:,:,i), model_grid%scalebb(:,:,:,i), &
+                                grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, 1, num_bb_steps)
+               enddo
+            end if
 #endif
 
             ! Update boundary condition of model
@@ -899,10 +907,12 @@
             model_grid%moist_bys = grid%moist_bys
             model_grid%moist_bye = grid%moist_bye
 #if (WRF_CHEM == 1)
-            model_grid%chem_bxs = grid%chem_bxs
-            model_grid%chem_bxe = grid%chem_bxe
-            model_grid%chem_bys = grid%chem_bys
-            model_grid%chem_bye = grid%chem_bye
+            if (cv_options_chem == 1 .and. chem_opt(1) .gt. 0) then
+               model_grid%chem_bxs = grid%chem_bxs
+               model_grid%chem_bxe = grid%chem_bxe
+               model_grid%chem_bys = grid%chem_bys
+               model_grid%chem_bye = grid%chem_bye
+            end if
 #endif
 
             model_grid%u_btxs = grid%u_btxs
@@ -964,7 +974,9 @@
          call da_nl_model(it)
 
 #if (WRF_CHEM == 1)
-         call da_retrieve_chem_hx( model_grid, iv )
+         if ( use_chemobs ) &
+            call da_retrieve_chem_hx( model_grid, iv )
+
          if (write_checkpoints.eq.1) then
 #if defined(LAPACK)
                if (use_randomsvd) then
@@ -1288,7 +1300,7 @@
 #endif
 
 #if (WRF_CHEM == 1)
-   if (cv_options .eq. 10) then
+   if (cv_options.eq.0 .and. cv_options_chem.eq.1) then
 #ifdef DM_PARALLEL
       IF ( rootproc ) CALL start_timing
 #endif
@@ -1557,7 +1569,7 @@
       call da_nl_model(1)
       if(checkpoint_interval .gt.0 ) write_checkpoints = 0
 
-     if (config_flags%chem_obs_cost) then
+     if ( use_chemobs ) then
         call da_retrieve_chem_hx( model_grid, iv )
 
         call da_write_obs_chem( iv, ob, 0 )
@@ -1567,7 +1579,7 @@
       if( .not. config_flags%calc_hx_only) then
          !Calculate forcing for a cost function (does not have to be chem-specific)
          ! Chemical 4D-Var cost function
-         if (config_flags%chem_obs_cost) then
+         if ( use_chemobs ) then
             call da_calculate_chem_forcing_ad ( 1, model_grid, iv )
          end if
          call da_ad_model

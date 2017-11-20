@@ -61,36 +61,40 @@ subroutine da_setup_background_errors(grid, be)
 #endif
 
 #if (WRF_CHEM == 1)
-!   grid%num_alpha_chem = max(num_chem_surf-1,num_chem_acft-1)
    allocate (be%alpha_ant_chem (num_scaleant) )
    do ic = 1, num_scaleant
       be % alpha_ant_chem(ic) % mz = 0
    end do
-   allocate (be%cv%sizeant (num_scaleant) )
 
    allocate (be%alpha_bb_chem (num_scalebb) )
    do ic = 1, num_scalebb
       be % alpha_bb_chem(ic) % mz = 0
    end do
-   allocate (be%cv%sizebb (num_scalebb) )
 #endif
 
    if (global) then
       call da_setup_be_global(be)
-   else if(fg_format == fg_format_wrf_arw_regional) then    
+   else if(fg_format == fg_format_wrf_arw_regional) then
       if ( (cv_options == 5) .or. (cv_options == 6) .or. (cv_options == 7) ) then
          call da_setup_be_regional (grid%xb, be, grid)
       else if(cv_options == 3 ) then
          call da_setup_be_ncep_gfs (grid, be)
-#if (WRF_CHEM == 1)
-      else if(cv_options == 10 ) then
-            call da_setup_be_chem (grid, be)
+      else
+ #if (WRF_CHEM == 1)
+         if(cv_options_chem.ne.1 .or. chem_opt(1).eq.0) then
 #endif
-      else 
-         write(unit=message(1),fmt='(A,I4)') &
-             'Invalid CV option chosen:  cv_options = ', cv_options
-         call da_error(__FILE__,__LINE__,message(1:1))
+           write(unit=message(1),fmt='(A,I4)') &
+                'Invalid CV option chosen:  cv_options = ', cv_options
+            call da_error(__FILE__,__LINE__,message(1:1))
+#if (WRF_CHEM == 1)
+         end if
+#endif
       endif
+#if (WRF_CHEM == 1)
+      if(cv_options_chem == 1 .and. chem_opt(1) .gt. 0) then
+         call da_setup_be_chem (grid, be)
+      end if
+#endif
    else if(fg_format == fg_format_wrf_nmm_regional ) then
 !rizvi TBD            call da_setup_be_regional (grid%xb, be)
             call da_setup_be_nmm_regional (grid%xb, be)

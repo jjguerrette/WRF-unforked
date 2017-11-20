@@ -46,7 +46,7 @@ subroutine da_transform_vtox(grid, cv_size, xbx, be, ep, cv, vv, vp &
               fg_format == fg_format_wrf_nmm_regional) .and. &
               (.not. cv_options == 3) )then
 #if (WRF_CHEM == 1)
-      if (present(vch)) then
+      if (present(vch) .and. cv_options_chem == 1 .and. chem_opt(1) .gt. 0) then
          call da_transform_vtovv(grid, cv_size, be, cv, vv, vch)
       else
 #endif
@@ -57,13 +57,11 @@ subroutine da_transform_vtox(grid, cv_size, xbx, be, ep, cv, vv, vp &
    end if
 
 #if (WRF_CHEM == 1)
-   if ( cv_options == 10 .and. present(vch)) then
    !----------------------------------------------------------------------
    ! [2.0c]: Perform x = u_ch vch transform:
    !----------------------------------------------------------------------
+   if (present(vch) .and. cv_options_chem == 1 .and. chem_opt(1) .gt. 0) &
       call da_transform_vchtox(grid, vch, be)
-
-   else
 #endif
 
    !----------------------------------------------------------------------
@@ -75,7 +73,7 @@ subroutine da_transform_vtox(grid, cv_size, xbx, be, ep, cv, vv, vp &
       call da_apply_be( be, cv, vp, grid)
       call da_transform_bal( vp, be, grid)
    
-   else
+   else if (  cv_options .gt. 0 ) then
 
    if (vert_corr == vert_corr_2) then      
       call da_vertical_transform(grid, 'u', be, grid%xb % vertical_inner_product, vv, vp)
@@ -105,10 +103,6 @@ subroutine da_transform_vtox(grid, cv_size, xbx, be, ep, cv, vv, vp &
    !----------------------------------------------------------------------
 
    call da_transform_vptox(grid, vp, be, ep)
-
-#if (WRF_CHEM == 1)
-   end if
-#endif
 
    end if
    

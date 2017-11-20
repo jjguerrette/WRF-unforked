@@ -24,13 +24,13 @@ module da_setup_structures
       use_ssmiretrievalobs,use_radarobs,use_ssmitbobs,use_qscatobs, num_procs, use_rainobs, &
 #if (WRF_CHEM == 1)
       num_surf_obs, num_acft_obs, num_ts, num_platform, &
-      use_chem_surfobs, use_chem_acftobs, chem_surf, chem_acft, use_nonchemobs, &
+      use_chemobs, use_chem_surfobs, use_chem_acftobs, chem_surf, chem_acft, use_nonchemobs, &
       num_ant_steps, num_bb_steps, &
       rf_lengthscale_ant, rf_lengthscale_bb, &
       sigma_ant, sigma_bb, scaleant_frq, scalebb_frq, &
       temporal_corr, multiday_corr, &
       timescale_h_ant, timescale_d_ant, timescale_h_bb, timescale_d_bb, &
-      chem_opt, &
+      chem_opt, cv_options_chem, &
 #endif
       num_pseudo, missing, ob_format, ob_format_bufr,ob_format_ascii, ob_format_madis, ob_format_gpsro, &
       use_airepobs, use_tamdarobs, test_dm_exact, use_amsuaobs, use_amsubobs, &
