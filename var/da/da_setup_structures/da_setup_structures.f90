@@ -30,6 +30,7 @@ module da_setup_structures
       sigma_ant, sigma_bb, scaleant_frq, scalebb_frq, &
       temporal_corr, multiday_corr, &
       timescale_h_ant, timescale_d_ant, timescale_h_bb, timescale_d_bb, &
+      chem_opt, &
 #endif
       num_pseudo, missing, ob_format, ob_format_bufr,ob_format_ascii, ob_format_madis, ob_format_gpsro, &
       use_airepobs, use_tamdarobs, test_dm_exact, use_amsuaobs, use_amsubobs, &

@@ -130,6 +130,7 @@ subroutine da_setup_cv(be)
    ! [4] Define and add chem emiss cv sizes
    !--------------------------------------------------------------
 #if (WRF_CHEM == 1)
+   if (chem_opt .gt. 0) then
       iy = ite - its + 1
       jx = jte - jts + 1
 
@@ -146,6 +147,7 @@ subroutine da_setup_cv(be)
       end do
 
       be % cv % size_jb = be % cv % size_jb + sum (be % cv % sizeant (:)) + sum( be % cv % sizebb (:) )
+   end if
 #endif
 
    if (trace_use) call da_trace_exit("da_setup_cv")

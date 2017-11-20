@@ -58,7 +58,7 @@ echo "==> "$MPICALL
 #=======================================================================================
 #####################################################################################
 ## All of these MUST be set here or externally
-#export nout_RIOT=8 # number of outer iterations (overrides to max_ext_its in namelist.input)
+#export nout_RIOT=8 # number of outer iterations (overrides max_ext_its from namelist.input)
 #export SVDN=40    # number of ensembles (inner iterations) in first outer iteration
                    # - Similar to ntmax(1) in namelist.input, and should be a small factor
                    #    larger (x2-x5) than the CG inner iteration count to produce
