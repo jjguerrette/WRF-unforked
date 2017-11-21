@@ -382,7 +382,7 @@ SUBROUTINE chem_driver_ad(grid, config_flags &
   num_3d_m = num_moist
   num_3d_c = num_chem
   num_3d_s = num_scalar
-  numgas = GET_LAST_GAS(config_flags%chem_opt)
+  numgas = GET_LAST_GAS(config_flags%nta_chem_opt)
   CALL SET_TILES(grid, ids, ide, jds, jde, ips, ipe, jps, jpe)
   k_start = kps
   k_end = kpe
@@ -397,7 +397,7 @@ SUBROUTINE chem_driver_ad(grid, config_flags &
     ijde = ide
   END IF
   chem_minval = epsilc
-  SELECT CASE  (config_flags%chem_opt)
+  SELECT CASE  (config_flags%nta_chem_opt)
   CASE (GOCART_SIMPLE)
     CALL WRF_DEBUG(15, &
              'calling only gocart aerosols driver from chem_driver')
@@ -453,9 +453,9 @@ and subgrid transport chem_driver')
     CALL WRF_DEBUG(15, 'calling chem_opt=? from chem_driver')
   END SELECT
 
-  IF (((config_flags%chem_opt .EQ. cbmz_cam_mam3_noaq .OR. config_flags%&
-&      chem_opt .EQ. cbmz_cam_mam3_aq) .OR. config_flags%chem_opt .EQ. &
-&      cbmz_cam_mam7_noaq) .OR. config_flags%chem_opt .EQ. &
+  IF (((config_flags%nta_chem_opt .EQ. cbmz_cam_mam3_noaq .OR. config_flags%&
+&      nta_chem_opt .EQ. cbmz_cam_mam3_aq) .OR. config_flags%nta_chem_opt .EQ. &
+&      cbmz_cam_mam7_noaq) .OR. config_flags%nta_chem_opt .EQ. &
 &      cbmz_cam_mam7_aq) THEN
     IF (numgas_mam .LT. numgas) WRITE(msg, *) 'CHEM_DRIVER - NUMGAS_MAM &
 &is should be equal to numgas (check chemics_init.F),', ' numgas_mam=', &
@@ -480,7 +480,7 @@ and subgrid transport chem_driver')
       END DO
     END DO
   END DO
-  SELECT CASE  (config_flags%chem_opt) 
+  SELECT CASE  (config_flags%nta_chem_opt) 
   case (RADM2SORG, RADM2SORG_AQ, RADM2SORG_AQCHEM, RADM2SORG_KPP, &
         RACM_ESRLSORG_KPP,RACMSORG_AQ,RACMSORG_KPP, RACMSORG_AQCHEM_KPP, RACM_ESRLSORG_AQCHEM_KPP, &
         RACM_SOA_VBS_KPP,RACM_SOA_VBS_AQCHEM_KPP)
@@ -854,12 +854,12 @@ chem_tile_loop_ad:DO ij=1,grid%num_tiles
     ELSE
       CALL PUSHCONTROL1B(1)
     END IF
-    IF (do_chemstep .AND. config_flags%chem_opt .NE. chem_tracer .AND. &
-&        config_flags%chem_opt .NE. chem_vash .AND. config_flags%chem_opt&
-&        .NE. chem_volc .AND. config_flags%chem_opt .NE. chem_volc_4bin &
-&        .AND. config_flags%chem_opt .NE. dust .AND. config_flags%&
-&        chem_opt .NE. chem_trace2 .AND. config_flags%chem_opt .NE. &
-&        co2_tracer .AND. config_flags%chem_opt .NE. ghg_tracer) THEN
+    IF (do_chemstep .AND. config_flags%nta_chem_opt .NE. chem_tracer .AND. &
+&        config_flags%nta_chem_opt .NE. chem_vash .AND. config_flags%nta_chem_opt&
+&        .NE. chem_volc .AND. config_flags%nta_chem_opt .NE. chem_volc_4bin &
+&        .AND. config_flags%nta_chem_opt .NE. dust .AND. config_flags%&
+&        nta_chem_opt .NE. chem_trace2 .AND. config_flags%nta_chem_opt .NE. &
+&        co2_tracer .AND. config_flags%nta_chem_opt .NE. ghg_tracer) THEN
       IF (config_flags%gaschem_onoff .GT. 0) THEN
         CALL PUSHREAL8ARRAY(chem, (grid%em31-grid%sm31+1)*(grid%em32-&
 &                      grid%sm32+1)*(grid%em33-grid%sm33+1)*num_chem)

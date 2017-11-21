@@ -386,14 +386,14 @@ ENDIF ! active_this_task
             ENDIF
 
 #if ( WRF_CHEM == 1 )
-            IF ( config_flags%chem_obs_cost) THEN
+            IF ( config_flags%insitu_chem_opt .gt. 0) THEN
                IF ( config_flags%dyn_opt .EQ. dyn_em_ad ) THEN
-                 CALL chem_hx_ad ( grid, config_flags )
+                 CALL insitu_hx_ad ( grid, config_flags )
                ELSEIF ( config_flags%dyn_opt .EQ. dyn_em_tl ) THEN
-                 CALL chem_hx_tl ( grid, config_flags )
+                 CALL insitu_hx_tl ( grid, config_flags )
                ELSEIF ( config_flags%dyn_opt .EQ. dyn_em .AND. &
                         config_flags%auxhist6_interval_s .EQ. 0 ) THEN
-                 CALL chem_hx ( grid, config_flags )
+                 CALL insitu_hx ( grid, config_flags )
                ENDIF
             ENDIF
 #endif

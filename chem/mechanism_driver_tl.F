@@ -57,7 +57,7 @@ SUBROUTINE g_mechanism_driver(id, curr_secs, ktau, dtstep, ktauc, &
 &  vcso2_old(ims:ime, kms:kme, jms:jme), vch2o2_old(ims:ime, kms:kme, jms&
 &  :jme)
   INTRINSIC MAX, MIN
-  SELECT CASE  (config_flags%chem_opt) 
+  SELECT CASE  (config_flags%nta_chem_opt) 
   CASE (GOCART_SIMPLE, GOCARTRACM_KPP, GOCARTRADM2) 
     CALL WRF_DEBUG(15, 'calling g_gocart_chem_driver from g_mechanism_driver')
     CALL G_GOCART_CHEM_DRIVER(curr_secs, dtstepc, config_flags, gmt, &

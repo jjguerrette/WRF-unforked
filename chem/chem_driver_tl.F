@@ -247,7 +247,7 @@ SUBROUTINE chem_driver_tl(grid, config_flags &
   num_3d_m = num_moist
   num_3d_c = num_chem
   num_3d_s = num_scalar
-  numgas = GET_LAST_GAS(config_flags%chem_opt)
+  numgas = GET_LAST_GAS(config_flags%nta_chem_opt)
   CALL SET_TILES(grid, ids, ide, jds, jde, ips, ipe, jps, jpe)
   k_start = kps
   k_end = kpe
@@ -262,7 +262,7 @@ SUBROUTINE chem_driver_tl(grid, config_flags &
     ijde = ide
   END IF
   chem_minval = epsilc
-  SELECT CASE  (config_flags%chem_opt) 
+  SELECT CASE  (config_flags%nta_chem_opt) 
   CASE (GOCART_SIMPLE) 
     CALL WRF_DEBUG(15, &
              'calling only gocart aerosols driver from chem_driver')
@@ -317,9 +317,9 @@ and subgrid transport chem_driver')
   CASE DEFAULT
     CALL WRF_DEBUG(15, 'calling chem_opt=? from chem_driver')
   END SELECT
-  IF (((config_flags%chem_opt .EQ. cbmz_cam_mam3_noaq .OR. config_flags%&
-      chem_opt .EQ. cbmz_cam_mam3_aq) .OR. config_flags%chem_opt .EQ. &
-      cbmz_cam_mam7_noaq) .OR. config_flags%chem_opt .EQ. &
+  IF (((config_flags%nta_chem_opt .EQ. cbmz_cam_mam3_noaq .OR. config_flags%&
+      nta_chem_opt .EQ. cbmz_cam_mam3_aq) .OR. config_flags%nta_chem_opt .EQ. &
+      cbmz_cam_mam7_noaq) .OR. config_flags%nta_chem_opt .EQ. &
       cbmz_cam_mam7_aq) THEN
     grid%dgnum4d(:, :, :, :) = 0.0
     grid%dgnumwet4d(:, :, :, :) = 0.0
@@ -350,7 +350,7 @@ as (check chemics_init.F),', ' numgas_mam=', numgas_mam, ' and numgas='&
       END DO
     END DO
   END DO
-  SELECT CASE  (config_flags%chem_opt) 
+  SELECT CASE  (config_flags%nta_chem_opt) 
   case (RADM2SORG, RADM2SORG_AQ, RADM2SORG_AQCHEM, RADM2SORG_KPP, &
         RACM_ESRLSORG_KPP,RACMSORG_AQ,RACMSORG_KPP, RACMSORG_AQCHEM_KPP, RACM_ESRLSORG_AQCHEM_KPP, &
         RACM_SOA_VBS_KPP,RACM_SOA_VBS_AQCHEM_KPP)
@@ -441,10 +441,10 @@ as (check chemics_init.F),', ' numgas_mam=', numgas_mam, ' and numgas='&
       pbl_h(i, j) = grid%pblh(i, j)
     END DO
   END DO
-  if( config_flags%chem_opt == MOZART_KPP .or. &
-      config_flags%chem_opt == MOZCART_KPP .or. &
-      config_flags%chem_opt == MOZART_MOSAIC_4BIN_KPP .or. &
-      config_flags%chem_opt == MOZART_MOSAIC_4BIN_AQ_KPP) then
+  if( config_flags%nta_chem_opt == MOZART_KPP .or. &
+      config_flags%nta_chem_opt == MOZCART_KPP .or. &
+      config_flags%nta_chem_opt == MOZART_MOSAIC_4BIN_KPP .or. &
+      config_flags%nta_chem_opt == MOZART_MOSAIC_4BIN_AQ_KPP) then
     IF (config_flags%phot_opt .EQ. ftuv) THEN
       CALL FTUV_TIMESTEP_INIT(grid%id, grid%julday)
     END IF
@@ -611,14 +611,14 @@ chem_tile_loop_1:DO ij=1,grid%num_tiles
 
     END IF
     IF ( do_chemstep .and.                           &
-          config_flags%chem_opt /= CHEM_TRACER .and. &
-          config_flags%chem_opt /= CHEM_VASH .and. &
-          config_flags%chem_opt /= CHEM_VOLC .and. &
-          config_flags%chem_opt /= CHEM_VOLC_4BIN .and. &
-          config_flags%chem_opt /= DUST .and. &
-          config_flags%chem_opt /= CHEM_TRACE2 .and. &
-          config_flags%chem_opt /= CO2_TRACER  .and. &
-          config_flags%chem_opt /= GHG_TRACER ) THEN
+          config_flags%nta_chem_opt /= CHEM_TRACER .and. &
+          config_flags%nta_chem_opt /= CHEM_VASH .and. &
+          config_flags%nta_chem_opt /= CHEM_VOLC .and. &
+          config_flags%nta_chem_opt /= CHEM_VOLC_4BIN .and. &
+          config_flags%nta_chem_opt /= DUST .and. &
+          config_flags%nta_chem_opt /= CHEM_TRACE2 .and. &
+          config_flags%nta_chem_opt /= CO2_TRACER  .and. &
+          config_flags%nta_chem_opt /= GHG_TRACER ) THEN
       DO nv=param_first_scalar,num_chem_ct
         chem_old(its:ite, kts:kte, jts:jte, nv) = chem(its:ite, kts:kte&
           , jts:jte, chem_ct_indices(nv))

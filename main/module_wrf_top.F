@@ -73,7 +73,7 @@ MODULE module_wrf_top
    INTEGER :: max_dom , domain_id , fid , oid , idum1 , idum2 , ierr
    INTEGER :: debug_level, alarmid
    INTEGER :: xtraj_boundary_form=2, input_boundary_form
-
+   INTEGER :: io_form_checkpt
    LOGICAL :: input_from_file
 
 #ifdef DM_PARALLEL
@@ -917,9 +917,11 @@ IF ( config_flags%check_TL .or. config_flags%check_AD .or. config_flags%check_NL
       ! Force to turn off trajectory boundary update
       xtraj_boundary_form=0
    ELSE
+      io_form_checkpt = 2
+
       call nl_get_restart_interval_m ( head_grid%id, original_restart_interval)
       call nl_set_restart_interval_m ( head_grid%id, head_grid%checkpoint_interval)
-      call nl_set_io_form_restart ( head_grid%id, 2 )
+      call nl_set_io_form_restart ( head_grid%id, io_form_checkpt )
       rst_outname = "wrf_checkpoint_d<domain>_<date>"
       call nl_set_rst_outname ( head_grid%id, rst_outname )
       call nl_set_restart_begin_h( head_grid%id, 0)
@@ -2074,7 +2076,7 @@ ENDIF
       head_grid%pratec = 0.0
    ENDIF
 
-   IF ( .NOT. config_flags%trajectory_io ) THEN
+   IF ( .NOT. head_grid%trajectory_io ) THEN
       CALL nl_get_io_form_auxhist17( head_grid%id, io_auxh17 )
       CALL nl_set_io_form_auxhist17( head_grid%id, 0 )
    ENDIF
@@ -2085,7 +2087,7 @@ ENDIF
    IF ( ASSOCIATED(xtraj_tail) ) xtraj_pointer => xtraj_tail
    CALL integrate ( head_grid )
 
-   IF ( .NOT. config_flags%trajectory_io ) THEN
+   IF ( .NOT. head_grid%trajectory_io ) THEN
       CALL nl_set_io_form_auxhist17( head_grid%id, io_auxh17 )
    ENDIF
 
@@ -2179,7 +2181,7 @@ ENDIF
       head_grid%pratec = 0.0
    ENDIF
 
-   IF ( .NOT. config_flags%trajectory_io ) THEN
+   IF ( .NOT. head_grid%trajectory_io ) THEN
       CALL nl_get_io_form_auxhist17( head_grid%id, io_auxh17 )
       CALL nl_set_io_form_auxhist17( head_grid%id, 0 )
    ENDIF
@@ -2308,7 +2310,7 @@ ENDIF
             model_config_rec%restart = .true.
             head_grid%restart = .true.
             call nl_set_restart ( head_grid%id, .true. )
-            model_config_rec%io_form_restart = 2
+            model_config_rec%io_form_restart = io_form_checkpt
             head_grid%itimestep = 1
          endif
 
@@ -2703,7 +2705,7 @@ ENDIF
 
    CALL nl_set_auxinput16_interval_s (head_grid%id, 0 )
 
-   IF ( .NOT. config_flags%trajectory_io ) THEN
+   IF ( .NOT. head_grid%trajectory_io ) THEN
       CALL nl_set_io_form_auxhist17( head_grid%id, io_auxh17 )
    ENDIF
 
@@ -2996,20 +2998,20 @@ ENDIF
 #endif
    ENDIF
 
-   IF ( .NOT. config_flags%trajectory_io ) THEN
+   IF ( .NOT. head_grid%trajectory_io ) THEN
       CALL nl_get_io_form_auxhist18( head_grid%id, io_auxh18 )
       CALL nl_set_io_form_auxhist18( head_grid%id, 0 )
    ENDIF
 
    CALL integrate ( head_grid )
 
-   IF ( .NOT. config_flags%trajectory_io ) THEN
+   IF ( .NOT. head_grid%trajectory_io ) THEN
       CALL nl_set_io_form_auxhist18( head_grid%id, io_auxh18 )
    ENDIF
 
    CALL start_domain ( head_grid , .TRUE. )
 
-   IF ( .NOT. config_flags%trajectory_io .OR. gradient_out ) THEN
+   IF ( .NOT. head_grid%trajectory_io .OR. gradient_out ) THEN
       config_flags%auxhist17_outname = &
           "gradient_wrfplus_d<domain>_<date>"
       config_flags%io_form_auxhist17 = 2
@@ -3131,7 +3133,7 @@ ENDIF
    end_minute = model_config_rec%end_minute(head_grid%id)
    end_second = model_config_rec%end_second(head_grid%id)
 
-   IF ( .NOT. config_flags%trajectory_io ) THEN
+   IF ( .NOT. head_grid%trajectory_io ) THEN
       CALL nl_get_io_form_auxhist8( head_grid%id, io_auxh18 )
       CALL nl_set_io_form_auxhist8( head_grid%id, 0 )
    ENDIF
@@ -3239,7 +3241,7 @@ ENDIF
             model_config_rec%restart = .true.
             head_grid%restart = .true.
             call nl_set_restart ( head_grid%id, .true. )
-            model_config_rec%io_form_restart = 2
+            model_config_rec%io_form_restart = io_form_checkpt
             head_grid%itimestep = 1
          endif
 
@@ -3623,7 +3625,7 @@ ENDIF
 
          CALL nl_set_auxinput16_interval_s (head_grid%id, 0 )
 
-         IF ( icheck .LT. ncheck .AND. ( .NOT. config_flags%trajectory_io .OR. gradient_out ) ) THEN
+         IF ( icheck .LT. ncheck .AND. ( .NOT. head_grid%trajectory_io .OR. gradient_out ) ) THEN
             config_flags%auxhist17_outname = "adj_sens_d<domain>_<date>"
             config_flags%io_form_auxhist17 = 2
             CALL nl_set_io_form_auxhist17 ( head_grid%id, 2 )
@@ -3781,7 +3783,7 @@ ENDIF
    head_grid%itimestep = 0
    CALL start_domain ( head_grid , .TRUE. )
 
-   IF ( .NOT. config_flags%trajectory_io .OR. gradient_out .OR. head_grid%checkpoint_interval.GT.0) THEN
+   IF ( .NOT. head_grid%trajectory_io .OR. gradient_out .OR. head_grid%checkpoint_interval.GT.0) THEN
       config_flags%auxhist17_outname = "adj_sens_d<domain>_<date>"
       !config_flags%auxhist17_outname = "gradient_wrfplus_d<domain>_<date>"
       config_flags%io_form_auxhist17 = 2
@@ -3792,7 +3794,7 @@ ENDIF
       CALL  wrf_debug ( 0 , 'Output gradient in WRFPLUS (not including LBC gradient)' )
    ENDIF
 
-   IF ( .NOT. config_flags%trajectory_io ) THEN
+   IF ( .NOT. head_grid%trajectory_io ) THEN
       CALL nl_set_io_form_auxhist18( head_grid%id, io_auxh18 )
    ENDIF
 

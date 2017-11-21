@@ -166,6 +166,12 @@ SUBROUTINE med_before_solve_io ( grid , config_flags )
                CALL save_xtraj  (  message )
             ENDIF
          ENDIF
+         ! NL trajectory I/O to disk for offline observation operators in WRFDA
+         ! with checkpointing
+         IF ( ialarm.EQ.auxhist16_only .AND. config_flags%dyn_opt.EQ.dyn_em &
+              .AND. config_flags%checkpoint_interval.GT.0 ) THEN 
+            CALL med_hist_out ( grid , ialarm, config_flags )
+         ENDIF
        ENDIF
 #else
        IF ( grid%dfi_stage == DFI_FST .OR. grid%dfi_opt == DFI_NODFI ) THEN
@@ -189,18 +195,22 @@ SUBROUTINE med_before_solve_io ( grid , config_flags )
          ( (config_flags%restart) .AND. ( currTime .EQ. startTime ) .AND. &
            alarm%alarmint%Enabled ) ) THEN
            call wrf_debug(15,' CALL med_read_wrf_chem_emiss ')
+#if (WRFPLUS == 1)
            IF ( config_flags%dyn_opt .EQ. dyn_em_ad ) THEN
              CALL domain_clock_set( grid, time_step_seconds=-1*auxinput_step )
              grid%domain_clock%clockint%CurrTime = ESMF_TimeInc (grid%domain_clock%clockint%CurrTime, &
                                 grid%domain_clock%clockint%TimeStep )
            ENDIF
+#endif
            CALL med_read_wrf_chem_emiss ( grid , config_flags )
+#if (WRFPLUS == 1)
            IF ( config_flags%dyn_opt .EQ. dyn_em_ad ) THEN
              CALL domain_clock_set( grid, time_step_seconds=auxinput_step )
              grid%domain_clock%clockint%CurrTime = ESMF_TimeInc (grid%domain_clock%clockint%CurrTime, &
                                 grid%domain_clock%clockint%TimeStep )
              CALL domain_clock_set( grid, time_step_seconds=-1*model_config_rec%time_step )
            ENDIF
+#endif
            CALL WRFU_AlarmRingerOff( alarm, rc=rc )
            call wrf_debug(15,' Back from CALL med_read_wrf_chem_emiss ')
          ENDIF
@@ -218,18 +228,22 @@ SUBROUTINE med_before_solve_io ( grid , config_flags )
          IF( WRFU_AlarmIsRinging( alarm, rc=rc ) .OR.  &
          ((config_flags%restart) .AND. ( currTime .EQ. startTime ) .AND. &
            alarm%alarmint%Enabled ) ) THEN
+#if (WRFPLUS == 1)
            IF ( config_flags%dyn_opt .EQ. dyn_em_ad ) THEN
              CALL domain_clock_set( grid, time_step_seconds=-1*auxinput_step )
              grid%domain_clock%clockint%CurrTime = ESMF_TimeInc (grid%domain_clock%clockint%CurrTime, &
                                 grid%domain_clock%clockint%TimeStep )
            ENDIF
+#endif
            CALL med_auxinput_in ( grid, ialarm, config_flags )
+#if (WRFPLUS == 1)
            IF ( config_flags%dyn_opt .EQ. dyn_em_ad ) THEN
              CALL domain_clock_set( grid, time_step_seconds=auxinput_step )
              grid%domain_clock%clockint%CurrTime = ESMF_TimeInc (grid%domain_clock%clockint%CurrTime, &
                                 grid%domain_clock%clockint%TimeStep )
              CALL domain_clock_set( grid, time_step_seconds=-1*model_config_rec%time_step )
            ENDIF
+#endif
            WRITE ( message , FMT='(A,i3,A,i3)') 'Input data processed for aux input ',&
                   ialarm - first_auxinput + 1, ' for domain ',grid%id
            CALL wrf_debug ( 15 , message )
@@ -263,6 +277,7 @@ SUBROUTINE med_before_solve_io ( grid , config_flags )
        ENDIF
 #endif
      ELSE IF( WRFU_AlarmIsRinging( grid%alarms( ialarm ), rc=rc ) ) THEN
+#if (WRFPLUS == 1)
        IF ( grid%trajectory_io .AND. (ialarm .EQ. auxinput16_only .OR. ialarm .EQ. auxinput17_only)) THEN
          IF ( ialarm .EQ. auxinput16_only ) THEN ! Read Trajectory only
            IF ( config_flags%dyn_opt .EQ. dyn_em_ad  ) THEN
@@ -303,7 +318,9 @@ SUBROUTINE med_before_solve_io ( grid , config_flags )
              CYCLE
           ENDIF        
 #endif
+#endif
           CALL med_auxinput_in ( grid, ialarm, config_flags )
+#if (WRFPLUS == 1)
           IF ( config_flags%dyn_opt .EQ. dyn_em_ad .AND. ialarm .EQ. auxinput16_only ) THEN
              CALL domain_clock_get( grid, current_time=currTime, start_time=startTime, &
                                     current_timestr=timestr )
@@ -379,7 +396,7 @@ SUBROUTINE med_before_solve_io ( grid , config_flags )
 !          CALL domain_clock_set( grid, time_step_seconds=-1*model_config_rec%time_step )
 !#endif
        ENDIF
-
+#endif
        CALL WRFU_AlarmRingerOff( grid%alarms( ialarm ), rc=rc )
      ENDIF
    ENDDO

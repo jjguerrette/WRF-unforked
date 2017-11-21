@@ -390,7 +390,7 @@ CONTAINS
     CASE DEFAULT
       CALL PUSHCONTROL1B(1)
     END SELECT
-    SELECT CASE  (config_flags%chem_opt) 
+    SELECT CASE  (config_flags%nta_chem_opt) 
     CASE (GOCARTRACM_KPP, GOCARTRADM2) 
       IF (config_flags%emiss_inpt_opt .NE. 3) THEN
         IF (config_flags%kemit .GT. kte - ksub) THEN
@@ -915,7 +915,7 @@ CONTAINS
       CALL WRF_DEBUG(15, 'fire emissions: adding biomassb emissions adjoint')
       CALL A_ADD_EMIS_BURN(id, dtstep, ktau, dz8w, a_dz8w, rho_phy, &
 &                     a_rho_phy, chem, a_chem, julday, gmt, xlat, xlong, &
-&                     t_phy, p_phy, ebu, config_flags%chem_opt, 0, &
+&                     t_phy, p_phy, ebu, config_flags%nta_chem_opt, 0, &
 &                     config_flags%biomass_burn_opt, scalebb(:, ibb, :, :&
 &                     ), a_scalebb(:, ibb, :, :), config_flags%&
 &                     scale_burn_opt, num_chem, ids, ide, jds, jde, kds, &

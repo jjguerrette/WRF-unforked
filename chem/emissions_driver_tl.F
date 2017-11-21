@@ -310,7 +310,7 @@ CONTAINS
       CALL WRF_DEBUG(15, 'fire emissions: adding biomassb emissions')
       CALL G_ADD_EMIS_BURN(id, dtstep, ktau, dz8w, g_dz8w, rho_phy, &
 &                     g_rho_phy, chem, g_chem, julday, gmt, xlat, xlong, &
-&                     t_phy, p_phy, ebu, config_flags%chem_opt, 0, &
+&                     t_phy, p_phy, ebu, config_flags%nta_chem_opt, 0, &
 &                     config_flags%biomass_burn_opt, scalebb(:, ibb, :, :&
 &                     ), g_scalebb(:, ibb, :, :), config_flags%&
 &                     scale_burn_opt, num_chem, ids, ide, jds, jde, kds, &
@@ -322,7 +322,7 @@ CONTAINS
     IF (config_flags%scale_emiss_opt .NE. config_flags%emiss_opt) CALL &
 &      WRF_ERROR_FATAL3('<stdin>', 471, &
 &                 'emissions_driver: scale_emiss_opt /= emiss_opt')
-    SELECT CASE  (config_flags%chem_opt) 
+    SELECT CASE  (config_flags%nta_chem_opt) 
     CASE (GOCARTRACM_KPP, GOCARTRADM2) 
       IF (config_flags%emiss_inpt_opt .NE. 3) THEN
         IF (config_flags%kemit .GT. kte - ksub) THEN
