@@ -18,7 +18,11 @@ subroutine da_read_basicstates ( xbx, grid, config_flags, timestr, fgat )
 #ifdef VAR4D
    if ( grid%var4d ) then
       if ( grid%trajectory_io ) then
-         call input_nl_xtraj (timestr)
+         if ( checkpoint_interval .le. 0 ) then
+            call input_nl_xtraj (timestr)
+         else
+            call input_nl_xtraj_checkpoint (timestr)
+         end if
          call da_swap_xtraj (grid)
       else
          config_flags%auxinput16_inname = "auxhist6_d<domain>_<date>"

@@ -127,7 +127,6 @@ subroutine da_transform_vtoy_adj(cv_size, be, ep, cv, iv, vp, vv, vp6, vv6, xbx,
          end do
       endif
 
-      if ( checkpoint_interval .eq. 0 ) then
       do nobwin=num_fgat_time, 1, -1
 
          call domain_clock_get( grid, current_timestr=timestr )
@@ -160,7 +159,6 @@ subroutine da_transform_vtoy_adj(cv_size, be, ep, cv, iv, vp, vv, vp6, vv6, xbx,
          call domain_clockprint(150, grid, 'DEBUG Adjoint Forcing:  get CurrTime from clock,')
 
       end do
-      endif
 
       if (num_fgat_time > 1) then
          call nl_get_time_step ( grid%id, time_step_seconds)
@@ -168,7 +166,7 @@ subroutine da_transform_vtoy_adj(cv_size, be, ep, cv, iv, vp, vv, vp6, vv6, xbx,
          call domain_clockprint(150, grid, 'get CurrTime from clock,')
       endif
 
-      if ( trajectory_io .and. checkpoint_interval .eq. 0 ) then
+      if ( trajectory_io ) then
          ! for memory io, we need to up-side-down the adjoint forcing linked list generated in previous step.
           call upsidedown_ad_forcing
       endif

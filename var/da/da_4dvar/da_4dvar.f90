@@ -1,18 +1,21 @@
 module da_4dvar
 
 use da_tracing, only : da_trace_entry, da_trace_exit
-use da_reporting, only : da_error
+use da_reporting, only : da_error, message, da_message
 use da_control, only : comm, var4d_bin, var4d_lbc, trace_use_dull, num_fgat_time, multi_inc, &
                        run_hours, run_days, adtl_run_hours, &
 #if (WRF_CHEM == 1)
                        init_osse_chem, calc_hx_only, &
-                       cv_options, cv_options_chem, use_chemobs, &
+                       cv_options, cv_options_chem, &
+                       use_chemobs, use_nonchemobs, use_offlineobs, &
 #endif
                        checkpoint_interval, write_checkpoints, cycle_interval
 
 #ifdef VAR4D
 
 use module_streams, only : MAX_WRF_ALARMS
+use module_io_domain, only : open_r_dataset,close_dataset, &
+             input_input,input_auxhist16,construct_filename2a
 use module_wrf_top, only : domain, head_grid, config_flags, &
              wrf_init, wrf_run, wrf_run_tl, wrf_run_ad, wrf_finalize, &
              wrf_run_tl_checkpt, wrf_run_ad_checkpt, wrf_run_cycle, &
@@ -54,6 +57,8 @@ REAL , DIMENSION(:,:,:) , ALLOCATABLE  :: u6_2, v6_2, w6_2, t6_2, ph6_2, p6
 REAL , DIMENSION(:,:,:,:) , ALLOCATABLE  :: moist6
 REAL , DIMENSION(:,:) , ALLOCATABLE  :: mu6_2, psfc6
 
+integer :: end_year0, end_month0, end_day0, end_hour0
+
 contains
 
 #include "da_nl_model.inc"
@@ -63,6 +68,7 @@ contains
 #include "da_4dvar_io.inc"
 #include "da_4dvar_lbc.inc"
 #include "da_set_run_hours.inc"
+#include "da_reset_run_hours.inc"
 #if (WRF_CHEM == 1)
 #include "da_init_model_output.inc"
 #include "da_init_model_input.inc"

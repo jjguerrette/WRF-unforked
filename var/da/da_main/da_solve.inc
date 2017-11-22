@@ -134,6 +134,7 @@
    end if
 
 #if (WRF_CHEM == 1)
+   !Add all non-chem obs as they become available
    if (use_nonchemobs) then
       use_nonchemobs =  any((/use_synopobs, use_shipsobs, use_metarobs, use_soundobs, &
               use_mtgirsobs, use_tamdarobs, use_bogusobs, use_pilotobs, &
@@ -147,9 +148,14 @@
               use_airsretobs, use_rainobs, &
               use_iasiobs, use_radarobs, use_radar_rv, use_radar_rf/))
    end if
-   if (use_chemobs) then
-      use_chemobs = any((/use_chem_surfobs,use_chem_acftobs/))
-   end if
+
+   !Add applicable chem obs as they become available
+   use_offlineobs = any((/(use_nonchemobs.and.cv_options.gt.0),&
+                          (.false..and.cv_options_chem.gt.0)/)) 
+
+   !Add all chem obs as they become available
+   use_chemobs = any((/use_chem_surfobs,use_chem_acftobs/))
+
    if ( .not.any((/use_nonchemobs,use_chemobs/)) ) then
       CALL wrf_error_fatal('Must use either meteorological or chemical observations to conduct DA')
    end if
@@ -171,8 +177,9 @@
 !       num_fgat_time = NINT(time_max/var4d_bin)
 !       if ( NINT(time_max/var4d_bin)*var4d_bin .ne. NINT(time_max) ) then
 #if (WRF_CHEM == 1)
-       if ( var4d_bin .eq. time_step .and. use_nonchemobs ) then
-
+       if (.not. use_nonchemobs) then
+          num_fgat_time = -1
+       else if ( var4d_bin .eq. time_step ) then
           num_fgat_time = 0
        else
 #endif
@@ -855,7 +862,7 @@
 #if (WRF_CHEM == 1)
             end if
 
-            if (cv_options_chem == 1 .and. chem_opt(1) .gt. 0) then
+            if (cv_options_chem .gt. 0 .and. chem_opt(1) .gt. 0) then
                ! Transferring chem from grid to model_grid 
                ! --> Gives same result as da_init_model_input, unless chem is included
                !      as a control variable, in which case the code below is correct.
@@ -907,7 +914,7 @@
             model_grid%moist_bys = grid%moist_bys
             model_grid%moist_bye = grid%moist_bye
 #if (WRF_CHEM == 1)
-            if (cv_options_chem == 1 .and. chem_opt(1) .gt. 0) then
+            if (cv_options_chem .gt. 0 .and. chem_opt(1) .gt. 0) then
                model_grid%chem_bxs = grid%chem_bxs
                model_grid%chem_bxe = grid%chem_bxe
                model_grid%chem_bys = grid%chem_bys
@@ -951,8 +958,10 @@
 #endif
 
             ! Turn off model boundary reading as we already provide a new one.
-            if ( checkpoint_interval .eq. 0 ) call da_model_lbc_off
+            if ( checkpoint_interval.eq.0 .or. var4d_lbc ) call da_model_lbc_off
          endif !end it>1 test
+
+         if (adtl_run_hours .le. 0) adtl_run_hours=run_hours
 
          run_hours0 = adtl_run_hours
 
@@ -1300,7 +1309,7 @@
 #endif
 
 #if (WRF_CHEM == 1)
-   if (cv_options.eq.0 .and. cv_options_chem.eq.1) then
+   if (cv_options.eq.0 .and. cv_options_chem.gt.0) then
 #ifdef DM_PARALLEL
       IF ( rootproc ) CALL start_timing
 #endif

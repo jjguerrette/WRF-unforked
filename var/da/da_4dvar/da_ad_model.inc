@@ -9,15 +9,13 @@ subroutine da_ad_model ()
 
    integer :: time_step, alarmid, gwd_opt
 
-   integer :: end_year0, end_month0, end_day0, end_hour0
-
    if (trace_use_dull) call da_trace_entry("da_ad_model")
 
 #ifdef _OPENMP
    call setfeenv()
 #endif
 
-   IF ( checkpoint_interval .LE. 0 ) THEN
+   IF ( use_nonchemobs ) THEN
       ! Set the file names and interval for reading basic states.
       model_config_rec%auxinput16_inname = "auxhist6_d<domain>_<date>"
       call nl_get_time_step ( head_grid%id, time_step )
@@ -241,41 +239,11 @@ subroutine da_ad_model ()
    IF ( checkpoint_interval .LE. 0 ) THEN
       call wrf_run_ad
    ELSE
-      end_year0 = model_config_rec%end_year(head_grid%id)
-      end_month0 = model_config_rec%end_month(head_grid%id)
-      end_day0 = model_config_rec%end_day(head_grid%id)
-      end_hour0 = model_config_rec%end_hour(head_grid%id)
-
       call da_set_run_hours ()
 
       call wrf_run_ad_checkpt
 
-      if ( run_hours .gt. adtl_run_hours .and. run_days .eq. 0 ) then
-         model_config_rec%run_hours = run_hours
-
-         model_config_rec%end_year(head_grid%id) = end_year0
-         model_config_rec%end_month(head_grid%id) = end_month0
-         model_config_rec%end_day(head_grid%id) = end_day0
-         model_config_rec%end_hour(head_grid%id) = end_hour0
-
-         IF ( ASSOCIATED( head_grid%domain_clock ) ) THEN
-           IF ( head_grid%domain_clock_created ) THEN
-             CALL WRFU_ClockDestroy( head_grid%domain_clock )
-             head_grid%domain_clock_created = .FALSE.
-           ENDIF
-         ENDIF
-         IF ( ASSOCIATED( head_grid%alarms ) .AND. &
-              ASSOCIATED( head_grid%alarms_created ) ) THEN
-           DO alarmid = 1, MAX_WRF_ALARMS
-             IF ( head_grid%alarms_created( alarmid ) ) THEN
-               CALL WRFU_AlarmDestroy( head_grid%alarms( alarmid ) )
-               head_grid%alarms_created( alarmid ) = .FALSE.
-             ENDIF
-           ENDDO
-         ENDIF
-         call Setup_Timekeeping ( head_grid )
-
-      end if 
+      call da_reset_run_hours ()
    ENDIF
 
    ! restore the physics options to the originals
@@ -292,11 +260,9 @@ subroutine da_ad_model ()
    call nl_set_icloud (head_grid%id, original_icloud)
    !call nl_set_isfflx (head_grid%id, original_isfflx)
 
-   IF ( checkpoint_interval .LE. 0 ) THEN
    ! Turn off auxinput16,17 reading and auxhist17 output
-      call nl_set_auxinput16_interval_s (head_grid%id, 0 )
-      call nl_set_auxinput17_interval_s ( head_grid%id, 0 )
-   ENDIF
+   call nl_set_auxinput16_interval_s (head_grid%id, 0 )
+   call nl_set_auxinput17_interval_s ( head_grid%id, 0 )
 
    IF ( ASSOCIATED( head_grid%domain_clock ) ) THEN
      IF ( head_grid%domain_clock_created ) THEN

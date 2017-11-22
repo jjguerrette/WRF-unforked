@@ -96,17 +96,25 @@ subroutine da_update_firstguess(grid, out_filename)
         fgname = 'fg02'
      else
 #if (WRF_CHEM == 1)
-        fgname = 'fgc'
-#else
-        fgname = 'fg'
+        if ( use_chemobs .and. cv_options_chem .gt. 0 ) then
+           fgname = 'fgc'
+        else
+#endif
+           fgname = 'fg'
+#if (WRF_CHEM == 1)
+        end if
 #endif
      endif
   else
      file_name = 'wrfvar_output'
 #if (WRF_CHEM == 1)
-     fgname = 'fgc'
-#else
-     fgname = 'fg'
+     if ( use_chemobs .and. cv_options_chem .gt. 0 ) then
+        fgname = 'fgc'
+     else
+#endif
+        fgname = 'fg'
+#if (WRF_CHEM == 1)
+     end if
 #endif
   endif
 
@@ -1119,9 +1127,8 @@ end if        ! end of radar or radiance
 !-------------End of update QCLOUD, QRAIN, QICE, QSNOW & QGROUP
 
 #if (WRF_CHEM == 1)
-!The code can be modified if scaleant and scalebb members are already present in the original wrfinput file,
-! but should not need to be. -JJGuerrette 07/2015
-if ( use_chem_surfobs .or. use_chem_acftobs ) then
+if ( use_chemobs .and. cv_options_chem .gt. 0 ) then
+
 !
 !  write scaleant members
 !

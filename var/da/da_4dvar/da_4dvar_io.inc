@@ -76,6 +76,53 @@ subroutine input_nl_xtraj ( time )
 
 end subroutine input_nl_xtraj
 
+subroutine input_nl_xtraj_checkpoint ( time )
+
+   implicit none
+
+   character*256, intent(in) :: time
+   character(len=256)        :: filename !, start_time
+   INTEGER                   :: fid, ierr 
+
+   if (trace_use_dull) call da_trace_entry("input_nl_xtraj_checkpoint")
+
+!   call domain_clock_get( model_grid, start_timestr=start_time )
+!   if (time == start_time) then
+!      !Read wrfinput/fg file
+!      filename = "wrfinput_d01"
+!
+!      WRITE(message(1),*)'read initial xtraj: opening ',TRIM(filename)
+!      CALL da_message (  message(1:1) )
+!      CALL open_r_dataset ( fid , TRIM(filename) , model_grid , config_flags , "DATASET=INPUT", ierr )
+!      IF ( ierr .NE. 0 ) THEN
+!        WRITE( message(1) , '("program da_wrfvar: error opening ",A," for reading")') TRIM(filename)
+!        call da_error(__FILE__,__LINE__,message(1:1))
+!      ENDIF
+!      CALL input_input ( fid,   model_grid , config_flags , ierr )
+!      CALL close_dataset ( fid , config_flags , "DATASET=INPUT" )
+!   else
+      !Read wrf_checkpoint files
+!      filename = "wrf_checkpoint_d01_"//trim(time)
+!      filename = "xtraj_for_obs_d01_"//trim(time)
+
+      CALL da_construct_filename2a ( filename , "xtraj_for_obs_d<domain>_<date>" , model_grid%id , 2 , time )
+
+      WRITE(message(1),*)'read checkpointed xtraj: opening ',TRIM(filename)
+      CALL da_message (  message(1:1) )
+      CALL open_r_dataset ( fid , TRIM(filename) , model_grid , config_flags , "DATASET=AUXHIST16", ierr )
+      IF ( ierr .NE. 0 ) THEN
+        WRITE( message(1) , '("program da_wrfvar: error opening ",A," for reading")') TRIM(filename)
+        call da_error(__FILE__,__LINE__,message(1:1))
+      ENDIF
+!      CALL input_restart ( fid,   model_grid , config_flags , ierr )
+      CALL input_auxhist16 ( fid,   model_grid , config_flags , ierr )
+      CALL close_dataset ( fid , config_flags , "DATASET=AUXHIST16" )
+!   end if
+
+   if (trace_use_dull) call da_trace_entry("input_nl_xtraj_checkpoint")
+
+end subroutine input_nl_xtraj_checkpoint
+
 subroutine push_tl_pert (time )
 
    implicit none

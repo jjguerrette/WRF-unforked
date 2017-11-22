@@ -102,7 +102,6 @@ subroutine da_transform_vtoy(cv_size, be, ep, cv, iv, vp, vv, vp6, vv6, xbx, &
          call domain_clockprint(150, grid, 'get CurrTime from clock,')
       endif
 
-      if (checkpoint_interval .eq. 0 ) then
       do nobwin= num_fgat_time, 1 , -1
 
          call domain_clock_get( grid, current_timestr=timestr )
@@ -129,7 +128,6 @@ subroutine da_transform_vtoy(cv_size, be, ep, cv, iv, vp, vv, vp6, vv6, xbx, &
          call domain_clockprint(150, grid, 'DEBUG :  get CurrTime from clock,')
 
       end do
-      endif
 
       ! Caculate var4d_bin_rain rainfall
       if (num_fgat_time > 1 .and. use_rainobs) then

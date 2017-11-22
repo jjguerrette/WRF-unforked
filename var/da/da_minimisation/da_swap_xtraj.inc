@@ -48,14 +48,14 @@ subroutine da_swap_xtraj ( grid )
       call kj_swap_reverse (model_grid%chem(:,:,:,i), grid%chem(:,:,:,i), &
                     grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, grid%xp%kms, grid%xp%kme)
    enddo
-   do i = PARAM_FIRST_SCALAR, num_scaleant
-      call kj_swap_reverse (model_grid%scaleant(:,:,:,i), grid%scaleant(:,:,:,i), &
-                    grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, 1, grid%num_ant_steps)
-   enddo
-   do i = PARAM_FIRST_SCALAR, num_scalebb
-      call kj_swap_reverse (model_grid%scalebb(:,:,:,i), grid%scalebb(:,:,:,i), &
-                    grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, 1, grid%num_bb_steps)
-   enddo
+!   do i = PARAM_FIRST_SCALAR, num_scaleant
+!      call kj_swap_reverse (model_grid%scaleant(:,:,:,i), grid%scaleant(:,:,:,i), &
+!                    grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, 1, grid%num_ant_steps)
+!   enddo
+!   do i = PARAM_FIRST_SCALAR, num_scalebb
+!      call kj_swap_reverse (model_grid%scalebb(:,:,:,i), grid%scalebb(:,:,:,i), &
+!                    grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, 1, grid%num_bb_steps)
+!   enddo
 #endif
    grid%mu_2 = model_grid%mu_2
    grid%psfc = model_grid%psfc

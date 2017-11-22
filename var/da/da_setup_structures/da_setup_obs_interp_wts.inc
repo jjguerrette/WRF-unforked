@@ -16,15 +16,16 @@ subroutine da_setup_obs_interp_wts (iv)
 #if (WRF_CHEM ==1)
       if ( i == chem_acft  .and. iv%info(i)%nlocal > 0) then
             call da_store_obs_grid_info_acft (iv%info(i))
-!      else if ( i == chem_surf  .and. iv%info(i)%nlocal > 0) then
-!            call da_store_obs_grid_info (iv%info(i))
-      elseif (i /= radiance .and. iv%info(i)%nlocal > 0 .and. use_nonchemobs) then ! i=22 is radiance , should be excluded here
+      else if (i /= radiance .and. iv%info(i)%nlocal > 0) then ! i=22 is radiance , should be excluded here
 #else
       if (i /= radiance .and. iv%info(i)%nlocal > 0) then ! i=22 is radiance , should be excluded here
 #endif
-         if ( ob_format == ob_format_ascii ) then
-            call da_store_obs_grid_info (iv%info(i))
-         else if ( ob_format == ob_format_bufr ) then
+         if ( ob_format == ob_format_ascii .or. &
+              ob_format == ob_format_bufr &
+#if (WRF_CHEM ==1)
+              .or. i == chem_surf &
+#endif
+                                    ) then
             call da_store_obs_grid_info (iv%info(i))
          end if
       end if
