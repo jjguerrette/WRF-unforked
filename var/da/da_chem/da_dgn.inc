@@ -79,19 +79,19 @@ subroutine da_dgn( grid, cv_size, xbx, be, iv, xhat, cv, ob, config_flags, ja_to
    call da_evaluate_j( grid, config_flags, cv_size, be%cv%size_jb, &
                        xbx, be, iv, xhat, cv, ob, &
                        cv_s_ant, cv_e_ant, cv_s_bb, cv_e_bb, eta_b, jb)
-   write(unit=stdout,fmt='("DGN: eta_b          jb")')
-   write(unit=stdout,fmt='("DGN:",1F6.3,1F11.3)') eta_b,jb
+   write(unit=stdout,fmt='("DGN:   i  eta_b          jb")')
+   write(unit=stdout,fmt='("DGN:",I4,1F7.3,1F11.3)') 1,eta_b,jb
 
    call da_evaluate_j( grid, config_flags, cv_size, be%cv%size_jb, &
                        xbx, be, iv, xhat, cv, ob, &
                        cv_s_ant, cv_e_ant, cv_s_bb, cv_e_bb, eta_c, jc)
-   write(unit=stdout,fmt='("DGN: eta_c          jc")')
-   write(unit=stdout,fmt='("DGN:",1F6.3,1F11.3)') eta_c,jc
+   write(unit=stdout,fmt='("DGN:   i  eta_c          jc")')
+   write(unit=stdout,fmt='("DGN:",I4,1F7.3,1F11.3)') 2,eta_c,jc
 
    eta = eta_d
 
    branch = 2
-   itgold = 0
+   itgold = 2
    do while (eta_b - eta_a .gt. tol)
       itgold = itgold + 1
       call da_evaluate_j( grid, config_flags, cv_size, be%cv%size_jb, &
@@ -104,8 +104,8 @@ subroutine da_dgn( grid, cv_size, xbx, be, iv, xhat, cv, ob, config_flags, ja_to
       end if
 !!      write(unit=stdout,fmt='("DGN: i  eta_a eta_b       ja          jb          jc          jd")')
 !!      write(unit=stdout,fmt='("DGN:",I4,2F6.3,4F11.3)') itgold,eta_a,eta_b,ja,jb,jc,jd
-      write(unit=stdout,fmt='("DGN: i   eta_a eta_c eta_d eta_b       ja         jc         jd         jb")')
-      write(unit=stdout,fmt='("DGN:",I4,4F6.3,4F11.3)') itgold,eta_a,eta_c,eta_d,eta_b,ja,jc,jd,jb
+      write(unit=stdout,fmt='("DGN:   i  eta_a  eta_c  eta_d  eta_b       ja         jc         jd         jb")')
+      write(unit=stdout,fmt='("DGN:",I4,4F7.3,4F11.3)') itgold,eta_a,eta_c,eta_d,eta_b,ja,jc,jd,jb
 
 !      if ( jb.lt.jc .and. jb.lt.jd) then
 !         eta = eta_b

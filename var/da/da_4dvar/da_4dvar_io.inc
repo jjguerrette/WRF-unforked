@@ -103,17 +103,17 @@ subroutine input_nl_xtraj_checkpoint ( time )
 !   else
       !Read wrf_checkpoint files
 !      filename = "wrf_checkpoint_d01_"//trim(time)
-!      filename = "xtraj_for_obs_d01_"//trim(time)
+      filename = trim(xtrajprefix)//"_d01_"//trim(time)
 
-      CALL da_construct_filename2a ( filename , "xtraj_for_obs_d<domain>_<date>" , model_grid%id , 2 , time )
+!      CALL da_construct_filename2a ( filename , "xtraj_for_obs_d<domain>_<date>" , model_grid%id , 2 , time )
 
-      WRITE(message(1),*)'read checkpointed xtraj: opening ',TRIM(filename)
-      CALL da_message (  message(1:1) )
-      CALL open_r_dataset ( fid , TRIM(filename) , model_grid , config_flags , "DATASET=AUXHIST16", ierr )
+     CALL open_r_dataset ( fid , TRIM(filename) , model_grid , config_flags , "DATASET=AUXHIST16", ierr )
       IF ( ierr .NE. 0 ) THEN
         WRITE( message(1) , '("program da_wrfvar: error opening ",A," for reading")') TRIM(filename)
         call da_error(__FILE__,__LINE__,message(1:1))
       ENDIF
+      WRITE(message(1),*)'read checkpointed xtraj: opening ',TRIM(filename)
+      CALL da_message (  message(1:1) ) 
 !      CALL input_restart ( fid,   model_grid , config_flags , ierr )
       CALL input_auxhist16 ( fid,   model_grid , config_flags , ierr )
       CALL close_dataset ( fid , config_flags , "DATASET=AUXHIST16" )

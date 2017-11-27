@@ -149,7 +149,7 @@
               use_iasiobs, use_radarobs, use_radar_rv, use_radar_rf/))
    end if
 
-   !Add applicable chem obs as they become available
+   !Replace false below with applicable chem obs as they become available (e.g., AOD?)
    use_offlineobs = any((/(use_nonchemobs.and.cv_options.gt.0),&
                           (.false..and.cv_options_chem.gt.0)/)) 
 

@@ -179,7 +179,7 @@ state    real   vtrop          ij       dyn_em      1        Y     i1  "VTROP"  
 #
 # U Vel
 state    real   u              ikjb     dyn_em      2         X     \
-     i0rh0{16}usdf=(bdy_interp:dt)       "U"                      "x-wind component"   "m s-1"
+     i0{16}rh0{16}usdf=(bdy_interp:dt)       "U"                      "x-wind component"   "m s-1"
 state    real   ru             ikj     dyn_em      1         X      -        "MU_U"        "mu-coupled u"   "Pa m s-1"
 state    real   ru_m           ikj     dyn_em      1         X      -        "ru_m"        ""   ""
 state    real   ru_tend        ikj     dyn_em      1         X      -        "ru_tend"        ""   ""                                   
@@ -192,7 +192,7 @@ state    real   u_g_tend       |       dyn_em      1         -      i3rh     "U_
 #                                               
 # V Vel
 state    real   v              ikjb     dyn_em      2         Y     \
-     i0rh0{16}usdf=(bdy_interp:dt)        "V"                     "y-wind component"   "m s-1"
+     i0{16}rh0{16}usdf=(bdy_interp:dt)        "V"                     "y-wind component"   "m s-1"
 state    real   rv             ikj     dyn_em      1         Y      -        "MU_V"        "mu-coupled v"   "Pa m s-1"
 state    real   rv_m           ikj     dyn_em      1         Y      -        "rv_m"
 state    real   rv_tend        ikj     dyn_em      1         Y      -        "rv_tend"
@@ -203,7 +203,7 @@ state    real   v_g_tend       |       dyn_em      1         -      i3rh     "V_
 #                                               
 # Vertical Vel                                          
 state    real   w              ikjb     dyn_em      2         Z     \
-        irh0{16}usdf=(bdy_interp:dt)  "w"                          "z-wind component"   "m s-1"
+        i0{16}rh0{16}usdf=(bdy_interp:dt)  "w"                          "z-wind component"   "m s-1"
 state    real   ww             ikj     dyn_em      1         Z      r         "ww"   "mu-coupled eta-dot"    "Pa s-1"
 state    real   rw             ikj     dyn_em      1         Z      -         "rw"   "mu-coupled w"          "Pa m s-1"
 i1       real   ww1            ikj     dyn_em      1         Z                                          
@@ -217,7 +217,7 @@ state    real   w_subs_tend    |       dyn_em      1         -      i3rh      "W
 
 # Geopotential
 state    real   ph             ikjb     dyn_em      2         Z     \
-       irh0{16}usdf=(bdy_interp:dt)   "ph"   "perturbation geopotential"  "m2 s-2"
+       i0{16}rh0{16}usdf=(bdy_interp:dt)   "ph"   "perturbation geopotential"  "m2 s-2"
 state    real   phb            ikj     dyn_em      1         Z     irhdus "phb"  "base-state geopotential"  "m2 s-2"
 state    real   phb_fine       ikj     dyn_em      1         Z      -     "phb_fine"  "for nesting, temp holding interpolated coarse grid phb"  "m2 s-2"
 state    real   ph0            ikj     dyn_em      1         Z      r     "ph0"  "initial geopotential"     "m2 s-2"
@@ -229,7 +229,7 @@ i1       real   ph_save        ikj     dyn_em      1         Z
 # Potential Temperature
 #KAL added d (interpolating down to t_init) for the vertical nesting code
 state    real   t              ikjb     dyn_em      2         -     \
-       i0rh0{16}usdf=(bdy_interp:dt)   "t"      "perturbation potential temperature (theta-t0)" "K"
+       i0{16}rh0{16}usdf=(bdy_interp:dt)   "t"      "perturbation potential temperature (theta-t0)" "K"
 
 state    real   t_init         ikj     dyn_em      1         -      ird       "t_init" "initial potential temperature" "K"
 i1       real   t_tend         ikj     dyn_em      1         -  
@@ -306,7 +306,7 @@ state    real   tsk_force_tend      -     dyn_em      1      -      i3rh     "TS
 
 # Mass
 state    real   mu              ijb     dyn_em      2         -     \
-     irh0{16}usdf=(bdy_interp:dt)   "mu"  "perturbation dry air mass in column" "Pa"
+     i0{16}rh0{16}usdf=(bdy_interp:dt)   "mu"  "perturbation dry air mass in column" "Pa"
 state    real   mub             ij     dyn_em      1         -     irhdus       "mub" "base state dry air mass in column" "Pa"
 state    real   mub_fine        ij     dyn_em      1         -      -           "mub_fine" "nest temp, holds interpolated coarse grid mub" "Pa"
 state    real   mub_save        ij     dyn_em      1         -      -           "mub_save" "nest temp, holds orig fine grid mub" "Pa"
@@ -334,8 +334,8 @@ state    real   tke            ikj     dyn_em      2         -       r        "t
 i1       real   tke_tend       ikj     dyn_em      1         -      
 
 # Pressure and Density
-state    real   p              ikj     dyn_em      1         -      irh0{16}  "p"           "perturbation pressure"         "Pa"
-state    real   al             ikj     dyn_em      1         -      rh{16}    "al"          "inverse perturbation density"  "m3 kg-1"
+state    real   p              ikj     dyn_em      1         -      i0{16}rh0{16}  "p"           "perturbation pressure"         "Pa"
+state    real   al             ikj     dyn_em      1         -      i{16}rh{16}    "al"          "inverse perturbation density"  "m3 kg-1"
 state    real   alt            ikj     dyn_em      1         -      r         "alt"         "inverse density"               "m3 kg-1"
 state    real   alb            ikj     dyn_em      1         -      rdus      "alb"         "inverse base density"          "m3 kg-1"
 state    real   zx             ikj     dyn_em      1         XZ     -         " "  " "  " "    
@@ -389,15 +389,15 @@ state    real   p_hyd           ikj     dyn_em      1         -      irh       "
 state    real   p_hyd_w         ikj     dyn_em      1         Z       r        "p_hyd_w"     "hydrostatic pressure at full levels"         "Pa"
 
 # 2m and 10m output diagnostics
-state    real   Q2               ij     misc        1         -     irh0{16}{22}{23}du     "Q2"                   "QV at 2 M"         "kg kg-1"
-state    real   T2               ij     misc        1         -     i01rh0{16}{22}{23}du   "T2"                   "TEMP at 2 M"       "K"
+state    real   Q2               ij     misc        1         -     i0{16}rh0{16}{22}{23}du     "Q2"                   "QV at 2 M"         "kg kg-1"
+state    real   T2               ij     misc        1         -     i01{16}rh0{16}{22}{23}du   "T2"                   "TEMP at 2 M"       "K"
 state    real   TH2              ij     misc        1         -     irhdu     "TH2"                  "POT TEMP at 2 M"   "K"
-state    real   PSFC             ij     misc        1         -     i01rh0{16}du   "PSFC"                 "SFC PRESSURE"      "Pa"
+state    real   PSFC             ij     misc        1         -     i01{16}rh0{16}du   "PSFC"                 "SFC PRESSURE"      "Pa"
 
 # these next 2 are for the HFSoLE/PET demo; writing these to auxhist1 output over MCEL for coupling
 # with wave model, only if compiled with -DMCELIO, JM 2003/05/29
-state    real   U10              ij     misc        1         -     irh01{16}{22}{23}du     "U10"                "U at 10 M"         "m s-1"
-state    real   V10              ij     misc        1         -     irh01{16}{22}{23}du     "V10"                "V at 10 M"         "m s-1"
+state    real   U10              ij     misc        1         -     i0{16}rh01{16}{22}{23}du     "U10"                "U at 10 M"         "m s-1"
+state    real   V10              ij     misc        1         -     i0{16}rh01{16}{22}{23}du     "V10"                "V at 10 M"         "m s-1"
 # LPI
 state    real   LPI              ij     misc        1         -     rhdu   "LPI"                 "Lightning Potential Index"      "m^2 s-2"
 
@@ -462,19 +462,19 @@ state    real    vc_j                 -       misc     -     -    r
 #                                               
 state   real    -              ikjftb   moist       1         -     -    -
 state   real    qv             ikjftb   moist       1         -     \
-   i0rh0{16}usdf=(bdy_interp:dt)  "QVAPOR"           "Water vapor mixing ratio"      "kg kg-1"
+   i0{16}rh0{16}usdf=(bdy_interp:dt)  "QVAPOR"           "Water vapor mixing ratio"      "kg kg-1"
 state   real    qc             ikjftb   moist       1         -     \
-   i0rh0{16}usdf=(bdy_interp:dt)  "QCLOUD"           "Cloud water mixing ratio"      "kg kg-1"
+   i0{16}rh0{16}usdf=(bdy_interp:dt)  "QCLOUD"           "Cloud water mixing ratio"      "kg kg-1"
 state   real    qr             ikjftb   moist       1         -     \
-   i0rh0{16}usdf=(bdy_interp:dt)  "QRAIN"            "Rain water mixing ratio"       "kg kg-1"
+   i0{16}rh0{16}usdf=(bdy_interp:dt)  "QRAIN"            "Rain water mixing ratio"       "kg kg-1"
 state   real    qi             ikjftb   moist       1         -     \
-   i0rh0{16}usdf=(bdy_interp:dt)  "QICE"             "Ice mixing ratio"              "kg kg-1"
+   i0{16}rh0{16}usdf=(bdy_interp:dt)  "QICE"             "Ice mixing ratio"              "kg kg-1"
 state   real    qs             ikjftb   moist       1         -     \
-   i0rh0{16}usdf=(bdy_interp:dt)  "QSNOW"            "Snow mixing ratio"             "kg kg-1"
+   i0{16}rh0{16}usdf=(bdy_interp:dt)  "QSNOW"            "Snow mixing ratio"             "kg kg-1"
 state   real    qg             ikjftb   moist       1         -     \
-   i0rh0{16}usdf=(bdy_interp:dt)  "QGRAUP"           "Graupel mixing ratio"          "kg kg-1"
+   i0{16}rh0{16}usdf=(bdy_interp:dt)  "QGRAUP"           "Graupel mixing ratio"          "kg kg-1"
 state   real    qh             ikjftb   moist       1         -     \
-   i0rh0{16}usdf=(bdy_interp:dt)  "QHAIL"            "Hail mixing ratio"             "kg kg-1"
+   i0{16}rh0{16}usdf=(bdy_interp:dt)  "QHAIL"            "Hail mixing ratio"             "kg kg-1"
 state   real    -              ikjftb   dfi_moist       1         -     -    -
 state   real    dfi_qv         ikjftb   dfi_moist       1         -     \
    rusdf=(bdy_interp:dt)  "DFI_QVAPOR"       "Water vapor mixing ratio"      "kg kg-1"
@@ -571,7 +571,7 @@ state   real    dfi_qke_adv   ikjftb  dfi_scalar      1         -      \
 
 state    real   fcx            w         misc     -         -      ir       "fcx"                  "RELAXATION TERM FOR BOUNDARY ZONE"         ""
 state    real   gcx            w         misc     -         -      ir       "gcx"                  "2ND RELAXATION TERM FOR BOUNDARY ZONE"         ""
-state    real   dtbc            -        misc     -         -      irh{16}  "dtbc"                 "TIME SINCE BOUNDARY READ"         ""
+state    real   dtbc            -        misc     -         -      i0{16}rh{16}  "dtbc"                 "TIME SINCE BOUNDARY READ"         ""
 
 #-------------------------------------------------------------------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------------------------------------------------------------------
@@ -651,7 +651,7 @@ state   real   vegcat              ij    misc          1     -     i12     "VEGC
 
 # soil model variables  (Note that they are marked as staggered in the vertical dimension
 # because they are "fully dimensioned" -- they use every element in that dim
-state    real   TSLB           ilj       misc      1         Z     i02rh0{16}d=(interp_mask_field:lu_index,iswater)u=(copy_fcnm)           "TSLB"     "SOIL TEMPERATURE"   "K"
+state    real   TSLB           ilj       misc      1         Z     i02{16}rh0{16}d=(interp_mask_field:lu_index,iswater)u=(copy_fcnm)           "TSLB"     "SOIL TEMPERATURE"   "K"
 
 # Time series variables
 state    real   ts_hour         ?!       misc      -         -      -        "TS_HOUR"        "Model integration time, hours"
@@ -708,7 +708,7 @@ state    real   ZDR_URB2D      i{udr}j  misc      1        Z      -  "ZDR_URB2D"
 
 # lsm State Variables
 
-state    real   SMOIS            ilj     -          1         Z     i02rh0{16}d=(interp_mask_field:lu_index,iswater)u=(copy_fcnm)    "SMOIS"            "SOIL MOISTURE"     "m3 m-3"
+state    real   SMOIS            ilj     -          1         Z     i02{16}rh0{16}d=(interp_mask_field:lu_index,iswater)u=(copy_fcnm)    "SMOIS"            "SOIL MOISTURE"     "m3 m-3"
 state    real   SH2O             ilj     -          1         Z     i02rhd=(interp_mask_field:lu_index,iswater)u=(copy_fcnm)    "SH2O"             "SOIL LIQUID WATER" "m3 m-3"
 state    real   SMCREL           ilj     -          1         Z     i02rhd=(interp_mask_field:lu_index,iswater)u=(copy_fcnm)    "SMCREL"           "RELATIVE SOIL MOISTURE" ""
 state    real   XICE             ij     misc        1         -     i0124rhd=(interp_mask_field:lu_index,isice)u=(copy_fcnm)  "SEAICE"             "SEA ICE FLAG"  ""
@@ -734,9 +734,9 @@ state    real   SFCEXC           ij     misc        1         -      r          
 state    real   ACSNOW           ij     misc        1         -      rd=(interp_mask_field:lu_index,iswater)u=(copy_fcnm)       "ACSNOW"           "ACCUMULATED SNOW"         "kg m-2"
 state    real   ACSNOM           ij     misc        1         -      rhd=(interp_mask_field:lu_index,iswater)u=(copy_fcnm)       "ACSNOM"           "ACCUMULATED MELTED SNOW"  "kg m-2"
 state    real   SNOW             ij     misc        1         -     i012rhd=(interp_mask_field:lu_index,iswater)u=(copy_fcnm)    "SNOW"             "SNOW WATER EQUIVALENT"    "kg m-2"
-state    real   SNOWH            ij     misc        1         -     i012rh0{16}d=(interp_mask_field:lu_index,iswater)u=(copy_fcnm)    "SNOWH"            "PHYSICAL SNOW DEPTH"      "m"
+state    real   SNOWH            ij     misc        1         -     i012{16}rh0{16}d=(interp_mask_field:lu_index,iswater)u=(copy_fcnm)    "SNOWH"            "PHYSICAL SNOW DEPTH"      "m"
 #state    real   RHOSN            ij     misc        1         -    i02rhd=(interp_mask_field:lu_index,iswater)u=(copy_fcnm)    "RHOSN"            " SNOW DENSITY"      "kg m-3" 
-state    real   CANWAT           ij     misc        1         -     i012rh0{16}d=(interp_mask_field:lu_index,iswater)u=(copy_fcnm)    "CANWAT"           "CANOPY WATER"             "kg m-2"
+state    real   CANWAT           ij     misc        1         -     i012{16}rh0{16}d=(interp_mask_field:lu_index,iswater)u=(copy_fcnm)    "CANWAT"           "CANOPY WATER"             "kg m-2"
 state  integer  IFNDSNOWH        -      misc        1         -     i         "FNDSNOWH" "SNOWH_LOGICAL"
 state  integer  IFNDSOILW        -      misc        1         -     i         "FNDSOILW" "SOILW_LOGICAL"
 state  integer  IFNDALBSI        -      misc        1         -     ir        "FNDALBSI" "ALBSI_LOGICAL"
@@ -1142,7 +1142,7 @@ state   real    lnint          ij      misc         1         -      r        "L
 
 
 # Other Misc State Variables                                            
-state   real    h_diabatic     ikj     misc         1         -      rh{16}du "h_diabatic"            "MICROPHYSICS LATENT HEATING"         "K s-1"      
+state   real    h_diabatic     ikj     misc         1         -      i{16}rh{16}du "h_diabatic"            "MICROPHYSICS LATENT HEATING"         "K s-1"      
 state   real    qv_diabatic    ikj     misc         1         -      rdu      "qv_diabatic"           "MICROPHYSICS QV TENDENCY"            "g g-1 s-1"      
 state   real    qc_diabatic    ikj     misc         1         -      rdu      "qc_diabatic"           "MICROPHYSICS QC TENDENCY"            "g g-1 s-1"      
 state   real    msft           ij      misc         1         -     i012rhdu=(copy_fcnm)    "MAPFAC_M"         "Map scale factor on mass grid" ""
@@ -1170,7 +1170,7 @@ i1      real    ht_loc         ij      misc         1         -     -
 state   integer  shadowmask    ij      misc         1         -     - 
 state   integer min_ptchsz     -       misc         1         -     r
 
-state   real    TSK            ij      misc         1         -     i012rh0{16}d=(interp_mask_field:lu_index,iswater)u=(copy_fcnm)    "TSK"                   "SURFACE SKIN TEMPERATURE"                  "K"
+state   real    TSK            ij      misc         1         -     i012{16}rh0{16}d=(interp_mask_field:lu_index,iswater)u=(copy_fcnm)    "TSK"                   "SURFACE SKIN TEMPERATURE"                  "K"
 state   real    dfi_TSK        ij      misc         1         -     r                       "TSK_dfi"               "saved SURFACE SKIN TEMPERATURE"
 state   real    TSK_SAVE       ij      misc         1         -     r         "TSK_SAVE" "SURFACE SKIN TEMPERATURE, EXTRA COPY FOR SEA ICE TESTS in REAL"       "K"
 state   real    u_base         k       misc         1         -     ir        "u_base"                "BASE STATE X WIND IN IDEALIZED CASES"         ""      
@@ -1273,16 +1273,16 @@ state    real  RQCNCUTEN       ikj      misc        1         -      r       "RQ
 state    real  RQINCUTEN       ikj      misc        1         -      r       "RQINCUTEN"             "COUPLED Q_IN TENDENCY DUE TO CUMULUS SCHEME"       "Pa kg kg-1 s-1"
 state    real  W0AVG           ikj      misc        1         -      r        "W0AVG"                 "AVERAGE VERTICAL VELOCITY FOR KF CUMULUS SCHEME"         "m s-1"
 
-state    real  RAINC            ij      misc        1         -      rh0{16}du "RAINC"                 "ACCUMULATED TOTAL CUMULUS PRECIPITATION"                 "mm"      
+state    real  RAINC            ij      misc        1         -      i{16}rh0{16}du "RAINC"                 "ACCUMULATED TOTAL CUMULUS PRECIPITATION"                 "mm"      
 state    real  RAINSH           ij      misc        1         -      rhdu      "RAINSH"                "ACCUMULATED SHALLOW CUMULUS PRECIPITATION"               "mm"
-state    real  RAINNC           ij      misc        1         -      rh0{16}du "RAINNC"                "ACCUMULATED TOTAL GRID SCALE PRECIPITATION"              "mm"      
+state    real  RAINNC           ij      misc        1         -      i{16}rh0{16}du "RAINNC"                "ACCUMULATED TOTAL GRID SCALE PRECIPITATION"              "mm"      
 state  integer I_RAINC          ij      misc        1         -      rhd=(interp_fcni)u=(copy_fcni)     "I_RAINC"            "BUCKET FOR RAINC"                    ""
 state  integer I_RAINNC         ij      misc        1         -      rhd=(interp_fcni)u=(copy_fcni)     "I_RAINNC"           "BUCKET FOR RAINNC"                   ""
 state    real  PRATEC           ij      misc        1         -      r         "PRATEC"                "PRECIP RATE FROM CUMULUS SCHEME"                         "mm s-1"
 state    real  PRATESH          ij      misc        1         -      r         "PRATESH"               "PRECIP RATE FROM SHALLOW CUMULUS SCHEME"                 "mm s-1"
-state    real  RAINCV           ij      misc        1         -      rh{16}    "RAINCV"                "TIME-STEP CUMULUS PRECIPITATION"                         "mm"
+state    real  RAINCV           ij      misc        1         -      i{16}rh{16}    "RAINCV"                "TIME-STEP CUMULUS PRECIPITATION"                         "mm"
 state    real  RAINSHV          ij      misc        1         -      r         "RAINSHV"               "TIME-STEP SHALLOW CUMULUS PRECIPITATION"                 "mm"
-state    real  RAINNCV          ij      misc        1         -      rh{16}    "RAINNCV"               "TIME-STEP NONCONVECTIVE PRECIPITATION"                   "mm"
+state    real  RAINNCV          ij      misc        1         -      i{16}rh{16}    "RAINNCV"               "TIME-STEP NONCONVECTIVE PRECIPITATION"                   "mm"
 state    real  RAINBL           ij      misc        1         -      r         "RAINBL"                "PBL TIME-STEP TOTAL PRECIPITATION"                       "mm"      
 state    real  SNOWNC           ij      misc        1         -      rhdu      "SNOWNC"                "ACCUMULATED TOTAL GRID SCALE SNOW AND ICE"               "mm"
 state    real  GRAUPELNC        ij      misc        1         -      rhdu      "GRAUPELNC"             "ACCUMULATED TOTAL GRID SCALE GRAUPEL"                    "mm"
@@ -1347,7 +1347,7 @@ state    real  RQVFTEN          ikj     misc        1         -      r        "R
 
 state integer  STEPCU          -        misc        1         -      r        "STEPCU"                "NUMBER OF FUNDAMENTAL TIMESTEPS BETWEEN CONVECTION CALLS"  ""
                                                 
-state    real  RTHRATEN        ikj      misc        1         -      rh{16}d  "RTHRATEN"              "COUPLED THETA TENDENCY DUE TO RADIATION"              "Pa K s-1"
+state    real  RTHRATEN        ikj      misc        1         -      i{16}rh{16}d  "RTHRATEN"              "COUPLED THETA TENDENCY DUE TO RADIATION"              "Pa K s-1"
 state    real  RTHRATENLW      ikj      misc        1         -      r        "RTHRATLW"              "UNCOUPLED THETA TENDENCY DUE TO LONG WAVE RADIATION"    "K s-1"
 state    real  RTHRATENSW      ikj      misc        1         -      r        "RTHRATSW"              "UNCOUPLED THETA TENDENCY DUE TO SHORT WAVE RADIATION"   "K s-1"
 state    real  CLDFRA          ikj      misc        1         -      rh       "CLDFRA"                "CLOUD FRACTION"                                       ""
@@ -1358,8 +1358,8 @@ state    real  CLDT             ij      misc        1         -      -        "C
 #state    real  LWP              ij      misc        1         -      -        "LWP"                   "LIQUID CLOUD WATER PATH"                              "kg m-2"
 state    real  SWDOWN           ij      misc        1         -      rhd      "SWDOWN"                "DOWNWARD SHORT WAVE FLUX AT GROUND SURFACE"           "W m-2"      
 state    real  SWDOWNC          ij      misc        1         -      -        "SWDOWNC"               "DOWNWARD CLEAR-SKY SHORT WAVE FLUX AT GROUND SURFACE"           "W m-2"      
-state    real  GSW              ij      misc        1         -      rh0{16}d       "GSW"                   "NET SHORT WAVE FLUX AT GROUND SURFACE"           "W m-2"      
-state    real  GLW              ij      misc        1         -      rh0{16}d      "GLW"                   "DOWNWARD LONG WAVE FLUX AT GROUND SURFACE"            "W m-2"      
+state    real  GSW              ij      misc        1         -      i{16}rh0{16}d       "GSW"                   "NET SHORT WAVE FLUX AT GROUND SURFACE"           "W m-2"      
+state    real  GLW              ij      misc        1         -      i{16}rh0{16}d      "GLW"                   "DOWNWARD LONG WAVE FLUX AT GROUND SURFACE"            "W m-2"      
 state    real  SWNORM           ij      misc        1         -      rhd      "SWNORM"                "NORMAL SHORT WAVE FLUX AT GROUND SURFACE (SLOPE-DEPENDENT)"           "W m-2"
 state    real  diffuse_frac     ij      misc        1         -      rd       "DIFFUSE_FRAC"          "DIFFUSE FRACTION OF SURFACE SHORTWAVE IRRADIANCE"       ""
 # WRF-Solar
@@ -1679,21 +1679,21 @@ state    integer NYEAR          -       misc        1         -     r        "NY
 state    real    NDAY           -       misc        1         -     r        "NDAY"                  "ACCUM TIMESTEPS IN A DAY"                      ""
 state    real  XLAND            ij      misc        1         -     i02rhd=(interp_fcnm_imask)u=(copy_fcnm)       "XLAND"                 "LAND MASK (1 FOR LAND, 2 FOR WATER)"          ""      
 state    real  cplmask       i{ncpldom}j      misc        1       z        i0r     "CPLMASK"    "COUPLING MASK (0:VALUE FROM SST UPDATE; 1:VALUE FROM COUPLED OCEAN), vertical dim is number of external domains"  ""
-state    real  ZNT              ij      misc        1         -      i3rh{16} "ZNT"                   "TIME-VARYING ROUGHNESS LENGTH"                "m"      
+state    real  ZNT              ij      misc        1         -      i3{16}rh{16} "ZNT"                   "TIME-VARYING ROUGHNESS LENGTH"                "m"      
 state    real  CK               ij      misc        1         -      r        "CK"                    "ENTHALPY EXCHANGE COEFF AT 10 m"                      ""
 state    real  CKA              ij      misc        1         -      r        "CKA"                   "ENTHALPY EXCHANGE COEFF AT LOWEST MODEL LVL"          ""
 state    real  CD               ij      misc        1         -      r        "CD"                    "DRAG COEFF AT 10m"                      ""
 state    real  CDA              ij      misc        1         -      r        "CDA"                   "DRAG COEFF AT LOWEST MODEL LVL"         ""
-state    real  UST              ij      misc        1         -      rh0{16}  "UST"                   "U* IN SIMILARITY THEORY"                      "m s-1"      
-state    real  USTM             ij      misc        1         -      rh0{16}  "USTM"                  "U* IN SIMILARITY THEORY WITHOUT VCONV"        "m s-1"
+state    real  UST              ij      misc        1         -      i{16}rh0{16}  "UST"                   "U* IN SIMILARITY THEORY"                      "m s-1"      
+state    real  USTM             ij      misc        1         -      i{16}rh0{16}  "USTM"                  "U* IN SIMILARITY THEORY WITHOUT VCONV"        "m s-1"
 i1       real  HOL              ij      misc        1         -      -        "HOL"                   "PBL HEIGHT OVER MONIN-OBUKHOV LENGTH"         ""
 state    real  RMOL             ij      misc        1         -      r        "RMOL"                  "1./Monin Ob. Length"                      ""
-state    real  MOL              ij      misc        1         -      rh{16}   "MOL"                   "T* IN SIMILARITY THEORY"                      "K"      
-state    real  PBLH             ij      misc        1         -      rh0{16}  "PBLH"                  "PBL HEIGHT"         "m"      
+state    real  MOL              ij      misc        1         -      i{16}rh{16}   "MOL"                   "T* IN SIMILARITY THEORY"                      "K"      
+state    real  PBLH             ij      misc        1         -      i{16}rh0{16}  "PBLH"                  "PBL HEIGHT"         "m"      
 state    real  CAPG             ij      misc        1         -      r        "CAPG"                  "HEAT CAPACITY FOR SOIL"                       "J K-1 m-3"      
 state    real  THC              ij      misc        1         -      r        "THC"                   "THERMAL INERTIA"                              "Cal cm-2 K-1 s-0.5"      
-state    real  HFX              ij      misc        1         -      rh0{16}  "HFX"                   "UPWARD HEAT FLUX AT THE SURFACE"              "W m-2"      
-state    real  QFX              ij      misc        1         -      rh0{16}  "QFX"                   "UPWARD MOISTURE FLUX AT THE SURFACE"          "kg m-2 s-1"      
+state    real  HFX              ij      misc        1         -      i{16}rh0{16}  "HFX"                   "UPWARD HEAT FLUX AT THE SURFACE"              "W m-2"      
+state    real  QFX              ij      misc        1         -      i{16}rh0{16}  "QFX"                   "UPWARD MOISTURE FLUX AT THE SURFACE"          "kg m-2 s-1"      
 state    real  LH               ij      misc        1         -      rh       "LH"                    "LATENT HEAT FLUX AT THE SURFACE"              "W m-2"
 state    real  ACHFX            ij      misc        1         -      rhdu     "ACHFX"                 "ACCUMULATED UPWARD HEAT FLUX AT THE SURFACE"  "J m-2"
 #BSINGH - Added WSTAR for CuP scheme
@@ -1711,7 +1711,7 @@ state    real  dfi_SOILT1       ij      misc        1         -      r        "S
 state    real  TSNAV            ij      misc        1         -      r        "TSNAV"                 "AVERAGE SNOW TEMPERATURE "                    "C"
 state    real  dfi_TSNAV        ij      misc        1         -      r        "TSNAV_dfi"             "AVERAGE SNOW TEMPERATURE "                    "C"
 state    real  REGIME           ij      misc        1         -      r        "REGIME"  "FLAGS: 1=Night/Stable, 2=Mechanical Turbulent, 3=Forced Conv, 4=Free Conv" ""
-state    real  SNOWC            ij      misc        1         -      i012rh0{16}d=(interp_mask_field:lu_index,iswater)u=(copy_fcnm)  "SNOWC"  "FLAG INDICATING SNOW COVERAGE (1 FOR SNOW COVER)"  ""
+state    real  SNOWC            ij      misc        1         -      i012{16}rh0{16}d=(interp_mask_field:lu_index,iswater)u=(copy_fcnm)  "SNOWC"  "FLAG INDICATING SNOW COVERAGE (1 FOR SNOW COVER)"  ""
 state    real  dfi_SNOWC        ij      misc        1         -      r        "SNOWC_dfi"             "FLAG INDICATING SNOW COVERAGE (1 FOR SNOW COVER)"         ""
 state    real  MAVAIL           ij      misc        1         -      r        "MAVAIL"                "SURFACE MOISTURE AVAILABILITY"                ""
                                                 
@@ -2849,8 +2849,8 @@ rconfig  integer    cellcount_method         namelist,physics   max_domains    0
 rconfig  real       cldtop_adjustment        namelist,physics   max_domains    0.      -   "cldtop_adjustment"         "Adjustment to cloud top for ltng param"     "km"
 rconfig  integer    sf_lake_physics          namelist,physics   max_domains    0       -   "sf_lake_physics"           "activate lake model  0=no, 1=yes"   ""
 
-state    real  iccg_in_num    ij      misc        1         -      i{16}r     "iccg_in_num"      "IC:CG input numerator"      ""
-state    real  iccg_in_den    ij      misc        1         -      i{16}r     "iccg_in_den"      "IC:CG input denominator"    ""
+#state    real  iccg_in_num    ij      misc        1         -      i{16}r     "iccg_in_num"      "IC:CG input numerator"      ""
+#state    real  iccg_in_den    ij      misc        1         -      i{16}r     "iccg_in_den"      "IC:CG input denominator"    ""
 
 package	ltng_none           lightning_option==0            -       -
 package	ltng_crm_PR92w      lightning_option==1            -       state:ic_flashcount,ic_flashrate,cg_flashcount,cg_flashrate

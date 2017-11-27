@@ -14,12 +14,11 @@ use da_control, only : comm, var4d_bin, var4d_lbc, trace_use_dull, num_fgat_time
 #ifdef VAR4D
 
 use module_streams, only : MAX_WRF_ALARMS
-use module_io_domain, only : open_r_dataset,close_dataset, &
-             input_input,input_auxhist16,da_construct_filename2a
+use module_io_domain, only : open_r_dataset,close_dataset,input_auxhist16
 use module_wrf_top, only : domain, head_grid, config_flags, &
              wrf_init, wrf_run, wrf_run_tl, wrf_run_ad, wrf_finalize, &
              wrf_run_tl_checkpt, wrf_run_ad_checkpt, wrf_run_cycle, &
-             Setup_Timekeeping, gradient_out
+             Setup_Timekeeping, gradient_out, io_form_checkpt
 use mediation_pertmod_io, only : xtraj_io_initialize, adtl_initialize, &
              save_ad_forcing, read_ad_forcing, read_nl_xtraj, save_tl_pert, &
              read_tl_pert, swap_ad_forcing
@@ -41,7 +40,11 @@ use module_dm, only : local_communicator
 type (domain), pointer :: model_grid
 type (grid_config_rec_type) :: model_config_flags
 
+
 character*256 :: timestr
+character*20  :: xtrajprefix="xtraj_for_obs"
+integer :: io_form_xtraj = 2 !Change this if alternative I/O MECHANISM is preferred
+
 
 ! Define some variables to save the NL physical option
 integer :: original_mp_physics, original_ra_lw_physics, original_ra_sw_physics, &

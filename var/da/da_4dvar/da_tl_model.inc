@@ -186,6 +186,8 @@ subroutine da_tl_model ()
    ELSE
       call da_set_run_hours ()
 
+      io_form_checkpt = io_form_xtraj
+
       call wrf_run_tl_checkpt
 
       call da_reset_run_hours ()

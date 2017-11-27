@@ -241,6 +241,8 @@ subroutine da_ad_model ()
    ELSE
       call da_set_run_hours ()
 
+      io_form_checkpt = io_form_xtraj
+
       call wrf_run_ad_checkpt
 
       call da_reset_run_hours ()
