@@ -15,7 +15,7 @@ use da_control, only : comm, var4d_bin, var4d_lbc, trace_use_dull, num_fgat_time
 
 use module_streams, only : MAX_WRF_ALARMS
 use module_io_domain, only : open_r_dataset,close_dataset, &
-             input_input,input_auxhist16,construct_filename2a
+             input_input,input_auxhist16,da_construct_filename2a
 use module_wrf_top, only : domain, head_grid, config_flags, &
              wrf_init, wrf_run, wrf_run_tl, wrf_run_ad, wrf_finalize, &
              wrf_run_tl_checkpt, wrf_run_ad_checkpt, wrf_run_cycle, &

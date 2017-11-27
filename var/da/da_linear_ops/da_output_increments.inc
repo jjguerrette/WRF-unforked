@@ -1,6 +1,6 @@
 subroutine da_output_increments(grid,config_flags,mz, &
                                 it,cv_size,xbx,be, &
-                                hessian_info)
+                                cvt,hessian_info)
 
    !-------------------------------------------------------------------------
    ! Purpose:   Output increment for all inner loop truncations using Hessian
@@ -24,6 +24,7 @@ subroutine da_output_increments(grid,config_flags,mz, &
    integer,        intent(in)    :: cv_size ! Size of cv array.
    type(xbx_type), intent(in)    :: xbx  ! For header & non-grid arrays.
    type(be_type),  intent(in)    :: be   ! background errors.
+   real*8, intent(in)            :: cvt(1:cv_size)
    type(hessian_type), intent(in) :: hessian_info
 
 !   integer                      :: je_start, je_end       ! Start/end indices of Je.
@@ -37,7 +38,7 @@ subroutine da_output_increments(grid,config_flags,mz, &
    real*8, allocatable, target :: qhat(:,:)
    real*8 :: ghat(1:cv_size)
    real*8 :: xhat(1:cv_size)
-   real*8 :: xhat_REF(1:cv_size)
+   real*8 :: cvt_REF(1:cv_size)
    real*8 :: dvnorm_(1:cv_size)
    real*8 :: EUCNORM_xPa(2)
 !   real*8 :: minlam(1:1)
@@ -139,7 +140,7 @@ subroutine da_output_increments(grid,config_flags,mz, &
          !-----------------------------------------
          !Define reference case
          if (icount .eq. 1) then
-            xhat_REF = xhat
+            cvt_REF = cvt + xhat
 
             write(cproc,fmt='(i4.4)') myproc
             write(cit,fmt='(i2.2)') it
@@ -147,12 +148,12 @@ subroutine da_output_increments(grid,config_flags,mz, &
             filename = '../hess_REF_out.nmodes'//trim(adjustl(cmode))//'.it'//trim(adjustl(cit))//'.'//trim(adjustl(cproc))
             call da_hessian_io ('w',grid,cv_size,it,nmodes,neign, &
                          eignvec,eignval,qhat,mz, &
-                         xhat_REF,hess_file=filename)
+                         cvt_REF,hess_file=filename)
 
             nmodes_REF = nmodes
 
             if (read_hess_REF.gt.0) then
-               !Allows hess_REF and xhat_REF to be defined in a separate inversion scenario
+               !Allows hess_REF and cvt_REF to be defined in a separate inversion scenario
                ! (read in from file)
                if (read_hess_REF.eq.1) then
                   nmodes_REF = nmodes_hess_REF
@@ -169,7 +170,7 @@ subroutine da_output_increments(grid,config_flags,mz, &
                qhat_REF(:,0) = 0.D0
                call da_hessian_io ('r',grid,cv_size,it,nmodes_REF,hess_REF%neign, &
                             hess_REF%eignvec,hess_REF%eignval,qhat_REF,mz, &
-                            xhat_REF,hess_file=filename)
+                            cvt_REF,hess_file=filename)
             else
                qhat_REF => qhat
                allocate(hess_REF%eignval(1:nmodes_REF))
@@ -187,7 +188,7 @@ subroutine da_output_increments(grid,config_flags,mz, &
          end if
 
          !diffvec
-         xhat = xhat - xhat_REF
+         xhat = cvt + xhat - cvt_REF
 
 
          !Multiply Pav_REF^-1 * (dv - dv_REF) in two steps
@@ -215,17 +216,18 @@ subroutine da_output_increments(grid,config_flags,mz, &
 
    end do
 
-   deallocate(LAM)
-   deallocate(qhat)
-
    deallocate(LAM_REF)
    deallocate(hess_REF%eignval)
    deallocate(hess_REF%eignvec)
+!   if (read_hess_REF.gt.0) then
    if (ASSOCIATED(qhat_REF,qhat)) then
       NULLIFY(qhat_REF)
    else
       deallocate(qhat_REF)
    end if
+
+   deallocate(LAM)
+   deallocate(qhat)
 
 
    config_flags%auxhist18_outname = trim(dummy_name)
