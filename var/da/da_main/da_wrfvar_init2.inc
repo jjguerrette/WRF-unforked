@@ -225,6 +225,9 @@ subroutine da_wrfvar_init2
       if ( var4d ) then
          call med_latbound_in ( head_grid, config_flags )
          call close_dataset ( head_grid%lbc_fid , config_flags , "DATASET=BOUNDARY" )
+
+         call nl_set_boundary_io(1, .false.)
+         boundary_io = .false.
       end if
    end if
 

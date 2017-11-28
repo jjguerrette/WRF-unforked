@@ -45,7 +45,7 @@ if [ -z $MPICALL ]; then #Could be defined externally
    MPICALL=mpirun #(e.g., NOAA Theia)
 
    # Note: the script performance has been verified on the platforms in parentheses;
-   #        add more as they are confirmed
+   #       please add more as they are confirmed
 fi
 echo "MPI Calling Wrapper = "
 echo "==> "$MPICALL
@@ -373,6 +373,10 @@ echo " Setup ensemble directories"
 echo "=================================================="
 CWD=$(pwd)
 echo "WORKING DIRECTORY: "$CWD
+cd ../
+PARENTDIR=$(pwd)
+CWD_rel=${CWD#$PARENTDIR"/"} #Use for linking, more stable
+cd $CWD
 
 dummy=$(ls ../run.*)
 if [ $? -eq 0 ]; then  rm -r ../run.[0-9]*; fi
@@ -444,7 +448,7 @@ if [ $svd_type -ne 11 ]; then
       cd ../run.$ii
 
       # link all files necessary to run da_wrfvar.exe
-      ln -s $CWD/* ./
+      ln -s $CWD_rel/* ./
       rm namelist.input
       rm rsl.out.*
       rm rsl.error.*
@@ -641,11 +645,11 @@ do
             cd ../run.$ii
 
             if [ $CPDT -gt 0 ]; then
-               ln -sf $CWD/wrf_checkpoint_d01_* ./
+               ln -sf $CWD_rel/wrf_checkpoint_d01_* ./
             fi
             if [ $WRF_CHEM -gt 0 ]; then
-               ln -sf $CWD/SURFACE_Hx_y* ./
-               ln -sf $CWD/AIRCRAFT_Hx_y* ./
+               ln -sf $CWD_rel/SURFACE_Hx_y* ./
+               ln -sf $CWD_rel/AIRCRAFT_Hx_y* ./
             fi
 
             cp $CWD/namelist.input ./
@@ -653,7 +657,7 @@ do
 
             #Test for the presence of cvt
             if [ $(ls "$CWD"/cvt.it"$it0_last".* | wc -l) -eq 0 ]; then echo "ERROR: Missing cvt.*"; echo 14; exit 14; fi
-            ln -sf $CWD/cvt.* ./
+            ln -sf $CWD_rel/cvt.* ./
             mkdir oldrsl_$it0_last
             mv -v rsl.* oldrsl_$it0_last
 
@@ -796,11 +800,11 @@ do
       cd ../run.$ii
 
       if [ $CPDT -gt 0 ]; then
-         ln -sf $CWD/wrf_checkpoint_d01_* ./
+         ln -sf $CWD_rel/wrf_checkpoint_d01_* ./
       fi
       if [ $WRF_CHEM -gt 0 ]; then
-         ln -sf $CWD/SURFACE_Hx_y* ./
-         ln -sf $CWD/AIRCRAFT_Hx_y* ./
+         ln -sf $CWD_rel/SURFACE_Hx_y* ./
+         ln -sf $CWD_rel/AIRCRAFT_Hx_y* ./
       fi
 
       if [ $iENS -le $NENS ] && [ "$GLOBAL_OMEGA" == "true" ] && ([ $it -eq 1 ] || [ $GRAD_PRECON -eq 0 ]); then
@@ -820,7 +824,7 @@ do
       if [ $it -gt 1 ] && ([ $RIOT_RESTART -eq 0 ] || [ $RIOT_RESTART -eq 2 ]); then
          #Test for the presence of cvt
          if [ $(ls "$CWD"/cvt.it"$it0_last".* | wc -l) -eq 0 ]; then echo "ERROR: Missing cvt.*"; echo 20; exit 20; fi
-         ln -sf $CWD/cvt.* ./
+         ln -sf $CWD_rel/cvt.* ./
          mkdir oldrsl_$it0_last
          mv -v rsl.* oldrsl_$it0_last
       fi

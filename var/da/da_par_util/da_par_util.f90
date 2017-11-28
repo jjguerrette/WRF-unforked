@@ -44,6 +44,9 @@ module da_par_util
       ims_int,ime_int,jms_int,jme_int,kms_int,kme_int, &
       ids_int,ide_int,jds_int,jde_int,kds_int,kde_int, &
       ips_int,ipe_int,jps_int,jpe_int,kps_int,kpe_int, &
+#if (WRF_CHEM == 1)
+      cv_options, cv_options_chem, &
+#endif
       anal_type_hybrid_dual_res
    use da_reporting, only : da_error
    use da_tracing, only : da_trace_entry, da_trace_exit

@@ -22,19 +22,31 @@ subroutine da_read_basicstates ( xbx, grid, config_flags, timestr, fgat )
       if ( grid%trajectory_io ) then
          if ( checkpoint_interval .le. 0 ) then
             call input_nl_xtraj (timestr)
-            call da_swap_xtraj (grid)
-         else
-!            call input_nl_xtraj_checkpoint (timestr)
 !            call da_swap_xtraj (grid)
+         else
+!            if ( xtrajswitch .gt. 0) then
+               call input_nl_xtraj_checkpt (timestr)
+!               call da_swap_xtraj (grid)
+!            else
+!
+!               call nl_get_io_form_auxinput16 ( grid%id, io_form )
+!               if (io_form .le. 0) then
+!                  call nl_set_io_form_auxinput16 ( grid%id, io_form_xtraj )
+!                  config_flags%io_form_auxinput16 = io_form_xtraj
+!               else
+!                  config_flags%io_form_auxinput16 = io_form
+!               end if
+!
+!               config_flags%frames_per_auxinput16 = 1
+!
+!               config_flags%auxinput16_inname = trim(xtrajprefix)//"_d<domain>_<date>"
+!
+!               call med_auxinput_in ( grid, auxinput16_only, config_flags )
+!
+!               call nl_set_io_form_auxinput16 ( grid%id, io_form )
+!            end if
 
-            call nl_get_io_form_auxinput16 ( grid%id, io_form )
-            if (io_form .le. 0) call nl_set_io_form_auxinput16 ( grid%id, io_form_xtraj )
-
-            config_flags%auxinput16_inname = trim(xtrajprefix)//"_d<domain>_<date>"
-
-            call med_auxinput_in ( grid, auxinput16_only, config_flags )
-
-            if (io_form .le. 0) call nl_set_io_form_auxinput16 ( grid%id, 0 )
+            call da_swap_xtraj (grid)
          end if
       else
          config_flags%auxinput16_inname = "auxhist6_d<domain>_<date>"

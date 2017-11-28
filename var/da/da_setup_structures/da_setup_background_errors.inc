@@ -79,20 +79,24 @@ subroutine da_setup_background_errors(grid, be)
          call da_setup_be_regional (grid%xb, be, grid)
       else if(cv_options == 3 ) then
          call da_setup_be_ncep_gfs (grid, be)
+      else 
+         write(unit=message(1),fmt='(A,I4)') &
+              'Invalid CV option chosen:  cv_options = ', cv_options
 #if (WRF_CHEM == 1)
-      else if(cv_options_chem.le.0 .or. chem_opt(1).eq.0) then
-#else
-      else
-#endif
-           write(unit=message(1),fmt='(A,I4)') &
-                'Invalid CV option chosen:  cv_options = ', cv_options
-            call da_error(__FILE__,__LINE__,message(1:1))
-      endif
-#if (WRF_CHEM == 1)
+         if(cv_options_chem.le.0 .or. chem_opt(1).eq.0) then
+            write(unit=message(2),fmt='(A,I4)') &
+                 'Invalid chem CV option chosen:  cv_options_chem = ', cv_options_chem
+            call da_error(__FILE__,__LINE__,message(1:2))
+         end if
+      end if
       if(cv_options_chem == 1 .and. chem_opt(1) .gt. 0) then
          call da_setup_be_chem (grid, be)
       end if
+#else
+         call da_error(__FILE__,__LINE__,message(1:1))
+      endif
 #endif
+
    else if(fg_format == fg_format_wrf_nmm_regional ) then
 !rizvi TBD            call da_setup_be_regional (grid%xb, be)
             call da_setup_be_nmm_regional (grid%xb, be)

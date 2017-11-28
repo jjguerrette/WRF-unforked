@@ -612,35 +612,46 @@
 !        allocate (full_eignvec(cv_size))
 !      end if
 
-      if ( outer_loop_restart ) then
-         !call da_get_unit(cvt_unit)
-         cvt_unit=600
-         if ( max_ext_its > 1 ) then
-           max_ext_its=1
-           write(unit=message(1),fmt='(a)') "Re-set max_ext_its = 1 for outer_loop_restart"
-           call da_message(message(1:1))
-         end if
-         write(unit=cvtfile,fmt='(a,i4.4)') 'cvt_',myproc
-         inquire(file=trim(cvtfile), exist=ex)
-         if ( ex ) then
-           open(unit=cvt_unit,file=trim(cvtfile),iostat=iost,form='UNFORMATTED',status='OLD')
-           if (iost /= 0) then
-             write(unit=message(1),fmt='(A,I5,A)') &
-                "Error ",iost," opening cvt file "//trim(cvtfile)
-             call da_error(__FILE__,__LINE__,message(1:1))
-           end if
-           write(unit=message(1),fmt='(a)') 'Reading cvt from : '//trim(cvtfile) 
-           call da_message(message(1:1))
-           read(cvt_unit) cvt
-           close(cvt_unit)
-         else
-           write(unit=message(1),fmt='(a)') "cvt file '"//trim(cvtfile)//"' does not exists, initiallizing cvt."
-           call da_message(message(1:1))
-           call da_initialize_cv (cv_size, cvt)
-         end if
+#if defined(LAPACK)
+      if (use_randomsvd .and. svd_outer.gt.1 .and. svd_minimise) then
+         write(cproc,fmt='(i4.4)') myproc
+         write(cit,fmt='(i2.2)') svd_outer-1
+         cvtfile_svd = 'cvt.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
+         call da_cv_io ('r', cvtfile_svd, cv_size, cvt(1:cv_size), grid, mz)
       else
-         call da_initialize_cv (cv_size, cvt)
+#endif
+         if ( outer_loop_restart ) then
+            !call da_get_unit(cvt_unit)
+            cvt_unit=600
+            if ( max_ext_its > 1 ) then
+              max_ext_its=1
+              write(unit=message(1),fmt='(a)') "Re-set max_ext_its = 1 for outer_loop_restart"
+              call da_message(message(1:1))
+            end if
+            write(unit=cvtfile,fmt='(a,i4.4)') 'cvt_',myproc
+            inquire(file=trim(cvtfile), exist=ex)
+            if ( ex ) then
+              open(unit=cvt_unit,file=trim(cvtfile),iostat=iost,form='UNFORMATTED',status='OLD')
+              if (iost /= 0) then
+                write(unit=message(1),fmt='(A,I5,A)') &
+                   "Error ",iost," opening cvt file "//trim(cvtfile)
+                call da_error(__FILE__,__LINE__,message(1:1))
+              end if
+              write(unit=message(1),fmt='(a)') 'Reading cvt from : '//trim(cvtfile) 
+              call da_message(message(1:1))
+              read(cvt_unit) cvt
+              close(cvt_unit)
+            else
+              write(unit=message(1),fmt='(a)') "cvt file '"//trim(cvtfile)//"' does not exists, initiallizing cvt."
+              call da_message(message(1:1))
+              call da_initialize_cv (cv_size, cvt)
+            end if
+         else
+            call da_initialize_cv (cv_size, cvt)
+         end if
+#if defined(LAPACK)
       end if
+#endif
 
       call da_zero_vp_type (grid%vv)
       call da_zero_vp_type (grid%vp)
@@ -958,7 +969,8 @@
 #endif
 
             ! Turn off model boundary reading as we already provide a new one.
-            if ( checkpoint_interval.eq.0 .or. var4d_lbc ) call da_model_lbc_off
+            if ( checkpoint_interval.eq.0 .or. var4d_lbc .or. .not.boundary_io) &
+               call da_model_lbc_off
          endif !end it>1 test
 
          if (adtl_run_hours .le. 0) adtl_run_hours=run_hours
@@ -1137,12 +1149,6 @@
       else if ( use_randomsvd) then
          j0_total = 0.D0
          if ( nens .gt. 0  .and.  svd_outer .gt. 0  .and.  it .eq. 1 ) then
-            if (svd_outer .gt. 1 .and. svd_minimise) then
-               write(cproc,fmt='(i4.4)') myproc
-               write(cit,fmt='(i2.2)') svd_outer-1
-               cvtfile_svd = 'cvt.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
-               call da_cv_io ('r', cvtfile_svd, cv_size, cvt(1:cv_size), grid, mz)
-            end if
             if (svd_stage .eq. 1 .and. &
                 (ensmember .eq. nens+1)) then
                select case (svd_type)
@@ -1343,34 +1349,32 @@
          deallocate(hessian_info%eigs)
          deallocate(hessian_info%qhat)
          deallocate(hessian_info%ghat)
+#ifdef DM_PARALLEL
+         IF ( rootproc ) CALL end_timing('da_end_timing: increment_diagnostics')
+#endif
+#ifdef DM_PARALLEL
+         IF ( rootproc ) CALL start_timing
+#endif
+
       end if
 
       ! Update outer-loop control variable
       cvt = cvt + xhat
-
-#if defined(LAPACK)
-!      if ( use_randomsvd .and. .not.use_lanczos ) then
-         write(cproc,fmt='(i4.4)') myproc
-         write(cit,fmt='(i2.2)') svd_outer
-         cvtfile_svd = 'cvt.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
-         call da_cv_io ('w', cvtfile_svd, cv_size, cvt(1:cv_size), grid, mz)
-!      end if
-#endif
 
 #if (WRF_CHEM == 1)
       if (osse_chem .or. use_iter_metrics) then
 
 #if defined(LAPACK)
          if (svd_minimise .and. use_randomsvd) then
+            allocate(xhat_prev(1:cv_size))
+
             if (svd_outer.gt.1) then 
                write(cproc,fmt='(i4.4)') myproc
                write(cit,fmt='(i2.2)') svd_outer-1
 
-               allocate(xhat_prev(1:cv_size))
                cvtfile_svd = 'xhat.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
                call da_cv_io ('r', cvtfile_svd, cv_size, xhat_prev(1:cv_size), grid, mz)
            else
-               allocate(xhat_prev(1:cv_size))
                xhat_prev = 0.D0
             end if
          end if
@@ -1408,6 +1412,14 @@
       end if
 #endif
 
+#if defined(LAPACK)
+      if (use_randomsvd) then
+         write(cproc,fmt='(i4.4)') myproc
+         write(cit,fmt='(i2.2)') svd_outer
+         cvtfile_svd = 'cvt.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
+         call da_cv_io ('w', cvtfile_svd, cv_size, cvt(1:cv_size), grid, mz)
+      else
+#endif
       if ( outer_loop_restart ) then
         open(unit=cvt_unit,status='unknown',file=trim(cvtfile),iostat=iost,form='UNFORMATTED')
         if (iost /= 0) then
@@ -1421,6 +1433,10 @@
         close(cvt_unit)
         !call da_free_unit(cvt_unit)
       end if
+#if defined(LAPACK)
+      end if
+#endif
+
       !------------------------------------------------------------------------
 
       ! reset cv to random noise

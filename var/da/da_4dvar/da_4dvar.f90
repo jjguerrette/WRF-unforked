@@ -3,7 +3,7 @@ module da_4dvar
 use da_tracing, only : da_trace_entry, da_trace_exit
 use da_reporting, only : da_error, message, da_message
 use da_control, only : comm, var4d_bin, var4d_lbc, trace_use_dull, num_fgat_time, multi_inc, &
-                       run_hours, run_days, adtl_run_hours, &
+                       run_hours, run_days, adtl_run_hours, xtrajswitch, &
 #if (WRF_CHEM == 1)
                        init_osse_chem, calc_hx_only, &
                        cv_options, cv_options_chem, &
@@ -21,7 +21,7 @@ use module_wrf_top, only : domain, head_grid, config_flags, &
              Setup_Timekeeping, gradient_out, io_form_checkpt
 use mediation_pertmod_io, only : xtraj_io_initialize, adtl_initialize, &
              save_ad_forcing, read_ad_forcing, read_nl_xtraj, save_tl_pert, &
-             read_tl_pert, swap_ad_forcing
+             read_tl_pert, swap_ad_forcing, read_nl_xtraj_checkpt
 use module_configure, only :  model_to_grid_config_rec, grid_config_rec_type, model_config_rec
 use module_domain, only : wrfu_timeinterval, domain_clock_get, domain_clock_set
 use module_utility

@@ -11,7 +11,7 @@ subroutine da_nl_model (it)
    integer :: time_step, alarmid
    character(len=256) :: rst_outname
 #if (WRF_CHEM == 1)
-   integer :: ioform8
+   integer :: ioform8, io_form
 #endif
 
    if (trace_use_dull) call da_trace_entry("da_nl_model")
@@ -67,7 +67,8 @@ subroutine da_nl_model (it)
          !Turn on Output for standard checkpoint files
          call nl_set_restart_interval_m ( head_grid%id, checkpoint_interval)
          call nl_set_restart_interval_h ( head_grid%id, 0)
-         call nl_set_io_form_restart ( head_grid%id, io_form_xtraj )
+         call nl_get_io_form_restart ( head_grid%id, io_form )
+         if (io_form .le. 0) call nl_set_io_form_restart ( head_grid%id, io_form_xtraj )
          rst_outname = "wrf_checkpoint_d<domain>_<date>"
          call nl_set_rst_outname ( head_grid%id, rst_outname)
          call nl_set_restart_begin_m( head_grid%id, 0 )
@@ -78,7 +79,8 @@ subroutine da_nl_model (it)
 #endif
             model_config_rec%auxhist16_outname = trim(xtrajprefix)//"_d<domain>_<date>"
             call nl_set_auxhist16_interval_s (head_grid%id, var4d_bin )
-            call nl_set_io_form_auxhist16 ( head_grid%id, io_form_xtraj )
+            call nl_get_io_form_auxhist16 ( head_grid%id, io_form )
+            if (io_form .le. 0) call nl_set_io_form_auxhist16 ( head_grid%id, io_form_xtraj )
             call nl_set_frames_per_auxhist16 ( head_grid%id, 1 )
 #if (WRF_CHEM == 1)
          end if
@@ -187,7 +189,7 @@ subroutine da_nl_model (it)
 #endif
          model_config_rec%auxhist16_outname = "auxhist16_d<domain>_<date>"
          call nl_set_auxhist16_interval_s (head_grid%id, 0 )
-         call nl_set_io_form_auxhist16 ( head_grid%id, 0 )
+         call nl_set_io_form_auxhist16 ( head_grid%id, io_form )
 #if (WRF_CHEM == 1)
       end if
    else if ( write_checkpoints .eq. 2 ) then

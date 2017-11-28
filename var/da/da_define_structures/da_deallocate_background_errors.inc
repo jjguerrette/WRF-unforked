@@ -19,7 +19,17 @@ subroutine da_deallocate_background_errors (be)
    if (trace_use) call da_trace_entry("da_deallocate_background_errors")
 
 #if (WRF_CHEM == 1)
-   if (cv_options_chem.eq.1) then
+   if (cv_options_chem.gt.0) then
+!      !! Chem
+!      do ic = PARAM_FIRST_SCALAR, num_chem
+!         if ( be % alpha_chem(ic) % mz > 0 ) then
+!            deallocate( be % alpha_chem(ic) % val )
+!            deallocate( be % alpha_chem(ic) % evec )
+!            deallocate( be % alpha_chem(ic) % rf_alpha )
+!         end if
+!      end do
+!      deallocate ( be % alpha_chem )
+
       !! Anthropogenic
       do ic = PARAM_FIRST_SCALAR, num_scaleant
          if ( be % alpha_ant_chem(ic) % mz > 0 ) then
@@ -41,8 +51,9 @@ subroutine da_deallocate_background_errors (be)
       deallocate ( be % alpha_bb_chem )
 
    end if
-#endif
 
+   if ( cv_options .gt. 0 )  then
+#endif
    if (cv_options /= 3) then
       ! Deallocate gridpoint errors:
 
@@ -143,7 +154,7 @@ subroutine da_deallocate_background_errors (be)
 
       ! deallocate (be % cv % val)
 
-   else if (cv_options .gt. 0) then ! for cv_options = 3
+   else ! for cv_options = 3
     
       deallocate (be % corz)
       deallocate (be % corp)
@@ -165,6 +176,10 @@ subroutine da_deallocate_background_errors (be)
    if( .not. use_rf )deallocate(be%wsd,ws)
    if( do_normalize )deallocate(be%sd)
    if( do_normalize .or. .not. use_rf )deallocate(nij)
+
+#if (WRF_CHEM == 1)
+   end if
+#endif
 
    if (trace_use) call da_trace_exit("da_deallocate_background_errors")
 

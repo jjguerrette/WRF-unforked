@@ -113,7 +113,7 @@ subroutine da_tl_model ()
    head_grid%g_pratec = 0.0
 
 #if (WRF_CHEM == 1)
-   if (cv_options.eq.0 .and. cv_options_chem.eq.1) then
+   if (cv_options.eq.0 .and. cv_options_chem.gt.0) then
       ! Added these 6-30-2017, need to remove if chem ICs/BCs are control variables
       head_grid%g_chem = 0.0
       head_grid%g_chem_bxs = 0.0; head_grid%g_chem_bxe = 0.0; head_grid%g_chem_bys = 0.0; head_grid%g_chem_bye = 0.0

@@ -51,6 +51,7 @@ module da_minimisation
       var_scaling4,var_scaling5,var_scaling3, jo_unit, test_gradient, &
       print_detail_grad,omb_set_rand,grad_unit,cost_unit, num_pseudo, cv_options, &
       cv_size_domain_je,cv_size_domain_jb, cv_size_domain_jp, cv_size_domain_js, cv_size_domain_jl, &
+      xtrajswitch, &
 #if (WRF_CHEM == 1)
       chem_surf, chem_acft, num_platform, &
       sigma_r_acft, sigma_c_acft, &
@@ -196,7 +197,7 @@ module da_minimisation
    use da_transfer_model, only : da_transfer_wrftoxb
 #ifdef VAR4D
    use da_4dvar, only : da_tl_model, da_ad_model, model_grid, &
-       input_nl_xtraj, xtrajprefix, io_form_xtraj, input_nl_xtraj_checkpoint, &
+       input_nl_xtraj, xtrajprefix, io_form_xtraj, input_nl_xtraj_checkpt, &
        kj_swap_reverse, upsidedown_ad_forcing, u6_2, v6_2, w6_2, t6_2, ph6_2, p6, &
       mu6_2, psfc6, moist6
    use da_transfer_model, only : da_transfer_xatowrftl_lbc, da_transfer_xatowrftl_adj_lbc, &
