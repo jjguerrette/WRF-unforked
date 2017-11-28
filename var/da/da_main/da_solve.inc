@@ -1283,6 +1283,22 @@
 #ifdef DM_PARALLEL
    IF ( rootproc ) CALL start_timing
 #endif
+      if ( var4d .and. var4d_inc_out .and. allocated(hessian_info%ghat) ) then
+         call da_output_increments( grid,config_flags,mz, &
+                                    max(it,svd_outer),cv_size,xbx,be, &
+                                    cvt,hessian_info)
+
+         do ii = 1, hessian_info%nmodes_max
+            if(allocated(hessian_info%eigs(ii)%eignval)) &
+               deallocate(hessian_info%eigs(ii)%eignval)
+            if(allocated(hessian_info%eigs(ii)%eignvec)) &
+               deallocate(hessian_info%eigs(ii)%eignvec)
+         end do
+
+         deallocate(hessian_info%eigs)
+         deallocate(hessian_info%qhat)
+         deallocate(hessian_info%ghat)
+      end if
 
       ! Update outer-loop control variable
       cvt = cvt + xhat
@@ -1372,23 +1388,6 @@
       if (.not. var4d) then
          call da_transform_vtox (grid,cv_size,xbx,be,grid%ep,xhat,grid%vv,grid%vp)
       else
-         if ( var4d_inc_out .and. allocated(hessian_info%ghat) ) then
-            call da_output_increments(grid,config_flags,mz, &
-                                               max(it,svd_outer),cv_size,xbx,be, &
-                                               hessian_info)
-
-            do ii = 1, hessian_info%nmodes_max
-               if(allocated(hessian_info%eigs(ii)%eignval)) &
-                  deallocate(hessian_info%eigs(ii)%eignval)
-               if(allocated(hessian_info%eigs(ii)%eignvec)) &
-                  deallocate(hessian_info%eigs(ii)%eignvec)
-            end do
-
-            deallocate(hessian_info%eigs)
-            deallocate(hessian_info%qhat)
-            deallocate(hessian_info%ghat)
-         end if
-
          call da_transform_vtox (grid,be%cv%size_jb,xbx,be,grid%ep,xhat(1:be%cv%size_jb),grid%vv,grid%vp &
 #if (WRF_CHEM == 1)
          , grid%vch &
