@@ -23,18 +23,17 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
    type(domain), intent(inout)       :: grid
    integer, intent(in)               :: mz(:)
    type(grid_config_rec_type), intent(inout) :: config_flags
-   integer, intent(in)               :: cv_size                ! Total cv size
-   type (xbx_type),intent(inout)     :: xbx                    ! Header & non-gridded vars.
-   type (be_type), intent(in)        :: be                     ! background error structure.
-   type (iv_type), intent(inout)     :: iv                     ! ob. increment vector.
-   real,   intent(inout)             :: cv(1:cv_size)          ! control variable (local).
-   type (y_type), intent(inout)      :: re                     ! residual (o-a) structure.
-   type (y_type), intent(inout)      :: y                      ! y = H(x_inc) structure.
-   real,   intent(out)               :: xhat(1:cv_size)        ! control variable (local).
-   integer, intent(in)               :: nens                   ! Total number of eigenpairs
-
-   type (j_type), optional, intent(out) :: j_cost                        ! cost function
-   real,      optional, intent(out) :: qhat(1:cv_size, 0:nens) ! orthonormal basis set of A = Q * B * Q^T
+   integer, intent(in)               :: cv_size                  ! Total cv size
+   type (xbx_type),intent(inout)     :: xbx                      ! Header & non-gridded vars.
+   type (be_type), intent(in)        :: be                       ! background error structure.
+   type (iv_type), intent(inout)     :: iv                       ! ob. increment vector.
+   real,   intent(inout)             :: cv(1:cv_size)            ! control variable (local).
+   type (y_type), intent(inout)      :: re                       ! residual (o-a) structure.
+   type (y_type), intent(inout)      :: y                        ! y = H(x_inc) structure.
+   real,   intent(out)               :: xhat(1:cv_size)          ! control variable (local).
+   integer, intent(in)               :: nens                     ! Total number of eigenpairs
+   type (j_type), optional, intent(out) :: j_cost                ! cost function
+   real, optional, intent(out)       :: qhat(1:cv_size, 0:nens)  ! orthonormal basis set of A = Q * B * Q^T
    real,      optional, intent(out) :: eignvec(nens, nens)
    real,      optional, intent(out) :: eignval(nens)
    integer,   optional, intent(out) :: neign                         ! Number of non-truncated eigenpairs

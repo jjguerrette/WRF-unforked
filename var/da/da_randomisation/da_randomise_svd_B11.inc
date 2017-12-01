@@ -1,6 +1,6 @@
 subroutine da_randomise_svd_B11(grid, mz, config_flags,            &
                            cv_size, xbx, be, iv, cv, &
-                           re, y, xhat, j_cost, &
+                           re, y, xhat, nens, j_cost, &
                            qhat, eignval, eignvec, neign)
 
    !-------------------------------------------------------------------------
@@ -23,53 +23,53 @@ subroutine da_randomise_svd_B11(grid, mz, config_flags,            &
    type(domain), intent(inout)       :: grid
    integer, intent(in)               :: mz(:)
    type(grid_config_rec_type), intent(inout) :: config_flags
-   integer, intent(in)               :: cv_size                       ! Total cv size
-   type (xbx_type),intent(inout)     :: xbx                           ! Header & non-gridded vars.
-   type (be_type), intent(in)        :: be                            ! background error structure.
-   type (iv_type), intent(inout)     :: iv                            ! ob. increment vector.
-   real, intent(inout)               :: cv(1:cv_size)                 ! control variable (local).
-   type (y_type), intent(inout)      :: re                            ! residual (o-a) structure.
-   type (y_type), intent(inout)      :: y                             ! y = H(x_inc) structure.
-   real, intent(out)                 :: xhat(1:cv_size)               ! control variable (local).
-   type (j_type), optional, intent(out) :: j_cost                        ! cost function
-
-   real, optional, intent(out)       :: qhat(1:cv_size, 0:ensdim_svd) ! orthonormal basis set of A = Q * B * Q^T
-   real*8, optional, intent(out)     :: eignvec(ensdim_svd, ensdim_svd)
-   real*8, optional, intent(out)     :: eignval(ensdim_svd)
+   integer, intent(in)               :: cv_size                  ! Total cv size
+   type (xbx_type),intent(inout)     :: xbx                      ! Header & non-gridded vars.
+   type (be_type), intent(in)        :: be                       ! background error structure.
+   type (iv_type), intent(inout)     :: iv                       ! ob. increment vector.
+   real, intent(inout)               :: cv(1:cv_size)            ! control variable (local).
+   type (y_type), intent(inout)      :: re                       ! residual (o-a) structure.
+   type (y_type), intent(inout)      :: y                        ! y = H(x_inc) structure.
+   real, intent(out)                 :: xhat(1:cv_size)          ! control variable (local).
+   integer, intent(in)               :: nens                     ! Total number of eigenpairs
+   type (j_type), optional, intent(out) :: j_cost                ! cost function
+   real, optional, intent(out)       :: qhat(1:cv_size, 0:nens)  ! orthonormal basis set of A = Q * B * Q^T
+   real*8, optional, intent(out)     :: eignvec(nens, nens)
+   real*8, optional, intent(out)     :: eignval(nens)
    integer, optional, intent(out)    :: neign                         ! Number of non-truncated eigenpairs
 
 #if defined(LAPACK)
 
-   real(wp), dimension(1:ensdim_svd) :: LAM, LAMinv
+   real(wp), dimension(1:nens) :: LAM, LAMinv
    real(wp), allocatable        :: yhat(:,:)  ! yhat = A * omega
    real(wp), allocatable        :: omega(:,:) ! Gaussian draw
    real(wp), allocatable        :: nuhat(:,:) ! Eigenvectors of A
    real(wp)                     :: dot_cv
   
-   integer                      :: iens, jens, nens, i, j, ccount, p
+   integer                      :: iens, jens, i, j, ccount, p
    integer                      :: je_start, je_end       ! Start/end indices of Je.
    integer                      :: jp_start, jp_end       ! Start/end indices of Jp.
    integer                      :: jl_start, jl_end       ! Start/end indices of Jl.
 
    real                         :: ghat(1:cv_size)        ! cv copy.
-   real(wp)                     :: F1(ensdim_svd, ensdim_svd) ! intermediate matrix
-   real(wp)                     :: F2(ensdim_svd, ensdim_svd) ! intermediate matrix
-   real(wp)                     :: U(ensdim_svd, ensdim_svd)
-   real(wp)                     :: VT(ensdim_svd, ensdim_svd)
-   real(wp)                     :: SIG(ensdim_svd)
+   real(wp)                     :: F1(nens, nens) ! intermediate matrix
+   real(wp)                     :: F2(nens, nens) ! intermediate matrix
+   real(wp)                     :: U(nens, nens)
+   real(wp)                     :: VT(nens, nens)
+   real(wp)                     :: SIG(nens)
    real(wp), allocatable        :: TEMP1(:,:), TEMP2(:,:)
 
    integer                      :: svd_unit
-   real(wp)                     :: KMAT(ensdim_svd, ensdim_svd)  ! B = Q^T * A * Q
-   real(wp)                     :: KMAT_antidiag(ensdim_svd,2)
-   real(wp)                     :: KMAT_maxerr(ensdim_svd)
-   integer                      :: KMAT_maxerri(ensdim_svd)
+   real(wp)                     :: KMAT(nens, nens)  ! B = Q^T * A * Q
+   real(wp)                     :: KMAT_antidiag(nens,2)
+   real(wp)                     :: KMAT_maxerr(nens)
+   integer                      :: KMAT_maxerri(nens)
 
-   integer                      :: piv(ensdim_svd)
+   integer                      :: piv(nens)
    integer                      :: info
 
    real                         :: gdot, beta, temp_l
-   real                         :: temp_e(ensdim_svd)
+   real                         :: temp_e(nens)
    real                         :: j0_total, erri
    character*10                 :: cproc, cens
    character(len=filename_len)  :: filename
@@ -90,8 +90,6 @@ subroutine da_randomise_svd_B11(grid, mz, config_flags,            &
    jp_end     = be % cv % size_jb + be % cv % size_je + be % cv % size_jp
    jl_start   = be % cv % size_jb + be % cv % size_je + be % cv % size_jp + 1
    jl_end     = be % cv % size_jb + be % cv % size_je + be % cv % size_jp + be % cv % size_jl
-
-   nens = ensdim_svd
 
    xhat = 0.D0
 

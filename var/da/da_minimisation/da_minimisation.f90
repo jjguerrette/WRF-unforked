@@ -60,7 +60,7 @@ module da_minimisation
       use_nonchemobs, &
 #endif
 #if defined(LAPACK)
-      use_randomsvd, svd_stage, ensdim_svd, rotate_omega, &
+      use_randomsvd, svd_stage, rotate_omega, &
 #endif
       use_global_cv_io, var4d_inc_out, inc_out_interval, &
       use_lanczos, spectral_precon, ntused, info_stop, grm_shmt_order, &

@@ -65,10 +65,7 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
    if ( any(riot_precon .eq. (/14,15/)) ) then
       eig_total = 0
       do it=nouter_seed, 1, -1
-         nens_it = ensdim_svd
-         if (it.gt.1) then
-            nens_it = min(ntmax(it),ensdim_svd)
-         end if
+         nens_it = ntmax(it)
 
          call da_hessian_io ('r',grid, cv_size,it,nens_it,neign_it)
          if(riot_precon .eq. 14) eig_total = eig_total + neign_it
@@ -76,14 +73,11 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
       end do
    end if
 
-   allocate(crit(ensdim_svd*nouter_seed))
-   allocate(lam_all(ensdim_svd*nouter_seed))
+   allocate(crit(sum(ntmax(1:nouter_seed))))
+   allocate(lam_all(sum(ntmax(1:nouter_seed))))
 
    do it=nouter_seed, 1, -1
-      nens_it = ensdim_svd
-      if (it.gt.1) then
-         nens_it = min(ntmax(it),ensdim_svd)
-      end if
+      nens_it = ntmax(it)
 
       allocate(eignvec_prev(nens_it,nens_it))
       allocate(eignval_prev(nens_it))

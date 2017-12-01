@@ -14,7 +14,7 @@ module da_randomisation
 #endif
       PARAM_FIRST_SCALAR
 
-   use da_control, only : svd_stage, ensmember, ensdim_svd, svd_outer, &
+   use da_control, only : svd_stage, ensmember, svd_outer, &
        myproc, filename_len, test_dm_exact, rootproc, cv_size_domain, &
        var4d_lbc, stdout, trace_use, adapt_svd, prepend_rsvd_basis, &
        num_ob_indexes, read_omega, svd_p, ierr, comm, &

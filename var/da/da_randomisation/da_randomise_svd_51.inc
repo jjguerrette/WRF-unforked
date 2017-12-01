@@ -35,8 +35,7 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
    real,   intent(out)               :: xhat(1:cv_size)          ! control variable (local).
    integer, intent(in)               :: nens                     ! Total number of eigenpairs
    type (j_type), optional, intent(out) :: j_cost                ! cost function
-
-   real,   optional, intent(out)       :: qhat(1:cv_size, 0:nens) ! orthonormal basis set of A = Q * B * Q^T
+   real,   optional, intent(out)     :: qhat(1:cv_size, 0:nens)  ! orthonormal basis set of A = Q * B * Q^T
    real*8, optional, intent(out)     :: eignvec(nens, nens)
    real*8, optional, intent(out)     :: eignval(nens)
    integer, optional, intent(out)    :: neign                         ! Number of non-truncated eigenpairs

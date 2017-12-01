@@ -15,14 +15,15 @@ echo ""
 #=======================================================================================
 # INSTRUCTIONS:
 #=======================================================================================
-# Place this script in the same directory where you would normally execute da_wrfvar.exe.
-# Ensure that you are able to successfully run da_wrfvar.exe for a 4D-Var inversion in 
-#   that directory, including generation of cost_fn and wrfvar_output files.
+# Place this script and RIOT_settings.sh in the same directory where you would normally 
+# execute da_wrfvar.exe. Ensure that you are able to successfully run da_wrfvar.exe for 
+# a 4D-Var inversion before using RIOT, including generation of cost_fn and 
+# wrfvar_output files.
 # The same namelist.input file used for standard 4D-Var will be used for RIOT 4D-Var,
 #   with additional modifications automated by this script. You must have access to the
 #   parent directory within which this working directory is located.  This script will
 #   generate directories such as ../run.0001, ../run.0002, etc. that are essential.
-# Fill in the environment variables in the User Options section. 
+# Fill in the environment variables in RIOT_settings.sh and the User Options section. 
 #   - nout_RIOT takes the place of max_ext_its in namelist.input as the # outer iterations
 #   - ntmax(1) in namelist.input is replaced by SVDN
 #   - ntmax(2:nout_RIOT) should be set in namelist.input
@@ -39,6 +40,7 @@ echo ""
 #
 #=======================================================================================
 
+
 if [ -z $MPICALL ]; then #Could be defined externally
    ##Check the manual for your compute system in order to choose one of the following:
    #MPICALL=mpiexec #(e.g., NASA Pleiades)
@@ -50,52 +52,20 @@ fi
 echo "MPI Calling Wrapper = "
 echo "==> "$MPICALL
 
-#Set to 0 (default) or 1 to conduct chemical emission inversion (requires WRFDA-Chem)
-#export WRF_CHEM=0
-
+if [ -z $WRF_CHEM ]; then #Could be defined externally
+   #Set to 0 (default) or 1 to conduct chemical emission inversion (requires WRFDA-Chem)
+   export WRF_CHEM=0
+fi
 #=======================================================================================
 # Begin User Options
 #=======================================================================================
 #####################################################################################
-## All of these MUST be set here or externally
-#export nout_RIOT=8 # number of outer iterations (overrides max_ext_its from namelist.input)
-#export SVDN=40    # number of ensembles (inner iterations) in first outer iteration
-                   # - Similar to ntmax(1) in namelist.input, and should be a small factor
-                   #    larger (x2-x5) than the CG inner iteration count to produce
-                   #    equivalent results.
-                   # - Ensemble counts in all other outer iterations should be set in 
-                   #    namelist.input as ntmax=$SVDN,nens[2],nens[3],nens[4], etc...
-                   # - Eventually SVDN can be replaced with retrieval of ntmax(1) 
-                   #    from namelist.input.  For now, this separate setting is a
-                   #    reminder to set the number of nodes/cores.
-                   # - NUMNODES must be >= $((SVDN+1)) [where the +1 accounts for the gradient]
-                   # - For 2 nodes per AD/TL simulation, set NUMNODES=$((2*$((SVDN+1)))), etc.
-                   # FUTURE IDEA: it may reduce wall-time of 1st ensemble member (slowest one)
-                   #  to request 1 extra independent head node for process management
-#export svd_type=6 # 1-RSVD5.1 (chem only); 6-RSVD5.6 (default); 2-HESS(SVDN=Nobs, chem only); 10-B-cov debug
-#export prepend_rsvd_basis=0 #If ==1, prepend RSVD basis with gradient vector in 
-#                            # all outer iterations after the first
-#export GRAD_PRECON=0  #Set to 0 (default), 1, 2, 3, or 4 to control preconditioning for it > 1
-#export ADAPT_SVD="1" #0, 1 (default), or 2
-#export svd_p=0 #some small value (e.g., 5) between [0,min(SVDN)), only used for adaptive
-#export GLOBAL_OPT="true" #"true" or "false"
-#export GLOBAL_OMEGA="false" #"true" or "false"
+#Modify RIOT_settings.sh to control RIOT behavior
 
-#export RIOT_RESTART=0 #If ==1, set nout_RIOT to the number of outer iterations 
-#                      # to complete after start file "ALT_START" 
-#                      #   --> posterior covariance only
-#                      #If ==2, use ALT_it1 to set the alternative starting iteration
-#                      #   --> minimisation and posterior covariance
-#Alternative "wrfinput_d01" and "fg" for RIOT_RESTART>0:
-#export ALT_START=$DADIR"/run/wrfvar_output_05"
-
-#Three extra settings for RIOT_RESTART==2:
-#export ALT_it1=9
-#ii=$((ALT_it1-1))
-#if [ $ii -lt 10 ]; then ii=0$ii; fi
-#export ALT_CVT='/nobackupp8/jjguerr1/wrf/DA/SVD6_N=40_no=8_40-PRECON0_adap0/run/cvt.it$ii.p0000'
-#export ALT_XHAT="/nobackupp8/jjguerr1/wrf/DA/SVD6_N=40_no=8_40-PRECON0_adap0/run/xhat.it"$ii".p0000"
-#export ALT_hess_dir='/nobackupp8/jjguerr1/wrf/DA/SVD6_N=40_no=8_40-PRECON0_adap0/'
+#Read in baseline RIOT settings
+if [ -z $RIOT_SETTINGS_CALLED ]; then
+   . ./RIOT_settings.sh
+fi
 
 #Manually set the maximum number of processes per job 
 # - limited by WRF patch overlap
@@ -325,15 +295,20 @@ echo "=================================================================="
 #------------------------------------------------------------------
 CPDT=$checkpoint_interval 
 quick_svd="true"
-if [ -z $CPDT ] || [ $WRF_CHEM -eq 0 ]; then
-#   CPDT=60 # (or manually, e.g., 5, 6, 10, 12, 15, 20, 30, 60, 180)
-   CPDT=0 
-   quick_svd="false"
+if [ -z $CPDT ]; then
+   if [ $WRF_CHEM -eq 0 ]; then
+      CPDT=0 #Or set to some other default for WRF_CHEM==0
+   else
+      #Thus far WRF_CHEM==1 requires CPDT>0
+      CPDT=180 # (or manually, e.g., 5, 6, 10, 12, 15, 20, 30, 60, 180)
+   fi
 fi
+if [ $CPDT -le 0 ]; then quick_svd="false"; fi
 echo "checkpoint interval = "
 echo "==> "$CPDT
 
 #CHEM OSSE
+
 OSSE=$OSSE_CHEM # Set OSSE (from env var)
 if [ -z $OSSE ] || [ $WRF_CHEM -eq 0 ]; then
    OSSE=0 #Default if env var missing
@@ -348,8 +323,8 @@ if (grep -q use_lanczos namelist.input); then
 fi
 
 # Add or modify RIOT namelist options
-SVD_VARS=("svd_outer" "svd_minimise" "ensmember" "ensdim_svd" "svd_stage" "use_randomsvd" "svd_type" "quick_svd" "adapt_svd" "svd_p" "riot_precon" "read_omega" "use_global_cv_io" "prepend_rsvd_basis")
-SVD_VALS=("1" "true" "0" "$NENS" "0" "true" "$svd_type" "$quick_svd" "$ADAPT_SVD" "$svd_p" "$GRAD_PRECON" "$GLOBAL_OMEGA" "$GLOBAL_OPT" "0")
+SVD_VARS=("svd_outer" "svd_minimise" "ensmember" "svd_stage" "use_randomsvd" "svd_type" "quick_svd" "adapt_svd" "svd_p" "riot_precon" "read_omega" "use_global_cv_io" "prepend_rsvd_basis")
+SVD_VALS=("1" "true" "0" "0" "true" "$svd_type" "$quick_svd" "$ADAPT_SVD" "$svd_p" "$GRAD_PRECON" "$GLOBAL_OMEGA" "$GLOBAL_OPT" "0")
 ivar=0
 for var in ${SVD_VARS[@]}
 do
@@ -492,6 +467,27 @@ do
    rm yhat.e*.p*
 
    it0_last=$((it-1))
+
+   NENS=${ntmax_array[$((it-1))]}
+
+   #Hard constraint that NENS must be <= SVDN (necessary?)
+   if [ $NENS -gt $SVDN ]; then
+      echo "WARNING SVDN=$SVDN, ntmax(it)=$NENS, setting NENS=$SVDN"
+      NENS=$SVDN
+      ntmax_array[$((it-1))]=$NENS
+      ntmax=
+      for it in $(seq 1 $nout_RIOT)
+      do
+         echo "# ensembles in outer iteration $it: ntmax($it)=${ntmax_array[$((it-1))]}"
+         ntmax=$ntmax${ntmax_array[$((it-1))]}","
+      done
+      ntmax=$ntmax${ntmax_array[$((nout_RIOT-1))]}","
+      ex -c :"/ntmax" +:":s/=.*/=$ntmax/" +:wq namelist.input
+   fi
+   echo ""
+   echo "Using ensemble size $NENS in iteration $it, according to ntmax in namelist.input."
+   echo ""
+
    if [ $it0_last -lt 10 ]; then it0_last="0"$it0_last; fi
    if [ $STAGE0 -gt 0 ]; then
 #====================================================================================
@@ -548,6 +544,26 @@ do
       echo "EXIT: STAGE1 > 0 required for multiple outer iterations"; echo 10; exit 10;
    fi
 
+   if [ "$GLOBAL_OMEGA" == "true" ]; then
+      if [ $it -eq 1 ] || [ $GRAD_PRECON -eq 0 ]; then
+         echo "Distributing global omega files"
+
+         #Test for the presence of each vector type
+         cd $CWD
+         ls omega.e*.p0000
+         dummy=`ls omega.e*.p0000 | wc -l`
+         echo "$dummy present of $NENS omega files"
+         if [ $dummy -ne $NENS ]; then 
+            echo "ERROR: Missing or extra omega.e*.p0000"
+            echo 18; exit 18
+         fi
+         mv -v omega.e*.p* ../vectors_$it0
+      else
+         rm omega.e*.p*
+      fi
+   fi
+
+
 #====================================================================================
 #====================================================================================
    echo "======================================================="
@@ -580,18 +596,15 @@ do
       do
 #         NENS_last=${ntmax_array[$((itprev-1))]}
          NENS_PREV=$((NENS_PREV+${ntmax_array[$((itprev-1))]}))
-         echo $NENS_PREV
+         echo "NENS_PREV=$NENS_PREV"
       done
-      NENS=${ntmax_array[$((it-1))]}
 
-      if [ $NENS -gt $SVDN ]; then
-         echo "WARNING SVDN=$SVDN, ntmax(it)=$NENS, setting NENS=$SVDN"
-         NENS=$SVDN
-      fi
-
-      echo ""
-      echo "Using ensemble size $NENS in iteration $it, according to namelist.input."
-      echo ""
+      # This test avoids extra wall time when GRAD_PRECON=[1,3] and NENS in 
+      # current iteration is larger than number of potential preconditioning vectors
+      dependent_grad=0
+      if [ $NENS_PREV -gt $NENS ] && \
+        ([ $GRAD_PRECON -eq 1 ] || [ $GRAD_PRECON -eq 3 ]); then dependent_grad=1; fi
+      if [ $GRAD_PRECON -eq 2 ] || [ $GRAD_PRECON -eq 4 ]; then dependent_grad=1; fi
 
       NJOBS=$NENS
       if [ $svd_type -ne 10 ]; then
@@ -616,13 +629,6 @@ do
          if [ $iENS -lt 1000 ]; then ii=0$ii; fi
 
          ii_grad=$ii
-
-         # This test avoids extra wall time when GRAD_PRECON=[1,3] and NENS in 
-         # current iteration is larger than number of potential preconditioning vectors
-         dependent_grad=0
-         if [ $NENS_PREV -gt $NENS ] && \
-           ([ $GRAD_PRECON -eq 1 ] || [ $GRAD_PRECON -eq 3 ]); then dependent_grad=1; fi
-         if [ $GRAD_PRECON -eq 2 ] || [ $GRAD_PRECON -eq 4 ]; then dependent_grad=1; fi
 
 #         if ([ $NENS_PREV -gt $NENS ] \
 #            && ([ $GRAD_PRECON -eq 1 ] \
@@ -713,9 +719,6 @@ do
                mv -v $file ./$myfile
             done
          done
-      else
-         ex -c :"/read_omega" +:":s/=.*/=$GLOBAL_OMEGA,/" +:wq namelist.input
-         ex -c :"/ensdim_svd" +:":s/=.*/=$NENS,/" +:wq namelist.input
       fi
 #====================================================================================
 
@@ -764,25 +767,6 @@ do
       ##--------------------------------------------------------------------------
 
       #2 and #3 are possible only with global CV I/O in WRFDA (GLOBAL_OPT="true")
-   fi
-
-   if [ "$GLOBAL_OMEGA" == "true" ]; then
-      if [ $it -eq 1 ] || [ $GRAD_PRECON -eq 0 ]; then
-         echo "Distributing global omega files"
-
-         #Test for the presence of each vector type
-         cd $CWD
-         ls omega.e*.p0000
-         dummy=`ls omega.e*.p0000 | wc -l`
-         echo "$dummy present of $NENS omega files"
-         if [ $dummy -ne $NENS ]; then 
-            echo "ERROR: Missing or extra omega.e*.p0000"
-            echo 18; exit 18
-         fi
-         mv -v omega.e*.p* ../vectors_$it0
-      else
-         rm omega.e*.p*
-      fi
    fi
 
    #==============================================

@@ -618,6 +618,11 @@
          write(cit,fmt='(i2.2)') svd_outer-1
          cvtfile_svd = 'cvt.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
          call da_cv_io ('r', cvtfile_svd, cv_size, cvt(1:cv_size), grid, mz)
+         if ( max_ext_its > 1 ) then
+           max_ext_its=1
+           write(unit=message(1),fmt='(a)') "Re-set max_ext_its = 1 for use_randomsvd"
+           call da_message(message(1:1))
+         end if
       else
 #endif
          if ( outer_loop_restart ) then
@@ -775,15 +780,14 @@
          allocate (eignval(ntmax(it)))
       end if
 #if defined(LAPACK)
-      if (use_randomsvd .and. .not.use_lanczos) then
+      if (use_randomsvd) then
+         use_lanczos = .false.
+         nens = ntmax(svd_outer)
+
          if (riot_precon.ge.1 .and. svd_outer .gt. 1) then
-            if (svd_type .eq. 6 .or. svd_type .eq. 1) then
-               nens = min(ntmax(svd_outer),ensdim_svd)
-            else
+            if (svd_type .ne. 6 .and. svd_type .ne. 1) then
                CALL wrf_error_fatal('RIOT preconditioning is only available for svd_type=[6,1] at this time.')
             end if
-         else
-            nens = ensdim_svd
          end if
          if ( svd_stage.eq.0 .and. read_omega ) then
             call wrf_message("Generating global omega")
@@ -1168,7 +1172,7 @@
                   case(2)
                      call da_calculate_hessian( &
                            grid, mz, config_flags, cv_size, xbx, &
-                           be, iv, cvt, re, y, xhat, j_cost = j)
+                           be, iv, cvt, re, y, xhat, nens, j_cost = j)
 #endif
                   case default
                      write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: Invalid selection for svd_type', svd_type
@@ -1221,18 +1225,18 @@
                      if (svd_stage .eq. 2) then
                         call da_randomise_svd_B( &
                               grid, mz, config_flags, cv_size, xbx, &
-                              be, iv, cvt, re, y, xhat, &
+                              be, iv, cvt, re, y, xhat, nens, &
                               qhat=qhat, eignval=eignval, &
                               eignvec=eignvec, neign=neign)
                      else
                         call da_randomise_svd_B( &
                               grid, mz, config_flags, cv_size, xbx, &
-                              be, iv, cvt, re, y, xhat)
+                              be, iv, cvt, re, y, xhat, nens)
                      end if
                   case(11)
                         call da_randomise_svd_B11( &
                               grid, mz, config_flags, cv_size, xbx, &
-                              be, iv, cvt, re, y, xhat, &
+                              be, iv, cvt, re, y, xhat, nens, &
                               qhat=qhat, eignval=eignval, &
                               eignvec=eignvec, neign=neign)
 #if (WRF_CHEM == 1)
@@ -1247,14 +1251,14 @@
 
                         call da_calculate_hessian( &
                               grid, mz, config_flags, cv_size, xbx, &
-                              be, iv, cvt, re, y, xhat, &
+                              be, iv, cvt, re, y, xhat, nens, &
                               qhat=qhat, eignval=eignval, &
                               eignvec=eignvec, neign=neign) !, &
 !                              hessian_info=hessian_info)
                      else
                         call da_calculate_hessian( &
                               grid, mz, config_flags, cv_size, xbx, &
-                              be, iv, cvt, re, y, xhat)
+                              be, iv, cvt, re, y, xhat, nens)
                      end if
 #endif
                   case default

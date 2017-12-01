@@ -71,10 +71,7 @@ subroutine da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, nouter_prev, 
          nmode_it = ntused(it)
 #if defined(LAPACK)
       else if (use_randomsvd) then
-         nmode_it = ensdim_svd
-         if (it.gt.1) then
-            nmode_it = min(ntmax(it),ensdim_svd)
-         end if
+         nmode_it = ntmax(it)
 #endif
       else
          call da_error(__FILE__,__LINE__, &

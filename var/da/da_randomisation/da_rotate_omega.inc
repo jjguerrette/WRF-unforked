@@ -45,10 +45,7 @@ subroutine da_rotate_omega(grid, cv_size, mz, jp_start, jp_end, nouter_prev, cv_
 
    eig_total = 0
    do it = 1, nouter_prev
-      nmode_it = ensdim_svd
-      if (it.gt.1) then
-         nmode_it = min(ntmax(it),ensdim_svd)
-      end if
+      nmode_it = ntmax(it)
 
       call da_hessian_io ('r',grid, cv_size,it,nmode_it,neign_it)
       eig_total = eig_total + neign_it
@@ -61,10 +58,7 @@ subroutine da_rotate_omega(grid, cv_size, mz, jp_start, jp_end, nouter_prev, cv_
   cv_v = cv_z
 
    do it = 1, nouter_prev
-      nmode_it = ensdim_svd
-      if (it.gt.1) then
-         nmode_it = min(ntmax(it),ensdim_svd)
-      end if
+      nmode_it = ntmax(it)
 
       allocate(eignvec_prev(nmode_it,nmode_it))
       allocate(eignval_prev(nmode_it))
@@ -106,10 +100,7 @@ subroutine da_rotate_omega(grid, cv_size, mz, jp_start, jp_end, nouter_prev, cv_
    !! Multiply by inverse preconditioner to recover OMEGA in v-space
    eig_count = 0
    do it=1, nouter_prev
-      nmode_it = ensdim_svd
-      if (it.gt.1) then
-         nmode_it = min(ntmax(it),ensdim_svd)
-      end if
+      nmode_it = ntmax(it)
 
       call da_hessian_io ('r',grid, cv_size,it,nmode_it,neign_it)
 

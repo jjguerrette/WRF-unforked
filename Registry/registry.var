@@ -383,6 +383,8 @@ rconfig   integer   tovs_start              namelist,wrfvar5  1  1        - "tov
 rconfig   integer   tovs_end                namelist,wrfvar5  1  10000000 - "tovs_end"                 ""  ""
 rconfig   logical   gpsref_thinning         namelist,wrfvar5  1  .false.  - "gpsref_thinning"          ""  ""
 rconfig   logical   outer_loop_restart      namelist,wrfvar6  1  .false.  - "outer_loop_restart"       ""  ""
+rconfig   integer   iouter_restart          namelist,wrfvar6  1  1        - "iouter_restart"           ""  ""
+
 rconfig   integer   max_ext_its             namelist,wrfvar6  1  1        - "max_ext_its"              ""  ""
 rconfig   integer   ntmax                   namelist,wrfvar6  max_outer_iterations  200      - "ntmax"                    ""  ""
 rconfig   integer   nsave                   namelist,wrfvar6  1  4        - "nsave"                    ""  ""
@@ -406,7 +408,6 @@ rconfig   logical   quick_svd               namelist,wrfvar6  1  .false.  - "qui
 rconfig   integer   adapt_svd               namelist,wrfvar6  1  0        - "adapt_svd"                ""  ""
 rconfig   integer   prepend_rsvd_basis      namelist,wrfvar6  max_outer_iterations  0       - "prepend_rsvd_basis"       ""  ""
 rconfig   integer   svd_stage               namelist,wrfvar6  1  0        - "svd_stage"                ""  ""
-rconfig   integer   ensdim_svd              namelist,wrfvar6  1  0        - "ensdim_svd"               ""  ""
 rconfig   integer   nens_compare            namelist,wrfvar6  1  0        - "nens_compare"             ""  ""
 rconfig   logical   check_hess_symm         namelist,wrfvar6  1  .false.   - "check_hess_symm"          ""  ""
 rconfig   logical   tsvd_compare            namelist,wrfvar6  1  .true.   - "tsvd_compare"             ""  ""
