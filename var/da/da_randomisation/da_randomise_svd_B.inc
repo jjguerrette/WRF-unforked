@@ -89,7 +89,7 @@ subroutine da_randomise_svd_B(grid, mz, config_flags,            &
 
    xhat = 0.D0
 
-   if ( svd_stage .eq. 1 .and. ensmember .gt. 0) then
+   if ( rand_stage .eq. 1 .and. ensmember .gt. 0) then
       ! Generate vectors in Y = A*OMEGA (Halko, Algorithm 4.1), where A = U^T * H^T * R^-1 * H * U 
       allocate(yhat(1:cv_size,1))
       yhat = 0.D0
@@ -98,10 +98,10 @@ subroutine da_randomise_svd_B(grid, mz, config_flags,            &
       write(cens,fmt='(i4.4)') ensmember
 
       if ( ensmember .eq. nens+1 ) then 
-         use_randomsvd = .false.
-         call da_calculate_j(svd_outer, 0, cv_size, be%cv%size_jb, be%cv%size_je, be%cv%size_jp, &
+         use_randomblock = .false.
+         call da_calculate_j(rand_outer, 0, cv_size, be%cv%size_jb, be%cv%size_je, be%cv%size_jp, &
                              be%cv%size_jl, xbx, be, iv, xhat, cv, re, y, j_cost, ghat, grid, config_flags)
-         use_randomsvd = .true.
+         use_randomblock = .true.
 
          j0_total = j_cost%total
          if (j0_total == 0.0) return
@@ -142,7 +142,7 @@ subroutine da_randomise_svd_B(grid, mz, config_flags,            &
 #endif
 
 
-!         call da_calculate_gradj(svd_outer, 1, cv_size,be%cv%size_jb,be%cv%size_je,be%cv%size_jp, &
+!         call da_calculate_gradj(rand_outer, 1, cv_size,be%cv%size_jb,be%cv%size_je,be%cv%size_jp, &
 !                                 be%cv%size_jl, xbx,be,iv,omega(1:cv_size,1),y,yhat(1:cv_size,1),grid,config_flags)
 
          !Write omega to file
@@ -161,7 +161,7 @@ subroutine da_randomise_svd_B(grid, mz, config_flags,            &
 
       deallocate(yhat)
 
-   else if ( svd_stage .eq. 2 ) then
+   else if ( rand_stage .eq. 2 ) then
       allocate(yhat(1:cv_size,nens))
       allocate(omega(1:cv_size,nens))
       qhat(:,0) = 0.D0
@@ -348,7 +348,7 @@ subroutine da_randomise_svd_B(grid, mz, config_flags,            &
       deallocate(yhat)
       deallocate(omega)
    else
-      write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: svd_stage should be 0, 1, or 2, not ',svd_stage
+      write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: rand_stage should be 0, 1, or 2, not ',rand_stage
       CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
    end if
    if (trace_use) call da_trace_exit("da_randomise_svd_B")

@@ -59,7 +59,7 @@ subroutine da_randomise_svd_B11(grid, mz, config_flags,            &
    real(wp)                     :: SIG(nens)
    real(wp), allocatable        :: TEMP1(:,:), TEMP2(:,:)
 
-   integer                      :: svd_unit
+   integer                      :: SVD_unit
    real(wp)                     :: KMAT(nens, nens)  ! B = Q^T * A * Q
    real(wp)                     :: KMAT_antidiag(nens,2)
    real(wp)                     :: KMAT_maxerr(nens)
@@ -261,13 +261,13 @@ subroutine da_randomise_svd_B11(grid, mz, config_flags,            &
          end if
       end do
    end do
-   call da_get_unit (svd_unit)
+   call da_get_unit (SVD_unit)
    filename = 'KMAT_symm.txt'
-   open (unit=svd_unit, file = trim(filename), form = 'formatted', status = 'replace',access='sequential')
+   open (unit=SVD_unit, file = trim(filename), form = 'formatted', status = 'replace',access='sequential')
    do iens = 1, nens
-      write(unit=svd_unit,fmt='(I5,3D25.16,I6)') iens, KMAT_antidiag(iens,1:2), KMAT_maxerr(iens), KMAT_maxerri(iens)
+      write(unit=SVD_unit,fmt='(I5,3D25.16,I6)') iens, KMAT_antidiag(iens,1:2), KMAT_maxerr(iens), KMAT_maxerri(iens)
    end do
-   call da_free_unit (svd_unit)
+   call da_free_unit (SVD_unit)
 
    ! Force symmetry in B
    do iens = 1, nens
@@ -340,19 +340,19 @@ subroutine da_randomise_svd_B11(grid, mz, config_flags,            &
       end do
    else
       if(rootproc) then
-         call da_get_unit (svd_unit)
+         call da_get_unit (SVD_unit)
          filename = 'eigenvalues.txt'
-         open (unit=svd_unit, file = trim(filename), form = 'formatted', status = 'replace',access='sequential')
-         write(unit=svd_unit,fmt='(D25.16)') LAM(1:nens)
-         call da_free_unit (svd_unit)
+         open (unit=SVD_unit, file = trim(filename), form = 'formatted', status = 'replace',access='sequential')
+         write(unit=SVD_unit,fmt='(D25.16)') LAM(1:nens)
+         call da_free_unit (SVD_unit)
 
          do iens = 1, nens
-            call da_get_unit (svd_unit)
+            call da_get_unit (SVD_unit)
             write(cens,fmt='(i4.4)') iens
             filename = 'eigenvector.e'//trim(adjustl(cens))//'.txt'
-            open (unit=svd_unit, file = trim(filename), form = 'formatted', status = 'replace',access='sequential')
-            write(unit=svd_unit,fmt='(D25.16)') eignvec(1:nens,iens)
-            call da_free_unit (svd_unit)
+            open (unit=SVD_unit, file = trim(filename), form = 'formatted', status = 'replace',access='sequential')
+            write(unit=SVD_unit,fmt='(D25.16)') eignvec(1:nens,iens)
+            call da_free_unit (SVD_unit)
          end do
       end if
 #ifdef DM_PARALLEL

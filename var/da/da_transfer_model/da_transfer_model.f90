@@ -48,7 +48,7 @@ module da_transfer_model
       init_scale, num_ts, crossval_chem_surfobs, crossval_chem_acftobs, &
       osse_chem, outer_loop_restart, iouter_restart, &
 #if defined(LAPACK)
-      use_randomsvd, svd_outer, &
+      use_randomblock, rand_outer, &
 #endif
 #endif
       ids,ide,jds,jde,kds,kde, ims,ime,jms,jme,kms,kme, num_fft_factors, &

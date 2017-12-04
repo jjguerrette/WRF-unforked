@@ -17,34 +17,34 @@ subroutine da_yhat_io (io_config, filename, nall, nobs, obs)
    integer,           intent(inout) :: nobs
    real, allocatable, intent(inout) :: obs(:)
 
-   integer                         :: svd_unit, dummy
+   integer                         :: yhat_unit, dummy
 
    if (trace_use) call da_trace_entry("da_yhat_io")
    
-   call da_get_unit (svd_unit)
+   call da_get_unit (yhat_unit)
 
 !   ! Unformatted
 !   if (io_config == 'r') then
 !      write(*,*) 'Reading randomized SVD obs vector from '//trim(filename)
-!      open (unit=svd_unit, file = trim(filename), form = 'unformatted', status = 'old')
-!      read(unit=svd_unit) nobs
+!      open (unit=yhat_unit, file = trim(filename), form = 'unformatted', status = 'old')
+!      read(unit=yhat_unit) nobs
 !      if (nobs .gt. 0) then
 !         if (allocated(obs)) deallocate(obs)
 !         allocate(obs(1:nobs))
-!         read(unit=svd_unit) obs(1:nobs)
-!         read(unit=svd_unit) nall
+!         read(unit=yhat_unit) obs(1:nobs)
+!         read(unit=yhat_unit) nall
 !      else
 !         nall(:) = 0
 !      end if
-!      close(unit=svd_unit)
+!      close(unit=yhat_unit)
 !   else if (io_config == 'w') then
 !      write(*,*) 'Writing randomized SVD obs vector to '//trim(filename)
-!      open (unit=svd_unit, file = trim(filename), form = 'unformatted', status = 'replace')
-!      write(unit=svd_unit) nobs
+!      open (unit=yhat_unit, file = trim(filename), form = 'unformatted', status = 'replace')
+!      write(unit=yhat_unit) nobs
 !      if (nobs .gt. 0 .and. allocated(obs) ) then
 !         if (size(obs) .eq. nobs) then
-!            write(unit=svd_unit) obs(1:nobs)
-!            write(unit=svd_unit) nall
+!            write(unit=yhat_unit) obs(1:nobs)
+!            write(unit=yhat_unit) nall
 !         else
 !            write(*,*) 'ERROR in da_yhat_io: obs vector is wrong size', size(obs), nobs
 !         end if
@@ -52,35 +52,35 @@ subroutine da_yhat_io (io_config, filename, nall, nobs, obs)
 
    if (io_config == 'r') then
       write(*,*) 'Reading randomized SVD obs vector from '//trim(filename)
-      open (unit=svd_unit, file = trim(filename), form = 'formatted', status = 'old',access='sequential')
-      read(unit=svd_unit,fmt='(I10)') nobs
+      open (unit=yhat_unit, file = trim(filename), form = 'formatted', status = 'old',access='sequential')
+      read(unit=yhat_unit,fmt='(I10)') nobs
       if (nobs .gt. 0) then
          if (allocated(obs)) deallocate(obs)
          allocate(obs(1:nobs))
-         read(unit=svd_unit,fmt='(E27.16E3)') obs(1:nobs)
-         read(unit=svd_unit,fmt='(I10)') nall
+         read(unit=yhat_unit,fmt='(E27.16E3)') obs(1:nobs)
+         read(unit=yhat_unit,fmt='(I10)') nall
       else
          nall(:) = 0
       end if
-      close(unit=svd_unit)
+      close(unit=yhat_unit)
    else if (io_config == 'w') then
       write(*,*) 'Writing randomized SVD obs vector to '//trim(filename)
-      open (unit=svd_unit, file = trim(filename), form = 'formatted', status = 'replace',access='sequential')
-      write(unit=svd_unit,fmt='(I10)') nobs
+      open (unit=yhat_unit, file = trim(filename), form = 'formatted', status = 'replace',access='sequential')
+      write(unit=yhat_unit,fmt='(I10)') nobs
       if (nobs .gt. 0 .and. allocated(obs) ) then
          if (size(obs) .eq. nobs) then
-            write(unit=svd_unit,fmt='(E27.16E3)') obs(1:nobs)
-            write(unit=svd_unit,fmt='(I10)') nall
+            write(unit=yhat_unit,fmt='(E27.16E3)') obs(1:nobs)
+            write(unit=yhat_unit,fmt='(I10)') nall
          else
             write(*,*) 'da_yhat_io: obs vector is wrong size', size(obs), nobs
          end if
       end if
-      close(unit=svd_unit)
+      close(unit=yhat_unit)
    else
       write(*,*) 'Unknow configuration for randomized SVD I/O routine'
    end if
 
-   call da_free_unit (svd_unit)
+   call da_free_unit (yhat_unit)
 
    if (trace_use) call da_trace_exit ("da_yhat_io")
 

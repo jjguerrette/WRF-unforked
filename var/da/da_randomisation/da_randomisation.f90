@@ -14,11 +14,11 @@ module da_randomisation
 #endif
       PARAM_FIRST_SCALAR
 
-   use da_control, only : svd_stage, ensmember, svd_outer, &
+   use da_control, only : rand_stage, ensmember, rand_outer, &
        myproc, filename_len, test_dm_exact, rootproc, cv_size_domain, &
        var4d_lbc, stdout, trace_use, adapt_svd, prepend_rsvd_basis, &
        num_ob_indexes, read_omega, svd_p, ierr, comm, &
-       use_randomsvd, nens_compare, tsvd_compare, cglz_compare, rsvd_compare, &
+       use_randomblock, nens_compare, tsvd_compare, cglz_compare, rsvd_compare, &
        use_global_cv_io, ntmax, var4d_inc_out, inc_out_interval, &
        spectral_precon, riot_precon, rotate_omega, &
        hess_comp_x, &

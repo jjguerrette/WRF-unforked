@@ -59,8 +59,8 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
    ! [2.0] Select preconditioned omega vectors
    !-------------------------------------------------------------------------
 
-   nouter_seed = svd_outer-1
-   if (any(riot_precon .eq. (/12,13,14,15/))) nouter_seed = svd_outer
+   nouter_seed = rand_outer-1
+   if (any(riot_precon .eq. (/12,13,14,15/))) nouter_seed = rand_outer
 
    if ( any(riot_precon .eq. (/14,15/)) ) then
       eig_total = 0

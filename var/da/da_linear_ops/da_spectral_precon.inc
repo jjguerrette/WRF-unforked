@@ -70,7 +70,7 @@ subroutine da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, nouter_prev, 
       if (use_lanczos) then
          nmode_it = ntused(it)
 #if defined(LAPACK)
-      else if (use_randomsvd) then
+      else if (use_randomblock) then
          nmode_it = ntmax(it)
 #endif
       else

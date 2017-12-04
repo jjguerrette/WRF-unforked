@@ -354,7 +354,7 @@ subroutine da_calculate_j(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size_jp,
    end if
 
 #if defined(LAPACK)
-   if ( use_randomsvd .and. (svd_stage.eq.1 &
+   if ( use_randomblock .and. (rand_stage.eq.1 &
 #if (WRF_CHEM == 1)
        .or. osse_chem &
 #endif

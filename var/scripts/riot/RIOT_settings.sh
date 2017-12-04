@@ -45,14 +45,14 @@ if [ $RIOT_RESTART -gt 0 ]; then
 
    PREVIOUS_RUN="SVD6_N=40_no=12"
 
-   if [ -z $WRFSUPER ] && [ -z $DADIR ]; then #Could be defined externally
+   if [ -z "$WRFSUPER" ] && [ -z "$DADIR" ]; then #Could be defined externally
       echo ""
       echo "Need to define DADIR for RIOT_RESTART>0."
       echo "Turning off RIOT restart capability."
       echo ""
       RIOT_RESTART=0
    else
-      if [ -z $DADIR ]; then
+      if [ -z "$DADIR" ]; then
          #Adjust the file structure as needed
          DADIR="$WRFSUPER/DA/$PREVIOUS_RUN/run"
       fi

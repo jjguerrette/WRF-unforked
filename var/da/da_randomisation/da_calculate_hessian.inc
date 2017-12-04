@@ -90,23 +90,23 @@ subroutine da_calculate_hessian(grid, mz, config_flags, &
 
    xhat = 0.D0
 
-   if ( svd_stage .eq. 1 .and. ensmember .gt. 0) then
+   if ( rand_stage .eq. 1 .and. ensmember .gt. 0) then
       write(cproc,fmt='(i4.4)') myproc
       write(cens,fmt='(i4.4)') ensmember
 
 
       if ( ensmember .eq. nyobs+1 ) then
-         use_randomsvd = .false.
-         call da_calculate_j(svd_outer, 0, cv_size, be%cv%size_jb, be%cv%size_je, be%cv%size_jp, &
+         use_randomblock = .false.
+         call da_calculate_j(rand_outer, 0, cv_size, be%cv%size_jb, be%cv%size_je, be%cv%size_jp, &
                              be%cv%size_jl, xbx, be, iv, xhat, cv, re, y, j_cost, ghat, grid, config_flags)
-         use_randomsvd = .true.
+         use_randomblock = .true.
 
          j0_total = j_cost%total
          if (j0_total == 0.0) return
 
          beta = SQRT(da_dot_cv(cv_size, ghat, ghat, grid, mz, jp_start, jp_end))
 
-         write(unit=stdout,fmt='("Starting outer iteration : ",i3)') svd_outer
+         write(unit=stdout,fmt='("Starting outer iteration : ",i3)') rand_outer
          write(unit=stdout,fmt=11) j0_total, beta
 11       format('Starting cost function: ' ,1PD15.8,', Gradient: ',1PD15.8)
 
@@ -145,7 +145,7 @@ subroutine da_calculate_hessian(grid, mz, config_flags, &
 
          call da_deallocate_y(jo_grad_y)
       end if
-   else if ( svd_stage .eq. 2 ) then
+   else if ( rand_stage .eq. 2 ) then
       ! Eigen decomposition of A
 
       allocate(AMAT(1:cv_size,nyobs))
@@ -331,7 +331,7 @@ subroutine da_calculate_hessian(grid, mz, config_flags, &
       deallocate(nuhat)
 
    else
-      write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: For HESS SVD, svd_stage should be 0, 1, or 2, not ',svd_stage
+      write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: For HESS SVD, rand_stage should be 0, 1, or 2, not ',rand_stage
       CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
    end if
    if (trace_use) call da_trace_exit("da_calculate_hessian")

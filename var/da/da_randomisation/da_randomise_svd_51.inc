@@ -101,24 +101,24 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
 
    xhat = 0.D0
 
-   if ( svd_stage .eq. 1 .and. ensmember .gt. 0) then
+   if ( rand_stage .eq. 1 .and. ensmember .gt. 0) then
       
       write(cproc,fmt='(i4.4)') myproc
       write(cens,fmt='(i4.4)') ensmember
 
       if ( ensmember .eq. nens+1 ) then 
          ! Calculate J and grad J (ghat)
-         use_randomsvd = .false.
-         call da_calculate_j(svd_outer, 0, cv_size, be%cv%size_jb, be%cv%size_je, be%cv%size_jp, &
+         use_randomblock = .false.
+         call da_calculate_j(rand_outer, 0, cv_size, be%cv%size_jb, be%cv%size_je, be%cv%size_jp, &
                              be%cv%size_jl, xbx, be, iv, xhat, cv, re, y, j_cost, ghat, grid, config_flags)
-         use_randomsvd = .true.
+         use_randomblock = .true.
 
          j0_total = j_cost%total
          if (j0_total == 0.0) return
 
          beta = SQRT(da_dot_cv(cv_size, ghat, ghat, grid, mz, jp_start, jp_end))
 
-         write(unit=stdout,fmt='("Starting outer iteration : ",i3)') svd_outer
+         write(unit=stdout,fmt='("Starting outer iteration : ",i3)') rand_outer
          write(unit=stdout,fmt=11) j0_total, beta
 11       format('Starting cost function: ' ,1PD15.8,', Gradient: ',1PD15.8)
 
@@ -128,7 +128,7 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
          filename = 'ghat.p'//trim(adjustl(cproc))
          call da_cv_io ('w', filename, cv_size, ghat, grid, mz)
 
-         if (any(riot_precon.eq.(/1,2,3,4/)) .and. svd_outer.gt.1 .and. sum(ntmax(1:svd_outer-1)).gt.nens) &
+         if (any(riot_precon.eq.(/1,2,3,4/)) .and. rand_outer.gt.1 .and. sum(ntmax(1:rand_outer-1)).gt.nens) &
             call da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat)
 
       else if (ensmember .gt. 0 .and. ensmember .le. nens) then
@@ -147,13 +147,13 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
          if ( be%cv%size_je.gt.0) omega(je_start:je_end,1) = 0.D0
          if ( .not. var4d_lbc .and. be%cv%size_jl.gt.0) omega(jl_start:jl_end,1) = 0.D0
 
-         if (rotate_omega .and. spectral_precon .and. svd_outer.gt.1) then
+         if (rotate_omega .and. spectral_precon .and. rand_outer.gt.1) then
             call da_rotate_omega(grid, cv_size, mz, jp_start, jp_end, &
-                                    svd_outer-1, omega(:,1), omega(:,1))
+                                    rand_outer-1, omega(:,1), omega(:,1))
 
 !            !Included in da_rotate_omega to save I/O time
 !            call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
-!                                    svd_outer-1, omega(:,1), omega(:,1), 'IT' )
+!                                    rand_outer-1, omega(:,1), omega(:,1), 'IT' )
          end if
 
          call da_transform_vtoy(cv_size, be, grid%ep, omega(1:cv_size,1), iv, grid%vp, &
@@ -192,7 +192,7 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
 
       end if
 
-   else if ( svd_stage .eq. 2 ) then
+   else if ( rand_stage .eq. 2 ) then
 
       allocate(nobs(nens))
       write(cproc,fmt='(i4.4)') myproc
@@ -266,7 +266,7 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
       if (allocated(YHAT)) deallocate(YHAT)
       if (allocated(qhat_ens)) deallocate(qhat_ens)
       deallocate(nobs)
-   else if ( svd_stage .eq. 3 ) then
+   else if ( rand_stage .eq. 3 ) then
 
       call da_allocate_y(iv, jo_grad_y)
 #if (WRF_CHEM == 1)
@@ -302,7 +302,7 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
 
       call da_deallocate_y(jo_grad_y)
 
-   else if ( svd_stage .eq. 4 ) then
+   else if ( rand_stage .eq. 4 ) then
       ! Eigen decomposition of A (Algorithm 5.1 of Halko)
 
       allocate(KMAT(nens,1:cv_size))
@@ -461,27 +461,27 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
          xhat = xhat + ghat
       end if
 
-      if (spectral_precon .and. svd_outer.gt.1) &
+      if (spectral_precon .and. rand_outer.gt.1) &
          call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
-                                 svd_outer-1, xhat, xhat, 'TL' )
+                                 rand_outer-1, xhat, xhat, 'TL' )
 
       if (riot_precon.ge.1 .or. spectral_precon) &
-         call da_hessian_io ('w',grid, cv_size,svd_outer,nens,neign,&
+         call da_hessian_io ('w',grid, cv_size,rand_outer,nens,neign,&
                             eignvec,eignval,qhat,mz,ghat)
 
-      if (riot_precon.gt.0 .and. sum(ntmax(1:svd_outer)).lt.ntmax(svd_outer+1)) then
+      if (riot_precon.gt.0 .and. sum(ntmax(1:rand_outer)).lt.ntmax(rand_outer+1)) then
          if ( riot_precon.eq.1 ) riot_precon=14
          if ( riot_precon.eq.3 ) riot_precon=15
       end if
 
       if ( any(riot_precon.eq.(/12,13,14,15/)) ) &
-         call da_precon_omega(grid, cv_size, mz, jp_start, jp_end, ntmax(svd_outer+1), ghat)
+         call da_precon_omega(grid, cv_size, mz, jp_start, jp_end, ntmax(rand_outer+1), ghat)
 
       deallocate(KMAT)
       deallocate(nuhat_T)
 
    else
-      write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: For RSVD5.1, svd_stage should be 0, 1, 2, 3, or 4, not ',svd_stage
+      write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: For RSVD5.1, rand_stage should be 0, 1, 2, 3, or 4, not ',rand_stage
       CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
    end if
    if (trace_use) call da_trace_exit("da_randomise_svd_51")

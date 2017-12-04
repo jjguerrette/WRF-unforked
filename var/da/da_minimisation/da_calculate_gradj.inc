@@ -122,7 +122,7 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
 
       if (( &
 #if defined(LAPACK)
-            use_randomsvd .or. &
+            use_randomblock .or. &
 #endif
             use_lanczos) .and. spectral_precon .and. it.gt.1) then
          call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
@@ -151,7 +151,7 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
 
    if (( &
 #if defined(LAPACK)
-         use_randomsvd .or. &
+         use_randomblock .or. &
 #endif
          use_lanczos) .and. spectral_precon .and. it.gt.1) then
       if (.not.present(re)) grad_jo = cv_spectral + grad_jo !Not entirely sure on relative sign of grad_jo here due to compensation above
@@ -167,7 +167,7 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
    call da_deallocate_y(jo_grad_y)
 
 #if defined(LAPACK)
-   if ( .not. use_randomsvd ) then
+   if ( .not. use_randomblock ) then
 #endif
 
    !-------------------------------------------------------------------------
@@ -252,7 +252,7 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
    if (cv_size_jl > 0) grad_jl(jl_start:jl_end) = cv(jl_start:jl_end)
 
 #if defined(LAPACK)
-   end if !use_randomsvd test
+   end if !use_randomblock test
 #endif
 
    !--------------------------------------------------------------------------------------------------

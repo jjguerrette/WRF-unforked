@@ -53,6 +53,9 @@ subroutine da_vv_to_cv(vv, xp, mzs, cv_size, rcv &
    ijk=0
 #endif
 
+#if (WRF_CHEM == 1)
+   if (cv_options .gt. 0) then
+#endif
    ! Store v1
    mz = mzs(1)
    if (mz > 0) then
@@ -296,9 +299,10 @@ subroutine da_vv_to_cv(vv, xp, mzs, cv_size, rcv &
       rcv(cv_s:cv_e) = RESHAPE(vv % alpha(its_int:ite_int,jts_int:jte_int,1:mz,1:ne), (/ijmn/))
 #endif
    end if
-
 #if (WRF_CHEM == 1)
-   if (present(vch) ) then
+   end if !cv_options > 0
+
+   if (cv_options_chem.gt.0 .and. present(vch)) then
       ix = ie-is+1
       jy = je-js+1
 #ifdef CLOUD_CV
