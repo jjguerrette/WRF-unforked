@@ -26,6 +26,7 @@
    type (y_type)                :: re          ! Residual (o-a) structure.
    type (y_type)                :: y           ! y = H(x_inc) structure.
    integer                      :: it          ! External loop counter.
+   integer                      :: global_it   ! External loop counter.
    integer                      :: neign       
    type (j_type)                :: j           ! Cost function.
    type (y_type)                :: jo_grad_y   ! Grad_y(jo)
@@ -788,8 +789,10 @@
          allocate (eignvec(ntmax(it), ntmax(it)))
          allocate (eignval(ntmax(it)))
       end if
+      global_it = it
 #if defined(LAPACK)
       if (use_randomblock) then
+         global_it = rand_outer
          use_lanczos = .false.
          nens = ntmax(rand_outer)
 
@@ -1333,10 +1336,10 @@
 #ifdef DM_PARALLEL
       IF ( rootproc ) CALL start_timing
 #endif
-      if ( dgn_emiss .eq. 1 .and. eta_emiss .lt. 1.D0 .and. eta_emiss .gt. 0.D0 ) then
+      if ( dgn_emiss(global_it) .eq. 1 .and. eta_emiss .lt. 1.D0 .and. eta_emiss .gt. 0.D0 ) then
          call da_hdgn(it, cv_size, be, xhat)
 
-      else if (dgn_emiss .eq. 2) then
+      else if (dgn_emiss(global_it) .eq. 2) then
          call da_dgn(grid, cv_size, xbx, be, iv, xhat, cvt, ob, config_flags, j0_total)
       end if
 #ifdef DM_PARALLEL
