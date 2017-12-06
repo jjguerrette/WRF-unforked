@@ -106,6 +106,7 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
             call da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat)
 
       else if (ensmember .gt. 0 .and. ensmember .le. nens) then
+         !Generate OMEGA
          allocate(omega(1:cv_size,1))
          if (read_omega) then
             ! Read in omega vector for this ensemble member
@@ -128,17 +129,18 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
 !                                    rand_outer-1, omega(:,1), omega(:,1), 'IT' )
          end if
 
-         allocate(yhat(1:cv_size,1))
-         yhat = 0.D0
-
-         call da_calculate_gradj(rand_outer, 1, cv_size,be%cv%size_jb,be%cv%size_je,be%cv%size_jp, &
-                                 be%cv%size_jl, xbx,be,iv,omega(1:cv_size,1),y,yhat(1:cv_size,1),grid,config_flags)
-
          if (.not. read_omega) then
             !Write omega to file
             filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
             call da_cv_io ('w', filename, cv_size, omega(1:cv_size,1), grid, mz)
          end if
+
+         ! Multiply A * OMEGA
+         allocate(yhat(1:cv_size,1))
+         yhat = 0.D0
+         call da_calculate_gradj(rand_outer, 1, cv_size,be%cv%size_jb,be%cv%size_je,be%cv%size_jp, &
+                                 be%cv%size_jl, xbx,be,iv,omega(1:cv_size,1),y,yhat(1:cv_size,1),grid,config_flags)
+
          deallocate(omega)
 
          ! Write yhat to file
@@ -197,7 +199,7 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
 !         write(unit=stdout,fmt='("Writing qhat vectors to disk: ",i3)') iens
 !         write(cens,fmt='(i4.4)') iens
 !         filename = 'qhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
-!         call da_cv_io ('w', filename, cv_size, qhat(1:cv_size,iens), grid, mz, .true.)
+!         call da_cv_io ('w', filename, cv_size, qhat(1:cv_size,iens), grid, mz)
 !      end do
 !REMOVE EVENTUALLY or add option since very useful for debugging
 

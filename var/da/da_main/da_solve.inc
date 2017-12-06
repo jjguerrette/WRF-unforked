@@ -709,8 +709,12 @@
 #if defined(LAPACK)
       if (.not.use_randomblock .or. (rand_stage.eq.0 .and. rand_outer.eq.1) ) then
 #endif
-      !Turn off all trajectory writing
-      write_checkpoints = 3
+      write_checkpoints = 0
+
+      if ( checkpoint_interval .gt. 0) then
+         !Turn off all trajectory writing
+         write_checkpoints = 3
+      end if
 
       call da_nl_model(0)
 
@@ -991,8 +995,6 @@
 
          if (adtl_run_hours .le. 0) adtl_run_hours=run_hours
 
-         run_hours0 = adtl_run_hours
-
          call nl_set_var4d_run (head_grid%id, .true.)
 
          !Restore default trajectory setting
@@ -1002,8 +1004,7 @@
             write_checkpoints = 1
 #if defined(LAPACK)
             if (use_randomblock .and. rand_stage.gt.0) then
-               if (quick_rand) adtl_run_hours = interval_seconds / 3600
-               write_checkpoints = 2
+               if (quick_rand) write_checkpoints = 2
             end if
 #endif
          end if
@@ -1015,22 +1016,10 @@
             call da_retrieve_chem_hx( model_grid, iv )
 
          if (write_checkpoints.eq.1) then
+            call da_write_obs_chem( iv, ob, global_it )
 #if defined(LAPACK)
-               if (use_randomblock) then
-                  call da_write_obs_chem( iv, ob, rand_outer )
-               else
-#endif
-                  call da_write_obs_chem( iv, ob, it )
-#if defined(LAPACK)
-               end if
-         else
-            if (quick_rand) then
-            if (write_checkpoints.eq.2 .and. use_randomblock) then
-               call da_read_obs_chem_again( iv, ob, rand_outer, model_grid)
-            end if
-            end if
-
-            adtl_run_hours = run_hours0
+         else if ( write_checkpoints.eq.2) then
+            call da_read_obs_chem_again( iv, ob, rand_outer, model_grid)
 #endif
          end if
 
@@ -1069,6 +1058,9 @@
 
          !Restore default trajectory setting
          write_checkpoints = 0
+
+!         adtl_run_hours = run_hours0
+
 
 !      elseif (var4d .and. multi_inc == 2 ) then
 #else

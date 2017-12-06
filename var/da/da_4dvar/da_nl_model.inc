@@ -35,12 +35,17 @@ subroutine da_nl_model (it)
 !      call nl_set_var4d_run (head_grid%id, .true.)
       model_config_rec%var4d_run = .true.
       config_flags%var4d_run = .true.
-
    endif
-   
+ 
    ! 4dvar init
-   !moved to the later part of the code
-   !call init_4dvar
+   call init_4dvar
+
+#if (WRF_CHEM == 1)
+   if ( use_chemobs .and. cv_options_chem .gt. 0 ) &
+      call da_copy_chem_to_model( head_grid, it )
+#endif
+ 
+   if (write_checkpoints .eq. 2) return
 
    ! Turn off  history output
    call nl_set_history_begin_y (head_grid%id, 9999)
@@ -85,15 +90,11 @@ subroutine da_nl_model (it)
 #if (WRF_CHEM == 1)
          end if
       endif
-   else if ( write_checkpoints .eq. 2 ) then
-      !Turn off xtraj writing
-      call nl_set_auxhist6_interval_s ( head_grid%id, 0 )
-
-      call da_set_run_hours ()
+#endif
    else if ( write_checkpoints .eq. 3 ) then
       !Turn off xtraj writing
       call nl_set_auxhist6_interval_s ( head_grid%id, 0 )
-
+#if (WRF_CHEM == 1)
    else
       ! Turn off gocart_bg field reading
       call nl_get_io_form_auxinput8(head_grid%id, ioform8)
@@ -120,18 +121,11 @@ subroutine da_nl_model (it)
    ENDIF
    call Setup_Timekeeping ( head_grid )
 
-   call domain_clock_get(head_grid, start_time=head_grid%start_subtime)
-   call domain_clock_get(head_grid, stop_time=head_grid%stop_subtime)
-
-   ! 4dvar init
-   call init_4dvar
-
 #if (WRF_CHEM == 1)
    if ( use_chemobs .and. cv_options_chem .gt. 0 ) then
-      call da_copy_chem_to_model( head_grid, it )
 
       !Need a first guess file that includes scaleant and scalebb
-      if ( (it == 1 .and. .not.(write_checkpoints .eq. 2)) .or. init_osse_chem ) then
+      if ( it == 1 .or. init_osse_chem ) then
          call da_init_model_output()
       end if
    end if
@@ -192,8 +186,10 @@ subroutine da_nl_model (it)
          call nl_set_io_form_auxhist16 ( head_grid%id, io_form )
 #if (WRF_CHEM == 1)
       end if
-   else if ( write_checkpoints .eq. 2 ) then
-      call da_reset_run_hours ()
+!#endif
+!   else if ( write_checkpoints .eq. 2 ) then
+!      call da_reset_run_hours ()
+!#if (WRF_CHEM == 1)
    else
       call nl_set_io_form_auxinput8(head_grid%id, ioform8)
 #endif

@@ -90,6 +90,17 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
               VT = VT(1:nens,1:nens), &
               INFO = info)
 
+   call mpi_barrier(comm, ierr)
+
+   if (info .ne. 0) then
+      do iens = 1, nens
+         write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'F1: ',F1(iens,1:nens)
+      end do
+
+      write(stdout,*) 'Error in randomised SVD: GESV returned ',info
+      CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
+   end if
+
    ! KMAT = VT^T * SIG^-1 * U^T * F2 
    do iens = 1, nens
       VSIGinvT(iens,1:nens) = VT(iens,1:nens) / SIG(iens)
@@ -104,10 +115,6 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
       end do
    end do
 
-   if (info /=0) then
-      write(stdout,*) 'Error in randomised SVD: GESV returned ',info
-      CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
-   end if
 
    ! Force symmetry in KMAT
    KMAT = (KMAT + TRANSPOSE(KMAT)) / 2.D0
@@ -117,7 +124,17 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
    info = 0
    call SYEV(KMAT, LAM, JOBZ = 'V' , INFO = info) !F95
 
-   if (info /=0) then
+   call mpi_barrier(comm, ierr)
+
+   if (info .ne. 0) then
+      do iens = 1, nens
+         write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'F2: ',F2(iens,1:nens)
+      end do
+
+      do iens = 1, nens
+         write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'KMAT: ',KMAT(iens,1:nens)
+      end do
+
       write(stdout,*) 'Error in randomised SVD: SYEV returned ',info
       CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
    end if

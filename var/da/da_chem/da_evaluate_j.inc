@@ -129,7 +129,7 @@ subroutine da_evaluate_j(grid, config_flags, cv_size, cv_size_jb, xbx, be, iv, x
    enddo
 
    ! Relinearize
-   if ( checkpoint_interval .gt. 0 ) write_checkpoints = 2
+   if ( checkpoint_interval .gt. 0 ) write_checkpoints = 3
    call da_nl_model(-1)
    if ( checkpoint_interval .gt. 0 ) write_checkpoints = 0
 
