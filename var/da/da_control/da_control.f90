@@ -363,6 +363,9 @@ module da_control
    real          :: sigma_alpha          ! Alpha standard deviation.
    real          :: jb_factor            ! Weighting for Background Error Cov.
 
+   ! Line Search
+   logical       :: evalj
+
    ! Namelist variables in future?:
    real, parameter :: maximum_rh = 100.0
    real, parameter :: minimum_rh =  10.0

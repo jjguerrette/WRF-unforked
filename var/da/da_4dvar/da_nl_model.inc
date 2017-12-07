@@ -11,7 +11,7 @@ subroutine da_nl_model (it)
    integer :: time_step, alarmid
    character(len=256) :: rst_outname
 #if (WRF_CHEM == 1)
-   integer :: ioform8, io_form
+   integer :: ioform8, ioform16, io_form
 #endif
 
    if (trace_use_dull) call da_trace_entry("da_nl_model")
@@ -77,18 +77,7 @@ subroutine da_nl_model (it)
          rst_outname = "wrf_checkpoint_d<domain>_<date>"
          call nl_set_rst_outname ( head_grid%id, rst_outname)
          call nl_set_restart_begin_m( head_grid%id, 0 )
-
-         ! Set up basic states writing for offline obs. operators
 #if (WRF_CHEM == 1)
-         if ( use_offlineobs ) then
-#endif
-            model_config_rec%auxhist16_outname = trim(xtrajprefix)//"_d<domain>_<date>"
-            call nl_set_auxhist16_interval_s (head_grid%id, var4d_bin )
-            call nl_get_io_form_auxhist16 ( head_grid%id, io_form )
-            if (io_form .le. 0) call nl_set_io_form_auxhist16 ( head_grid%id, io_form_xtraj )
-            call nl_set_frames_per_auxhist16 ( head_grid%id, 1 )
-#if (WRF_CHEM == 1)
-         end if
       endif
 #endif
    else if ( write_checkpoints .eq. 3 ) then
@@ -103,6 +92,19 @@ subroutine da_nl_model (it)
       endif
 #endif
    endif
+
+   ! Set up basic states writing for offline obs. operators
+   if (any(write_checkpoints.eq.(/1,3/)) &
+#if (WRF_CHEM == 1)
+        .and. use_offlineobs &
+#endif
+        ) then
+      model_config_rec%auxhist16_outname = trim(xtrajprefix)//"_d<domain>_<date>"
+      call nl_set_auxhist16_interval_s (head_grid%id, var4d_bin )
+      call nl_get_io_form_auxhist16 ( head_grid%id, ioform16 )
+      if (ioform16 .le. 0) call nl_set_io_form_auxhist16 ( head_grid%id, io_form_xtraj )
+      call nl_set_frames_per_auxhist16 ( head_grid%id, 1 )
+   end if
 
    IF ( ASSOCIATED( head_grid%domain_clock ) ) THEN
      IF ( head_grid%domain_clock_created ) THEN
@@ -178,21 +180,22 @@ subroutine da_nl_model (it)
       call nl_set_rst_outname ( head_grid%id, rst_outname)
       call nl_set_restart_begin_h( head_grid%id, original_restart_interval)
 
-#if (WRF_CHEM == 1)
-      if ( use_offlineobs ) then
-#endif
-         model_config_rec%auxhist16_outname = "auxhist16_d<domain>_<date>"
-         call nl_set_auxhist16_interval_s (head_grid%id, 0 )
-         call nl_set_io_form_auxhist16 ( head_grid%id, io_form )
-#if (WRF_CHEM == 1)
-      end if
-!#endif
 !   else if ( write_checkpoints .eq. 2 ) then
 !      call da_reset_run_hours ()
-!#if (WRF_CHEM == 1)
+#if (WRF_CHEM == 1)
    else
       call nl_set_io_form_auxinput8(head_grid%id, ioform8)
 #endif
+   end if
+
+   if (any(write_checkpoints.eq.(/1,3/)) &
+#if (WRF_CHEM == 1)
+        .and. use_offlineobs &
+#endif
+        ) then
+      model_config_rec%auxhist16_outname = "auxhist16_d<domain>_<date>"
+      call nl_set_auxhist16_interval_s (head_grid%id, 0 )
+      call nl_set_io_form_auxhist16 ( head_grid%id, ioform16 )
    end if
 
    IF ( ASSOCIATED( head_grid%domain_clock ) ) THEN

@@ -208,9 +208,11 @@ subroutine da_setup_firstguess_wrf(xbx, grid, config_flags, ens)
    mkz = grid%xb % mkz
 
 #if (WRF_CHEM == 1)
-   if (.not.osse_chem .and. (.not.outer_loop_restart .or. iouter_restart.eq.1)&
+   if (.not.osse_chem &
+   .and. (iouter_restart.eq.1 .or. .not.outer_loop_restart)&
+   .and. .not.evalj &
 #if defined(LAPACK)
-   .and. (.not.use_randomblock .or. rand_outer .eq. 1) &
+   .and. (rand_outer.eq.1 .or. .not.use_randomblock) &
 #endif
        ) then
 

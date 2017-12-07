@@ -11,7 +11,7 @@ module da_transfer_model
       output_auxinput17, open_w_dataset
    use module_state_description, only : dyn_em_ad, dyn_em, dyn_em_tl, &
 #if (WRF_CHEM == 1)
-      num_chem_surf, num_chem_acft, num_scaleant, num_scalebb, &
+      num_chem_surf, num_chem_acft, num_scaleant, num_scalebb, num_chem, &
       PARAM_FIRST_SCALAR, &
 #endif
       p_qv, p_qh, p_qr, p_qi, p_qs, p_qg, p_qc, param_first_scalar, num_moist, &
@@ -42,11 +42,12 @@ module da_transfer_model
       dt_cloud_model, cp, use_ssmiretrievalobs, var4d_detail_out, &
       vertical_ip_sqrt_delta_p, vertical_ip_delta_p,check_rh_simple, check_rh_tpw, &
       t_kelvin, num_fgat_time, num_pseudo, iso_temp, interval_seconds, trajectory_io, &
-      cv_options, &
+      cv_options, evalj, &
 #if (WRF_CHEM == 1)
       chem_surf, chem_acft, num_platform, num_ant_steps, num_bb_steps, &
       init_scale, num_ts, crossval_chem_surfobs, crossval_chem_acftobs, &
       osse_chem, outer_loop_restart, iouter_restart, &
+      chem_opt, cv_options_chem, use_nonchemobs, &
 #if defined(LAPACK)
       use_randomblock, rand_outer, &
 #endif
@@ -78,7 +79,11 @@ module da_transfer_model
    ! an array
    ! use da_wrf_interfaces, only : wrf_dm_bcast_real
 #ifdef VAR4D
-   use da_4dvar, only : model_grid, push_ad_forcing, push_tl_pert, pop_tl_pert, kj_swap, &
+   use da_4dvar, only : &
+#if (WRF_CHEM == 1)
+       da_init_model_input, &
+#endif
+       model_grid, push_ad_forcing, push_tl_pert, pop_tl_pert, kj_swap, &
        kj_swap_reverse, model_config_flags, g_couple, g_stuff_bdy, a_couple, a_stuff_bdy, &
        g_stuff_bdytend, a_stuff_bdytend_old, a_stuff_bdytend_new, decouple, da_calc_2nd_fg, &
        ubdy3dtemp1 , vbdy3dtemp1 , tbdy3dtemp1 , pbdy3dtemp1 , qbdy3dtemp1, mbdy2dtemp1, &
@@ -121,10 +126,10 @@ module da_transfer_model
 #include "da_setup_firstguess_wrf_nmm_regional.inc"
 #include "da_setup_firstguess_kma.inc"
 #include "da_get_2nd_firstguess.inc"
+#include "da_transfer_headtomodel.inc"
 
 #if (WRF_CHEM == 1)
 #include "da_transfer_wrftltoy_chem.inc"
 #include "da_transfer_wrftltoy_chem_adj.inc"
-#include "da_transfer_xatowrf_temp.inc"
 #endif
 end module da_transfer_model

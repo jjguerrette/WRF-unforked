@@ -1,9 +1,9 @@
-subroutine da_hdgn(it, cv_size, be, xhat)!, eta)
+subroutine da_hdgn(it, cv_size, be, xhat)
 
    !---------------------------------------------------------------------------
    ! Purpose: Scales the cv emission increments to improve convergence
    ! Note: Requires user specification of "eta", and is non-optimal
-   ! Reference: Heuristic damped Gauss Newton; Guerrette and Henze (2016)
+   ! Reference: Heuristic damped Gauss Newton; Guerrette and Henze (2017)
    !
    ! Creation: 07/25/2016           JJ Guerrette 
    !

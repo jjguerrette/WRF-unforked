@@ -51,13 +51,13 @@ module da_minimisation
       var_scaling4,var_scaling5,var_scaling3, jo_unit, test_gradient, &
       print_detail_grad,omb_set_rand,grad_unit,cost_unit, num_pseudo, cv_options, &
       cv_size_domain_je,cv_size_domain_jb, cv_size_domain_jp, cv_size_domain_js, cv_size_domain_jl, &
-      xtrajswitch, &
+      evalj, num_qcstat_conv, write_checkpoints, boundary_io, &
 #if (WRF_CHEM == 1)
       chem_surf, chem_acft, num_platform, &
       sigma_r_acft, sigma_c_acft, &
       num_ant_steps, num_bb_steps, &
       osse_chem, &
-      use_nonchemobs, &
+      use_nonchemobs, use_chemobs, &
 #endif
 #if defined(LAPACK)
       use_randomblock, rand_stage, rotate_omega, &
@@ -150,7 +150,8 @@ module da_minimisation
    use da_chem, only : da_get_innov_vector_chem_surf, da_get_innov_vector_chem_acft, &
       da_residual_chem_surf, da_residual_chem_acft, &
       da_jo_and_grady_chem_surf, da_jo_and_grady_chem_acft, &
-      da_calculate_grady_chem_surf, da_calculate_grady_chem_acft
+      da_calculate_grady_chem_surf, da_calculate_grady_chem_acft, &
+      da_retrieve_chem_hx
 #endif
 
    use da_reporting, only : da_message, da_warning, da_error, message
@@ -183,8 +184,11 @@ module da_minimisation
    use da_transfer_model, only : da_transfer_wrftltoxa,da_transfer_xatowrftl, &
 #if (WRF_CHEM == 1)
       da_transfer_wrftltoy_chem, da_transfer_wrftltoy_chem_adj, &
+      da_transfer_wrftoxb_chem, &
 #endif
-      da_transfer_xatowrftl_adj,da_transfer_wrftltoxa_adj
+      da_transfer_headtomodel, da_transfer_xatoanalysis, da_setup_firstguess, &
+      da_transfer_wrftoxb, &
+      da_transfer_xatowrftl_adj, da_transfer_wrftltoxa_adj
 #if defined(RTTOV) || defined(CRTM)
    use da_varbc, only : da_varbc_tl,da_varbc_adj,da_varbc_precond,da_varbc_coldstart
 #endif
@@ -194,9 +198,9 @@ module da_minimisation
    use module_symbols_util, only : wrfu_finalize
    use da_lapack, only : dsteqr
    use da_wrfvar_io, only : da_med_initialdata_input
-   use da_transfer_model, only : da_transfer_wrftoxb
 #ifdef VAR4D
-   use da_4dvar, only : da_tl_model, da_ad_model, model_grid, &
+   use da_4dvar, only : da_tl_model, da_ad_model, da_nl_model, model_grid, &
+       da_model_lbc_off, &
        input_nl_xtraj, xtrajprefix, io_form_xtraj, input_nl_xtraj_checkpt, &
        kj_swap_reverse, upsidedown_ad_forcing, u6_2, v6_2, w6_2, t6_2, ph6_2, p6, &
       mu6_2, psfc6, moist6
@@ -236,7 +240,8 @@ contains
 #include "da_amat_mul.inc"
 #include "da_kmat_mul.inc"
 #include "da_lanczos_io.inc"
-
+#include "da_dgn.inc"
+#include "da_evaluate_j.inc"
 #if (WRF_CHEM == 1)
 #include "da_calculate_aminusb.inc"
 #endif

@@ -384,7 +384,6 @@ rconfig   integer   tovs_end                namelist,wrfvar5  1  10000000 - "tov
 rconfig   logical   gpsref_thinning         namelist,wrfvar5  1  .false.  - "gpsref_thinning"          ""  ""
 rconfig   logical   outer_loop_restart      namelist,wrfvar6  1  .false.  - "outer_loop_restart"       ""  ""
 rconfig   integer   iouter_restart          namelist,wrfvar6  1  1        - "iouter_restart"           ""  ""
-
 rconfig   integer   max_ext_its             namelist,wrfvar6  1  1        - "max_ext_its"              ""  ""
 rconfig   integer   ntmax                   namelist,wrfvar6  max_outer_iterations  200      - "ntmax"                    ""  ""
 rconfig   integer   nsave                   namelist,wrfvar6  1  4        - "nsave"                    ""  ""
@@ -399,6 +398,7 @@ rconfig   logical   orthonorm_gradient      namelist,wrfvar6  1  .false.  - "ort
 rconfig   integer   grm_shmt_order          namelist,wrfvar6  1  1        - "grm_shmt_order"           ""  ""
 rconfig   logical   info_stop               namelist,wrfvar6  1  .true.   -  "info_stop"               ""  ""
 rconfig   logical   use_randomblock         namelist,wrfvar6  1  .false.  - "use_randomblock"          ""  ""
+rconfig   integer   dgn_search              namelist,wrfvar6  max_outer_iterations  0  - "dgn_search"            ""  ""
 rconfig   logical   spectral_precon         namelist,wrfvar6  1  .false.  -  "spectral_precon"         ""  ""
 rconfig   logical   rotate_omega            namelist,wrfvar6  1  .false.  -  "rotate_omega"            ""  ""
 rconfig   logical   use_global_cv_io        namelist,wrfvar6  1  .true.   - "use_global_cv_io"         ""  ""

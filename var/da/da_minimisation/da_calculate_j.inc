@@ -343,9 +343,9 @@ subroutine da_calculate_j(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size_jp,
    !-------------------------------------------------------------------------
    if (rootproc) then
       if (it == 1 .and. iter == 0) then
-         write(unit=cost_unit,fmt='(a)')'Outer    EPS     Inner      J           Jb       Jo           Jc         Je         Jd         Jp         Js        jl'
+         write(unit=cost_unit,fmt='(a)')'Outer    EPS     Inner         J            Jb            Jo            Jc            Je            Jd            Jp            Js            jl'
          write(unit=cost_unit,fmt='(a)')'Iter             Iter                            '
-         write(unit=grad_unit,fmt='(a)')'Outer    EPS     Inner      G           Gb       Go           Ge         Gd         Gp         Gs        Gl'
+         write(unit=grad_unit,fmt='(a)')'Outer    EPS     Inner      G         Gb         Go         Ge         Gd         Gp         Gs         Gl'
          write(unit=grad_unit,fmt='(a)')'Iter             Iter                            '
       end if
 

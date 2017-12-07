@@ -80,7 +80,6 @@ rconfig   real      len_scaling_bb          namelist,wrfvarchem  max_outer_itera
 #rconfig   real      len_scaling_bio         namelist,wrfvarchem  max_outer_iterations  1.0      - "len_scaling_bio"            ""  ""
 
 
-rconfig   integer   dgn_emiss               namelist,wrfvarchem  max_outer_iterations  0        - "dgn_emiss"             ""  ""
 rconfig   real      eta_emiss               namelist,wrfvarchem  1  1.0                         - "eta_emiss"             ""  ""
 rconfig   logical   calc_aminusb            namelist,wrfvarchem  1  .false.                     - "calc_aminusb"          ""  ""
 

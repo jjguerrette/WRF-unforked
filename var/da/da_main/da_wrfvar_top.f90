@@ -52,7 +52,7 @@ module da_wrfvar_top
 #if (WRF_CHEM == 1)
    use da_chem, only:  da_retrieve_chem_hx, da_write_obs_chem, da_calculate_chem_forcing_ad, &
       da_read_obs_chem_again
-   use da_chem_tools, only: da_hdgn, da_dgn, da_setup_osse_chem
+   use da_chem_tools, only: da_hdgn, da_setup_osse_chem
 
 !   use da_control, only: use_synopobs, use_shipsobs, use_metarobs, use_soundobs, &
 !              use_mtgirsobs, use_tamdarobs, use_bogusobs, use_pilotobs, &
@@ -93,7 +93,7 @@ module da_wrfvar_top
 #if (WRF_CHEM == 1)
       da_calculate_aminusb, &
 #endif
-      da_kmat_mul
+      da_dgn, da_kmat_mul
 
    use da_linear_ops, only: da_output_increments, da_cv_io
 
@@ -134,7 +134,7 @@ module da_wrfvar_top
 #if (WRF_CHEM == 1)
        da_transfer_wrftoxb_chem, &
 #endif
-       da_transfer_wrftltoxa_adj
+       da_transfer_headtomodel, da_transfer_wrftltoxa_adj
    use da_vtox_transforms, only : da_transform_vtox, da_transform_xtoxa, &
       da_transform_xtoxa_adj
    use da_wrfvar_io, only : da_med_initialdata_input, da_update_firstguess
