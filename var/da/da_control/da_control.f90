@@ -364,7 +364,7 @@ module da_control
    real          :: jb_factor            ! Weighting for Background Error Cov.
 
    ! Line Search
-   logical       :: evalj
+   logical       :: evalj=.false.
 
    ! Namelist variables in future?:
    real, parameter :: maximum_rh = 100.0

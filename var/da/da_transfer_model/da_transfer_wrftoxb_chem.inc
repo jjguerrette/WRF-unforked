@@ -14,8 +14,27 @@ subroutine da_transfer_wrftoxb_chem(grid)
 
    if (trace_use) call da_trace_entry("da_transfer_wrftoxb_chem")
 
-   !$OMP PARALLEL DO &
-   !$OMP PRIVATE ( ic, ij, i, j, k )
+!!!!$OMP PARALLEL DO &
+!!!!$OMP PRIVATE ( ic, ij, i, j, k )
+!!!   do ij = 1 , grid%num_tiles
+!!!
+!!!   do ic = PARAM_FIRST_SCALAR, num_chem
+!!!      do j=grid%j_start(ij),grid%j_end(ij)
+!!!         do i=its,ite
+!!!            do k=1, kte
+!!!               grid%xbch%alpha_chem(i,j,k,ic) = log ( grid%scalechem(i,j,k,ic) )
+!!!            end do
+!!!         end do
+!!!      end do
+!!!   end do
+!!!
+!!!   end do
+!!!!$OMP END PARALLEL DO
+
+   if (var4d) then
+
+!$OMP PARALLEL DO &
+!$OMP PRIVATE ( ic, ij, i, j, k )
    do ij = 1 , grid%num_tiles
 
    ! Need to ensure scaling factors never drop to zero, which could happen if 4D-Var increment is too large
@@ -23,34 +42,34 @@ subroutine da_transfer_wrftoxb_chem(grid)
       do j=grid%j_start(ij),grid%j_end(ij)
          do i=its,ite
             do k=1, num_ant_steps
-!               if ( grid%scaleant(i,j,k,ic) > 0.D0 ) then
-                  grid%xbch%alpha_ant(i,j,k,ic) = log ( grid%scaleant(i,j,k,ic) )
-!               else
-!                  grid%scaleant(i,j,k,ic) = 1.D0
-!                  grid%xbch%alpha_ant(i,j,k,ic) = 0.D0
-!               end if
+               grid%xbch%alpha_ant(i,j,k,ic) = log ( grid%scaleant(i,j,k,ic) )
             end do
          end do
       end do
    end do
+
+   end do
+!$OMP END PARALLEL DO
+
+
+!$OMP PARALLEL DO &
+!$OMP PRIVATE ( ic, ij, i, j, k )
+   do ij = 1 , grid%num_tiles
 
    do ic = PARAM_FIRST_SCALAR, num_scalebb
       do j=grid%j_start(ij),grid%j_end(ij)
          do i=its,ite
             do k=1, num_bb_steps
-!               if ( grid%scalebb(i,j,k,ic) > 0.D0 ) then
-                  grid%xbch%alpha_bb(i,j,k,ic) = log ( grid%scalebb(i,j,k,ic) )
-!               else
-!                  grid%scalebb(i,j,k,ic) = 1.D0
-!                  grid%xbch%alpha_bb(i,j,k,ic) = 0.D0
-!               end if
+               grid%xbch%alpha_bb(i,j,k,ic) = log ( grid%scalebb(i,j,k,ic) )
             end do
          end do
       end do
    end do
 
    end do
-   !$OMP END PARALLEL DO
+!$OMP END PARALLEL DO
+
+   end if
 
    if (trace_use) call da_trace_exit("da_transfer_wrftoxb_chem")
 

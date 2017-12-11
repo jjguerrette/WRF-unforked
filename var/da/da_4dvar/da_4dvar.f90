@@ -3,7 +3,7 @@ module da_4dvar
 use da_tracing, only : da_trace_entry, da_trace_exit
 use da_reporting, only : da_error, message, da_message
 use da_control, only : comm, var4d_bin, var4d_lbc, trace_use_dull, num_fgat_time, multi_inc, &
-                       run_hours, run_days, adtl_run_hours, xtrajswitch, &
+                       run_hours, run_days, adtl_run_hours, &
 #if (WRF_CHEM == 1)
                        init_osse_chem, calc_hx_only, &
                        cv_options, cv_options_chem, &

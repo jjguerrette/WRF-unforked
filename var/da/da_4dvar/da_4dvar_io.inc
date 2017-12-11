@@ -83,39 +83,11 @@ subroutine input_nl_xtraj_checkpt ( time )
    character*256, intent(in) :: time
    character(len=256)        :: filename
 
-!   INTEGER                   :: fid, ierr, io_form
-
    if (trace_use_dull) call da_trace_entry("input_nl_xtraj_checkpt")
 
-!   if (xtrajswitch .eq. 1) then
-!      !Read xtraj file
-!      filename = trim(xtrajprefix)//"_d01_"//trim(time)
-!      call nl_get_io_form_auxhist16 ( model_grid%id, io_form )
-!      if (io_form .le. 0) then
-!         call nl_set_io_form_auxhist16 ( model_grid%id, io_form_xtraj )
-!         config_flags%io_form_auxhist16 = io_form_xtraj
-!      else
-!         config_flags%io_form_auxhist16 = io_form
-!      end if
-!
-!      CALL open_r_dataset ( fid , TRIM(filename) , model_grid , config_flags , "DATASET=AUXHIST16", ierr )
-!      IF ( ierr .NE. 0 ) THEN
-!        WRITE( message(1) , '("program da_wrfvar: error opening ",A," for reading")') TRIM(filename)
-!        call da_error(__FILE__,__LINE__,message(1:1))
-!      ENDIF
-!      WRITE(message(1),*)'read checkpointed xtraj: opening ',TRIM(filename)
-!      CALL da_message (  message(1:1) ) 
-!      CALL input_auxhist16 ( fid,   model_grid , config_flags , ierr )
-!      CALL close_dataset ( fid , config_flags , "DATASET=AUXHIST16" )
-!   end if
-!
-!   if (xtrajswitch .eq. 2) then
+   filename = trim(xtrajprefix)//"_d01_"//trim(time)
 
-      filename = trim(xtrajprefix)//"_d01_"//trim(time)
-
-      call read_nl_xtraj_checkpt (filename, io_form_xtraj, config_flags)
-
-!   end if
+   call read_nl_xtraj_checkpt (filename, io_form_xtraj, config_flags)
 
    if (trace_use_dull) call da_trace_entry("input_nl_xtraj_checkpt")
 

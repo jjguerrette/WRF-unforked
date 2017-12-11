@@ -1,7 +1,7 @@
 subroutine da_minimise_cg(grid, config_flags,            &
                            it, cv_size, xbx, be, iv, &
                            j_grad_norm_target, xhat, cv, &
-                           re, y, j_cost, j0_total)
+                           re, y, j_cost, j0_cost, j0_total)
 
    !-------------------------------------------------------------------------
    ! Purpose:         Main Conjugate Gradient minimisation routine 
@@ -33,6 +33,7 @@ subroutine da_minimise_cg(grid, config_flags,            &
    type (y_type), intent(inout)      :: y     ! y = H(x_inc) structure.
 
    type (j_type), intent(out)        :: j_cost                 ! cost function
+   type (j_type), intent(out)        :: j0_cost                ! cost function
 
    type(domain), intent(inout)       :: grid
    type(grid_config_rec_type), intent(inout) :: config_flags
@@ -111,6 +112,7 @@ subroutine da_minimise_cg(grid, config_flags,            &
                        be%cv%size_jl, xbx, be, iv, xhat, cv, re, y, j_cost, ghat, grid, config_flags)
 
    j0_total = j_cost%total
+   j0_cost = j_cost
    if (j0_total == 0.0) then
       if (trace_use) call da_trace_exit("da_minimise_cg")
       return

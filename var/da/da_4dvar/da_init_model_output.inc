@@ -13,7 +13,7 @@ subroutine da_init_model_output(filename)
    if ( present(filename) ) then
       config_flags%input_outname = trim(filename)
    else
-      config_flags%input_outname = "fgc"
+      config_flags%input_outname = "fg"
    end if
    config_flags%write_input = .true.
 

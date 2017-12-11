@@ -29,6 +29,7 @@
    integer                      :: global_it   ! External loop counter.
    integer                      :: neign       
    type (j_type)                :: j           ! Cost function.
+   type (j_type)                :: j0_cost     ! Cost function.
    type (y_type)                :: jo_grad_y   ! Grad_y(jo)
 
    integer                      :: cv_size, i, ichan, k, n
@@ -723,7 +724,7 @@
 
       call da_retrieve_chem_hx( model_grid, iv )
 
-      ! Re-read model inputs from fgc file, then overwrite scaling factors.
+      ! Re-read model inputs from fg file, then overwrite scaling factors.
       call da_init_model_input
 
       ! Write out pseudo obs and perturb head_grid scaling factors
@@ -1014,7 +1015,7 @@
             end if
 
             call da_minimise_lz(grid, config_flags, it, cv_size, xbx,& 
-                             be, iv, j_grad_norm_target, xhat, qhat, cvt, re, y, j, eignvec, eignval, neign, j0_total, hessian_info=hessian_info)
+                             be, iv, j_grad_norm_target, xhat, qhat, cvt, re, y, j, eignvec, eignval, neign, j0_cost, j0_total, hessian_info=hessian_info)
 #if (WRF_CHEM == 1)
             if (calc_aminusb) call da_calculate_aminusb(grid,config_flags,it,cv_size,xbx, &
                                 be,qhat,eignvec,eignval,neign,ntmax(it))
@@ -1188,7 +1189,7 @@
 #endif
       else
          call da_minimise_cg( grid, config_flags, it, be % cv % size, & 
-              xbx, be, iv, j_grad_norm_target, xhat, cvt, re, y, j, j0_total)
+              xbx, be, iv, j_grad_norm_target, xhat, cvt, re, y, j, j0_cost, j0_total)
       end if
 
 #ifdef DM_PARALLEL
@@ -1201,7 +1202,9 @@
 #endif
       if (var4d) then
       if (dgn_search(global_it) .eq. 1) then
-         call da_dgn(grid, cv_size, xbx, be, iv, xhat, cvt, ob, config_flags, j, j0_total, global_it, mz)
+         call da_dgn(grid, config_flags, cv_size, xhat, cvt, &
+                     xbx, be, iv, ob, &
+                     j0_cost, j0_total, global_it, mz)
 #if (WRF_CHEM == 1)
       else if ( dgn_search(global_it) .eq. 2 .and. eta_emiss .lt. 1.D0 .and. eta_emiss .gt. 0.D0 ) then
          call da_hdgn(it, cv_size, be, xhat)
@@ -1237,12 +1240,37 @@
 #ifdef DM_PARALLEL
          IF ( rootproc ) CALL start_timing
 #endif
-
       end if
 
       ! Update outer-loop control variable
       cvt = cvt + xhat
 
+#if defined(LAPACK)
+      if (use_randomblock .and. rand_minimise) then
+         write(cproc,fmt='(i4.4)') myproc
+         write(cit,fmt='(i2.2)') rand_outer
+         cvtfile_rand = 'cvt.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
+         call da_cv_io ('w', cvtfile_rand, cv_size, cvt(1:cv_size), grid, mz)
+      else
+#endif
+      if ( outer_loop_restart ) then
+        open(unit=cvt_unit,status='unknown',file=trim(cvtfile),iostat=iost,form='UNFORMATTED')
+        if (iost /= 0) then
+           write(unit=message(1),fmt='(A,I5,A)') &
+             "Error ",iost," opening cvt file "//trim(cvtfile)
+          call da_error(__FILE__,__LINE__,message(1:1))
+        end if
+        write(unit=message(1),fmt='(a)') 'Writing cvt to : '//trim(cvtfile) 
+        call da_message(message(1:1))
+        write(cvt_unit) cvt
+        close(cvt_unit)
+        !call da_free_unit(cvt_unit)
+      end if
+#if defined(LAPACK)
+      end if
+#endif
+
+      !------------------------------------------------------------------------
 #if (WRF_CHEM == 1)
       if (osse_chem .or. use_iter_metrics) then
 
@@ -1293,32 +1321,6 @@
                                    eignval(1:neign), eignvec(1:neign,1:neign), qhat(:,0:neign))
       end if
 #endif
-
-#if defined(LAPACK)
-      if (use_randomblock .and. rand_minimise) then
-         write(cproc,fmt='(i4.4)') myproc
-         write(cit,fmt='(i2.2)') rand_outer
-         cvtfile_rand = 'cvt.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
-         call da_cv_io ('w', cvtfile_rand, cv_size, cvt(1:cv_size), grid, mz)
-      else
-#endif
-      if ( outer_loop_restart ) then
-        open(unit=cvt_unit,status='unknown',file=trim(cvtfile),iostat=iost,form='UNFORMATTED')
-        if (iost /= 0) then
-           write(unit=message(1),fmt='(A,I5,A)') &
-             "Error ",iost," opening cvt file "//trim(cvtfile)
-          call da_error(__FILE__,__LINE__,message(1:1))
-        end if
-        write(unit=message(1),fmt='(a)') 'Writing cvt to : '//trim(cvtfile) 
-        call da_message(message(1:1))
-        write(cvt_unit) cvt
-        close(cvt_unit)
-        !call da_free_unit(cvt_unit)
-      end if
-#if defined(LAPACK)
-      end if
-#endif
-
       !------------------------------------------------------------------------
 
       ! reset cv to random noise
@@ -1403,9 +1405,10 @@
      if ( it < max_ext_its .and. &
           (print_detail_outerloop &
 #ifdef VAR4D
-          .or. (dgn_search(min(global_it+1,max_ext_its)).eq.1 .and. var4d)&
+          .or. checkpoint_interval.gt.0 &
+          .or. (var4d .and. dgn_search(global_it+1).eq.1)&
 #endif
-          ) ) then
+           ) ) then
         write(outerloop,'(i2.2)') it
         call da_update_firstguess(grid,'wrfvar_output_'//outerloop)
 #ifdef VAR4D

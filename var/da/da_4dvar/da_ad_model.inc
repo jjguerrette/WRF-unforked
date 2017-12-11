@@ -140,30 +140,50 @@ subroutine da_ad_model ()
    head_grid%a_smois = 0.0
    head_grid%a_canwat = 0.0
 
-   head_grid%a_u_bxs = 0.0; head_grid%a_u_bxe = 0.0; head_grid%a_u_bys = 0.0; head_grid%a_u_bye = 0.0
-   head_grid%a_v_bxs = 0.0; head_grid%a_v_bxe = 0.0; head_grid%a_v_bys = 0.0; head_grid%a_v_bye = 0.0
-   head_grid%a_w_bxs = 0.0; head_grid%a_w_bxe = 0.0; head_grid%a_w_bys = 0.0; head_grid%a_w_bye = 0.0
-   head_grid%a_ph_bxs = 0.0; head_grid%a_ph_bxe = 0.0; head_grid%a_ph_bys = 0.0; head_grid%a_ph_bye = 0.0
-   head_grid%a_t_bxs = 0.0; head_grid%a_t_bxe = 0.0; head_grid%a_t_bys = 0.0; head_grid%a_t_bye = 0.0
-   head_grid%a_mu_bxs = 0.0; head_grid%a_mu_bxe = 0.0; head_grid%a_mu_bys = 0.0; head_grid%a_mu_bye = 0.0
-   head_grid%a_moist_bxs = 0.0; head_grid%a_moist_bxe = 0.0; head_grid%a_moist_bys = 0.0; head_grid%a_moist_bye = 0.0
-   head_grid%a_scalar_bxs = 0.0; head_grid%a_scalar_bxe = 0.0; head_grid%a_scalar_bys = 0.0; head_grid%a_scalar_bye = 0.0
-   head_grid%a_tracer_bxs = 0.0; head_grid%a_tracer_bxe = 0.0; head_grid%a_tracer_bys = 0.0; head_grid%a_tracer_bye = 0.0
+   head_grid%a_u_bxs = 0.0; head_grid%a_u_bxe = 0.0
+   head_grid%a_u_bys = 0.0; head_grid%a_u_bye = 0.0
+   head_grid%a_v_bxs = 0.0; head_grid%a_v_bxe = 0.0
+   head_grid%a_v_bys = 0.0; head_grid%a_v_bye = 0.0
+   head_grid%a_w_bxs = 0.0; head_grid%a_w_bxe = 0.0
+   head_grid%a_w_bys = 0.0; head_grid%a_w_bye = 0.0
+   head_grid%a_ph_bxs = 0.0; head_grid%a_ph_bxe = 0.0
+   head_grid%a_ph_bys = 0.0; head_grid%a_ph_bye = 0.0
+   head_grid%a_t_bxs = 0.0; head_grid%a_t_bxe = 0.0
+   head_grid%a_t_bys = 0.0; head_grid%a_t_bye = 0.0
+   head_grid%a_mu_bxs = 0.0; head_grid%a_mu_bxe = 0.0
+   head_grid%a_mu_bys = 0.0; head_grid%a_mu_bye = 0.0
+   head_grid%a_moist_bxs = 0.0; head_grid%a_moist_bxe = 0.0
+   head_grid%a_moist_bys = 0.0; head_grid%a_moist_bye = 0.0
+   head_grid%a_scalar_bxs = 0.0; head_grid%a_scalar_bxe = 0.0
+   head_grid%a_scalar_bys = 0.0; head_grid%a_scalar_bye = 0.0
+   head_grid%a_tracer_bxs = 0.0; head_grid%a_tracer_bxe = 0.0
+   head_grid%a_tracer_bys = 0.0; head_grid%a_tracer_bye = 0.0
 #if (WRF_CHEM == 1)
-   head_grid%a_chem_bxs = 0.0; head_grid%a_chem_bxe = 0.0; head_grid%a_chem_bys = 0.0; head_grid%a_chem_bye = 0.0
+   head_grid%a_chem_bxs = 0.0; head_grid%a_chem_bxe = 0.0
+   head_grid%a_chem_bys = 0.0; head_grid%a_chem_bye = 0.0
 #endif
 
-   head_grid%a_u_btxs = 0.0; head_grid%a_u_btxe = 0.0; head_grid%a_u_btys = 0.0; head_grid%a_u_btye = 0.0
-   head_grid%a_v_btxs = 0.0; head_grid%a_v_btxe = 0.0; head_grid%a_v_btys = 0.0; head_grid%a_v_btye = 0.0
-   head_grid%a_w_btxs = 0.0; head_grid%a_w_btxe = 0.0; head_grid%a_w_btys = 0.0; head_grid%a_w_btye = 0.0
-   head_grid%a_ph_btxs = 0.0; head_grid%a_ph_btxe = 0.0; head_grid%a_ph_btys = 0.0; head_grid%a_ph_btye = 0.0
-   head_grid%a_t_btxs = 0.0; head_grid%a_t_btxe = 0.0; head_grid%a_t_btys = 0.0; head_grid%a_t_btye = 0.0
-   head_grid%a_mu_btxs = 0.0; head_grid%a_mu_btxe = 0.0; head_grid%a_mu_btys = 0.0; head_grid%a_mu_btye = 0.0
-   head_grid%a_moist_btxs = 0.0; head_grid%a_moist_btxe = 0.0; head_grid%a_moist_btys = 0.0; head_grid%a_moist_btye = 0.0
-   head_grid%a_scalar_btxs = 0.0; head_grid%a_scalar_btxe = 0.0; head_grid%a_scalar_btys = 0.0; head_grid%a_scalar_btye = 0.0
-   head_grid%a_tracer_btxs = 0.0; head_grid%a_tracer_btxe = 0.0; head_grid%a_tracer_btys = 0.0; head_grid%a_tracer_btye = 0.0
+   head_grid%a_u_btxs = 0.0; head_grid%a_u_btxe = 0.0
+   head_grid%a_u_btys = 0.0; head_grid%a_u_btye = 0.0
+   head_grid%a_v_btxs = 0.0; head_grid%a_v_btxe = 0.0
+   head_grid%a_v_btys = 0.0; head_grid%a_v_btye = 0.0
+   head_grid%a_w_btxs = 0.0; head_grid%a_w_btxe = 0.0
+   head_grid%a_w_btys = 0.0; head_grid%a_w_btye = 0.0
+   head_grid%a_ph_btxs = 0.0; head_grid%a_ph_btxe = 0.0
+   head_grid%a_ph_btys = 0.0; head_grid%a_ph_btye = 0.0
+   head_grid%a_t_btxs = 0.0; head_grid%a_t_btxe = 0.0
+   head_grid%a_t_btys = 0.0; head_grid%a_t_btye = 0.0
+   head_grid%a_mu_btxs = 0.0; head_grid%a_mu_btxe = 0.0
+   head_grid%a_mu_btys = 0.0; head_grid%a_mu_btye = 0.0
+   head_grid%a_moist_btxs = 0.0; head_grid%a_moist_btxe = 0.0
+   head_grid%a_moist_btys = 0.0; head_grid%a_moist_btye = 0.0
+   head_grid%a_scalar_btxs = 0.0; head_grid%a_scalar_btxe = 0.0
+   head_grid%a_scalar_btys = 0.0; head_grid%a_scalar_btye = 0.0
+   head_grid%a_tracer_btxs = 0.0; head_grid%a_tracer_btxe = 0.0
+   head_grid%a_tracer_btys = 0.0; head_grid%a_tracer_btye = 0.0
 #if (WRF_CHEM == 1)
-   head_grid%a_chem_btxs = 0.0; head_grid%a_chem_btxe = 0.0; head_grid%a_chem_btys = 0.0; head_grid%a_chem_btye = 0.0
+   head_grid%a_chem_btxs = 0.0; head_grid%a_chem_btxe = 0.0
+   head_grid%a_chem_btys = 0.0; head_grid%a_chem_btye = 0.0
 #endif
 
    head_grid%g_u_1 = 0.0  

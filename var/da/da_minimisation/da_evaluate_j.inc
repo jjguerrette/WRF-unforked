@@ -54,7 +54,7 @@ subroutine da_evaluate_j(grid, config_flags, cv_size, cv_size_jb, &
    type (y_type)    :: y      ! y = H(x_inc) = 0.; just a placeholder here
    integer          :: i
    integer, dimension(1:ncv_type) :: ncv
-
+   integer          :: rc !, alarmid
    character(len=filename_len) :: filename
 
    if (trace_use) call da_trace_entry("da_evaluate_j")
@@ -95,7 +95,21 @@ subroutine da_evaluate_j(grid, config_flags, cv_size, cv_size_jb, &
 
    call da_transform_xtoxa (grid)
 
-   call da_transfer_xatoanalysis (it, xbx, grid, config_flags)
+! Devise boundary updating if var4d_lbc is used...necessary?
+!...
+! ...RIOT would also present problems with determining g_u_XXX variables
+! Should define model_grid%g_u_bxs, model_grid%g_u_bxe, etc...
+
+   call da_transfer_xatowrf (grid, config_flags)
+
+!!None of these should be needed since xb is unused in the update to the model
+!setup_firstguess would probably be more general, but also has extra initialization code
+!   call da_setup_firstguess(xbx, grid, config_flags, .false.)
+!
+!   call da_transfer_wrftoxb(xbx, grid, config_flags)
+!#if (WRF_CHEM == 1)
+!   call da_transfer_wrftoxb_chem(grid)
+!#endif
 
    call da_transfer_headtomodel (grid)
 
@@ -111,7 +125,7 @@ subroutine da_evaluate_j(grid, config_flags, cv_size, cv_size_jb, &
 #if (WRF_CHEM == 1)
    if ( use_chemobs .and. ncv(2).gt.0 ) call da_retrieve_chem_hx( model_grid, iv )
 #endif
-   call da_get_innov_vector (2, num_qcstat_conv, ob, iv, grid , config_flags)
+   call da_get_innov_vector (it+1, num_qcstat_conv, ob, iv, grid , config_flags)
 
 !! The remainder of jo could be carried out by da_calculate_j (consider replacing)
 
@@ -164,46 +178,53 @@ subroutine da_evaluate_j(grid, config_flags, cv_size, cv_size_jb, &
 #endif
    end if
 
-
    call da_deallocate_y (re)
    call da_deallocate_y (y)
    call da_deallocate_y (jo_grad_y)
+
 
    !-------------------------------------------------------------------------
    ! [3.0] restore grid to appropriate state:
    !-------------------------------------------------------------------------
    if (it .eq. 1) then
-#if (WRF_CHEM == 1)
-      if ( ncv(2) .gt. 0 ) then
-         filename = 'fgc'
-      else
-#endif
-         filename = 'fg'
-#if (WRF_CHEM == 1)
-      end if
-#endif
+      filename = 'fg'
    else
       write(filename,fmt='("wrfvar_output_",I2.2)') it-1
    end if
 
    write(unit=message(1),fmt='(A)') 'Resetting state variables to values from previous iteration.'
-   write(unit=message(2),fmt='(3A)') '--> reading ', filename,' as INPUT stream'
+   write(unit=message(2),fmt='(3A)') '--> reading ', trim(filename),' as INPUT stream'
    call wrf_message(trim(message(1)))
    call wrf_message(trim(message(2)))
 
+   ! Reread fg from file since xtraj is overwritten by da_nl_model
    call da_med_initialdata_input (grid, config_flags, trim(filename))
 
-!setup_firstguess would probably be more general, but also has extra initialization code
-!   call da_setup_firstguess(xbx, grid, config_flags, .false.)
-
+   ! Reset xb, which get_innov_vector modifies above
    call da_transfer_wrftoxb(xbx, grid, config_flags)
-#if (WRF_CHEM == 1)
-   call da_transfer_wrftoxb_chem(grid)
-#endif
 
+   ! Needed for chem IC's when they are added as CVs
+!#if (WRF_CHEM == 1)
+!   call da_transfer_wrftoxb_chem(grid)
+!#endif
 
-   !NEED TO RESTORE BOUNDARY with file READ or recall from memory, 
-   ! plus another firstguess setup (see da_solve.inc)
+   !Reset boundary values in grid
+   if (.not.var4d_lbc .or. it.eq.1) then
+      if (checkpoint_interval .eq. 0 .or. &
+          (checkpoint_interval*60.lt.interval_seconds &
+           .and. run_hours*3600.eq.interval_seconds)) then
+         CALL WRFU_AlarmRingerOn( grid%alarms( BOUNDARY_ALARM ), rc=rc )
+   
+         call med_latbound_in ( grid, config_flags )
+         call close_dataset ( grid%lbc_fid , config_flags , "DATASET=BOUNDARY" )
+      end if
+!   else
+!      if (checkpoint_interval .eq. 0) then
+!         !NEED SOLUTION for var4d_lbc after first iteration (I/O of ana02_$it?)
+!      else
+!         !This solution might be more complicated
+!      end if
+   end if
 
    evalj = .false.
 

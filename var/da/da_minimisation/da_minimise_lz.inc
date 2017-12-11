@@ -1,8 +1,8 @@
 subroutine da_minimise_lz(grid, config_flags,            &
                            it, cv_size, xbx, be, iv,     &
                            j_grad_norm_target, xhat, qhat, cv, &
-                           re, y, j_cost, eignvec, eignval, neign, j0_total, &
-                           hessian_info)
+                           re, y, j_cost, eignvec, eignval, neign, &
+                           j0_cost, j0_total, hessian_info)
 
    !-------------------------------------------------------------------------
    ! Purpose:         Main Lanczos minimisation routine 
@@ -35,6 +35,7 @@ subroutine da_minimise_lz(grid, config_flags,            &
    type (y_type), intent(inout)      :: re                            ! residual (o-a) structure.
    type (y_type), intent(inout)      :: y                             ! y = H(x_inc) structure.
    type (j_type), intent(out)        :: j_cost                        ! cost function
+   type (j_type), intent(out)        :: j0_cost                       ! cost function
    real*8, intent(out)               :: eignvec(ntmax(it), ntmax(it))
    real*8, intent(out)               :: eignval(ntmax(it))
    integer, intent(out)              :: neign
@@ -108,6 +109,7 @@ subroutine da_minimise_lz(grid, config_flags,            &
                        be%cv%size_jl, xbx, be, iv, xhat, cv, re, y, j_cost, ghat0, grid, config_flags)
  
    j0_total = j_cost%total
+   j0_cost = j_cost
    if (j0_total == 0.0) then
       if (trace_use) call da_trace_exit("da_minimise_lz")
       return

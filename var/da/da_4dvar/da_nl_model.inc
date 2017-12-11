@@ -32,7 +32,6 @@ subroutine da_nl_model (it)
 
       ! Set up WRF model.
       call wrf_init ( .false. )
-!      call nl_set_var4d_run (head_grid%id, .true.)
       model_config_rec%var4d_run = .true.
       config_flags%var4d_run = .true.
    endif
@@ -41,10 +40,16 @@ subroutine da_nl_model (it)
    call init_4dvar
 
 #if (WRF_CHEM == 1)
-   if ( use_chemobs .and. cv_options_chem .gt. 0 ) &
+   if ( use_chemobs .and. cv_options_chem .gt. 0 ) then
       call da_copy_chem_to_model( head_grid, it )
+
+      !Need a first guess file that includes scaleant and scalebb
+      if ( it == 1 .or. init_osse_chem ) then
+         call da_init_model_output()
+      end if
+   end if
 #endif
- 
+
    if (write_checkpoints .eq. 2) return
 
    ! Turn off  history output
@@ -80,13 +85,19 @@ subroutine da_nl_model (it)
 #if (WRF_CHEM == 1)
       endif
 #endif
+      ! input_inname used to initialize first checkpoints in TL/AD models
+      if (it .eq. 1) then
+         model_config_rec%input_inname = "fg"
+      else if (it .gt. 1) then
+         write(model_config_rec%input_inname,fmt='("wrfvar_output_",I2.2)') it-1
+      end if
    else if ( write_checkpoints .eq. 3 ) then
       !Turn off xtraj writing
       call nl_set_auxhist6_interval_s ( head_grid%id, 0 )
 #if (WRF_CHEM == 1)
    else
       ! Turn off gocart_bg field reading
-      call nl_get_io_form_auxinput8(head_grid%id, ioform8)
+!      call nl_get_io_form_auxinput8(head_grid%id, ioform8)
       if ( model_config_rec%start_hour(head_grid%id) .ne. 0 ) then
          call nl_set_io_form_auxinput8(head_grid%id, 0)
       endif
@@ -122,16 +133,6 @@ subroutine da_nl_model (it)
      ENDDO
    ENDIF
    call Setup_Timekeeping ( head_grid )
-
-#if (WRF_CHEM == 1)
-   if ( use_chemobs .and. cv_options_chem .gt. 0 ) then
-
-      !Need a first guess file that includes scaleant and scalebb
-      if ( it == 1 .or. init_osse_chem ) then
-         call da_init_model_output()
-      end if
-   end if
-#endif
 
    ! Set the physics options to what they are in TL and AD
    !call nl_set_mp_physics (head_grid%id, 0)
@@ -179,13 +180,6 @@ subroutine da_nl_model (it)
       rst_outname = "wrfrst_d<domain>_<date>"
       call nl_set_rst_outname ( head_grid%id, rst_outname)
       call nl_set_restart_begin_h( head_grid%id, original_restart_interval)
-
-!   else if ( write_checkpoints .eq. 2 ) then
-!      call da_reset_run_hours ()
-#if (WRF_CHEM == 1)
-   else
-      call nl_set_io_form_auxinput8(head_grid%id, ioform8)
-#endif
    end if
 
    if (any(write_checkpoints.eq.(/1,3/)) &
@@ -216,7 +210,7 @@ subroutine da_nl_model (it)
    call Setup_Timekeeping ( head_grid )
 
    ! Turn off boundary input from now.
-   if ( checkpoint_interval .eq. 0 .or. var4d_lbc ) &
+   if ( checkpoint_interval.eq.0 .or. var4d_lbc ) &
       CALL nl_set_io_form_boundary( head_grid%id, 0 )
 
    if (trace_use_dull) call da_trace_exit("da_nl_model")

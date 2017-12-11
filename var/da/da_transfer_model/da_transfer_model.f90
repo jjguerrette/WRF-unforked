@@ -41,13 +41,12 @@ module da_transfer_model
       use_gpsztdobs, use_ssmitbobs, use_radarobs, use_radar_rf, use_radar_rhv,&
       dt_cloud_model, cp, use_ssmiretrievalobs, var4d_detail_out, &
       vertical_ip_sqrt_delta_p, vertical_ip_delta_p,check_rh_simple, check_rh_tpw, &
-      t_kelvin, num_fgat_time, num_pseudo, iso_temp, interval_seconds, trajectory_io, &
-      cv_options, evalj, &
+      t_kelvin, num_fgat_time, num_pseudo, iso_temp, interval_seconds, trajectory_io, & 
 #if (WRF_CHEM == 1)
       chem_surf, chem_acft, num_platform, num_ant_steps, num_bb_steps, &
       init_scale, num_ts, crossval_chem_surfobs, crossval_chem_acftobs, &
       osse_chem, outer_loop_restart, iouter_restart, &
-      chem_opt, cv_options_chem, use_nonchemobs, &
+      chem_opt, cv_options, cv_options_chem, use_nonchemobs, &
 #if defined(LAPACK)
       use_randomblock, rand_outer, &
 #endif

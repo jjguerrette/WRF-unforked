@@ -399,6 +399,8 @@ rconfig   integer   grm_shmt_order          namelist,wrfvar6  1  1        - "grm
 rconfig   logical   info_stop               namelist,wrfvar6  1  .true.   -  "info_stop"               ""  ""
 rconfig   logical   use_randomblock         namelist,wrfvar6  1  .false.  - "use_randomblock"          ""  ""
 rconfig   integer   dgn_search              namelist,wrfvar6  max_outer_iterations  0  - "dgn_search"            ""  ""
+rconfig   real      dgn_tol                 namelist,wrfvar6  max_outer_iterations  0.05  - "dgn_tol"            ""  ""
+
 rconfig   logical   spectral_precon         namelist,wrfvar6  1  .false.  -  "spectral_precon"         ""  ""
 rconfig   logical   rotate_omega            namelist,wrfvar6  1  .false.  -  "rotate_omega"            ""  ""
 rconfig   logical   use_global_cv_io        namelist,wrfvar6  1  .true.   - "use_global_cv_io"         ""  ""
@@ -618,7 +620,6 @@ rconfig   integer jcdfi_diag                namelist,perturbation  1  1        -
 rconfig   real    jcdfi_penalty             namelist,perturbation  1  10.      -   "jcdfi_penalty"    "Penalty parameter for JcDF"      ""
 rconfig   logical enable_identity           namelist,perturbation  1  .false.  -   "enable identity AD/TL model"        ""      ""
 rconfig   logical trajectory_io             namelist,perturbation  1  .true.   -  "0:disk IO;1:memory IO"   ""  ""
-rconfig   integer xtrajswitch               namelist,wrfvar12      1  0        -  "xtrajswitch"           ""    ""
 rconfig   logical boundary_io               namelist,perturbation  1  .false.   -  "choice for boundary I/O during checkpointed AD/TL"  ""      ""
 rconfig   logical var4d_detail_out          namelist,perturbation  1  .false.  -  "true:output perturbation, gradient to disk"   ""  ""
 rconfig   logical var4d_run                 namelist,perturbation  1  .true.  -  "true: exlcude the P calculation in start_em"   ""  ""

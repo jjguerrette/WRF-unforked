@@ -210,7 +210,6 @@ subroutine da_setup_firstguess_wrf(xbx, grid, config_flags, ens)
 #if (WRF_CHEM == 1)
    if (.not.osse_chem &
    .and. (iouter_restart.eq.1 .or. .not.outer_loop_restart)&
-   .and. .not.evalj &
 #if defined(LAPACK)
    .and. (rand_outer.eq.1 .or. .not.use_randomblock) &
 #endif

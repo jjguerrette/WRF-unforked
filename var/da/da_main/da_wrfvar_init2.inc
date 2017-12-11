@@ -218,6 +218,18 @@ subroutine da_wrfvar_init2
          p6 = head_grid%p
          mu6_2 = head_grid%mu_2
          psfc6 = head_grid%psfc
+
+         if (checkpoint_interval .gt. 0) then
+            if (checkpoint_interval*60.lt.interval_seconds &
+              .and. run_hours*3600.eq.interval_seconds) then
+               write(unit=message(1),fmt='(A)') "WARNING: Using checkpointing with var4d_lbc"
+               call da_warning(__FILE__,__LINE__,message(1:1))          
+            else
+               write(unit=message(1),fmt='(A,3I10)') "WARNING: Can not use checkpointing with var4d_lbc in this inversion: ", checkpoint_interval*60, run_hours*3600, interval_seconds
+               call da_warning(__FILE__,__LINE__,message(1:1))
+               checkpoint_interval = 0
+            end if
+         end if
       endif 
 #endif
 !     call da_med_initialdata_input (head_grid, config_flags, 'fg')
@@ -226,8 +238,10 @@ subroutine da_wrfvar_init2
          call med_latbound_in ( head_grid, config_flags )
          call close_dataset ( head_grid%lbc_fid , config_flags , "DATASET=BOUNDARY" )
 
-         call nl_set_boundary_io(1, .false.)
-         boundary_io = .false.
+         if ( checkpoint_interval.eq.0 .or. var4d_lbc) then
+            call nl_set_boundary_io(1, .false.)
+            boundary_io = .false.
+         end if
       end if
    end if
 

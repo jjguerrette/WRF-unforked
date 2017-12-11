@@ -95,27 +95,27 @@ subroutine da_update_firstguess(grid, out_filename)
      if (file_name == 'ana02') then
         fgname = 'fg02'
      else
-#if (WRF_CHEM == 1)
-        if ( use_chemobs .and. cv_options_chem .gt. 0 ) then
-           fgname = 'fgc'
-        else
-#endif
+!#if (WRF_CHEM == 1)
+!        if ( use_chemobs .and. cv_options_chem .gt. 0 ) then
+!           fgname = 'fgc'
+!        else
+!#endif
            fgname = 'fg'
-#if (WRF_CHEM == 1)
-        end if
-#endif
+!#if (WRF_CHEM == 1)
+!        end if
+!#endif
      endif
   else
      file_name = 'wrfvar_output'
-#if (WRF_CHEM == 1)
-     if ( use_chemobs .and. cv_options_chem .gt. 0 ) then
-        fgname = 'fgc'
-     else
-#endif
+!#if (WRF_CHEM == 1)
+!     if ( use_chemobs .and. cv_options_chem .gt. 0 ) then
+!        fgname = 'fgc'
+!     else
+!#endif
         fgname = 'fg'
-#if (WRF_CHEM == 1)
-     end if
-#endif
+!#if (WRF_CHEM == 1)
+!     end if
+!#endif
   endif
 
   if (rootproc) then

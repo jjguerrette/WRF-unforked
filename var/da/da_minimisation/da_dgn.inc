@@ -1,4 +1,6 @@
-subroutine da_dgn( grid, cv_size, xbx, be, iv, xhat, cv, ob, config_flags, j_cost, ja_total, it, mz)
+subroutine da_dgn(grid, config_flags, cv_size, xhat, cv, &
+                  xbx, be, iv, ob, &
+                  j_cost, ja_total, it, mz)
 
    !---------------------------------------------------------------------------
    ! Purpose: Uses line search to scale the cv increments; improves nonlinear convergence
@@ -38,13 +40,12 @@ subroutine da_dgn( grid, cv_size, xbx, be, iv, xhat, cv, ob, config_flags, j_cos
    logical, dimension(1:ncv_type) :: &
              exit_array
    character(1) :: ncv_char
-   real*8           :: tol = 0.05
 
    if (trace_use) call da_trace_entry("da_dgn")
 
    write(unit=stdout,fmt='("Starting Damped Gauss Newton (DGN) line search")')
 
-   ! Determine the scaling factor CV indices
+   ! Determine the MET CV indices
 
    cv_s(1) = 1
    cv_e(1) = cv_s(1) &
@@ -63,6 +64,7 @@ subroutine da_dgn( grid, cv_size, xbx, be, iv, xhat, cv, ob, config_flags, j_cos
           - 1
 
 #if (WRF_CHEM == 1)
+   ! Determine the CHEM CV indices
    cv_s(2) = cv_e(1) + 1
    cv_e(2) = cv_s(2) &
              + sum(be % cv % sizeant (:)) &
@@ -70,10 +72,12 @@ subroutine da_dgn( grid, cv_size, xbx, be, iv, xhat, cv, ob, config_flags, j_cos
              - 1
 #endif
 
-!   write(unit=stdout,fmt='("cv_s, cv_e, cv_s_chem, cv_e_chem, cv_size, size_jb: ",6I8)') cv_s(1), cv_e(1), cv_s(2), cv_e(2), cv_size, be % cv % size_jb
+   write(unit=stdout,fmt='("cv_s, cv_e, cv_s_chem, cv_e_chem, cv_size, size_jb: ",6I8)') cv_s(1), cv_e(1), cv_s(2), cv_e(2), cv_size, be % cv % size_jb
 
 
-   ! Carry out the line search using golden section algorithm
+   !---------------------------------------------------
+   ! Perform line search using golden section algorithm
+   !---------------------------------------------------
    grat = (sqrt(5.D0) - 1.D0) / 2.D0 ! Golden Ratio
 
    do i = 1, ncv_type
@@ -96,18 +100,18 @@ subroutine da_dgn( grid, cv_size, xbx, be, iv, xhat, cv, ob, config_flags, j_cos
    ja = 0.D0
    if (ja_total .gt. 0.D0) then
       ja(1) = ja_total
-
 #if (WRF_CHEM == 1)
-      jo_partial = &
-                 j_cost%jo%chem_acft &
-               + j_cost%jo%chem_surf 
-      ja(2) = wrf_dm_sum_real(jo_partial)
       if ( ncv(2) .gt. 0 ) then
+         jo_partial = &
+                    j_cost%jo%chem_acft &
+                  + j_cost%jo%chem_surf 
+         ja(2) = wrf_dm_sum_real(jo_partial)
+
          ja(2) = ja(2) + jb_factor * 0.5 * &
               da_dot_cv(ncv(2),  cv(cv_s(2):cv_e(2)), cv(cv_s(2):cv_e(2)), grid, mz)
-      end if
 
-      ja(1) = ja(1) - ja(2)
+         ja(1) = ja(1) - ja(2)
+      end if
 #endif
    end if
    jb = 0.D0
@@ -115,7 +119,7 @@ subroutine da_dgn( grid, cv_size, xbx, be, iv, xhat, cv, ob, config_flags, j_cos
    jd = 0.D0
 
    ! Don't need to calculate initial jb (@ eta=1.) except to demonstrate need for DGN
-   ! Could use jb/ja > 1 as criteria for needing DGN
+   ! Could use jb/ja > 1 as criteria for needing line search
    call da_evaluate_j(grid, config_flags, cv_size, be%cv%size_jb, &
                          cv_s, cv_e, eta_b, jb, &
                          xbx, be, iv, xhat, cv, ob, &
@@ -123,7 +127,8 @@ subroutine da_dgn( grid, cv_size, xbx, be, iv, xhat, cv, ob, config_flags, j_cos
 
    write(unit=stdout,fmt='("DGN:   i  eta_b          jb")')
    do i = 1, ncv_type
-      write(unit=stdout,fmt='("DGN:",I4,1F7.3,1F11.3)') 1,eta_b(i),jb(i)
+      if ( ncv(i) .le. 0 ) cycle
+      write(unit=stdout,fmt='("DGN:",I4,1F7.3,1F11.3)') i,eta_b(i),jb(i)
    end do
 
    call da_evaluate_j(grid, config_flags, cv_size, be%cv%size_jb, &
@@ -133,7 +138,8 @@ subroutine da_dgn( grid, cv_size, xbx, be, iv, xhat, cv, ob, config_flags, j_cos
 
    write(unit=stdout,fmt='("DGN:   i  eta_c          jc")')
    do i = 1, ncv_type
-      write(unit=stdout,fmt='("DGN:",I4,1F7.3,1F11.3)') 1,eta_c(i),jc(i)
+      if ( ncv(i) .le. 0 ) cycle
+      write(unit=stdout,fmt='("DGN:",I4,1F7.3,1F11.3)') i,eta_c(i),jc(i)
    end do
 
    branch = 2
@@ -179,18 +185,18 @@ subroutine da_dgn( grid, cv_size, xbx, be, iv, xhat, cv, ob, config_flags, j_cos
 
          if (.not.exit_array(i)) then
             if (ja(i).gt.1e-6 &
-                   .and. abs(jb(i)-ja(i))/min(ja(i),jb(i),jd(i)).lt.0.005 &
-                   .and. abs(jb(i)-jd(i))/min(ja(i),jb(i),jd(i)).lt.0.005) then
+                   .and. abs(jb(i)-ja(i))/min(ja(i),jb(i),jd(i)).lt.dgn_tol(it)/10. &
+                   .and. abs(jb(i)-jd(i))/min(ja(i),jb(i),jd(i)).lt.dgn_tol(it)/10.) then
                if (all(jb(i).lt.(/ja(i),jc(i),jd(i)/))) eta_a(i) = eta_b(i)
                exit_array(i) = .true.
             end if
 
-            if (eta(i).gt.(1.d0 - tol)) then
+            if (eta(i).gt.(1.d0 - dgn_tol(it))) then
                eta(i) = 1.D0
                exit_array(i) = .true.
             end if
 
-            if ((eta_b(i) - eta_a(i)) .le. tol) exit_array(i) = .true.
+            if ((eta_b(i) - eta_a(i)) .le. dgn_tol(it)) exit_array(i) = .true.
          end if
       end do
    end do

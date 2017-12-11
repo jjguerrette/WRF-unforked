@@ -11,7 +11,7 @@ module da_minimisation
       ntasks_y, data_order_xy, data_order_xyz
    use module_comm_dm, only : halo_wpec_sub, halo_wpec_adj_sub
 #endif
-
+   use module_io_domain, only : close_dataset
    use module_domain, only : domain, ep_type, vp_type, x_type, domain_clockprint, &
 #if (WRF_CHEM == 1)
                              xch_type, &
@@ -51,7 +51,7 @@ module da_minimisation
       var_scaling4,var_scaling5,var_scaling3, jo_unit, test_gradient, &
       print_detail_grad,omb_set_rand,grad_unit,cost_unit, num_pseudo, cv_options, &
       cv_size_domain_je,cv_size_domain_jb, cv_size_domain_jp, cv_size_domain_js, cv_size_domain_jl, &
-      evalj, num_qcstat_conv, write_checkpoints, boundary_io, &
+      evalj, dgn_tol, num_qcstat_conv, write_checkpoints, boundary_io, &
 #if (WRF_CHEM == 1)
       chem_surf, chem_acft, num_platform, &
       sigma_r_acft, sigma_c_acft, &
@@ -75,7 +75,7 @@ module da_minimisation
       use_satcv, sensitivity_option, print_detail_outerloop, adj_sens, filename_len, &
       ims, ime, jms, jme, kms, kme, ips, ipe, jps, jpe, kps, kpe, fgat_rain_flags, var4d_bin_rain, freeze_varbc, &
       use_wpec, wpec_factor, &
-      checkpoint_interval
+      checkpoint_interval, interval_seconds, run_hours
    use da_define_structures, only : iv_type, y_type,  j_type, be_type, &
 #if (WRF_CHEM == 1)
       da_allocate_y_chem, da_zero_xch_type, &
@@ -186,7 +186,7 @@ module da_minimisation
       da_transfer_wrftltoy_chem, da_transfer_wrftltoy_chem_adj, &
       da_transfer_wrftoxb_chem, &
 #endif
-      da_transfer_headtomodel, da_transfer_xatoanalysis, da_setup_firstguess, &
+      da_transfer_headtomodel, da_transfer_xatowrf, da_setup_firstguess, &
       da_transfer_wrftoxb, &
       da_transfer_xatowrftl_adj, da_transfer_wrftltoxa_adj
 #if defined(RTTOV) || defined(CRTM)
@@ -194,8 +194,10 @@ module da_minimisation
 #endif
    use da_vtox_transforms, only : da_transform_vtox,da_transform_vtox_adj,da_transform_xtoxa,da_transform_xtoxa_adj, &
        da_transform_xtoxa_all,da_transform_xtoxa_adj_all
-   use da_wrf_interfaces, only : wrf_dm_bcast_real, wrf_get_dm_communicator
-   use module_symbols_util, only : wrfu_finalize
+   use da_wrf_interfaces, only : wrf_dm_bcast_real, wrf_get_dm_communicator !, &
+!       Setup_Timekeeping
+   use module_symbols_util, only : wrfu_finalize, wrfu_alarmringeron !, &
+!       wrfu_clockdestroy, wrfu_alarmdestroy
    use da_lapack, only : dsteqr
    use da_wrfvar_io, only : da_med_initialdata_input
 #ifdef VAR4D
@@ -206,7 +208,7 @@ module da_minimisation
       mu6_2, psfc6, moist6
    use da_transfer_model, only : da_transfer_xatowrftl_lbc, da_transfer_xatowrftl_adj_lbc, &
       da_transfer_wrftl_lbc_t0, da_transfer_wrftl_lbc_t0_adj, da_get_2nd_firstguess
-   USE module_io_wrf, only : auxinput16_only, auxhist18_alarm
+   USE module_io_wrf, only : auxinput16_only, auxhist18_alarm, boundary_alarm
 #endif
 
    implicit none

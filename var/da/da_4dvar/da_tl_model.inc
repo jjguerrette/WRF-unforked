@@ -116,8 +116,10 @@ subroutine da_tl_model ()
    if (cv_options.eq.0 .and. cv_options_chem.gt.0) then
       ! Added these 6-30-2017, need to remove if chem ICs/BCs are control variables
       head_grid%g_chem = 0.0
-      head_grid%g_chem_bxs = 0.0; head_grid%g_chem_bxe = 0.0; head_grid%g_chem_bys = 0.0; head_grid%g_chem_bye = 0.0
-      head_grid%g_chem_btxs = 0.0; head_grid%g_chem_btxe = 0.0; head_grid%g_chem_btys = 0.0; head_grid%g_chem_btye = 0.0
+      head_grid%g_chem_bxs = 0.0; head_grid%g_chem_bxe = 0.0
+      head_grid%g_chem_bys = 0.0; head_grid%g_chem_bye = 0.0
+      head_grid%g_chem_btxs = 0.0; head_grid%g_chem_btxe = 0.0
+      head_grid%g_chem_btys = 0.0; head_grid%g_chem_btye = 0.0
 
 
       ! Likewise remove these if simultaneous physical/chemical DA
@@ -131,26 +133,43 @@ subroutine da_tl_model ()
       head_grid%g_moist = 0.0
       head_grid%g_tracer = 0.0
 
-      head_grid%g_u_bxs = 0.0; head_grid%g_u_bxe = 0.0; head_grid%g_u_bys = 0.0; head_grid%g_u_bye = 0.0
-      head_grid%g_v_bxs = 0.0; head_grid%g_v_bxe = 0.0; head_grid%g_v_bys = 0.0; head_grid%g_v_bye = 0.0
-      head_grid%g_w_bxs = 0.0; head_grid%g_w_bxe = 0.0; head_grid%g_w_bys = 0.0; head_grid%g_w_bye = 0.0
-      head_grid%g_ph_bxs = 0.0; head_grid%g_ph_bxe = 0.0; head_grid%g_ph_bys = 0.0; head_grid%g_ph_bye = 0.0
-      head_grid%g_t_bxs = 0.0; head_grid%g_t_bxe = 0.0; head_grid%g_t_bys = 0.0; head_grid%g_t_bye = 0.0
-      head_grid%g_mu_bxs = 0.0; head_grid%g_mu_bxe = 0.0; head_grid%g_mu_bys = 0.0; head_grid%g_mu_bye = 0.0
-      head_grid%g_moist_bxs = 0.0; head_grid%g_moist_bxe = 0.0; head_grid%g_moist_bys = 0.0; head_grid%g_moist_bye = 0.0
-      head_grid%g_scalar_bxs = 0.0; head_grid%g_scalar_bxe = 0.0; head_grid%g_scalar_bys = 0.0; head_grid%g_scalar_bye = 0.0
-      head_grid%g_tracer_bxs = 0.0; head_grid%g_tracer_bxe = 0.0; head_grid%g_tracer_bys = 0.0; head_grid%g_tracer_bye = 0.0
+      head_grid%g_u_bxs = 0.0; head_grid%g_u_bxe = 0.0
+      head_grid%g_u_bys = 0.0; head_grid%g_u_bye = 0.0
+      head_grid%g_v_bxs = 0.0; head_grid%g_v_bxe = 0.0
+      head_grid%g_v_bys = 0.0; head_grid%g_v_bye = 0.0
+      head_grid%g_w_bxs = 0.0; head_grid%g_w_bxe = 0.0
+      head_grid%g_w_bys = 0.0; head_grid%g_w_bye = 0.0
+      head_grid%g_ph_bxs = 0.0; head_grid%g_ph_bxe = 0.0
+      head_grid%g_ph_bys = 0.0; head_grid%g_ph_bye = 0.0
+      head_grid%g_t_bxs = 0.0; head_grid%g_t_bxe = 0.0
+      head_grid%g_t_bys = 0.0; head_grid%g_t_bye = 0.0
+      head_grid%g_mu_bxs = 0.0; head_grid%g_mu_bxe = 0.0
+      head_grid%g_mu_bys = 0.0; head_grid%g_mu_bye = 0.0
+      head_grid%g_moist_bxs = 0.0; head_grid%g_moist_bxe = 0.0
+      head_grid%g_moist_bys = 0.0; head_grid%g_moist_bye = 0.0
+      head_grid%g_scalar_bxs = 0.0; head_grid%g_scalar_bxe = 0.0
+      head_grid%g_scalar_bys = 0.0; head_grid%g_scalar_bye = 0.0
+      head_grid%g_tracer_bxs = 0.0; head_grid%g_tracer_bxe = 0.0
+      head_grid%g_tracer_bys = 0.0; head_grid%g_tracer_bye = 0.0
 
-      head_grid%g_u_btxs = 0.0; head_grid%g_u_btxe = 0.0; head_grid%g_u_btys = 0.0; head_grid%g_u_btye = 0.0
-      head_grid%g_v_btxs = 0.0; head_grid%g_v_btxe = 0.0; head_grid%g_v_btys = 0.0; head_grid%g_v_btye = 0.0
-      head_grid%g_w_btxs = 0.0; head_grid%g_w_btxe = 0.0; head_grid%g_w_btys = 0.0; head_grid%g_w_btye = 0.0
-      head_grid%g_ph_btxs = 0.0; head_grid%g_ph_btxe = 0.0; head_grid%g_ph_btys = 0.0; head_grid%g_ph_btye = 0.0
-      head_grid%g_t_btxs = 0.0; head_grid%g_t_btxe = 0.0; head_grid%g_t_btys = 0.0; head_grid%g_t_btye = 0.0
-      head_grid%g_mu_btxs = 0.0; head_grid%g_mu_btxe = 0.0; head_grid%g_mu_btys = 0.0; head_grid%g_mu_btye = 0.0
-      head_grid%g_moist_btxs = 0.0; head_grid%g_moist_btxe = 0.0; head_grid%g_moist_btys = 0.0; head_grid%g_moist_btye = 0.0
-      head_grid%g_scalar_btxs = 0.0; head_grid%g_scalar_btxe = 0.0; head_grid%g_scalar_btys = 0.0; head_grid%g_scalar_btye = 0.0
-      head_grid%g_tracer_btxs = 0.0; head_grid%g_tracer_btxe = 0.0; head_grid%g_tracer_btys = 0.0; head_grid%g_tracer_btye = 0.0
-
+      head_grid%g_u_btxs = 0.0; head_grid%g_u_btxe = 0.0
+      head_grid%g_u_btys = 0.0; head_grid%g_u_btye = 0.0
+      head_grid%g_v_btxs = 0.0; head_grid%g_v_btxe = 0.0
+      head_grid%g_v_btys = 0.0; head_grid%g_v_btye = 0.0
+      head_grid%g_w_btxs = 0.0; head_grid%g_w_btxe = 0.0
+      head_grid%g_w_btys = 0.0; head_grid%g_w_btye = 0.0
+      head_grid%g_ph_btxs = 0.0; head_grid%g_ph_btxe = 0.0
+      head_grid%g_ph_btys = 0.0; head_grid%g_ph_btye = 0.0
+      head_grid%g_t_btxs = 0.0; head_grid%g_t_btxe = 0.0
+      head_grid%g_t_btys = 0.0; head_grid%g_t_btye = 0.0
+      head_grid%g_mu_btxs = 0.0; head_grid%g_mu_btxe = 0.0
+      head_grid%g_mu_btys = 0.0; head_grid%g_mu_btye = 0.0
+      head_grid%g_moist_btxs = 0.0; head_grid%g_moist_btxe = 0.0
+      head_grid%g_moist_btys = 0.0; head_grid%g_moist_btye = 0.0
+      head_grid%g_scalar_btxs = 0.0; head_grid%g_scalar_btxe = 0.0
+      head_grid%g_scalar_btys = 0.0; head_grid%g_scalar_btye = 0.0
+      head_grid%g_tracer_btxs = 0.0; head_grid%g_tracer_btxe = 0.0
+      head_grid%g_tracer_btys = 0.0; head_grid%g_tracer_btye = 0.0
    end if
 #endif
 
