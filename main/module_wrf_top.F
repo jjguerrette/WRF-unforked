@@ -84,6 +84,7 @@ MODULE module_wrf_top
 #endif
 
    CHARACTER (LEN=256)     :: rstname
+   CHARACTER (LEN=256)     :: wrfinput_inname_for_checkpt="wrfinput_d01"
    CHARACTER (LEN=80)      :: message
    LOGICAL                 :: gradient_out = .FALSE.
    CHARACTER (LEN=256) , PRIVATE :: a_message
@@ -2306,6 +2307,7 @@ ENDIF
             call nl_set_restart ( head_grid%id, .false. )
             model_config_rec%io_form_restart = 0
             head_grid%itimestep = 0
+            model_config_rec%input_inname = trim(wrfinput_inname_for_checkpt)
          else
             model_config_rec%restart = .true.
             head_grid%restart = .true.
@@ -2633,9 +2635,9 @@ ENDIF
       model_config_rec%start_minute(head_grid%id) = start_minute0
 
       model_config_rec%rst_inname = "wrfrst_d<domain>_<date>"
-      IF(head_grid%cycle_interval > 0) then
+!      IF(head_grid%cycle_interval > 0) then
          model_config_rec%input_inname = "wrfinput_d<domain>"
-      ENDIF
+!      ENDIF
 
       !model_config_rec%interval_seconds = 3600*(run_hours + 24*run_days)
       ncheck = 1
@@ -3237,6 +3239,7 @@ ENDIF
             call nl_set_restart ( head_grid%id, .false. )
             model_config_rec%io_form_restart = 0
             head_grid%itimestep = 0
+            model_config_rec%input_inname = trim(wrfinput_inname_for_checkpt)
          else
             model_config_rec%restart = .true.
             head_grid%restart = .true.
@@ -3666,9 +3669,9 @@ ENDIF
       model_config_rec%start_minute(head_grid%id) = start_minute0
 
       model_config_rec%rst_inname = "wrfrst_d<domain>_<date>"
-      IF(head_grid%cycle_interval > 0) then
+!      IF(head_grid%cycle_interval > 0) then
          model_config_rec%input_inname = "wrfinput_d<domain>"
-      ENDIF
+!      ENDIF
 
       !model_config_rec%interval_seconds = 3600*(run_hours + 24*run_days)
       ncheck = 1
