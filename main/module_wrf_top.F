@@ -84,7 +84,6 @@ MODULE module_wrf_top
 #endif
 
    CHARACTER (LEN=256)     :: rstname
-   CHARACTER (LEN=256)     :: wrfinput_inname_for_checkpt="wrfinput_d01"
    CHARACTER (LEN=80)      :: message
    LOGICAL                 :: gradient_out = .FALSE.
    CHARACTER (LEN=256) , PRIVATE :: a_message
@@ -2307,7 +2306,6 @@ ENDIF
             call nl_set_restart ( head_grid%id, .false. )
             model_config_rec%io_form_restart = 0
             head_grid%itimestep = 0
-            model_config_rec%input_inname = trim(wrfinput_inname_for_checkpt)
          else
             model_config_rec%restart = .true.
             head_grid%restart = .true.
@@ -3239,7 +3237,6 @@ ENDIF
             call nl_set_restart ( head_grid%id, .false. )
             model_config_rec%io_form_restart = 0
             head_grid%itimestep = 0
-            model_config_rec%input_inname = trim(wrfinput_inname_for_checkpt)
          else
             model_config_rec%restart = .true.
             head_grid%restart = .true.
@@ -4039,7 +4036,6 @@ ENDIF
       head_grid%scalebb = 1.0D0
    ENDIF
 #endif
-
    model_config_rec%dyn_opt = dyn_em
    IF ( model_config_rec%bl_pbl_physics(head_grid%id) .EQ. SURFDRAGSCHEME ) THEN
       head_grid%rublten = 0.0D0
@@ -4090,7 +4086,6 @@ ENDIF
 #if (WRF_CHEM == 1)
    head_grid%ktauc = head_grid%itimestep
 #endif
-
 
    CALL start_domain ( head_grid , .TRUE. )
 #endif
