@@ -246,7 +246,9 @@ BENCH_END(phy_prep_tim)
 ! We are using (2) above.  The downside is that the radiation_driver outputs will be offset by one time step from the appropriate forward model variables, but the AD/TL will be symmetric.
 !-JJ Guerrette 
 
-      IF(config_flags%dyn_opt .eq. dyn_em_ad) then
+      IF(config_flags%dyn_opt.eq.dyn_em_ad &
+         .and. config_flags%ra_lw_physics.gt.0 &
+         .and. config_flags%ra_sw_physics.gt.0) then
          CALL PUSHREAL8ARRAY(grid%rthraten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
          CALL PUSHREAL8ARRAY(grid%gsw, (ime-ims+1)*(jme-jms+1))
          CALL PUSHREAL8ARRAY(grid%glw, (ime-ims+1)*(jme-jms+1))
@@ -432,7 +434,9 @@ BENCH_START(rad_driver_tim)
 BENCH_END(rad_driver_tim)
 
 #if ( WRFPLUS == 1 )
-      IF(config_flags%dyn_opt .eq. dyn_em_ad) then
+      IF(config_flags%dyn_opt.eq.dyn_em_ad &
+         .and. config_flags%ra_lw_physics.gt.0 &
+         .and. config_flags%ra_sw_physics.gt.0) then
          CALL POPREAL8ARRAY(grid%glw, (ime-ims+1)*(jme-jms+1))
          CALL POPREAL8ARRAY(grid%gsw, (ime-ims+1)*(jme-jms+1))
          CALL POPREAL8ARRAY(grid%rthraten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
