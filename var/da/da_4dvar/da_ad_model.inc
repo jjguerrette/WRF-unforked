@@ -226,24 +226,35 @@ subroutine da_ad_model ()
    head_grid%g_rainc  = 0.0
    head_grid%g_raincv = 0.0
    head_grid%g_pratec = 0.0
-
    ! Set the physics options to what they are in TL and AD
-   if (original_mp_physics .NE. 0 .and. original_mp_physics .NE. 98 .and. original_mp_physics .NE. 99) &
-      call nl_set_mp_physics (head_grid%id, original_mp_physics_ad) 
-   if ( original_sf_surface_physics .ne. 1 .AND. &
-        original_sf_surface_physics .ne. 7 ) then
+#if (WRF_CHEM == 1)
+   IF ( use_chemobs) THEN
+      if ( original_sf_surface_physics .ne. 1 .AND. &
+           original_sf_surface_physics .ne. 7 ) then
+         call nl_set_ra_lw_physics (head_grid%id, 0)
+         call nl_set_ra_sw_physics (head_grid%id, 0)
+      end if
+      if ( original_sf_sfclay_physics .gt. 0 .and. &
+           original_sf_sfclay_physics .ne. 7 .and. &
+           original_sf_sfclay_physics .ne. 91 ) &
+         call nl_set_sf_sfclay_physics (head_grid%id, 0)
+      if ( original_bl_pbl_physics .gt. 0 .and. original_bl_pbl_physics .ne. 7) &
+         call nl_set_bl_pbl_physics (head_grid%id, 98)
+   ELSE
+#endif
       call nl_set_ra_lw_physics (head_grid%id, 0)
       call nl_set_ra_sw_physics (head_grid%id, 0)
-   end if
-   if ( original_sf_sfclay_physics .gt. 0 .and. &
-        original_sf_sfclay_physics .ne. 7 .and. &
-        original_sf_sfclay_physics .ne. 91 ) &
       call nl_set_sf_sfclay_physics (head_grid%id, 0)
-   if ( original_bl_pbl_physics .gt. 0 .and. original_bl_pbl_physics .ne. 7) &
-      call nl_set_bl_pbl_physics (head_grid%id, 98)
-   if ( original_cu_physics .gt. 0 ) then
+      if (original_bl_pbl_physics .gt. 0) &
+         call nl_set_bl_pbl_physics (head_grid%id, 98)
+#if (WRF_CHEM == 1)
+   END IF
+#endif
+   if (original_mp_physics .NE. 0 .and. original_mp_physics .NE. 98 .and. original_mp_physics .NE. 99) &
+      call nl_set_mp_physics (head_grid%id, original_mp_physics_ad) 
+   if (original_cu_physics .gt. 0) then
       call nl_set_cu_physics (head_grid%id, 98) 
-      head_grid%cudt =0
+      head_grid%cudt = 0
    endif
    !call nl_set_mp_zero_out (head_grid%id, 0)
    !call nl_set_sf_surface_physics (head_grid%id, 1)
