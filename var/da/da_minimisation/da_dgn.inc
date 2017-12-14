@@ -123,7 +123,7 @@ subroutine da_dgn(grid, config_flags, cv_size, xhat, cv, &
    call da_evaluate_j(grid, config_flags, cv_size, be%cv%size_jb, &
                          cv_s, cv_e, eta_b, jb, &
                          xbx, be, iv, xhat, cv, ob, &
-                         it, mz)
+                         it, mz, 1)
 
    write(unit=stdout,fmt='("DGN:   i  eta_b          jb")')
    do i = 1, ncv_type
@@ -134,7 +134,7 @@ subroutine da_dgn(grid, config_flags, cv_size, xhat, cv, &
    call da_evaluate_j(grid, config_flags, cv_size, be%cv%size_jb, &
                          cv_s, cv_e, eta_c, jc, &
                          xbx, be, iv, xhat, cv, ob, &
-                         it, mz)
+                         it, mz, 2)
 
    write(unit=stdout,fmt='("DGN:   i  eta_c          jc")')
    do i = 1, ncv_type
@@ -149,7 +149,7 @@ subroutine da_dgn(grid, config_flags, cv_size, xhat, cv, &
       call da_evaluate_j(grid, config_flags, cv_size, be%cv%size_jb, &
                             cv_s, cv_e, eta, jout, &
                             xbx, be, iv, xhat, cv, ob, &
-                            it, mz)
+                            it, mz, 2+isearch)
 
       write( unit=stdout,fmt=&
        '("DGN: icv   i  eta_a  eta_c  eta_d  eta_b       ja         jc         jd         jb")' )

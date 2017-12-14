@@ -12,7 +12,7 @@ module da_minimisation
    use module_comm_dm, only : halo_wpec_sub, halo_wpec_adj_sub
 #endif
    use module_io_domain, only : close_dataset
-   use module_domain, only : domain, ep_type, vp_type, x_type, domain_clockprint, &
+   use module_domain, only : domain, ep_type, vp_type, x_type, xb_type, domain_clockprint, &
 #if (WRF_CHEM == 1)
                              xch_type, &
 #endif
@@ -51,12 +51,12 @@ module da_minimisation
       var_scaling4,var_scaling5,var_scaling3, jo_unit, test_gradient, &
       print_detail_grad,omb_set_rand,grad_unit,cost_unit, num_pseudo, cv_options, &
       cv_size_domain_je,cv_size_domain_jb, cv_size_domain_jp, cv_size_domain_js, cv_size_domain_jl, &
-      evalj, dgn_tol, num_qcstat_conv, write_checkpoints, boundary_io, &
+      evalj, dgn_tol, write_checkpoints, boundary_io, &
 #if (WRF_CHEM == 1)
       chem_surf, chem_acft, num_platform, &
       sigma_r_acft, sigma_c_acft, &
       num_ant_steps, num_bb_steps, &
-      osse_chem, &
+      chem_opt, osse_chem, &
       use_nonchemobs, use_chemobs, &
 #endif
 #if defined(LAPACK)

@@ -37,6 +37,7 @@ subroutine da_nl_model (it)
    endif
  
    ! 4dvar init
+!   if (.not. evalj) call init_4dvar
    call init_4dvar
 
 #if (WRF_CHEM == 1)
@@ -67,44 +68,12 @@ subroutine da_nl_model (it)
    call nl_set_io_form_auxhist6 ( head_grid%id, 2 ) 
    call nl_set_frames_per_auxhist6 ( head_grid%id, 1 ) 
 
-   if ( write_checkpoints .eq. 1 ) then
-      !Turn off xtraj writing
-      call nl_set_auxhist6_interval_s ( head_grid%id, 0 )
-      call nl_get_restart_interval_h ( head_grid%id, original_restart_interval)
-#if (WRF_CHEM == 1)
-      if( .not. calc_hx_only) then
-#endif
-         !Turn on Output for standard checkpoint files
-         call nl_set_restart_interval_m ( head_grid%id, checkpoint_interval)
-         call nl_set_restart_interval_h ( head_grid%id, 0)
-         call nl_get_io_form_restart ( head_grid%id, io_form )
-         if (io_form .le. 0) call nl_set_io_form_restart ( head_grid%id, io_form_xtraj )
-         rst_outname = "wrf_checkpoint_d<domain>_<date>"
-         call nl_set_rst_outname ( head_grid%id, rst_outname)
-         call nl_set_restart_begin_m( head_grid%id, 0 )
-#if (WRF_CHEM == 1)
-      endif
-#endif
-      ! input_inname used to initialize first checkpoints in TL/AD models
-      if (it .eq. 1) then
-         model_config_rec%input_inname = "fg"
-      else if (it .gt. 1) then
-         write(model_config_rec%input_inname,fmt='("wrfvar_output_",I2.2)') it-1
-      end if
-   else if ( write_checkpoints .eq. 3 ) then
-      !Turn off xtraj writing
-      call nl_set_auxhist6_interval_s ( head_grid%id, 0 )
-#if (WRF_CHEM == 1)
-   else
-      ! Turn off gocart_bg field reading
-!      call nl_get_io_form_auxinput8(head_grid%id, ioform8)
-      if ( model_config_rec%start_hour(head_grid%id) .ne. 0 ) then
-         call nl_set_io_form_auxinput8(head_grid%id, 0)
-      endif
-#endif
-   endif
+   !Turn off xtraj writing
+!   if (write_checkpoints.gt.0 .or. evalj) call nl_set_auxhist6_interval_s ( head_grid%id, 0 )
+   if (write_checkpoints.gt.0) call nl_set_auxhist6_interval_s ( head_grid%id, 0 )
 
    ! Set up basic states writing for offline obs. operators
+!   if ((any(write_checkpoints.eq.(/1,3/)) .or. evalj) &
    if (any(write_checkpoints.eq.(/1,3/)) &
 #if (WRF_CHEM == 1)
         .and. use_offlineobs &
@@ -116,6 +85,41 @@ subroutine da_nl_model (it)
       if (ioform16 .le. 0) call nl_set_io_form_auxhist16 ( head_grid%id, io_form_xtraj )
       call nl_set_frames_per_auxhist16 ( head_grid%id, 1 )
    end if
+
+   ! Set up checkpoint file writing (restart files) for offline and online obs. operators
+   if ( write_checkpoints .eq. 1 ) then
+      call nl_get_restart_interval_h ( head_grid%id, original_restart_interval)
+#if (WRF_CHEM == 1)
+      if( .not. calc_hx_only) then
+#endif
+         !Turn on Output for standard checkpoint files
+         call nl_set_restart_interval_m ( head_grid%id, checkpoint_interval)
+         call nl_set_restart_interval_h ( head_grid%id, 0)
+         call nl_get_io_form_restart ( head_grid%id, io_form )
+         if (io_form .le. 0) call nl_set_io_form_restart ( head_grid%id, io_form_xtraj )
+         rst_outname = "wrf_checkpoint_d<domain>_<date>"
+         call nl_set_rst_outname ( head_grid%id, rst_outname)
+!Should not be needed, equal to default
+!         call nl_set_restart_begin_m( head_grid%id, 0 )
+#if (WRF_CHEM == 1)
+      endif
+#endif
+      ! input_inname used to initialize first checkpoints in TL/AD models
+      if (it .eq. 1) then
+         model_config_rec%input_inname = "fg"
+      else if (it .gt. 1) then
+         write(model_config_rec%input_inname,fmt='("wrfvar_output_",I2.2)') it-1
+      end if
+#if (WRF_CHEM == 1)
+   else
+      ! Turn off gocart_bg field reading
+!      call nl_get_io_form_auxinput8(head_grid%id, ioform8)
+      if ( model_config_rec%start_hour(head_grid%id) .ne. 0 ) then
+         call nl_set_io_form_auxinput8(head_grid%id, 0)
+      endif
+#endif
+   endif
+
 
    IF ( ASSOCIATED( head_grid%domain_clock ) ) THEN
      IF ( head_grid%domain_clock_created ) THEN
@@ -173,15 +177,7 @@ subroutine da_nl_model (it)
    call nl_set_io_form_auxhist6 ( head_grid%id, 0 ) 
    call nl_set_auxhist6_interval_s ( head_grid%id, 0 ) 
 
-   if ( write_checkpoints .eq. 1 ) then
-      call nl_set_restart_interval_h ( head_grid%id, original_restart_interval)
-      call nl_set_restart_interval_m ( head_grid%id, 0)
-      call nl_set_io_form_restart ( head_grid%id, 0 )
-      rst_outname = "wrfrst_d<domain>_<date>"
-      call nl_set_rst_outname ( head_grid%id, rst_outname)
-      call nl_set_restart_begin_h( head_grid%id, original_restart_interval)
-   end if
-
+!   if ( (any(write_checkpoints.eq.(/1,3/)) .or. evalj) &
    if (any(write_checkpoints.eq.(/1,3/)) &
 #if (WRF_CHEM == 1)
         .and. use_offlineobs &
@@ -190,6 +186,15 @@ subroutine da_nl_model (it)
       model_config_rec%auxhist16_outname = "auxhist16_d<domain>_<date>"
       call nl_set_auxhist16_interval_s (head_grid%id, 0 )
       call nl_set_io_form_auxhist16 ( head_grid%id, ioform16 )
+   end if
+
+   if ( write_checkpoints .eq. 1 ) then
+      call nl_set_restart_interval_h ( head_grid%id, original_restart_interval)
+      call nl_set_restart_interval_m ( head_grid%id, 0)
+      call nl_set_io_form_restart ( head_grid%id, 0 )
+      rst_outname = "wrfrst_d<domain>_<date>"
+      call nl_set_rst_outname ( head_grid%id, rst_outname)
+      call nl_set_restart_begin_h( head_grid%id, original_restart_interval)
    end if
 
    IF ( ASSOCIATED( head_grid%domain_clock ) ) THEN

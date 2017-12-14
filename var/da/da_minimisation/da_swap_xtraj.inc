@@ -44,6 +44,7 @@ subroutine da_swap_xtraj ( grid )
 !                    grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, grid%xp%kms, grid%xp%kme)
 !   enddo
 #if (WRF_CHEM == 1)
+   IF (chem_opt(1) .gt. 0) THEN
    do i = PARAM_FIRST_SCALAR, num_chem
       call kj_swap_reverse (model_grid%chem(:,:,:,i), grid%chem(:,:,:,i), &
                     grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, grid%xp%kms, grid%xp%kme)
@@ -56,6 +57,7 @@ subroutine da_swap_xtraj ( grid )
 !      call kj_swap_reverse (model_grid%scalebb(:,:,:,i), grid%scalebb(:,:,:,i), &
 !                    grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, 1, grid%num_bb_steps)
 !   enddo
+   ENDIF
 #endif
    grid%mu_2 = model_grid%mu_2
    grid%psfc = model_grid%psfc

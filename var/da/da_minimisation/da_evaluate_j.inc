@@ -1,7 +1,7 @@
 subroutine da_evaluate_j(grid, config_flags, cv_size, cv_size_jb, &
                          cv_s, cv_e, eta, jout, &
                          xbx, be, iv, xhat, cv, ob, &
-                         it, mz)
+                         it, mz, iter)
 
    !---------------------------------------------------------------------------
    ! Purpose: Relinearize cost function around Lb * (cv + eta*dv)
@@ -28,9 +28,11 @@ subroutine da_evaluate_j(grid, config_flags, cv_size, cv_size_jb, &
    real, intent(in)                   :: xhat(1:cv_size) ! control variables.
    real, intent(in)                   :: cv(1:cv_size)   ! control variables.
    type (y_type) , intent(inout)      :: ob          ! Observation structure.
-   integer, intent(in)                :: it 
+   integer, intent(in)                :: it, iter 
    integer, intent(in)                :: mz(:)
+!   type (xb_type)      :: shuffleb
 #if (WRF_CHEM == 1)
+!   type (xch_type)      :: shuffleb_ch
    integer, parameter    :: ncv_type = 2
 #else
    integer, parameter    :: ncv_type = 1
@@ -43,7 +45,7 @@ subroutine da_evaluate_j(grid, config_flags, cv_size, cv_size_jb, &
 !   real, intent(in)                   :: eta_chem
 !   real, intent(out)                  :: jout_chem
 !#endif
-
+   integer          :: num_qcstat_conv(2,num_ob_indexes,num_ob_vars,npres_print+1)
    real             :: jo_partial                   ! jo for this processor
    real             :: joc_partial                  ! jo for cross-validation for this processor
    real             :: cv_xhat_jb(cv_size_jb)
@@ -56,10 +58,10 @@ subroutine da_evaluate_j(grid, config_flags, cv_size, cv_size_jb, &
    integer, dimension(1:ncv_type) :: ncv
    integer          :: rc !, alarmid
    character(len=filename_len) :: filename
-
+!   integer            :: n, time_step_seconds
+   character*256 :: timestr !, timestr1
    if (trace_use) call da_trace_entry("da_evaluate_j")
 
-   evalj = .true.
 
    !-------------------------------------------------------------------------
    ! [0.0] initialization:
@@ -81,6 +83,14 @@ subroutine da_evaluate_j(grid, config_flags, cv_size, cv_size_jb, &
       ncv(i) = cv_e(i) - cv_s(i) + 1
       if ( ncv(i) .gt. 0 ) xhat_temp(cv_s(i):cv_e(i)) = eta(i) * xhat(cv_s(i):cv_e(i))
    end do
+
+   ! Store xb, which get_innov_vector modifies below
+!   shuffleb = grid%xb
+!#if (WRF_CHEM == 1)
+!   shuffleb_ch = grid%xbch
+!#endif
+
+   evalj = .true.
 
    !-------------------------------------------------------------------------
    ! [1.0] calculate jo:
@@ -105,8 +115,8 @@ subroutine da_evaluate_j(grid, config_flags, cv_size, cv_size_jb, &
 !!None of these should be needed since xb is unused in the update to the model
 !setup_firstguess would probably be more general, but also has extra initialization code
 !   call da_setup_firstguess(xbx, grid, config_flags, .false.)
-!
-!   call da_transfer_wrftoxb(xbx, grid, config_flags)
+
+   call da_transfer_wrftoxb(xbx, grid, config_flags)
 !#if (WRF_CHEM == 1)
 !   call da_transfer_wrftoxb_chem(grid)
 !#endif
@@ -125,7 +135,9 @@ subroutine da_evaluate_j(grid, config_flags, cv_size, cv_size_jb, &
 #if (WRF_CHEM == 1)
    if ( use_chemobs .and. ncv(2).gt.0 ) call da_retrieve_chem_hx( model_grid, iv )
 #endif
-   call da_get_innov_vector (it+1, num_qcstat_conv, ob, iv, grid , config_flags)
+
+   num_qcstat_conv=0
+   call da_get_innov_vector (it+1+100*iter, num_qcstat_conv, ob, iv, grid , config_flags)
 
 !! The remainder of jo could be carried out by da_calculate_j (consider replacing)
 
@@ -136,13 +148,11 @@ subroutine da_evaluate_j(grid, config_flags, cv_size, cv_size_jb, &
                         , joc_partial &
 #endif
                         )
-
-   if (test_dm_exact) then
-      ! jo_partial has been already summed at lower level
-      j % jo % total = jo_partial
-   else
-      j % jo % total = wrf_dm_sum_real(jo_partial)
-   end if
+#ifdef DM_PARALLEL
+   j % jo % total = wrf_dm_sum_real(jo_partial)
+#else 
+   j % jo % total = jo_partial
+#endif
 
    jout = 0.D0
 
@@ -156,6 +166,8 @@ subroutine da_evaluate_j(grid, config_flags, cv_size, cv_size_jb, &
    end if
 #endif
 
+   write(unit=stdout,fmt='("DGN: jo = ",2F11.3)') jout
+
    !-------------------------------------------------------------------------
    ! [2.0] calculate jb:
    !-------------------------------------------------------------------------
@@ -164,7 +176,11 @@ subroutine da_evaluate_j(grid, config_flags, cv_size, cv_size_jb, &
       cv_xhat_jb(1:cv_size_jb) = cv(1:cv_size_jb) + xhat_temp(1:cv_size_jb)
       j % jb = jb_factor * 0.5 * da_dot_cv(cv_size_jb,  cv_xhat_jb, cv_xhat_jb, grid, mz)
 
+      write(unit=stdout,fmt='("DGN: jb = ",F11.3)') j%jb
+
       jout(1) = jout(1) + j % jb
+
+      write(unit=stdout,fmt='("DGN: jtotal = ",2F11.3)') jout
 
 #if (WRF_CHEM == 1)
       if ( ncv(1) .le. 0 ) then
@@ -176,23 +192,34 @@ subroutine da_evaluate_j(grid, config_flags, cv_size, cv_size_jb, &
          jout(1) = jout(1) - jout(2)
       end if
 #endif
+
+      write(unit=stdout,fmt='("DGN: jtotal = ",2F11.3)') jout
+
    end if
 
    call da_deallocate_y (re)
    call da_deallocate_y (y)
    call da_deallocate_y (jo_grad_y)
 
-
    !-------------------------------------------------------------------------
    ! [3.0] restore grid to appropriate state:
    !-------------------------------------------------------------------------
+
+   evalj = .false.
+
+!   !FROM MEMORY
+!   call domain_clock_get (grid, start_timestr=timestr)
+!   call domain_clock_set( grid, current_timestr=timestr )
+!   call da_read_basicstates ( xbx, grid, config_flags, timestr ) 
+
+   !FROM FILE
    if (it .eq. 1) then
       filename = 'fg'
    else
       write(filename,fmt='("wrfvar_output_",I2.2)') it-1
    end if
 
-   write(unit=message(1),fmt='(A)') 'Resetting state variables to values from previous iteration.'
+   write(unit=message(1),fmt='(A)') 'Resetting state variables to values from before da_evaluate_j.'
    write(unit=message(2),fmt='(3A)') '--> reading ', trim(filename),' as INPUT stream'
    call wrf_message(trim(message(1)))
    call wrf_message(trim(message(2)))
@@ -201,6 +228,12 @@ subroutine da_evaluate_j(grid, config_flags, cv_size, cv_size_jb, &
    call da_med_initialdata_input (grid, config_flags, trim(filename))
 
    ! Reset xb, which get_innov_vector modifies above
+!#if (WRF_CHEM == 1)
+!   if (use_chemobs .and. cv_options_chem.gt.0) grid%xbch = shuffleb_ch
+!   if (use_nonchemobs .and. cv_options.gt.0) &
+!#endif
+!      grid%xb = shuffleb
+
    call da_transfer_wrftoxb(xbx, grid, config_flags)
 
    ! Needed for chem IC's when they are added as CVs
@@ -208,25 +241,25 @@ subroutine da_evaluate_j(grid, config_flags, cv_size, cv_size_jb, &
 !   call da_transfer_wrftoxb_chem(grid)
 !#endif
 
-   !Reset boundary values in grid
-   if (.not.var4d_lbc .or. it.eq.1) then
-      if (checkpoint_interval .eq. 0 .or. &
-          (checkpoint_interval*60.lt.interval_seconds &
-           .and. run_hours*3600.eq.interval_seconds)) then
-         CALL WRFU_AlarmRingerOn( grid%alarms( BOUNDARY_ALARM ), rc=rc )
    
-         call med_latbound_in ( grid, config_flags )
-         call close_dataset ( grid%lbc_fid , config_flags , "DATASET=BOUNDARY" )
-      end if
-!   else
-!      if (checkpoint_interval .eq. 0) then
-!         !NEED SOLUTION for var4d_lbc after first iteration (I/O of ana02_$it?)
-!      else
-!         !This solution might be more complicated
-!      end if
-   end if
 
-   evalj = .false.
+!   !Reset boundary values in grid
+!   if (.not.var4d_lbc .or. it.eq.1) then
+!      if (checkpoint_interval .eq. 0 .or. &
+!          (checkpoint_interval*60.lt.interval_seconds &
+!           .and. run_hours*3600.eq.interval_seconds)) then
+!         CALL WRFU_AlarmRingerOn( grid%alarms( BOUNDARY_ALARM ), rc=rc )
+!   
+!         call med_latbound_in ( grid, config_flags )
+!         call close_dataset ( grid%lbc_fid , config_flags , "DATASET=BOUNDARY" )
+!      end if
+!!   else
+!!      if (checkpoint_interval .eq. 0) then
+!!         !NEED SOLUTION for var4d_lbc after first iteration (I/O of ana02_$it?)
+!!      else
+!!         !This solution might be more complicated
+!      end if
+!   end if
 
    if (trace_use) call da_trace_exit("da_evaluate_j")
 

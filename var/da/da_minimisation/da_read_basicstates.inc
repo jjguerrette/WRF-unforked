@@ -20,7 +20,9 @@ subroutine da_read_basicstates ( xbx, grid, config_flags, timestr, fgat )
 #ifdef VAR4D
    if ( grid%var4d ) then
       if ( grid%trajectory_io ) then
+!         if ( checkpoint_interval .le. 0 .and. .not.evalj ) then
          if ( checkpoint_interval .le. 0 ) then
+
             call input_nl_xtraj (timestr)
          else
             call input_nl_xtraj_checkpt (timestr)
