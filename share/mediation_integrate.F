@@ -168,8 +168,8 @@ SUBROUTINE med_before_solve_io ( grid , config_flags )
          ENDIF
          ! NL trajectory I/O to disk for offline observation operators in WRFDA
          ! with checkpointing
-         IF ( ialarm.EQ.auxhist16_only .AND. config_flags%dyn_opt.EQ.dyn_em &
-              .AND. config_flags%checkpoint_interval.GT.0 ) THEN 
+         IF ( ialarm.EQ.auxhist16_only .AND. config_flags%dyn_opt.EQ.dyn_em ) THEN ! &
+!              .AND. config_flags%checkpoint_interval.GT.0 ) THEN 
             CALL med_hist_out ( grid , ialarm, config_flags )
          ENDIF
        ENDIF
