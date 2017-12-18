@@ -353,8 +353,8 @@ CWD=$(pwd)
 echo "WORKING DIRECTORY: "$CWD
 cd ../
 PARENTDIR=$(pwd)
-CWD_rel=${CWD#$PARENTDIR"/"} #Use for linking, more stable
-CWD_rel="../"$CWD_rel
+CWD_rel0=${CWD#$PARENTDIR"/"} #Use for linking, more stable
+CWD_rel="../"$CWD_rel0
 cd $CWD
 
 dummy=$(ls ../run.*)
@@ -362,14 +362,14 @@ if [ $? -eq 0 ]; then  rm -r ../run.[0-9]*; fi
 
 if [ $OSSE -eq 2 ]; then
 #   DIRpert="LZ_N=100_no=1_LARGE"
-   DIRpert="LZ_N=10_no=10_LARGE"
-   fg_pert="/nobackupp8/jjguerr1/wrf/DA/"$DIRpert"/run/fg_pert"
-   osse_obs="/nobackupp8/jjguerr1/wrf/DA/"$DIRpert"/run/AIRCRAFT_DATA_*.txt"
-   osse_var="/nobackupp8/jjguerr1/wrf/DA/"$DIRpert"/run/AIRCRAFT_MODEL_VARIANCE_*.txt"
+#   DIRpert="LZ_N=10_no=10_LARGE"
+   fg_pert="$CWD/../../"$DIRpert"/CWD_rel0/fg_pert"
+   osse_obs="$CWD/../../"$DIRpert"/CWD_rel0/AIRCRAFT_DATA_*.txt"
+   osse_var="$CWD/../../"$DIRpert"/CWD_rel0/AIRCRAFT_MODEL_VARIANCE_*.txt"
 
-   ln -sf $fg_pert ./fg_pert
-   ln -sf $osse_obs ./
-   ln -sf $osse_var ./
+   cp -v $fg_pert ./fg_pert
+   cp -v $osse_obs ./
+   cp -v $osse_var ./
 fi
 
 if [ $RIOT_RESTART ] && [ $RIOT_RESTART -eq 1 ]; then
@@ -537,10 +537,10 @@ do
             mkdir rsl_init_osse
             cp rsl.* rsl_init_osse
 
-            mv fgc fgc_0
+            mv fg fg_0
          fi
          ln -sf ./fg_pert ./fg
-         ln -sf ./fg_pert ./wrfinput_d01
+         ln -sf ./fg ./wrfinput_d01
 
          ex -c :"/osse_chem" +:":s/=.*,/=true,/g" +:wq namelist.input
          ex -c :"/init_osse_chem" +:":s/=.*,/=false,/g" +:wq namelist.input
