@@ -221,15 +221,15 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
             call da_rsvd56(grid, mz, jp_start, jp_end, &
                           omega(:,1:iens), yhat(:,1:iens), qhat(:,0:iens), cv_size, &
                           hessian_info%eigs(iens)%eignval, hessian_info%eigs(iens)%eignvec, &
-                          iens, hessian_info%eigs(iens)%neign)
-
+                          iens)
+            hessian_info%eigs(iens)%neign = iens
             hessian_info%eigs(iens)%eignval = hessian_info%eigs(iens)%eignval + 1.D0
          end do
       end if
 
       call da_rsvd56(grid, mz, jp_start, jp_end, &
                      omega, yhat, qhat, cv_size, &
-                     eignval, eignvec, nens, neign)
+                     eignval, eignvec, nens)
 
       ! Add 1.0 to get eigenvalues of full preconditioned Hessian
       eignval = eignval + 1.D0
@@ -243,6 +243,7 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
          write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'EIGENVECTOR_MATRIX: ',eignvec(iens,1:nens)
       end do
 
+      neign = nens
       write(unit=stdout,fmt='(A)') ' '
       write(unit=stdout,fmt='(A,I5,A,I5,A)') 'Using ', neign, ' of ', nens, ' eigenpairs'
       write(unit=stdout,fmt='(A)') ' '
@@ -279,8 +280,8 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
                                  rand_outer-1, xhat, xhat, 'TL' )
 
       if (riot_precon.ge.1 .or. spectral_precon) &
-         call da_hessian_io ('w',grid, cv_size,rand_outer,nens,neign,&
-                            eignvec,eignval,qhat,mz,ghat)
+         call da_hessian_io ('w',grid, cv_size,rand_outer,neign,neign,&
+                            eignvec(1:neign,1:neign),eignval(1:neign),qhat(:,0:neign),mz,ghat)
 
       if (riot_precon.gt.0 .and. sum(ntmax(1:rand_outer)).lt.ntmax(rand_outer+1)) then
          if ( riot_precon.eq.1 ) riot_precon=14

@@ -63,7 +63,7 @@ module da_minimisation
       use_randomblock, rand_stage, rotate_omega, &
 #endif
       use_global_cv_io, var4d_inc_out, inc_out_interval, &
-      use_lanczos, spectral_precon, ntused, info_stop, grm_shmt_order, &
+      use_lanczos, spectral_precon, info_stop, grm_shmt_order, &
       sound, mtgirs, sonde_sfc, synop, profiler, gpsref, gpspw, polaramv, geoamv, ships, metar, &
       satem, radar, ssmi_rv, ssmi_tb, ssmt1, ssmt2, airsr, pilot, airep,tamdar, tamdar_sfc, rain, &
       bogus, buoy, qscat,pseudo, radiance, monitor_on, max_ext_its, use_rttov_kmatrix,&
@@ -186,7 +186,7 @@ module da_minimisation
       da_transfer_wrftltoy_chem, da_transfer_wrftltoy_chem_adj, &
       da_transfer_wrftoxb_chem, &
 #endif
-      da_transfer_headtomodel, da_transfer_xatowrf, da_setup_firstguess, &
+      da_transfer_headtomodel, da_transfer_xatowrf, &
       da_transfer_wrftoxb, &
       da_transfer_xatowrftl_adj, da_transfer_wrftltoxa_adj
 #if defined(RTTOV) || defined(CRTM)
@@ -202,10 +202,10 @@ module da_minimisation
    use da_wrfvar_io, only : da_med_initialdata_input
 #ifdef VAR4D
    use da_4dvar, only : da_tl_model, da_ad_model, da_nl_model, model_grid, &
-       da_model_lbc_off, &
+       da_model_lbc_off, nl_called, &
        input_nl_xtraj, xtrajprefix, io_form_xtraj, input_nl_xtraj_checkpt, &
        kj_swap_reverse, upsidedown_ad_forcing, u6_2, v6_2, w6_2, t6_2, ph6_2, p6, &
-      mu6_2, psfc6, moist6
+       mu6_2, psfc6, moist6
    use da_transfer_model, only : da_transfer_xatowrftl_lbc, da_transfer_xatowrftl_adj_lbc, &
       da_transfer_wrftl_lbc_t0, da_transfer_wrftl_lbc_t0_adj, da_get_2nd_firstguess
    USE module_io_wrf, only : auxinput16_only, auxhist18_alarm, boundary_alarm
@@ -235,6 +235,7 @@ contains
 #include "da_calculate_grady.inc"
 #include "da_transform_vtoy.inc"
 #include "da_transform_vtoy_adj.inc"
+#include "da_transform_xatowrftl_lbc_wrapper.inc"
 #include "da_transform_vtod_wpec.inc"
 #include "da_transform_vtod_wpec_adj.inc"
 #include "da_adjoint_sensitivity.inc"

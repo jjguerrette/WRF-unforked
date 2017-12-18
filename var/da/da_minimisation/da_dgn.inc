@@ -25,6 +25,8 @@ subroutine da_dgn(grid, config_flags, cv_size, xhat, cv, &
    real, intent(in)                   :: ja_total ! Cost function at eta = 0
    integer, intent(in)                :: it 
    integer, intent(in)                :: mz(:)
+
+   ! Need to allow ncv_type to be +1 when var4d_lbc
 #if (WRF_CHEM == 1)
    integer, parameter    :: ncv_type = 2
 #else
@@ -41,12 +43,15 @@ subroutine da_dgn(grid, config_flags, cv_size, xhat, cv, &
              exit_array
    character(1) :: ncv_char
 
+   integer :: jl_start, jl_end
+   character*256 :: timestr, timestr1
+   type(x_type) :: shuffle
+
    if (trace_use) call da_trace_entry("da_dgn")
 
    write(unit=stdout,fmt='("Starting Damped Gauss Newton (DGN) line search")')
 
    ! Determine the MET CV indices
-
    cv_s(1) = 1
    cv_e(1) = cv_s(1) &
           + be % cv % size1 &
@@ -72,8 +77,20 @@ subroutine da_dgn(grid, config_flags, cv_size, xhat, cv, &
              - 1
 #endif
 
-   write(unit=stdout,fmt='("cv_s, cv_e, cv_s_chem, cv_e_chem, cv_size, size_jb: ",6I8)') cv_s(1), cv_e(1), cv_s(2), cv_e(2), cv_size, be % cv % size_jb
+!   ! Still need to figure this out, probably group MET with MET lbc and CHEM with CHEM lbc
+!   if (var4d_lbc) then
+!      jl_start    = be%cv%size_jb + be%cv%size_je + be%cv%size_jp + 1
+!      jl_end      = be%cv%size_jb + be%cv%size_je + be%cv%size_jp + be%cv%size_jl
+!      cv_s(ncv_type+1) = jl_start
+!      cv_e(ncv_type+1) = jl_end
+!!#if (WRF_CHEM == 1)
+!!      cv_e(ncv_type+1) = jl_end - sum(be % cv % sizechem (:))
+!!      cv_s(ncv_type+2) = cv_e(ncv_type+1) + 1
+!!      cv_e(ncv_type+2) = jl_end
+!!#endif
+!   end if
 
+   write(unit=stdout,fmt='("cv_s, cv_e, cv_s_chem, cv_e_chem, cv_size, size_jb: ",6I8)') cv_s(1), cv_e(1), cv_s(2), cv_e(2), cv_size, be % cv % size_jb
 
    !---------------------------------------------------
    ! Perform line search using golden section algorithm
@@ -208,6 +225,52 @@ subroutine da_dgn(grid, config_flags, cv_size, xhat, cv, &
    end do
    write(ncv_char,fmt='(I1)') ncv_type
    write(unit=stdout,fmt='(A,'//ncv_char//'F8.5)') 'Final eta from DGN: ',eta
+
+
+   call da_transform_vtox (grid,be%cv%size_jb,xbx,be,grid%ep,&
+                            xhat(1:be%cv%size_jb),grid%vv,grid%vp &
+#if (WRF_CHEM == 1)
+                            , grid%vch &
+#endif
+                            )
+
+   call da_transform_xatowrftl_lbc_wrapper( &
+           it, cv_size, be, grid%ep, &
+           xhat, iv, grid%vp6, grid%vv6, xbx, &
+           grid, config_flags &
+!#if (WRF_CHEM == 1)
+!          , grid%vch6 &
+!#endif
+           )
+
+!Outputting fg_02 here would require restoring xb at initial time afterward
+!   if ((config_flags%real_data_init_type == 1) .or. &
+!       (config_flags%real_data_init_type == 3)) then
+!#ifdef VAR4D
+!      if ( var4d_lbc ) then
+!         call domain_clock_get (grid, stop_timestr=timestr1)
+!         call domain_clock_set( grid, current_timestr=timestr1 )
+!         if (it .eq. 1) then
+!            filename = 'fg02'
+!         else
+!            write(filename,fmt='("fg02_it",I2.2)') it-1
+!         end if
+!         call da_med_initialdata_input (grid, config_flags, trim(filename))
+!         call da_setup_firstguess(xbx, grid, config_flags, .false. )
+!         shuffle = grid%xa
+!         grid%xa  = grid%x6a
+!         call da_transform_vtox(grid, be%cv%size_jl, xbx, be, grid%ep, &
+!              xhat(jl_start:jl_end), grid%vv6, grid%vp6)
+!         grid%xa  = shuffle
+!         call da_transfer_xatoanalysis (it, xbx, grid, config_flags)
+!         write(filename,fmt='("fg02_it",I2.2)') it
+!         call da_update_firstguess (grid, trim(filename))
+!         call domain_clock_get (grid, start_timestr=timestr1)
+!         call domain_clock_set( grid, current_timestr=timestr1 )
+!      endif
+!#endif
+!   end if
+
 
    if (trace_use) call da_trace_exit("da_dgn")
 

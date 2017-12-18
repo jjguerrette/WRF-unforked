@@ -14,9 +14,10 @@ module da_linear_ops
        use_randomblock, &
 #endif
        myproc, filename_len, test_dm_exact, rootproc, cv_size_domain, &
-       stdout, trace_use, ierr, comm, ntused, &
+       stdout, trace_use, ierr, comm, &
        use_lanczos, use_global_cv_io, ntmax, inc_out_interval, &
-       read_hess_REF, nmodes_hess_REF
+       read_hess_REF, nmodes_hess_REF, &
+       spectral_precon
    use da_define_structures, only : iv_type, y_type, j_type, be_type, xbx_type, &
        hessian_type, hessian_eig_type
 

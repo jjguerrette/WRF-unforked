@@ -281,7 +281,7 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
          ! Eigenvalue decomposition of A (Algorithm 5.6 of Halko)
          call da_rsvd56(grid, mz, jp_start, jp_end, &
                         omega(:,1:neign), yhat(:,1:neign), qhat(:,0:neign), cv_size, &
-                        eignval, eignvec, neign, dummy)
+                        eignval, eignvec, neign)
 
          eignval = eignval + 1.D0
 

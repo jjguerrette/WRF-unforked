@@ -256,7 +256,7 @@ subroutine da_evaluate_hessian(grid, xbx, be, mz, cv_size, &
 
          call da_rsvd56(grid, mz, jp_start, jp_end, &
                         omega_Pa, yhat_Pa, qhat_Pa, cv_size, &
-                        eignval_res, eignvec_res, rankA, dummy, .false. )
+                        eignval_res, eignvec_res, rankA, .false. )
 
          deallocate(qhat_Pa)
 

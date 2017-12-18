@@ -1,7 +1,7 @@
 #if defined(LAPACK)
 subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
                      omega, yhat, qhat, cv_size, &
-                     eignval, eignvec, nens, neign, print_messages)
+                     eignval, eignvec, nens, print_messages)
 
    !-------------------------------------------------------------------------
    ! Purpose:         Second stage of RSVD 5.6
@@ -37,7 +37,6 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
    real, intent(out)       :: eignvec(nens, nens)
    real, intent(out)       :: eignval(nens)
 
-   integer, intent(out)    :: neign                    ! Number of non-truncated eigenpairs
    logical, optional, intent(in) :: print_messages
 
    real(wp)                     :: LAM(nens)
@@ -176,7 +175,7 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
    end do
 
    !Preconditioned observation Hessian should be positive semi-definite
-   neign = nens
+!   neign = nens
    do iens = 1, nens
       LAM(iens) = max(LAM(iens),0.D0)
    end do

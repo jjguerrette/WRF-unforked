@@ -376,7 +376,7 @@ if (.true.) then
 
       call da_rsvd56(grid, mz, jp_start, jp_end, &
                      omega_Pav, yhat_Pav_, qhat_Pav, cv_size, &
-                     eignval_res, eignvec_res, rank_rsvd_Pa, dummy)
+                     eignval_res, eignvec_res, rank_rsvd_Pa)
 
       deallocate(qhat_Pav)
 
@@ -559,7 +559,7 @@ if (.true.) then
 
       call da_rsvd56(grid, mz, jp_start, jp_end, &
                      omega_Pav, yhat_Pa_, qhat_Pa, cv_size, &
-                     eignval_res, eignvec_res, rank_rsvd_Pa, dummy)
+                     eignval_res, eignvec_res, rank_rsvd_Pa)
 
       deallocate(qhat_Pa)
 

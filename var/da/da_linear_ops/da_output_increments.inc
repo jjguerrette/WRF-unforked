@@ -124,6 +124,10 @@ subroutine da_output_increments(grid,config_flags,mz, &
             xhat = xhat + ghat
          end if
 
+         if (spectral_precon .and. it.gt.1) &
+            call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
+                                    it-1, xhat, xhat, 'TL' )
+
          call da_transform_vtox (grid,be%cv%size_jb,xbx,be,grid%ep,&
                                  xhat(1:be%cv%size_jb),grid%vv,grid%vp &
 #if (WRF_CHEM == 1)
@@ -156,12 +160,14 @@ subroutine da_output_increments(grid,config_flags,mz, &
                !Allows hess_REF and cvt_REF to be defined in a separate inversion scenario
                ! (read in from file)
                if (read_hess_REF.eq.1) then
-                  nmodes_REF = nmodes_hess_REF
+!                  nmodes_REF = nmodes_hess_REF
                   filename = 'hess_REF_in'
 !               else
 !                  !Debug setting to compare against read_hess_REF==0
 !                  !Unchanged filename and nmodes_REF
                end if
+
+               call da_hessian_io ('r',grid,cv_size,it,nmodes_REF,hess_REF%neign,hess_file=filename)
 
                allocate(qhat_REF(1:cv_size,0:nmodes_REF))
                allocate(hess_REF%eignval(1:nmodes_REF))

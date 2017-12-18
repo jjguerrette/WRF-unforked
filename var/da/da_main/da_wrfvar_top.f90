@@ -21,7 +21,7 @@ module da_wrfvar_top
       da_ad_model, da_init_model_input, da_init_model_output, &
 #endif
       mu6_2, psfc6, moist6, kj_swap, da_finalize_model, da_model_lbc_off
-   !use da_wrfvar_io, only : da_med_initialdata_output_lbc
+   use da_wrfvar_io, only : da_med_initialdata_output_lbc
 #endif
 
 #if defined(RTTOV) || defined(CRTM)
@@ -89,11 +89,14 @@ module da_wrfvar_top
       da_deallocate_y, da_zero_x, hessian_type
    use da_minimisation, only : da_get_innov_vector,da_minimise_cg, &
       da_minimise_lz, da_write_diagnostics, da_calculate_residual, &
-      da_calculate_grady, da_sensitivity, da_lanczos_io, da_calculate_j, &
+      da_kmat_mul, &
+#ifdef VAR4D
 #if (WRF_CHEM == 1)
       da_calculate_aminusb, &
 #endif
-      da_dgn, da_kmat_mul
+      da_dgn, da_transform_xatowrftl_lbc_wrapper, &
+#endif
+      da_calculate_grady, da_sensitivity, da_lanczos_io, da_calculate_j
 
    use da_linear_ops, only: da_output_increments, da_cv_io
 
@@ -134,7 +137,9 @@ module da_wrfvar_top
 #if (WRF_CHEM == 1)
        da_transfer_wrftoxb_chem, &
 #endif
-       da_transfer_headtomodel, da_transfer_wrftltoxa_adj
+       da_transfer_headtomodel, da_transfer_wrftltoxa_adj, &
+       da_transfer_xatowrftl, &
+       da_transfer_wrftoxb
    use da_vtox_transforms, only : da_transform_vtox, da_transform_xtoxa, &
       da_transform_xtoxa_adj
    use da_wrfvar_io, only : da_med_initialdata_input, da_update_firstguess

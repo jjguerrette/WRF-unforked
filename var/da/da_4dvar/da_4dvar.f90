@@ -44,7 +44,7 @@ type (grid_config_rec_type) :: model_config_flags
 character*256 :: timestr
 character*20  :: xtrajprefix="xtraj_for_obs"
 integer :: io_form_xtraj = 2 !Change this if alternative I/O MECHANISM is preferred
-
+integer :: nl_called = 0
 
 ! Define some variables to save the NL physical option
 integer :: original_mp_physics, original_ra_lw_physics, original_ra_sw_physics, &

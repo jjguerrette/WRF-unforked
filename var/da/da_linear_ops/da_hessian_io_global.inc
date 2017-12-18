@@ -13,7 +13,7 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, nens, neign, filename
    type(domain), intent(inout)     :: grid
    character,        intent(in)    :: io_config              ! 'r' = Read; 'w' = Write
    integer,          intent(in)    :: cv_size
-   integer,          intent(in)    :: nens
+   integer,          intent(inout) :: nens
    integer,          intent(inout) :: neign
    character(len=filename_len), intent(in)  :: filename               ! I/O filename
 
@@ -54,6 +54,7 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, nens, neign, filename
 
    if (io_config == 'r') then
 
+      nens = 0
       neign = 0
 
       if (rootproc) then
@@ -78,6 +79,8 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, nens, neign, filename
       call wrf_dm_bcast_integer(neign,1)
 
       if (present(eignvec) .and. present(eignval) .and. present(qhat)) then
+         if (rootproc) read(unit=ep_unit) dummy
+
          do i = 1, nens
             if (rootproc) then
                read(unit=ep_unit) temp(i)
@@ -117,6 +120,12 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, nens, neign, filename
             ghat = dumcv_g
 #endif
          end if
+      else
+         if (rootproc) read(unit=ep_unit) nens
+#ifdef DM_PARALLEL
+         call mpi_barrier(comm, ierr)
+         call wrf_dm_bcast_integer(nens,1)
+#endif
       end if
       if (rootproc) close(unit=ep_unit)
    else if (io_config == 'w') then
@@ -130,6 +139,7 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, nens, neign, filename
          end if
 
          write(unit=ep_unit) neign, cv_size_domain
+         write(unit=ep_unit) nens
       end if
 
       if (present(eignvec) .and. present(eignval) .and. present(qhat)) then

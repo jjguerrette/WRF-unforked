@@ -466,8 +466,9 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
                                  rand_outer-1, xhat, xhat, 'TL' )
 
       if (riot_precon.ge.1 .or. spectral_precon) &
-         call da_hessian_io ('w',grid, cv_size,rand_outer,nens,neign,&
-                            eignvec,eignval,qhat,mz,ghat)
+         call da_hessian_io ('w',grid, cv_size,rand_outer,neign,neign,&
+                            eignvec(1:neign,1:neign),eignval(1:neign),qhat(:,0:neign),mz,ghat)
+
 
       if (riot_precon.gt.0 .and. sum(ntmax(1:rand_outer)).lt.ntmax(rand_outer+1)) then
          if ( riot_precon.eq.1 ) riot_precon=14

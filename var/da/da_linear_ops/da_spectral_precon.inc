@@ -67,22 +67,17 @@ subroutine da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, nouter_prev, 
    cv_z = cv_v
 
    do it = outer_start, outer_end, increment
-      if (use_lanczos) then
-         nmode_it = ntused(it)
-#if defined(LAPACK)
-      else if (use_randomblock) then
-         nmode_it = ntmax(it)
-#endif
-      else
+      if (.not.any((/use_lanczos,use_randomblock/))) &
          call da_error(__FILE__,__LINE__, &
           (/"Spectral preconditioning can only be used with Lanczos or RSVD."/))
-      end if
+
+      call da_hessian_io ('r',grid,cv_size,it,nmode_it,neign_it)
 
       allocate(eignval_prev(nmode_it))
       allocate(eignvec_prev(nmode_it,nmode_it))
       allocate(qhat_prev(cv_size,0:nmode_it))
 
-      call da_hessian_io ('r',grid, cv_size,it,nmode_it,neign_it,&
+      call da_hessian_io ('r',grid,cv_size,it,nmode_it,neign_it,&
                          eignvec_prev,eignval_prev,qhat_prev,mz)
 
       !Need to add capability for user to set l <= neign_it for each set of eigenpairs

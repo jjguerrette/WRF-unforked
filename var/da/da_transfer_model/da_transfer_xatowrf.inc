@@ -647,7 +647,9 @@ subroutine da_transfer_xatowrf(grid, config_flags)
    IF ( var4d ) THEN
 
       ! We need to transfer LBC perturbation from model_grid to grid for output
+!      if ( all(dgn_search(1:max_ext_its).eq.0) .or. var4d_lbc ) then
 
+      if (var4d_lbc .or. checkpoint_interval.eq.0 .or. .not.boundary_io) then
       grid%u_bxs = grid%u_bxs + model_grid%g_u_bxs
       grid%u_bxe = grid%u_bxe + model_grid%g_u_bxe
       grid%u_bys = grid%u_bys + model_grid%g_u_bys
@@ -705,7 +707,9 @@ subroutine da_transfer_xatowrf(grid, config_flags)
       grid%moist_btxe = grid%moist_btxe + model_grid%g_moist_btxe
       grid%moist_btys = grid%moist_btys + model_grid%g_moist_btys
       grid%moist_btye = grid%moist_btye + model_grid%g_moist_btye
+      end if
 
+!      end if
 #if (WRF_CHEM == 1)
       ! Don't ever want scale < 0; alpha < 0 is no problem
       do ic = PARAM_FIRST_SCALAR, num_scaleant

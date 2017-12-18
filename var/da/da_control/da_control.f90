@@ -669,6 +669,4 @@ module da_control
 
    logical, allocatable :: fgat_rain_flags(:)
 
-   integer :: ntused(max_outer_iterations)
-
 end module da_control

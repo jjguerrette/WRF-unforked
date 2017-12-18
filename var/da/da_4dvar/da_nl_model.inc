@@ -35,10 +35,17 @@ subroutine da_nl_model (it)
       model_config_rec%var4d_run = .true.
       config_flags%var4d_run = .true.
    endif
- 
+
    ! 4dvar init
 !   if (.not. evalj) call init_4dvar
    call init_4dvar
+
+   if (it .gt. 0) then
+      nl_called = 1 
+   else
+      nl_called = nl_called + 1
+   end if
+
 
 #if (WRF_CHEM == 1)
    if ( use_chemobs .and. cv_options_chem .gt. 0 ) then

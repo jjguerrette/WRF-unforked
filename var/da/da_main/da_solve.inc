@@ -675,7 +675,10 @@
               call da_message(message(1:1))
               read(cvt_unit) cvt
               close(cvt_unit)
+
+              global_it = iouter_restart
             else
+              outer_loop_restart = .false.
               write(unit=message(1),fmt='(a)') "cvt file '"//trim(cvtfile)//"' does not exists, initiallizing cvt."
               call da_message(message(1:1))
               call da_initialize_cv (cv_size, cvt)
@@ -794,7 +797,7 @@
          allocate (eignvec(ntmax(it), ntmax(it)))
          allocate (eignval(ntmax(it)))
       end if
-      global_it = it
+      if (.not.outer_loop_restart) global_it = it
 #if defined(LAPACK)
       if (use_randomblock) then
          global_it = rand_outer
@@ -947,7 +950,7 @@
       call wrf_message("*** WRF-Var Part 8.2 ***")
 
       num_qcstat_conv=0
-      call da_get_innov_vector (it, num_qcstat_conv, ob, iv, grid , config_flags)
+      call da_get_innov_vector (global_it, num_qcstat_conv, ob, iv, grid , config_flags)
       if ( multi_inc == 1 ) then 
          if (trace_use) call da_trace_exit ("da_solve")
          return
@@ -1016,9 +1019,11 @@
 
             call da_minimise_lz(grid, config_flags, it, cv_size, xbx,& 
                              be, iv, j_grad_norm_target, xhat, qhat, cvt, re, y, j, eignvec, eignval, neign, j0_cost, j0_total, hessian_info=hessian_info)
+#ifdef VAR4D
 #if (WRF_CHEM == 1)
             if (calc_aminusb) call da_calculate_aminusb(grid,config_flags,it,cv_size,xbx, &
                                 be,qhat,eignvec,eignval,neign,ntmax(it))
+#endif
 #endif
          end if
 
@@ -1026,10 +1031,11 @@
 
          if (adj_sens) call da_sensitivity(grid,config_flags,it,cv_size,xbx, &
                                            be,iv,xhat,qhat,cvt,y,eignvec,eignval,neign )
+#ifdef VAR4D
 #if defined(LAPACK)
       else if ( use_randomblock) then
          j0_total = 0.D0
-         if ( nens .gt. 0  .and.  rand_outer .gt. 0  .and.  it .eq. 1 ) then
+         if ( nens.gt.0  .and.  rand_outer.gt.0  .and.  it.eq.1 ) then
             if (rand_stage .eq. 1 .and. &
                 (ensmember .eq. nens+1)) then
                select case (rand_type)
@@ -1154,9 +1160,7 @@
                if (use_background_errors) call da_deallocate_background_errors (be)
 
                call da_wrfvar_finalize
-#ifdef VAR4D
                if (var4d) call da_finalize_model
-#endif
 
 #ifdef DM_PARALLEL
                IF ( rootproc ) CALL end_timing('da_end_timing: RSVD_step')   
@@ -1187,6 +1191,7 @@
             CALL wrf_error_fatal('In randomised SVD. Check namelist settings.')
          end if
 #endif
+#endif
       else
          call da_minimise_cg( grid, config_flags, it, be % cv % size, & 
               xbx, be, iv, j_grad_norm_target, xhat, cvt, re, y, j, j0_cost, j0_total)
@@ -1201,13 +1206,13 @@
       IF ( rootproc ) CALL start_timing
 #endif
       if (var4d) then
-      if (dgn_search(global_it) .eq. 1) then
+      if (dgn_search(global_it).eq.1 .and. .not.var4d_lbc) then
          call da_dgn(grid, config_flags, cv_size, xhat, cvt, &
                      xbx, be, iv, ob, &
                      j0_cost, j0_total, global_it, mz)
 #if (WRF_CHEM == 1)
       else if ( dgn_search(global_it) .eq. 2 .and. eta_emiss .lt. 1.D0 .and. eta_emiss .gt. 0.D0 ) then
-         call da_hdgn(it, cv_size, be, xhat)
+         call da_hdgn(global_it, cv_size, be, xhat)
 #endif
       end if
       end if
@@ -1221,7 +1226,7 @@
 #endif
       if ( var4d .and. var4d_inc_out .and. allocated(hessian_info%ghat) ) then
          call da_output_increments( grid,config_flags,mz, &
-                                    max(it,rand_outer),cv_size,xbx,be, &
+                                    global_it,cv_size,xbx,be, &
                                     cvt,hessian_info)
 
          do ii = 1, hessian_info%nmodes_max
@@ -1339,6 +1344,22 @@
          , grid%vch &
 #endif
          )
+
+#ifdef VAR4D
+#if defined(LAPACK)
+         ! Should make this code section general (even for non-random),
+         ! and eliminate final call to da_calculate_gradj in both minimise_cg/lz routines
+         if (use_randomblock) &
+            call da_transform_xatowrftl_lbc_wrapper( &
+                    global_it, cv_size, be, grid%ep, &
+                    xhat, iv, grid%vp6, grid%vv6, xbx, &
+                    grid, config_flags &
+!#if (WRF_CHEM == 1)
+!                   , grid%vch6 &
+!#endif
+                    )
+#endif
+#endif
       endif
       call da_transform_xtoxa (grid)
 
@@ -1357,7 +1378,7 @@
       ! [8.7] Write out diagnostics
       call wrf_message("*** WRF-Var Part 8.7 ***")
 
-      call da_write_diagnostics (it, grid, num_qcstat_conv, ob, iv, re, y, j)
+      call da_write_diagnostics (global_it, grid, num_qcstat_conv, ob, iv, re, y, j)
 
       ! Write "clean" QCed observations if requested:
       if (anal_type_qcobs) then
@@ -1366,7 +1387,7 @@
             call da_write_modified_filtered_obs (grid, ob, iv, &
                coarse_ix, coarse_jy, start_x, start_y)
           else
-            call da_write_filtered_obs (it, grid, ob, iv, &
+            call da_write_filtered_obs (global_it, grid, ob, iv, &
                coarse_ix, coarse_jy, start_x, start_y)
           end if     
          ! end if     
@@ -1375,7 +1396,7 @@
       ! [8.7.1] Write Ascii radar OMB and OMA file
 
       if (use_radarobs) then
-         call da_write_oa_radar_ascii (ob,iv,re,it)
+         call da_write_oa_radar_ascii (ob,iv,re,global_it)
       end if
 
       ! [8.3] Interpolate x_g to low resolution grid
@@ -1384,14 +1405,14 @@
 
 #if defined(CRTM) || defined(RTTOV)
       if (use_rad .and. write_oa_rad_ascii) then
-         call da_write_oa_rad_ascii (it,ob,iv,re)
+         call da_write_oa_rad_ascii (global_it,ob,iv,re)
       end if
 #endif
 
       ! [8.9] Update VarBC parameters and write output file
 #if defined(CRTM) || defined(RTTOV)      
       if ( use_rad .and. (use_varbc.or.freeze_varbc) ) &
-                call da_varbc_update(it, cv_size, xhat, iv)
+                call da_varbc_update(global_it, cv_size, xhat, iv)
 #endif
 
 
@@ -1400,19 +1421,25 @@
       !------------------------------------------------------------------------
       call wrf_message("*** WRF-Var Part 8.10 ***")
 
-      call da_transfer_xatoanalysis (it, xbx, grid, config_flags)
+      call da_transfer_xatoanalysis (global_it, xbx, grid, config_flags)
 
      if ( it < max_ext_its .and. &
           (print_detail_outerloop &
 #ifdef VAR4D
           .or. checkpoint_interval.gt.0 &
-          .or. (var4d .and. dgn_search(global_it+1).eq.1)&
+          .or. (var4d .and. dgn_search(global_it+1).eq.1 .and. .not.var4d_lbc)&
 #endif
            ) ) then
         write(outerloop,'(i2.2)') it
         call da_update_firstguess(grid,'wrfvar_output_'//outerloop)
 #ifdef VAR4D
-        !if (var4d) call da_med_initialdata_output_lbc (grid , config_flags, 'wrfvar_bdyout_'//outerloop)
+        if (var4d .and. (&
+            outer_loop_restart &
+            .or. (var4d .and. dgn_search(global_it+1).eq.1 .and. .not.var4d_lbc) &
+#if defined(LAPACK)
+            .or. (use_randomblock .and. rand_minimise) &
+#endif
+            )) call da_med_initialdata_output_lbc (grid , config_flags, 'wrfvar_bdyout_'//outerloop)
 #endif
      end if
 

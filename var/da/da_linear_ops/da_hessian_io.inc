@@ -14,7 +14,7 @@ subroutine da_hessian_io (io_config, grid, cv_size, it, nens, neign, eignvec, ei
    character,        intent(in)    :: io_config              ! 'r' = Read; 'w' = Write
    integer,          intent(in)    :: cv_size
    integer,          intent(in)    :: it
-   integer,          intent(in)    :: nens
+   integer,          intent(inout) :: nens
    integer,          intent(inout) :: neign
 
    real*8, optional, intent(inout) :: eignvec(nens, nens)
@@ -72,12 +72,15 @@ subroutine da_hessian_io (io_config, grid, cv_size, it, nens, neign, eignvec, ei
             call da_wrf_error_fatal('Incorrect cv_size in hessian_eigenpairs file')
          end if
          if (present(eignvec) .and. present(eignval) .and. present(qhat)) then
+            read(unit=ep_unit) nens
             do i = 1, nens
                read(unit=ep_unit) eignval(i)
                read(unit=ep_unit) eignvec(1:nens,i)
                read(unit=ep_unit) qhat(1:cv_size,i)
             end do
             if (present(ghat)) read(unit=ep_unit) ghat(1:cv_size)
+         else
+            read(unit=ep_unit) dummy
          end if
          close(unit=ep_unit)
       else if (io_config == 'w') then
@@ -90,6 +93,7 @@ subroutine da_hessian_io (io_config, grid, cv_size, it, nens, neign, eignvec, ei
          end if
 
          write(unit=ep_unit) neign, cv_size
+         write(unit=ep_unit) nens
          if (present(eignvec) .and. present(eignval) .and. present(qhat)) then
             do i = 1, nens
                write(unit=ep_unit) eignval(i)

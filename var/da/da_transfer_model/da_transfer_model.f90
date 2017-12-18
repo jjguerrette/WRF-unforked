@@ -42,6 +42,7 @@ module da_transfer_model
       dt_cloud_model, cp, use_ssmiretrievalobs, var4d_detail_out, &
       vertical_ip_sqrt_delta_p, vertical_ip_delta_p,check_rh_simple, check_rh_tpw, &
       t_kelvin, num_fgat_time, num_pseudo, iso_temp, interval_seconds, trajectory_io, & 
+      evalj, dgn_search, checkpoint_interval, boundary_io, &
 #if (WRF_CHEM == 1)
       chem_surf, chem_acft, num_platform, num_ant_steps, num_bb_steps, &
       init_scale, num_ts, crossval_chem_surfobs, crossval_chem_acftobs, &
