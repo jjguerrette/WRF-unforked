@@ -25,6 +25,7 @@ subroutine da_med_initialdata_output (grid , config_flags, out_filename)
    end if
 
    call da_trace ("da_med_initialdata_ouput",Message="Writing wrfvar output")
+
    call open_w_dataset (fid, trim(file_name), grid , config_flags , &
                          output_input , "DATASET=INPUT,REAL_OUTPUT_SIZE=4", ierr)
 

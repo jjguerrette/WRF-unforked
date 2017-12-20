@@ -169,6 +169,9 @@ subroutine da_output_increments(grid,config_flags,mz, &
 
                call da_hessian_io ('r',grid,cv_size,it,nmodes_REF,hess_REF%neign,hess_file=filename)
 
+               write(unit=stdout,fmt='(A,I8,2A)') &
+                           'Bayes Risk Reference: Utilizing ',nmodes_REF,' modes from ',filename
+
                allocate(qhat_REF(1:cv_size,0:nmodes_REF))
                allocate(hess_REF%eignval(1:nmodes_REF))
                allocate(hess_REF%eignvec(1:nmodes_REF,1:nmodes_REF))

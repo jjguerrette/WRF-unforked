@@ -158,6 +158,13 @@
    !Add all chem obs as they become available
    use_chemobs = any((/use_chem_surfobs,use_chem_acftobs/))
 
+   init_chem_scale = &
+      ( cv_options_chem.eq.1 .and. chem_opt(1).gt.0 .and. .not.osse_chem &
+#if defined(LAPACK)
+         .and. (rand_outer.eq.1 .or. .not.use_randomblock) &
+#endif
+         .and. (iouter_restart.eq.1 .or. .not.outer_loop_restart) )
+
    if ( .not.any((/use_nonchemobs,use_chemobs/)) ) then
       CALL wrf_error_fatal('Must use either meteorological or chemical observations to conduct DA')
    end if

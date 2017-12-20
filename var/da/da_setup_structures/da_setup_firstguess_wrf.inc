@@ -208,13 +208,7 @@ subroutine da_setup_firstguess_wrf(xbx, grid, config_flags, ens)
    mkz = grid%xb % mkz
 
 #if (WRF_CHEM == 1)
-   if (.not.osse_chem &
-   .and. (iouter_restart.eq.1 .or. .not.outer_loop_restart)&
-#if defined(LAPACK)
-   .and. (rand_outer.eq.1 .or. .not.use_randomblock) &
-#endif
-       ) then
-
+   if ( init_chem_scale ) then 
       grid%scaleant = 0.D0
       do ic = PARAM_FIRST_SCALAR, num_scaleant
          grid%scaleant(:,:,:,ic) = REAL( init_scale, 8 )

@@ -51,9 +51,10 @@ subroutine da_nl_model (it)
    if ( use_chemobs .and. cv_options_chem .gt. 0 ) then
       call da_copy_chem_to_model( head_grid, it )
 
-      !Need a first guess file that includes scaleant and scalebb
-      if ( it == 1 .or. init_osse_chem ) then
-         call da_init_model_output()
+      !Adds scaleant, scalebb, or other variables initialized in WRFDA to fg file
+      if ( it == 1 .and. init_chem_scale ) then
+!         call da_init_model_output()
+         call da_add_var_to_firstguess()
       end if
    end if
 #endif

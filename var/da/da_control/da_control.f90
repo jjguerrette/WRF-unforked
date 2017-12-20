@@ -669,4 +669,8 @@ module da_control
 
    logical, allocatable :: fgat_rain_flags(:)
 
+#if (WRF_CHEM == 1)
+   logical :: init_chem_scale = .false.
+#endif
+
 end module da_control

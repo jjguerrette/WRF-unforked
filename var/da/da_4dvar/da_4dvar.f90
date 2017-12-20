@@ -8,10 +8,17 @@ use da_control, only : comm, var4d_bin, var4d_lbc, trace_use_dull, num_fgat_time
                        init_osse_chem, calc_hx_only, &
                        cv_options, cv_options_chem, &
                        use_chemobs, use_nonchemobs, use_offlineobs, &
+                       init_chem_scale, &
+                       rootproc, &
 #endif
                        checkpoint_interval, write_checkpoints, cycle_interval
 
 #ifdef VAR4D
+
+#if (WRF_CHEM == 1)
+   use, intrinsic :: iso_c_binding,                       &
+                     ONLY: c_int32_t, C_CHAR, C_NULL_CHAR
+#endif
 
 use module_streams, only : MAX_WRF_ALARMS
 use module_io_domain, only : open_r_dataset,close_dataset,input_auxhist16
@@ -75,6 +82,7 @@ contains
 #if (WRF_CHEM == 1)
 #include "da_init_model_output.inc"
 #include "da_init_model_input.inc"
+#include "da_add_var_to_firstguess.inc"
 #endif
 #endif
 

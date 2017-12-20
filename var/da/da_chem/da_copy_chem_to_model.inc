@@ -48,7 +48,7 @@ subroutine da_copy_chem_to_model( wrfplus_grid, it )
    head_grid%J = 0.D0
    wrfplus_grid%J = 0.D0
 
-   if ( it .lt. 2 ) then
+   if (it.lt.2 .and. it.ge.0) then
       do ic = PARAM_FIRST_SCALAR, num_scaleant
          do j = jms, jme
             do k = 1, num_ant_steps

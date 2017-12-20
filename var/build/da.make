@@ -2,6 +2,7 @@
 
 WRFVAR_OBJS = \
    copyfile.o \
+   deletefile.o \
    amsr2time_.o \
    da_blas.o \
    da_lapack.o \
@@ -264,6 +265,7 @@ hires_timer.o :
 	$(CC) -c $(CFLAGS) hires_timer.c
 
 da_join_iv_for_multi_inc.o \
+deletefile.o \
 copyfile.o :
 	$(SCC) -c $(CFLAGS) $*.c
 
