@@ -20,9 +20,7 @@ subroutine da_read_basicstates ( xbx, grid, config_flags, timestr, fgat )
 #ifdef VAR4D
    if ( grid%var4d ) then
       if ( grid%trajectory_io ) then
-!         if ( checkpoint_interval .le. 0 .and. .not.evalj ) then
          if ( checkpoint_interval .le. 0 ) then
-
             call input_nl_xtraj (timestr)
          else
             call input_nl_xtraj_checkpt (timestr)
@@ -33,8 +31,7 @@ subroutine da_read_basicstates ( xbx, grid, config_flags, timestr, fgat )
          call med_auxinput_in ( grid, auxinput16_only, config_flags )
       endif
       call da_transfer_wrftoxb(xbx, grid, config_flags)
-
-      ! Needed w/ chem IC's if they are added as CVs
+      ! Needed when chem IC's added as CVs
 !#if (WRF_CHEM == 1)
 !      call da_transfer_wrftoxb_chem(grid)
 !#endif
@@ -45,8 +42,7 @@ subroutine da_read_basicstates ( xbx, grid, config_flags, timestr, fgat )
    if ( .not. grid%var4d .and. grid%num_fgat_time > 1 .and. present(fgat) ) then
       call da_med_initialdata_input (grid, config_flags, trim(fgat))
       call da_transfer_wrftoxb(xbx, grid, config_flags)
-
-      ! Needed w/ chem IC's if they are added as CVs
+      ! Needed when chem IC's added as CVs
 !#if (WRF_CHEM == 1)
 !      call da_transfer_wrftoxb_chem(grid)
 !#endif

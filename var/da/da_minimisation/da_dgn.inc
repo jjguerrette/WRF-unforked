@@ -227,6 +227,7 @@ subroutine da_dgn(grid, config_flags, cv_size, xhat, cv, &
    write(unit=stdout,fmt='(A,'//ncv_char//'F8.5)') 'Final eta from DGN: ',eta
 
 
+   ! The following steps are needed to update boundary increments at initial time
    call da_transform_vtox (grid,be%cv%size_jb,xbx,be,grid%ep,&
                             xhat(1:be%cv%size_jb),grid%vv,grid%vp &
 #if (WRF_CHEM == 1)

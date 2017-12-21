@@ -53,7 +53,6 @@ subroutine da_nl_model (it)
 
       !Adds scaleant, scalebb, or other variables initialized in WRFDA to fg file
       if ( it == 1 .and. init_chem_scale ) then
-!         call da_init_model_output()
          call da_add_var_to_firstguess()
       end if
    end if
@@ -107,8 +106,6 @@ subroutine da_nl_model (it)
          if (io_form .le. 0) call nl_set_io_form_restart ( head_grid%id, io_form_xtraj )
          rst_outname = "wrf_checkpoint_d<domain>_<date>"
          call nl_set_rst_outname ( head_grid%id, rst_outname)
-!Should not be needed, equal to default
-!         call nl_set_restart_begin_m( head_grid%id, 0 )
 #if (WRF_CHEM == 1)
       endif
 #endif

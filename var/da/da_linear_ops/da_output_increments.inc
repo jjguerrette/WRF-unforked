@@ -160,13 +160,13 @@ subroutine da_output_increments(grid,config_flags,mz, &
                !Allows hess_REF and cvt_REF to be defined in a separate inversion scenario
                ! (read in from file)
                if (read_hess_REF.eq.1) then
-!                  nmodes_REF = nmodes_hess_REF
                   filename = 'hess_REF_in'
 !               else
 !                  !Debug setting to compare against read_hess_REF==0
-!                  !Unchanged filename and nmodes_REF
+!                  !Unchanged filename
                end if
 
+               !Read nmodes_REF from file
                call da_hessian_io ('r',grid,cv_size,it,nmodes_REF,hess_REF%neign,hess_file=filename)
 
                write(unit=stdout,fmt='(A,I8,2A)') &

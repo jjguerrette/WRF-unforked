@@ -13,7 +13,7 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, nens, neign, filename
    type(domain), intent(inout)     :: grid
    character,        intent(in)    :: io_config              ! 'r' = Read; 'w' = Write
    integer,          intent(in)    :: cv_size
-   integer,          intent(inout) :: nens
+   integer,          intent(in)    :: nens
    integer,          intent(inout) :: neign
    character(len=filename_len), intent(in)  :: filename               ! I/O filename
 
@@ -54,7 +54,6 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, nens, neign, filename
 
    if (io_config == 'r') then
 
-      nens = 0
       neign = 0
 
       if (rootproc) then
@@ -95,16 +94,11 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, nens, neign, filename
             call mpi_barrier(comm, ierr)
             call da_global_to_cv(cv_size, cv_size_domain, dumcv, grid, mz, dumcv_g)
             qhat(1:cv_size,i) = dumcv
-
-            call wrf_dm_bcast_real(tempa(:,i),nens)
 #else
             qhat(1:cv_size,i) = dumcv_g
 #endif
             eignvec(:,i) = tempa(:,i)
          end do
-#ifdef DM_PARALLEL        
-         call wrf_dm_bcast_real(temp,nens)
-#endif
          eignval = temp
 
          if (present(ghat)) then
@@ -120,12 +114,12 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, nens, neign, filename
             ghat = dumcv_g
 #endif
          end if
-      else
-         if (rootproc) read(unit=ep_unit) nens
-#ifdef DM_PARALLEL
-         call mpi_barrier(comm, ierr)
-         call wrf_dm_bcast_integer(nens,1)
-#endif
+!      else
+!         if (rootproc) read(unit=ep_unit) nens
+!#ifdef DM_PARALLEL
+!         call mpi_barrier(comm, ierr)
+!         call wrf_dm_bcast_integer(nens,1)
+!#endif
       end if
       if (rootproc) close(unit=ep_unit)
    else if (io_config == 'w') then
