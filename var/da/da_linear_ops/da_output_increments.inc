@@ -50,6 +50,7 @@ subroutine da_output_increments(grid,config_flags,mz, &
    character(len=256) :: timestr
    character(len=256) :: dummy_name
    character(len=filename_len)     :: filename
+   character(len=filename_len)     :: cvtfile
    character*10                    :: cproc
    character*10                    :: cmode
    character*10                    :: cit
@@ -180,6 +181,9 @@ subroutine da_output_increments(grid,config_flags,mz, &
                call da_hessian_io ('r',grid,cv_size,it,nmodes_REF,hess_REF%neign, &
                             hess_REF%eignvec,hess_REF%eignval,qhat_REF,mz, &
                             cvt_REF,hess_file=filename)
+
+               cvtfile = 'cvt_REF_in'
+               call da_cv_io ('r', cvtfile, cv_size, cvt_REF(1:cv_size), grid, mz)
             else
                qhat_REF => qhat
                allocate(hess_REF%eignval(1:nmodes_REF))

@@ -684,6 +684,24 @@
               close(cvt_unit)
 
               global_it = iouter_restart
+
+!!USED FOR DEBUGGING ONLY
+!      if (var4d_inc_out) then
+!         write(cproc,fmt='(i4.4)') myproc
+!         write(cit,fmt='(i2.2)') global_it-1
+!         cvtfile_rand = 'cvt_REF_out.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
+!         call da_cv_io ('w', cvtfile_rand, cv_size, cvt(1:cv_size), grid, mz)
+!
+!         call wrf_message("*** WRF-Var initialized cvt ***")
+!         if (trace_use) call da_trace_exit("da_wrfvar_main")
+!         if (trace_use) call da_trace_report
+!
+!         call wrfu_finalize
+!         call wrf_shutdown
+!         stop
+!      endif
+!!USED FOR DEBUGGING ONLY
+
             else
               outer_loop_restart = .false.
               write(unit=message(1),fmt='(a)') "cvt file '"//trim(cvtfile)//"' does not exists, initiallizing cvt."
@@ -1205,33 +1223,13 @@
       end if
 
 #ifdef DM_PARALLEL
-   IF ( rootproc ) CALL end_timing('da_end_timing: HESS_vector_multiply')
+      IF ( rootproc ) CALL end_timing('da_end_timing: HESS_vector_multiply')
 #endif
 
-#ifdef VAR4D
-#ifdef DM_PARALLEL
-      IF ( rootproc ) CALL start_timing
-#endif
-      if (var4d) then
-      if (dgn_search(global_it).eq.1 .and. .not.var4d_lbc) then
-         call da_dgn(grid, config_flags, cv_size, xhat, cvt, &
-                     xbx, be, iv, ob, &
-                     j0_cost, j0_total, global_it, mz)
-#if (WRF_CHEM == 1)
-      else if ( dgn_search(global_it) .eq. 2 .and. eta_emiss .lt. 1.D0 .and. eta_emiss .gt. 0.D0 ) then
-         call da_hdgn(global_it, cv_size, be, xhat)
-#endif
-      end if
-      end if
-#ifdef DM_PARALLEL
-      IF ( rootproc ) CALL end_timing('da_end_timing: LINESEARCH')
-#endif
-#endif
-
-#ifdef DM_PARALLEL
-   IF ( rootproc ) CALL start_timing
-#endif
       if ( var4d .and. var4d_inc_out .and. allocated(hessian_info%ghat) ) then
+#ifdef DM_PARALLEL
+         IF ( rootproc ) CALL start_timing
+#endif
          call da_output_increments( grid,config_flags,mz, &
                                     global_it,cv_size,xbx,be, &
                                     cvt,hessian_info)
@@ -1249,22 +1247,49 @@
 #ifdef DM_PARALLEL
          IF ( rootproc ) CALL end_timing('da_end_timing: increment_diagnostics')
 #endif
-#ifdef DM_PARALLEL
-         IF ( rootproc ) CALL start_timing
-#endif
       end if
 
+#ifdef VAR4D
+      if (var4d) then
+#ifdef DM_PARALLEL
+      IF ( rootproc ) CALL start_timing
+#endif
+      if (dgn_search(global_it).eq.1 .and. .not.var4d_lbc) then
+         call da_dgn(grid, config_flags, cv_size, xhat, cvt, &
+                     xbx, be, iv, ob, &
+                     j0_cost, j0_total, global_it, mz)
+#if (WRF_CHEM == 1)
+      else if ( dgn_search(global_it) .eq. 2 .and. eta_emiss .lt. 1.D0 .and. eta_emiss .gt. 0.D0 ) then
+         call da_hdgn(global_it, cv_size, be, xhat)
+#endif
+      end if
+#ifdef DM_PARALLEL
+      IF ( rootproc ) CALL end_timing('da_end_timing: LINESEARCH')
+#endif
+      end if
+#endif
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
       ! Update outer-loop control variable
       cvt = cvt + xhat
 
 #if defined(LAPACK)
-      if (use_randomblock .and. rand_minimise) then
+      if ((use_randomblock .and. rand_minimise)) then
          write(cproc,fmt='(i4.4)') myproc
          write(cit,fmt='(i2.2)') rand_outer
          cvtfile_rand = 'cvt.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
          call da_cv_io ('w', cvtfile_rand, cv_size, cvt(1:cv_size), grid, mz)
       else
 #endif
+      if (var4d_inc_out) then
+         write(cproc,fmt='(i4.4)') myproc
+         write(cit,fmt='(i2.2)') global_it
+         cvtfile_rand = 'cvt_REF_out.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
+         call da_cv_io ('w', cvtfile_rand, cv_size, cvt(1:cv_size), grid, mz)
+      endif
+
       if ( outer_loop_restart ) then
         open(unit=cvt_unit,status='unknown',file=trim(cvtfile),iostat=iost,form='UNFORMATTED')
         if (iost /= 0) then
@@ -1281,7 +1306,6 @@
 #if defined(LAPACK)
       end if
 #endif
-
       !------------------------------------------------------------------------
 #if (WRF_CHEM == 1)
       if (osse_chem .or. use_iter_metrics) then
