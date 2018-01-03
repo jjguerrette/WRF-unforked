@@ -85,60 +85,68 @@ subroutine da_output_increments(grid,config_flags,mz, &
 
    icount = 0
 
-   do imode = nmodes, 1, -inc_out_interval
+   do imode = nmodes, 0, -inc_out_interval
       allocate(eignval(1:imode))
       allocate(eignvec(1:imode,1:imode))
 
-      neign = hessian_info%eigs(imode)%neign
-      eignval = hessian_info%eigs(imode)%eignval
-      eignvec = hessian_info%eigs(imode)%eignvec
+      if (imode .gt. 0) then 
+         neign = hessian_info%eigs(imode)%neign
+         eignval = hessian_info%eigs(imode)%eignval
+         eignvec = hessian_info%eigs(imode)%eignvec
+      else
+         neign = 0
+      end if
 
       EUCNORM_xPa = 0.D0
    
       do itype = 1, iend
          icount = icount+ 1
-!!!      if ((minval(eignval(1:np)) .lt. 2.D0 .and. adapt_svd.eq.1) .or. adapt_svd.gt.1) then
-         if (itype .eq. 2) then
-            do i = 1, neign
-               LAM(i) = - (eignval(i) - 1.D0) / eignval(i)
-            end do
-
-            PREFIX = 'LRU'
-         else
-            do i = 1, neign
-               LAM(i) = 1.D0 / eignval(i)
-            end do
-
-            PREFIX = 'LRA'
-            if (use_lanczos) PREFIX = 'CGLZ'
-         end if
-         write(unit=filename,fmt='(2a,i2.2,a,i4.4)') trim(PREFIX),'inc_it',it,'_nmode',imode
-
          xhat = 0.D0
 
-         call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
-                                imode,imode,neign, &
-                                LAM(1:imode),eignvec,qhat(:,0:imode), &
-                                ghat,xhat)
 
-         if (itype .eq. 2) then !LRU
-            xhat = xhat + ghat
-         end if
+         if (imode .gt. 0) then
 
-         if (spectral_precon .and. it.gt.1) &
-            call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
-                                    it-1, xhat, xhat, 'TL' )
+   !!!      if ((minval(eignval(1:np)) .lt. 2.D0 .and. adapt_svd.eq.1) .or. adapt_svd.gt.1) then
+            if (itype .eq. 2) then
+               do i = 1, neign
+                  LAM(i) = - (eignval(i) - 1.D0) / eignval(i)
+               end do
 
-         call da_transform_vtox (grid,be%cv%size_jb,xbx,be,grid%ep,&
-                                 xhat(1:be%cv%size_jb),grid%vv,grid%vp &
+               PREFIX = 'LRU'
+            else
+               do i = 1, neign
+                  LAM(i) = 1.D0 / eignval(i)
+               end do
+
+               PREFIX = 'LRA'
+               if (use_lanczos) PREFIX = 'CGLZ'
+            end if
+            write(unit=filename,fmt='(2a,i2.2,a,i4.4)') trim(PREFIX),'inc_it',it,'_nmode',imode
+
+            call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
+                                   imode,imode,neign, &
+                                   LAM(1:imode),eignvec,qhat(:,0:imode), &
+                                   ghat,xhat)
+
+            if (itype .eq. 2) then !LRU
+               xhat = xhat + ghat
+            end if
+
+            if (spectral_precon .and. it.gt.1) &
+               call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
+                                       it-1, xhat, xhat, 'TL' )
+
+            call da_transform_vtox (grid,be%cv%size_jb,xbx,be,grid%ep,&
+                                    xhat(1:be%cv%size_jb),grid%vv,grid%vp &
 #if (WRF_CHEM == 1)
-                                 , grid%vch &
+                                    , grid%vch &
 #endif
-                                 )
+                                    )
 
-         call domain_clock_get( grid, current_timestr=timestr )
-         config_flags%auxhist18_outname = trim(filename)
-         call da_transfer_xatowrftl(grid, config_flags, 'DUMM', timestr, .true.)
+            call domain_clock_get( grid, current_timestr=timestr )
+            config_flags%auxhist18_outname = trim(filename)
+            call da_transfer_xatowrftl(grid, config_flags, 'DUMM', timestr, .true.)
+         end if
 
          !-----------------------------------------
          ! Calculate ||dx - dx_REF||^2_{Pa_REF^-1}

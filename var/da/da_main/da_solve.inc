@@ -1505,6 +1505,15 @@
        (config_flags%real_data_init_type == 3)) then
       call da_update_firstguess(input_grid)
 #ifdef VAR4D
+      if (var4d .and. (&
+            outer_loop_restart &
+            .or. (var4d .and. dgn_search(global_it+1).eq.1 .and. .not.var4d_lbc) &
+#if defined(LAPACK)
+            .or. (use_randomblock .and. rand_minimise) &
+#endif
+            )) call da_med_initialdata_output_lbc (input_grid , config_flags, 'wrfvar_bdyout')
+#endif
+
       !if (var4d) call da_med_initialdata_output_lbc (head_grid , config_flags)
       if ( var4d_lbc ) then
          call domain_clock_get (grid, stop_timestr=timestr1)
