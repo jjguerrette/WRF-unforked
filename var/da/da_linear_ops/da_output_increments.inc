@@ -265,8 +265,8 @@ subroutine da_output_increments(grid,config_flags,mz, &
       EUCNORM_xPa = 0.D0
  
       if (imode .gt. 0) then
-         SUMLAM = sum(eignval(1:imode))
-         SUMLAM3 = sum(eignval(1:imode)**3)
+         SUMLAM = sum(eignval(1:imode) - 1.D0)
+         SUMLAM3 = sum((eignval(1:imode) - 1.D0)**3)
       else
          SUMLAM = 0.D0 
          SUMLAM3 = 0.D0 
