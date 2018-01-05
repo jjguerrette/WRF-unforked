@@ -15,7 +15,9 @@ subroutine da_ad_model ()
    call setfeenv()
 #endif
 
+#if (WRF_CHEM == 1)
    IF ( use_nonchemobs ) THEN
+#endif
       ! Set the file names and interval for reading basic states.
       model_config_rec%auxinput16_inname = "auxhist6_d<domain>_<date>"
       call nl_get_time_step ( head_grid%id, time_step )
@@ -28,7 +30,9 @@ subroutine da_ad_model ()
       call nl_set_auxinput17_interval_s ( head_grid%id, var4d_bin )
       call nl_set_io_form_auxinput17 ( head_grid%id, 2 )
       call nl_set_frames_per_auxinput17 ( head_grid%id, 1 )
+#if (WRF_CHEM == 1)
    ENDIF
+#endif
    call nl_get_gwd_opt ( head_grid%id, gwd_opt )
 
    ! Set all perturbation to ZERO

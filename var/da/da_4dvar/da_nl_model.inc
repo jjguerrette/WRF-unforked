@@ -10,9 +10,7 @@ subroutine da_nl_model (it)
    integer, intent(in) :: it ! outer looper counter.
    integer :: time_step, alarmid
    character(len=256) :: rst_outname
-#if (WRF_CHEM == 1)
    integer :: ioform8, ioform16, io_form
-#endif
 
    if (trace_use_dull) call da_trace_entry("da_nl_model")
 

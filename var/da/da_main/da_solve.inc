@@ -1512,7 +1512,6 @@
             .or. (use_randomblock .and. rand_minimise) &
 #endif
             )) call da_med_initialdata_output_lbc (input_grid , config_flags, 'wrfvar_bdyout')
-#endif
 
       !if (var4d) call da_med_initialdata_output_lbc (head_grid , config_flags)
       if ( var4d_lbc ) then

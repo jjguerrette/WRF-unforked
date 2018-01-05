@@ -16,7 +16,9 @@ subroutine da_tl_model ()
    call setfeenv()
 #endif
 
+#if (WRF_CHEM == 1)
    IF ( use_nonchemobs ) THEN
+#endif
       ! Set up perturbation output at each slots
       model_config_rec%auxhist18_outname = "tl_d<domain>_<date>"
       call nl_set_auxhist18_interval_s ( head_grid%id, var4d_bin ) 
@@ -32,7 +34,9 @@ subroutine da_tl_model ()
       call nl_set_io_form_auxinput16 ( head_grid%id, 2 )
       call nl_set_frames_per_auxinput16 ( head_grid%id, 1 )
       call nl_get_gwd_opt ( head_grid%id, gwd_opt )
+#if (WRF_CHEM == 1)
    ENDIF
+#endif
 
    ! Set all perturbation to ZERO
 
