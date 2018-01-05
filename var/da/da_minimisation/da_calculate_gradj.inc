@@ -54,7 +54,8 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
    real             :: gnorm_j, gnorm_jo, gnorm_jb, gnorm_je, gnorm_jd, gnorm_jp, gnorm_js, gnorm_jl
    logical          :: jcdf_flag
 
-    real            :: cv_dummy(cv_size)
+    real            :: cv_dummy1(cv_size)
+    real            :: cv_dummy2(cv_size)
     real            :: cv_spectral(cv_size)
 
    ! Variables for VarBC background constraint
@@ -108,6 +109,8 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
    call da_allocate_y_chem(iv, jo_grad_y)
 #endif
 
+   cv_dummy1 = cv
+
    if (present(re)) then
       call da_calculate_grady(iv, re, jo_grad_y)   
       if ( iter > 0 .and. test_gradient ) jcdf_flag = .true.
@@ -119,20 +122,17 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
 #endif
               )
    else
-
+      !Apply preconditioner:  P * cv
       if (( &
 #if defined(LAPACK)
             use_randomblock .or. &
 #endif
             use_lanczos) .and. spectral_precon .and. it.gt.1) then
          call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
-                                 it-1, cv, cv_spectral, 'TL' )
-         cv_dummy = cv_spectral
-      else
-         cv_dummy = cv
+                                 it-1, cv, cv_dummy1, 'TL' )
       end if
 
-      call da_transform_vtoy(cv_size, be, grid%ep, cv_dummy, iv, grid%vp, &
+      call da_transform_vtoy(cv_size, be, grid%ep, cv_dummy1, iv, grid%vp, &
               grid%vv, grid%vp6, grid%vv6, xbx, y, grid, config_flags &
 #if (WRF_CHEM == 1)
               , grid%vch &
@@ -149,36 +149,56 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
       grad_jo = - grad_jo    !! Compensate for sign in calculation of grad_v (Jo)
    end if
 
+   !Apply preconditioner: P^T * (L^T H^T R^-1 H L * P * cv)
    if (( &
 #if defined(LAPACK)
          use_randomblock .or. &
 #endif
          use_lanczos) .and. spectral_precon .and. it.gt.1) then
-      if (.not.present(re)) grad_jo = cv_spectral + grad_jo !Not entirely sure on relative sign of grad_jo here due to compensation above
+
+#if defined(LAPACK)
+      !Account for the fact that use_randblock multiplies vector only by obs. Hessian
+      if (.not.present(re) .and. use_randomblock) grad_jo = cv_dummy1 + grad_jo
+#endif
+
+      cv_dummy2 = grad_jo
 
       call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
-                              it-1, grad_jo, grad_jo, 'AD' )
+                              it-1, cv_dummy2, grad_jo, 'AD' )
 
-      if (.not.present(re)) then
-         grad_jo = grad_jo - cv !Not entirely sure on relative sign of grad_jo here due to compensation above
-      end if
+#if defined(LAPACK)
+      !Account for the fact that use_randblock multiplies vector only by obs. Hessian
+      if (.not.present(re) .and. use_randomblock) grad_jo = grad_jo - cv
+#endif
    end if
      
    call da_deallocate_y(jo_grad_y)
 
 #if defined(LAPACK)
-   if ( .not. use_randomblock ) then
+   if ( .not.use_randomblock .or. present(re)) then
 #endif
+
+   cv_spectral = cv
+
+   !Apply preconditioner: P^T * (I_n * P * cv) (Hessian-multiplication)  or simply  P^T * cv (gradient)
+   if (( &
+#if defined(LAPACK)
+         use_randomblock .or. &
+#endif
+         use_lanczos) .and. spectral_precon .and. it.gt.1) then
+      call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
+                              it-1, cv_dummy1, cv_spectral, 'AD' )
+   end if
 
    !-------------------------------------------------------------------------
    ! [2.0] calculate grad_v (jb):
    !-------------------------------------------------------------------------
-   if (cv_size_jb > 0) grad_jb(1:cv_size_jb) = jb_factor * cv(1:cv_size_jb)
+   if (cv_size_jb > 0) grad_jb(1:cv_size_jb) = jb_factor * cv_spectral(1:cv_size_jb)
 
    !-------------------------------------------------------------------------
    ! [3.0] calculate grad_v (je):
    !-------------------------------------------------------------------------
-   if (cv_size_je > 0) grad_je(je_start:je_end) = je_factor * cv(je_start:je_end)
+   if (cv_size_je > 0) grad_je(je_start:je_end) = je_factor * cv_spectral(je_start:je_end)
    
    !----------------------------------------------------------------------
    ! [3.1] calculate grad_v (jd):
@@ -191,7 +211,7 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
       grid%xa%grad_p_x(:,:,:)=0.0
       grid%xa%grad_p_y(:,:,:)=0.0
 
-      call da_transform_vtod_wpec(cv_size, be, grid%ep, cv, grid%vp, grid%vv, xbx, grid)
+      call da_transform_vtod_wpec(cv_size, be, grid%ep, cv_spectral, grid%vp, grid%vv, xbx, grid)
 
       grid%xa%grad_p_x=(grid%xa%grad_p_x)/wpec_factor
       grid%xa%grad_p_y=(grid%xa%grad_p_y)/wpec_factor
@@ -214,7 +234,7 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
 	       bgerr  = iv%instid(inst)%varbc(ichan)%bgerr(ipred)
 	       if (bgerr > 0.0) &
                   grad_jp(id) = (1/sqrt(bgerr)) * &
-                     SUM(cv(id) * iv%instid(inst)%varbc(ichan)%vtox(ipred,1:npred))
+                     SUM(cv_spectral(id) * iv%instid(inst)%varbc(ichan)%vtox(ipred,1:npred))
 	    end do
          end do
       end do
@@ -230,17 +250,17 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
          ! Skin Temperature
          !-----------------
 	    if (use_satcv(1)) &
-            grad_js(iv%instid(inst)%cv_index(n)%ts) = cv(iv%instid(inst)%cv_index(n)%ts)
+            grad_js(iv%instid(inst)%cv_index(n)%ts) = cv_spectral(iv%instid(inst)%cv_index(n)%ts)
 	    
          ! Cloud cover(s)
          !---------------
 	    if (use_satcv(2)) then
-	    grad_js(iv%instid(inst)%cv_index(n)%cc) = cv(iv%instid(inst)%cv_index(n)%cc)
+	    grad_js(iv%instid(inst)%cv_index(n)%cc) = cv_spectral(iv%instid(inst)%cv_index(n)%cc)
 
-	    WHERE (cv(iv%instid(inst)%cv_index(n)%cc) < 0.0 .or.                                &
-	           cv(iv%instid(inst)%cv_index(n)%cc) > 1.0 )                                   &
+	    WHERE (cv_spectral(iv%instid(inst)%cv_index(n)%cc) < 0.0 .or.                                &
+	           cv_spectral(iv%instid(inst)%cv_index(n)%cc) > 1.0 )                                   &
 	    grad_js(iv%instid(inst)%cv_index(n)%cc) = grad_js(iv%instid(inst)%cv_index(n)%cc) + &
-                                                       10.0 * cv(iv%instid(inst)%cv_index(n)%cc)
+                                                       10.0 * cv_spectral(iv%instid(inst)%cv_index(n)%cc)
             end if
 	 end do
       end do	      
@@ -249,7 +269,7 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
    !-------------------------------------------------------------------------
    ! [6.0] calculate grad_v (jl):
    !-------------------------------------------------------------------------
-   if (cv_size_jl > 0) grad_jl(jl_start:jl_end) = cv(jl_start:jl_end)
+   if (cv_size_jl > 0) grad_jl(jl_start:jl_end) = cv_spectral(jl_start:jl_end)
 
 #if defined(LAPACK)
    end if !use_randomblock test

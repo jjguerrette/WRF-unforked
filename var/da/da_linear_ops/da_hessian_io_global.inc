@@ -79,7 +79,6 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, nens, neign, filename
 
       if (present(eignvec) .and. present(eignval) .and. present(qhat)) then
          if (rootproc) read(unit=ep_unit) dummy
-
          do i = 1, nens
             if (rootproc) then
                read(unit=ep_unit) temp(i)

@@ -31,7 +31,7 @@ subroutine da_output_increments(grid,config_flags,mz, &
    integer                      :: jp_start, jp_end       ! Start/end indices of Jp.
 !   integer                      :: jl_start, jl_end       ! Start/end indices of Jl.
 
-   integer :: i, imode, nmodes, nmodes_REF, neign, itype, iend, icount
+   integer :: i, j, imode, nmodes, nmodes_REF, neign, itype, iend, icount
    real*8, allocatable :: LAM(:)
    real*8, allocatable :: eignval(:)
    real*8, allocatable :: eignvec(:,:)
@@ -40,7 +40,7 @@ subroutine da_output_increments(grid,config_flags,mz, &
    real*8 :: xhat(1:cv_size)
    real*8 :: cvt_REF(1:cv_size)
    real*8 :: dvnorm_(1:cv_size)
-   real*8 :: EUCNORM_xPa(2), SUMLAM, SUMLAM3
+   real*8 :: EUCNORM_xPa(2), EUCNORM_v(2), SUMLAM, SUMLAM3
 !   real*8 :: minlam(1:1)
    type(hessian_eig_type) :: hess_REF
    real*8, pointer :: qhat_REF(:,:)
@@ -54,6 +54,10 @@ subroutine da_output_increments(grid,config_flags,mz, &
    character*10                    :: cproc
    character*10                    :: cmode
    character*10                    :: cit
+
+   real, allocatable                 :: temp_e(:)
+   real                              :: temp_l
+   logical                           :: swapped
 
    if (trace_use) call da_trace_entry("da_output_increments")
 
@@ -85,6 +89,9 @@ subroutine da_output_increments(grid,config_flags,mz, &
 
    icount = 0
 
+   write(unit=stdout,fmt='(A)') &
+      'EUCNORM_BY_ITER_AND_SAMPLE: imode,neign,min(lambda),EUCNORM_xPa[LRA,LRU],EUCNORM_v[LRA,LRU] = '
+
    do imode = nmodes, 0, -inc_out_interval
       allocate(eignval(1:imode))
       allocate(eignvec(1:imode,1:imode))
@@ -98,15 +105,14 @@ subroutine da_output_increments(grid,config_flags,mz, &
       end if
 
       EUCNORM_xPa = 0.D0
-   
+      EUCNORM_v = 0.D0
+  
       do itype = 1, iend
          icount = icount+ 1
          xhat = 0.D0
 
 
          if (imode .gt. 0) then
-
-   !!!      if ((minval(eignval(1:np)) .lt. 2.D0 .and. adapt_svd.eq.1) .or. adapt_svd.gt.1) then
             if (itype .eq. 2) then
                do i = 1, neign
                   LAM(i) = - (eignval(i) - 1.D0) / eignval(i)
@@ -136,13 +142,13 @@ subroutine da_output_increments(grid,config_flags,mz, &
                call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
                                        it-1, xhat, xhat, 'TL' )
 
-            call da_transform_vtox (grid,be%cv%size_jb,xbx,be,grid%ep,&
-                                    xhat(1:be%cv%size_jb),grid%vv,grid%vp &
-#if (WRF_CHEM == 1)
-                                    , grid%vch &
-#endif
-                                    )
-
+!            call da_transform_vtox (grid,be%cv%size_jb,xbx,be,grid%ep,&
+!                                    xhat(1:be%cv%size_jb),grid%vv,grid%vp &
+!#if (WRF_CHEM == 1)
+!                                    , grid%vch &
+!#endif
+!                                    )
+!
 !            !Output increment for each imode value
 !            call domain_clock_get( grid, current_timestr=timestr )
 !            config_flags%auxhist18_outname = trim(filename)
@@ -182,7 +188,8 @@ subroutine da_output_increments(grid,config_flags,mz, &
                !Read nmodes_REF from file
                call da_hessian_io ('r',grid,cv_size,it,nmodes_REF,hess_REF%neign,hess_file=filename)
 
-               write(unit=stdout,fmt='(A,I8,2A)') &
+               if (read_hess_REF.ne.3) &
+                  write(unit=stdout,fmt='(A,I8,2A)') &
                            'Bayes Risk Reference: Utilizing ',nmodes_REF,' modes from ',filename
 
                allocate(qhat_REF(1:cv_size,0:nmodes_REF))
@@ -207,6 +214,9 @@ subroutine da_output_increments(grid,config_flags,mz, &
             end if
             if (read_hess_REF.le.0 .or. read_hess_REF.eq.3) then
                nmodes_REF = nmodes
+
+               write(unit=stdout,fmt='(A,I8,2A)') &
+                        'Bayes Risk Reference: Utilizing ',nmodes_REF,' modes from this outer iteration.'
 
                qhat_REF => qhat
                allocate(hess_REF%eignval(1:nmodes_REF))
@@ -241,11 +251,14 @@ subroutine da_output_increments(grid,config_flags,mz, &
 
          !Multiply (dv - dv_REF)^T * Pav_REF^-1 * (dv - dv_REF) = ||dx - dx_REF||^2_{Pa_REF^-1}
          EUCNORM_xPa(itype) = da_dot_cv(cv_size, xhat, dvnorm_, grid, mz, jp_start, jp_end)
+
+         EUCNORM_v(itype) = da_dot_cv(cv_size, xhat, xhat, grid, mz, jp_start, jp_end)
+
       end do
 
-      write(unit=stdout,fmt='(A,2I6,3E27.16E3)') &
-         'BY_ITER_AND_SAMPLE: imode,neign,min(lambda),EUCNORM_xPa[LRA,LRU] = ',&
-         imode,neign,minval(eignval),EUCNORM_xPa
+      write(unit=stdout,fmt='(A,2I6,5E27.16E3)') &
+         'EUCNORM_BY_ITER_AND_SAMPLE: ',&
+         imode,neign,minval(eignval),EUCNORM_xPa,EUCNORM_v
 
       deallocate(eignval)
       deallocate(eignvec)
@@ -261,8 +274,34 @@ subroutine da_output_increments(grid,config_flags,mz, &
    eignval = hessian_info%eigs(nmodes)%eignval
    eignvec = hessian_info%eigs(nmodes)%eignvec
 
-   do imode = nmodes, 0, -1
+   !Sort eigenvalues and eigenvectors in descending order
+   allocate(temp_e(1:nmodes))
+   do j = nmodes-1, 1, -1
+     swapped = .false.
+     do i = 1, j
+       if (eignval(i) .lt. eignval(i+1)) then
+         temp_l = eignval(i)
+         eignval(i) = eignval(i+1)
+         eignval(i+1) = temp_l
+
+         temp_e = eignvec(:,i)
+         eignvec(:,i) = eignvec(:,i+1)
+         eignvec(:,i+1) = temp_e
+
+         swapped = .true.
+       end if
+     end do
+     if (.NOT. swapped) exit
+   end do
+   deallocate(temp_e)
+
+
+   write(unit=stdout,fmt='(A)') &
+      'EUCNORM_BY_FINAL_MODES: imode,neign,min(lambda),EUCNORM_xPa[LRA,LRU],EUCNORM_v[LRA,LRU], SUM(LAM), SUM(LAM^3) = '
+
+   do imode = 0, nmodes
       EUCNORM_xPa = 0.D0
+      EUCNORM_v = 0.D0
  
       if (imode .gt. 0) then
          SUMLAM = sum(eignval(1:imode) - 1.D0)
@@ -293,7 +332,7 @@ subroutine da_output_increments(grid,config_flags,mz, &
 
             call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
                                    nmodes,neign,imode, &
-                                   LAM,eignvec,qhat(:,0:nmodes), &
+                                   LAM,eignvec,qhat, &
                                    ghat,xhat)
 
             if (itype .eq. 2) then !LRU
@@ -303,13 +342,6 @@ subroutine da_output_increments(grid,config_flags,mz, &
             if (spectral_precon .and. it.gt.1) &
                call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
                                        it-1, xhat, xhat, 'TL' )
-
-            call da_transform_vtox (grid,be%cv%size_jb,xbx,be,grid%ep,&
-                                    xhat(1:be%cv%size_jb),grid%vv,grid%vp &
-#if (WRF_CHEM == 1)
-                                    , grid%vch &
-#endif
-                                    )
          end if
 
 
@@ -330,11 +362,13 @@ subroutine da_output_increments(grid,config_flags,mz, &
 
          !Multiply (dv - dv_REF)^T * Pav_REF^-1 * (dv - dv_REF) = ||dx - dx_REF||^2_{Pa_REF^-1}
          EUCNORM_xPa(itype) = da_dot_cv(cv_size, xhat, dvnorm_, grid, mz, jp_start, jp_end)
+
+         EUCNORM_v(itype) = da_dot_cv(cv_size, xhat, xhat, grid, mz, jp_start, jp_end)
       end do
 
-      write(unit=stdout,fmt='(A,2I6,5E27.16E3)') &
-         'BY_FINAL_MODES: imode,neign,min(lambda),EUCNORM_xPa[LRA,LRU], SUM(LAM), SUM(LAM^3) = ',&
-         imode,neign,minval(eignval),EUCNORM_xPa, SUMLAM, SUMLAM3
+      write(unit=stdout,fmt='(A,2I6,7E27.16E3)') &
+         'EUCNORM_BY_FINAL_MODES: ',&
+         imode,neign,minval(eignval),EUCNORM_xPa, EUCNORM_v, SUMLAM, SUMLAM3
    end do
 
    deallocate(eignval)

@@ -42,16 +42,15 @@ subroutine da_hessian_io (io_config, grid, cv_size, it, nens, neign, eignvec, ei
 
    if ( io_config == 'r' .and. .not.any((/present(eignvec),present(eignval),present(qhat)/)) ) then
       call da_get_unit (ep_unit)
-
-      write(*,*) 'Reading nens and neign from Hessian eigenpair file: ',trim(filename)
-      open (unit=ep_unit, file = trim(filename), form = 'unformatted', iostat =  iostat, status = 'old')  
-      if (iostat .ne. 0) then
-         write(unit=message(1),fmt='(A,I5)') "Error message: ",iostat
-         call da_warning(__FILE__,__LINE__,message(1:1))
-         call da_wrf_error_fatal('Error opening hessian file')
-      end if
-
       if (rootproc) then
+         write(*,*) 'Reading nens and neign from Hessian eigenpair file: ',trim(filename)
+         open (unit=ep_unit, file = trim(filename), form = 'unformatted', iostat =  iostat, status = 'old')
+         if (iostat .ne. 0) then
+            write(unit=message(1),fmt='(A,I5)') "Error message: ",iostat
+            call da_warning(__FILE__,__LINE__,message(1:1))
+            call da_wrf_error_fatal('Error opening hessian file')
+         end if
+
          read(unit=ep_unit) neign, dummy
          read(unit=ep_unit) nens
       end if
