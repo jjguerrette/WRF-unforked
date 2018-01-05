@@ -11,9 +11,7 @@ USE module_state_description, ONLY : PARAM_FIRST_SCALAR, num_moist, num_tracer, 
 #endif
                                      num_scalar
 
-#if (WRF_CHEM == 1)
-USE module_configure, ONLY: model_config_rec, grid_config_rec_type
-#endif
+USE module_configure, ONLY: grid_config_rec_type
 
 #ifdef DM_PARALLEL
 USE module_dm, ONLY : local_communicator, mytask, ntasks, ntasks_x, ntasks_y
