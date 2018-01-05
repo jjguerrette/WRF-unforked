@@ -40,7 +40,7 @@ subroutine da_output_increments(grid,config_flags,mz, &
    real*8 :: xhat(1:cv_size)
    real*8 :: cvt_REF(1:cv_size)
    real*8 :: dvnorm_(1:cv_size)
-   real*8 :: EUCNORM_xPa(2)
+   real*8 :: EUCNORM_xPa(2), SUMLAM, SUMLAM3
 !   real*8 :: minlam(1:1)
    type(hessian_eig_type) :: hess_REF
    real*8, pointer :: qhat_REF(:,:)
@@ -143,9 +143,10 @@ subroutine da_output_increments(grid,config_flags,mz, &
 #endif
                                     )
 
-            call domain_clock_get( grid, current_timestr=timestr )
-            config_flags%auxhist18_outname = trim(filename)
-            call da_transfer_xatowrftl(grid, config_flags, 'DUMM', timestr, .true.)
+!            !Output increment for each imode value
+!            call domain_clock_get( grid, current_timestr=timestr )
+!            config_flags%auxhist18_outname = trim(filename)
+!            call da_transfer_xatowrftl(grid, config_flags, 'DUMM', timestr, .true.)
          end if
 
          !-----------------------------------------
@@ -163,12 +164,15 @@ subroutine da_output_increments(grid,config_flags,mz, &
                          eignvec,eignval,qhat,mz, &
                          cvt_REF,hess_file=filename)
 
-            nmodes_REF = nmodes
+            if (read_cvt_REF.eq.1) then
+               cvtfile = 'cvt_REF_in'
+               call da_cv_io ('r', cvtfile, cv_size, cvt_REF(1:cv_size), grid, mz)
+            end if
 
             if (read_hess_REF.gt.0) then
                !Allows hess_REF and cvt_REF to be defined in a separate inversion scenario
                ! (read in from file)
-               if (read_hess_REF.eq.1) then
+               if (read_hess_REF.eq.1 .or. read_hess_REF.eq.3) then
                   filename = 'hess_REF_in'
 !               else
 !                  !Debug setting to compare against read_hess_REF==0
@@ -186,13 +190,24 @@ subroutine da_output_increments(grid,config_flags,mz, &
                allocate(hess_REF%eignvec(1:nmodes_REF,1:nmodes_REF))
 
                qhat_REF(:,0) = 0.D0
-               call da_hessian_io ('r',grid,cv_size,it,nmodes_REF,hess_REF%neign, &
-                            hess_REF%eignvec,hess_REF%eignval,qhat_REF,mz, &
-                            cvt_REF,hess_file=filename)
+               if (read_cvt_REF.eq.2) then
+                  call da_hessian_io ('r',grid,cv_size,it,nmodes_REF,hess_REF%neign, &
+                               hess_REF%eignvec,hess_REF%eignval,qhat_REF,mz, &
+                               cvt_REF,hess_file=filename)
+               else
+                  call da_hessian_io ('r',grid,cv_size,it,nmodes_REF,hess_REF%neign, &
+                               hess_REF%eignvec,hess_REF%eignval,qhat_REF,mz, &
+                               hess_file=filename)
+               end if
+               if (read_hess_REF.eq.3) then
+                  deallocate(hess_REF%eignval)
+                  deallocate(hess_REF%eignvec)
+                  deallocate(qhat_REF)
+               end if
+            end if
+            if (read_hess_REF.le.0 .or. read_hess_REF.eq.3) then
+               nmodes_REF = nmodes
 
-               cvtfile = 'cvt_REF_in'
-               call da_cv_io ('r', cvtfile, cv_size, cvt_REF(1:cv_size), grid, mz)
-            else
                qhat_REF => qhat
                allocate(hess_REF%eignval(1:nmodes_REF))
                allocate(hess_REF%eignvec(1:nmodes_REF,1:nmodes_REF))
@@ -229,13 +244,101 @@ subroutine da_output_increments(grid,config_flags,mz, &
       end do
 
       write(unit=stdout,fmt='(A,2I6,3E27.16E3)') &
-         'imode,neign,min(lambda),EUCNORM_xPa[LRA,LRU] = ',&
+         'BY_ITER_AND_SAMPLE: imode,neign,min(lambda),EUCNORM_xPa[LRA,LRU] = ',&
          imode,neign,minval(eignval),EUCNORM_xPa
 
       deallocate(eignval)
       deallocate(eignvec)
 
    end do
+
+
+   !Calculate Euclidean norm by modes
+   allocate(eignval(1:nmodes))
+   allocate(eignvec(1:nmodes,1:nmodes))
+
+   neign = hessian_info%eigs(nmodes)%neign
+   eignval = hessian_info%eigs(nmodes)%eignval
+   eignvec = hessian_info%eigs(nmodes)%eignvec
+
+   do imode = nmodes, 0, -1
+      EUCNORM_xPa = 0.D0
+ 
+      if (imode .gt. 0) then
+         SUMLAM = sum(eignval(1:imode))
+         SUMLAM3 = sum(eignval(1:imode)**3)
+      else
+         SUMLAM = 0.D0 
+         SUMLAM3 = 0.D0 
+      end if 
+      do itype = 1, iend
+         xhat = 0.D0
+
+         if (imode .gt. 0) then
+            if (itype .eq. 2) then
+               do i = 1, neign
+                  LAM(i) = - (eignval(i) - 1.D0) / eignval(i)
+               end do
+
+               PREFIX = 'LRU'
+            else
+               do i = 1, neign
+                  LAM(i) = 1.D0 / eignval(i)
+               end do
+
+               PREFIX = 'LRA'
+               if (use_lanczos) PREFIX = 'CGLZ'
+            end if
+            write(unit=filename,fmt='(2a,i2.2,a,i4.4)') trim(PREFIX),'inc_it',it,'_nmode',imode
+
+            call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
+                                   nmodes,neign,imode, &
+                                   LAM,eignvec,qhat(:,0:nmodes), &
+                                   ghat,xhat)
+
+            if (itype .eq. 2) then !LRU
+               xhat = xhat + ghat
+            end if
+
+            if (spectral_precon .and. it.gt.1) &
+               call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
+                                       it-1, xhat, xhat, 'TL' )
+
+            call da_transform_vtox (grid,be%cv%size_jb,xbx,be,grid%ep,&
+                                    xhat(1:be%cv%size_jb),grid%vv,grid%vp &
+#if (WRF_CHEM == 1)
+                                    , grid%vch &
+#endif
+                                    )
+         end if
+
+
+         !diffvec
+         xhat = cvt + xhat - cvt_REF
+
+         !Multiply Pav_REF^-1 * (dv - dv_REF) in two steps
+         !(1) (L^T H^T R^-1 H L)_REF * diffvec
+         dvnorm_ = 0.D0
+
+         call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
+                                nmodes_REF,nmodes_REF,hess_REF%neign, &
+                                LAM_REF,hess_REF%eignvec,qhat_REF, &
+                                xhat,dvnorm_)
+
+         !(2) (I + L^T H^T R^-1 H L) * diffvec
+         dvnorm_ = dvnorm_ + xhat
+
+         !Multiply (dv - dv_REF)^T * Pav_REF^-1 * (dv - dv_REF) = ||dx - dx_REF||^2_{Pa_REF^-1}
+         EUCNORM_xPa(itype) = da_dot_cv(cv_size, xhat, dvnorm_, grid, mz, jp_start, jp_end)
+      end do
+
+      write(unit=stdout,fmt='(A,2I6,5E27.16E3)') &
+         'BY_FINAL_MODES: imode,neign,min(lambda),EUCNORM_xPa[LRA,LRU], SUM(LAM), SUM(LAM^3) = ',&
+         imode,neign,minval(eignval),EUCNORM_xPa, SUMLAM, SUMLAM3
+   end do
+
+   deallocate(eignval)
+   deallocate(eignvec)
 
    deallocate(LAM_REF)
    deallocate(hess_REF%eignval)
