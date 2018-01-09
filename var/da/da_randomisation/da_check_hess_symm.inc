@@ -56,7 +56,6 @@ subroutine da_check_hess_symm( grid, xbx, be, mz, jp_start, jp_end, cv_size, &
 
    character*10                 :: cproc, cens
    character(len=filename_len)  :: filename
-   character(len=3) :: cnens=""
 
    if (trace_use) call da_trace_entry("da_check_hess_symm")
    write(unit=stdout,fmt=*) ' '

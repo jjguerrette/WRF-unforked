@@ -156,7 +156,7 @@ subroutine da_calculate_hessian(grid, mz, config_flags, &
 
       ! Read in AMAT for all rows on each processor, AMAT = (A^T * I)
       do iens = 1, nyobs
-         write(unit=stdout,fmt='("Reading AMAT row : ",i3)') iens
+         write(unit=stdout,fmt='("Reading AMAT row : ",i4)') iens
          write(cens,fmt='(i4.4)') iens
          filename = 'ahat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
          call da_cv_io ('r', filename, cv_size, AMAT(1:cv_size,iens), grid, mz)
@@ -264,7 +264,7 @@ subroutine da_calculate_hessian(grid, mz, config_flags, &
 !REMOVE THIS, JUST ADDS TO FOOTPRINT
 !      ! Write nuhat vectors to disk
 !      do i = 1, neign
-!         write(unit=stdout,fmt='("Writing nuhat vectors to disk: ",i3)') i
+!         write(unit=stdout,fmt='("Writing nuhat vectors to disk: ",i4)') i
 !         write(cens,fmt='(i4.4)') i
 !         filename = 'nuhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
 !         call da_cv_io ('w', filename, cv_size, nuhat(1:cv_size,i), grid, mz)

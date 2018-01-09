@@ -55,7 +55,7 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
    real                         :: j0_total
    character*10                 :: cproc, cens
    character(len=filename_len)  :: filename
-   character(len=3) :: cnens=""
+   character(len=4) :: cnens=""
    logical          :: swapped
 
    if (trace_use) call da_trace_entry("da_randomise_svd")
@@ -110,7 +110,7 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
          allocate(omega(1:cv_size,1))
          if (read_omega) then
             ! Read in omega vector for this ensemble member
-            write(unit=stdout,fmt='("Reading omega ensemble member ",i3," of ",i3)') ensmember,nens
+            write(unit=stdout,fmt='("Reading omega ensemble member ",i4," of ",i4)') ensmember,nens
             filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
             call da_cv_io ('r', filename, cv_size, omega(1:cv_size,1), grid, mz)
          else
@@ -167,7 +167,7 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
 
       ! Read in yhat and omega vectors from all ensembles on each processor
       do iens = 1, nens
-         write(unit=stdout,fmt='("Reading yhat and omega ensemble member : ",i3)') iens
+         write(unit=stdout,fmt='("Reading yhat and omega ensemble member : ",i4)') iens
          write(cens,fmt='(i4.4)') iens
          filename = 'yhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
          call da_cv_io ('r', filename, cv_size, yhat(1:cv_size,iens), grid, mz)
@@ -196,7 +196,7 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
 !REMOVE EVENTUALLY or add option since very useful for debugging
 !      ! Write qhat vectors to disk
 !      do iens = 1, nens
-!         write(unit=stdout,fmt='("Writing qhat vectors to disk: ",i3)') iens
+!         write(unit=stdout,fmt='("Writing qhat vectors to disk: ",i4)') iens
 !         write(cens,fmt='(i4.4)') iens
 !         filename = 'qhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
 !         call da_cv_io ('w', filename, cv_size, qhat(1:cv_size,iens), grid, mz)

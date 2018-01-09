@@ -82,7 +82,7 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
    real                        :: j0_total
    character*10                 :: cproc, cens
    character(len=filename_len)  :: filename
-   character(len=3) :: cnens=""
+   character(len=4) :: cnens=""
 
    if (trace_use) call da_trace_entry("da_randomise_svd_51")
 
@@ -136,11 +136,11 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
          allocate(omega(1:cv_size,1))
          if (read_omega) then
             ! Read in omega vector from this ensemble on each processor
-            write(unit=stdout,fmt='("Reading omega ensemble member : ",i3)') ensmember
+            write(unit=stdout,fmt='("Reading omega ensemble member : ",i4)') ensmember
             filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
             call da_cv_io ('r', filename, cv_size, omega(1:cv_size,1), grid, mz)
          else
-            write(unit=stdout,fmt='("Generating omega ensemble member : ",i3)') ensmember
+            write(unit=stdout,fmt='("Generating omega ensemble member : ",i4)') ensmember
             call da_set_randomcv(cv_size, omega(:,1))
          end if
          if ( be%cv%size_jp.gt.0) omega(jp_start:jp_end,1) = 0.D0
@@ -199,7 +199,7 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
 
       ! Read in yhat vector from all ensembles on each processor
       do iens = 1, nens
-         write(unit=stdout,fmt='("Reading yhat ensemble member : ",i3)') iens
+         write(unit=stdout,fmt='("Reading yhat ensemble member : ",i4)') iens
          write(cens,fmt='(i4.4)') iens
          filename = 'yhat_obs.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
 
@@ -254,7 +254,7 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
       allocate(qhat_obs(1:nobs(1)))
       ! Write qhat vectors to disk
       do iens = 1, nens
-         write(unit=stdout,fmt='("Writing qhat vectors to disk: ",i3)') iens
+         write(unit=stdout,fmt='("Writing qhat vectors to disk: ",i4)') iens
          write(cens,fmt='(i4.4)') iens
          filename = 'qhat_obs.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
 
@@ -313,7 +313,7 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
 
       ! Read in KMAT for all rows on each processor, KMAT = (A^T * Q)^T
       do iens = 1, nens
-         write(unit=stdout,fmt='("Reading KMAT row : ",i3)') iens
+         write(unit=stdout,fmt='("Reading KMAT row : ",i4)') iens
          write(cens,fmt='(i4.4)') iens
          filename = 'bhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
          call da_cv_io ('r', filename, cv_size, KMAT(iens,1:cv_size), grid, mz)
@@ -408,7 +408,7 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
 !REMOVE EVENTUALLY or add option
 !      ! Write nuhat vectors to disk
 !      do i = 1, neign
-!         write(unit=stdout,fmt='("Writing nuhat vectors to disk: ",i3)') i
+!         write(unit=stdout,fmt='("Writing nuhat vectors to disk: ",i4)') i
 !         write(cens,fmt='(i4.4)') i
 !         filename = 'nuhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
 !         call da_cv_io ('w', filename, cv_size, nuhat_T(i,1:cv_size), grid, mz)

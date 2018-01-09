@@ -123,11 +123,11 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
               )
    else
       !Apply preconditioner:  P * cv
-      if (( &
+      if (spectral_precon .and. it.gt.1 .and. ( use_lanczos &
 #if defined(LAPACK)
-            use_randomblock .or. &
+            .or. use_randomblock &
 #endif
-            use_lanczos) .and. spectral_precon .and. it.gt.1) then
+            )) then
          call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
                                  it-1, cv, cv_dummy1, 'TL' )
       end if
@@ -150,11 +150,11 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
    end if
 
    !Apply preconditioner: P^T * (L^T H^T R^-1 H L * P * cv)
-   if (( &
+   if (spectral_precon .and. it.gt.1 .and. ( use_lanczos &
 #if defined(LAPACK)
-         use_randomblock .or. &
+         .or. use_randomblock &
 #endif
-         use_lanczos) .and. spectral_precon .and. it.gt.1) then
+         )) then
 
 #if defined(LAPACK)
       !Account for the fact that use_randblock multiplies vector only by obs. Hessian
@@ -181,11 +181,11 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
    cv_spectral = cv
 
    !Apply preconditioner: P^T * (I_n * P * cv) (Hessian-multiplication)  or simply  P^T * cv (gradient)
-   if (( &
+   if (spectral_precon .and. it.gt.1 .and. ( use_lanczos &
 #if defined(LAPACK)
-         use_randomblock .or. &
+         .or. use_randomblock &
 #endif
-         use_lanczos) .and. spectral_precon .and. it.gt.1) then
+         )) then
       call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
                               it-1, cv_dummy1, cv_spectral, 'AD' )
    end if

@@ -54,7 +54,7 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
 
    real(wp)                     :: temp_l
    real(wp)                     :: temp_e(nens)
-   character(len=3) :: cnens=""
+   character(len=4) :: cnens=""
    logical          :: swapped
   
    if (trace_use) call da_trace_entry("da_rsvd56")

@@ -151,7 +151,7 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
    end do
 
    do iens = 1, nens
-      write(unit=stdout,fmt='("iens = ",i3,", ieig = ",i3,", crit(i) = ",D26.16)') iens, precon_list(iens), crit_save(iens)
+      write(unit=stdout,fmt='("iens = ",i4,", ieig = ",i4,", crit(i) = ",D26.16)') iens, precon_list(iens), crit_save(iens)
    end do
 
    deallocate(crit)
@@ -181,7 +181,7 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
    ! Write preconditioned omega vectors from all ensembles on each processor
    write(cproc,fmt='(i4.4)') myproc
    do iens = 1, nens
-      write(unit=stdout,fmt='("Writing preconditioned omega ensemble; iens = ",i3)') iens
+      write(unit=stdout,fmt='("Writing preconditioned omega ensemble; iens = ",i4)') iens
       write(cens,fmt='(i4.4)') iens
 
       filename = 'omega_precon.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))

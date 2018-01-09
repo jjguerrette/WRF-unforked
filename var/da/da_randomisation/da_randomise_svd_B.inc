@@ -69,7 +69,7 @@ subroutine da_randomise_svd_B(grid, mz, config_flags,            &
    real                         :: j0_total
    character*10                 :: cproc, cens
    character(len=filename_len)  :: filename
-   character(len=3) :: cnens=""
+   character(len=4) :: cnens=""
    logical          :: swapped
   
    if (trace_use) call da_trace_entry("da_randomise_svd_B")
@@ -115,7 +115,7 @@ subroutine da_randomise_svd_B(grid, mz, config_flags,            &
          allocate(omega(1:cv_size,1))
          if (read_omega) then
             ! Read in omega vector from this ensemble on each processor
-            write(unit=stdout,fmt='("Reading omega ensemble member : ",i3)') iens
+            write(unit=stdout,fmt='("Reading omega ensemble member : ",i4)') iens
             filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
             call da_cv_io ('r', filename, cv_size, omega(1:cv_size,1))
          else
@@ -170,7 +170,7 @@ subroutine da_randomise_svd_B(grid, mz, config_flags,            &
 
       ! Read in yhat and omega vectors from all ensembles on each processor
       do iens = 1, nens
-         write(unit=stdout,fmt='("Reading yhat and omega ensemble member : ",i3)') iens
+         write(unit=stdout,fmt='("Reading yhat and omega ensemble member : ",i4)') iens
          write(cens,fmt='(i4.4)') iens
          filename = 'yhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
          call da_cv_io ('r', filename, cv_size, yhat(1:cv_size,iens))
@@ -201,7 +201,7 @@ subroutine da_randomise_svd_B(grid, mz, config_flags,            &
 
       ! Write qhat vectors to disk
       do iens = 1, nens
-         write(unit=stdout,fmt='("Writing qhat vectors to disk: ",i3)') iens
+         write(unit=stdout,fmt='("Writing qhat vectors to disk: ",i4)') iens
          write(cens,fmt='(i4.4)') iens
          filename = 'qhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
          call da_cv_io ('w', filename, cv_size, qhat(1:cv_size,iens))
