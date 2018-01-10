@@ -17,7 +17,7 @@ module da_linear_ops
        stdout, trace_use, ierr, comm, &
        use_lanczos, use_global_cv_io, ntmax, inc_out_interval, &
        read_hess_REF, read_cvt_REF, &
-       spectral_precon
+       spectral_precon, spectral_trunc
    use da_define_structures, only : iv_type, y_type, j_type, be_type, xbx_type, &
        hessian_type, hessian_eig_type
 

@@ -31,7 +31,7 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, nens, neign, filename
    real*8, allocatable             :: dumcv(:)
    real*8, allocatable             :: dumcv_g(:)
    real*8, dimension(1:nens)       :: temp
-   real*8, dimension(1:nens,1:nens):: tempa
+   real*8, dimension(1:nens)       :: tempa
 
 
    if (trace_use) call da_trace_entry("da_hessian_io_global")
@@ -78,33 +78,38 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, nens, neign, filename
       call wrf_dm_bcast_integer(neign,1)
 
       if (present(eignvec) .and. present(eignval) .and. present(qhat)) then
+         temp = 0.D0
+         tempa = 0.D0
+         dumcv_g = 0.D0
+
          if (rootproc) read(unit=ep_unit) dummy
          do i = 1, nens
             if (rootproc) then
                read(unit=ep_unit) temp(i)
-               read(unit=ep_unit) tempa(:,i)
+               read(unit=ep_unit) tempa
                read(unit=ep_unit) dumcv_g
-            else
-               temp = 0.D0
-               tempa = 0.D0
-               dumcv_g = 0.D0
             end if
 #ifdef DM_PARALLEL
             call mpi_barrier(comm, ierr)
             call da_global_to_cv(cv_size, cv_size_domain, dumcv, grid, mz, dumcv_g)
             qhat(1:cv_size,i) = dumcv
+            call wrf_dm_bcast_real(tempa,nens)
 #else
             qhat(1:cv_size,i) = dumcv_g
 #endif
-            eignvec(:,i) = tempa(:,i)
+            eignvec(:,i) = tempa
          end do
+#ifdef DM_PARALLEL
+         call mpi_barrier(comm, ierr)
+         call wrf_dm_bcast_real(temp,nens)
+#endif
          eignval = temp
 
          if (present(ghat)) then
+            dumcv_g = 0.D0
+
             if (rootproc) then
                read(unit=ep_unit) dumcv_g
-            else
-               dumcv_g = 0.D0
             end if
 #ifdef DM_PARALLEL
             call mpi_barrier(comm, ierr)
@@ -113,12 +118,6 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, nens, neign, filename
             ghat = dumcv_g
 #endif
          end if
-!      else
-!         if (rootproc) read(unit=ep_unit) nens
-!#ifdef DM_PARALLEL
-!         call mpi_barrier(comm, ierr)
-!         call wrf_dm_bcast_integer(nens,1)
-!#endif
       end if
       if (rootproc) close(unit=ep_unit)
    else if (io_config == 'w') then

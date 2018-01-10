@@ -54,9 +54,7 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
    real             :: gnorm_j, gnorm_jo, gnorm_jb, gnorm_je, gnorm_jd, gnorm_jp, gnorm_js, gnorm_jl
    logical          :: jcdf_flag
 
-    real            :: cv_dummy1(cv_size)
-    real            :: cv_dummy2(cv_size)
-    real            :: cv_spectral(cv_size)
+   real            :: cv_spectral(cv_size)
 
    ! Variables for VarBC background constraint
    integer                           :: jp_start, jp_end       ! Start/end indices of Jp.
@@ -109,7 +107,7 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
    call da_allocate_y_chem(iv, jo_grad_y)
 #endif
 
-   cv_dummy1 = cv
+   cv_spectral = cv
 
    if (present(re)) then
       call da_calculate_grady(iv, re, jo_grad_y)   
@@ -129,10 +127,10 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
 #endif
             )) then
          call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
-                                 it-1, cv, cv_dummy1, 'TL' )
+                                 it-1, cv, cv_spectral, 'TL' )
       end if
 
-      call da_transform_vtoy(cv_size, be, grid%ep, cv_dummy1, iv, grid%vp, &
+      call da_transform_vtoy(cv_size, be, grid%ep, cv_spectral, iv, grid%vp, &
               grid%vv, grid%vp6, grid%vv6, xbx, y, grid, config_flags &
 #if (WRF_CHEM == 1)
               , grid%vch &
@@ -147,48 +145,21 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
 #endif
               )
       grad_jo = - grad_jo    !! Compensate for sign in calculation of grad_v (Jo)
-   end if
-
-   !Apply preconditioner: P^T * (L^T H^T R^-1 H L * P * cv)
-   if (spectral_precon .and. it.gt.1 .and. ( use_lanczos &
-#if defined(LAPACK)
-         .or. use_randomblock &
-#endif
-         )) then
 
 #if defined(LAPACK)
-      !Account for the fact that use_randblock multiplies vector only by obs. Hessian
-      if (.not.present(re) .and. use_randomblock) grad_jo = cv_dummy1 + grad_jo
-#endif
-
-      cv_dummy2 = grad_jo
-
-      call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
-                              it-1, cv_dummy2, grad_jo, 'AD' )
-
-#if defined(LAPACK)
-      !Account for the fact that use_randblock multiplies vector only by obs. Hessian
-      if (.not.present(re) .and. use_randomblock) grad_jo = grad_jo - cv
+      if ( use_randomblock .and. spectral_precon .and. it.gt.1) then
+         !Account for the fact that use_randblock multiplies vector only by obs. Hessian
+         grad_jo = cv_spectral + grad_jo
+      end if
 #endif
    end if
-     
+
+    
    call da_deallocate_y(jo_grad_y)
 
 #if defined(LAPACK)
-   if ( .not.use_randomblock .or. present(re)) then
+   if ( present(re) .or. spectral_precon.and.it.gt.1 .or. .not.use_randomblock ) then
 #endif
-
-   cv_spectral = cv
-
-   !Apply preconditioner: P^T * (I_n * P * cv) (Hessian-multiplication)  or simply  P^T * cv (gradient)
-   if (spectral_precon .and. it.gt.1 .and. ( use_lanczos &
-#if defined(LAPACK)
-         .or. use_randomblock &
-#endif
-         )) then
-      call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
-                              it-1, cv_dummy1, cv_spectral, 'AD' )
-   end if
 
    !-------------------------------------------------------------------------
    ! [2.0] calculate grad_v (jb):
@@ -279,6 +250,24 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
    ! [7.0] calculate grad_v (j) = grad_v (jb) + grad_v (jo) + grad_v (je) + grad_v (jd) + grad_v (jp) + grad_v (js) + grad_v (jl)
    !--------------------------------------------------------------------------------------------------   
    grad = grad_jo + grad_jb + grad_je + grad_jd + grad_jp + grad_js + grad_jl
+
+   !Apply preconditioner: 
+   ! Hessian: P^T * (I_n + L^T H^T R^-1 H L * P * cv)
+   ! gradient: P^T * (cv + L^T H^T R^-1 d)
+   if (spectral_precon .and. it.gt.1 .and. ( use_lanczos &
+#if defined(LAPACK)
+         .or. use_randomblock &
+#endif
+         )) then
+      cv_spectral = grad
+      call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
+                              it-1, cv_spectral, grad, 'AD' )
+
+#if defined(LAPACK)
+      !Account for the fact that use_randblock multiplies vector only by obs. Hessian
+      if (.not.present(re) .and. use_randomblock) grad = grad - cv
+#endif
+   end if
 
    !-------------------------------------------------------------------------
    ! [8.0] write Gradient:

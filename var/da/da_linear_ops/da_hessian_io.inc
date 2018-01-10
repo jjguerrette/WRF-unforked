@@ -41,9 +41,9 @@ subroutine da_hessian_io (io_config, grid, cv_size, it, nens, neign, eignvec, ei
    end if
 
    if ( io_config == 'r' .and. .not.any((/present(eignvec),present(eignval),present(qhat)/)) ) then
-      call da_get_unit (ep_unit)
       if (rootproc) then
          write(*,*) 'Reading nens and neign from Hessian eigenpair file: ',trim(filename)
+         call da_get_unit (ep_unit)
          open (unit=ep_unit, file = trim(filename), form = 'unformatted', iostat =  iostat, status = 'old')
          if (iostat .ne. 0) then
             write(unit=message(1),fmt='(A,I5)') "Error message: ",iostat
@@ -59,9 +59,10 @@ subroutine da_hessian_io (io_config, grid, cv_size, it, nens, neign, eignvec, ei
       call wrf_dm_bcast_integer(neign,1)
       call wrf_dm_bcast_integer(nens,1)
 #endif
-      close(unit=ep_unit)
-
-      call da_free_unit (ep_unit)
+      if (rootproc) then
+         close(unit=ep_unit)
+         call da_free_unit (ep_unit)
+      end if
    else
       if (use_global_cv_io) then
          if (present(eignvec) .and. present(eignval) .and. present(qhat)) then
@@ -102,8 +103,6 @@ subroutine da_hessian_io (io_config, grid, cv_size, it, nens, neign, eignvec, ei
                   read(unit=ep_unit) qhat(1:cv_size,i)
                end do
                if (present(ghat)) read(unit=ep_unit) ghat(1:cv_size)
-!            else
-!               read(unit=ep_unit) nens
             end if
             close(unit=ep_unit)
          else if (io_config == 'w') then

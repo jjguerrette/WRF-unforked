@@ -77,6 +77,10 @@ subroutine da_minimise_lz(grid, config_flags,            &
    character(len=2) :: iterc,itc
 #endif
 
+   real, allocatable                 :: temp_e(:)
+   real                              :: temp_l
+   logical                           :: swapped
+
    if (trace_use) call da_trace_entry("da_minimise_lz")
 
    write(unit=stdout,fmt='(A)') 'Minimize cost function using Lanczos method'
@@ -264,6 +268,27 @@ subroutine da_minimise_lz(grid, config_flags,            &
    neign = iter
 
    if (spectral_precon) then
+      !Sort eigenvalues and eigenvectors in descending order
+      allocate(temp_e(1:neign))
+      do j = neign-1, 1, -1
+        swapped = .false.
+        do i = 1, j
+          if (eignval(i) .lt. eignval(i+1)) then
+            temp_l = eignval(i)
+            eignval(i) = eignval(i+1)
+            eignval(i+1) = temp_l
+
+            temp_e = eignvec(1:neign,i)
+            eignvec(1:neign,i) = eignvec(1:neign,i+1)
+            eignvec(1:neign,i+1) = temp_e
+
+            swapped = .true.
+          end if
+        end do
+        if (.NOT. swapped) exit
+      end do
+      deallocate(temp_e)
+
       call da_hessian_io ('w',grid, cv_size,it,neign,neign,&
                          eignvec(1:neign,1:neign),eignval(1:neign),qhat(:,0:neign),mz)
 !      ntused(it) = neign

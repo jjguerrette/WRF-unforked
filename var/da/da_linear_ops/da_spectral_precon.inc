@@ -23,15 +23,15 @@ subroutine da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, nouter_prev, 
    character*2, intent(in)      :: mode
 
    real*8                       :: cv_z0(cv_size)
-   integer                      :: it, it_inner, l
+   integer                      :: it, imode, l
    character*10                 :: cproc, cens
    character(len=filename_len)  :: filename
 
-   real*8, allocatable   :: eignvec_prev(:,:)
-   real*8, allocatable   :: eignval_prev(:)
-   real*8, allocatable   :: qhat_prev(:,:)
+   real*8, allocatable   :: eignvec(:,:)
+   real*8, allocatable   :: eignval(:)
+   real*8, allocatable   :: qhat(:,:)
 
-   integer  :: nmode_it, neign_it, outer_start, outer_end, increment
+   integer  :: nmodes, neign, outer_start, outer_end, increment
    real     :: expon
 
    if (trace_use) call da_trace_entry("da_spectral_precon")
@@ -39,22 +39,22 @@ subroutine da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, nouter_prev, 
    write(unit=stdout,fmt='(2A)') 'Apply Spectral preconditioner in mode: ', trim(mode)
    write(unit=stdout,fmt=*) ' '
 
-   if (trim(mode) == 'TL') then
+   if (trim(mode) == 'TL') then !Tangent preconditioner
       outer_start = nouter_prev
       outer_end = 1
       increment = -1
       expon = -0.5D0
-   else if (trim(mode) == 'AD') then
+   else if (trim(mode) == 'AD') then !Adjoint or Transpose of preconditioner
       outer_start = 1
       outer_end = nouter_prev
       increment = 1
       expon = -0.5D0
-   else if (trim(mode) == 'IT') then
+   else if (trim(mode) == 'IT') then !Inverse of tangent preconditioner
       outer_start = 1
       outer_end = nouter_prev
       increment = 1
       expon = 0.5D0
-   else if (trim(mode) == 'IA') then
+   else if (trim(mode) == 'IA') then !Inverse of adjoint preconditioner
       outer_start = nouter_prev
       outer_end = 1
       increment = -1
@@ -71,34 +71,35 @@ subroutine da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, nouter_prev, 
          call da_error(__FILE__,__LINE__, &
           (/"Spectral preconditioning can only be used with Lanczos or RSVD."/))
 
-      call da_hessian_io ('r',grid,cv_size,it,nmode_it,neign_it)
+      call da_hessian_io ('r',grid,cv_size,it,nmodes,neign)
 
-      allocate(eignval_prev(nmode_it))
-      allocate(eignvec_prev(nmode_it,nmode_it))
-      allocate(qhat_prev(cv_size,0:nmode_it))
+      allocate(eignval(nmodes))
+      allocate(eignvec(nmodes,nmodes))
+      allocate(qhat(cv_size,0:nmodes))
 
-      call da_hessian_io ('r',grid,cv_size,it,nmode_it,neign_it,&
-                         eignvec_prev,eignval_prev,qhat_prev,mz)
+      call da_hessian_io ('r',grid,cv_size,it,nmodes,neign,&
+                         eignvec,eignval,qhat,mz)
 
-      !Need to add capability for user to set l <= neign_it for each set of eigenpairs
-      l = neign_it
-!      l = min(neign_it,l_user_input(it))
+      ! Precondition with the l leading eigen modes from iteration it
+      !  (requires eignval/eignvec to be sorted by decreasing value)
+      l = min(neign,spectral_trunc(it))
+      if (l .gt. 0) then
+         do imode = 1, l
+            eignval(imode) = eignval(imode)**expon - 1.D0
+         end do
 
-      do it_inner = 1, l
-         eignval_prev(it_inner) = eignval_prev(it_inner)**expon - 1.D0
-      end do
+         ! cv_z^it = (I_n + V (LAM^-0.5 - I_l) V^T ) * cv_z^it-1
+         cv_z0 = 0.D0
+         call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size,&
+                                nmodes,neign,l, &
+                                eignval,eignvec,qhat,&
+                                cv_z,cv_z0)
+         cv_z = cv_z + cv_z0
+      end if
 
-      ! cv_z^it = (I_n + V (LAM^-0.5 - I_l) V^T ) * cv_z^it-1
-      cv_z0 = 0.D0
-      call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size,&
-                             nmode_it,nmode_it,l, &
-                             eignval_prev,eignvec_prev,qhat_prev,&
-                             cv_z,cv_z0)
-      cv_z = cv_z + cv_z0
-
-      deallocate(eignval_prev)
-      deallocate(eignvec_prev)
-      deallocate(qhat_prev)
+      deallocate(eignval)
+      deallocate(eignvec)
+      deallocate(qhat)
    end do
 
    if (trace_use) call da_trace_exit("da_spectral_precon")
