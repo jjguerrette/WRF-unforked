@@ -31,11 +31,14 @@ subroutine da_output_increments(grid,config_flags,mz, &
    integer                      :: jp_start, jp_end       ! Start/end indices of Jp.
 !   integer                      :: jl_start, jl_end       ! Start/end indices of Jl.
 
-   integer :: i, j, imode, nmodes, nmodes_REF, neign, itype, iend, icount
+   integer :: i, j, imode, nmodes, nmodes_REF, neign, itype, iend, dmode, icount
    real*8, allocatable :: LAM(:)
    real*8, allocatable :: eignval(:)
    real*8, allocatable :: eignvec(:,:)
    real*8, allocatable, target :: qhat(:,:)
+   real*8, allocatable :: nuhat(:,:)
+   real*8, allocatable :: nuhat_REF(:,:)
+
    real*8 :: ghat(1:cv_size)
    real*8 :: xhat(1:cv_size)
    real*8 :: cvt_REF(1:cv_size)
@@ -134,10 +137,6 @@ subroutine da_output_increments(grid,config_flags,mz, &
                                    LAM(1:imode),eignvec,qhat(:,0:imode), &
                                    ghat,xhat)
 
-            if (itype .eq. 2) then !LRU
-               xhat = xhat + ghat
-            end if
-
             if (spectral_precon .and. it.gt.1) &
                call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
                                        it-1, xhat, xhat, 'TL' )
@@ -153,6 +152,10 @@ subroutine da_output_increments(grid,config_flags,mz, &
 !            call domain_clock_get( grid, current_timestr=timestr )
 !            config_flags%auxhist18_outname = trim(filename)
 !            call da_transfer_xatowrftl(grid, config_flags, 'DUMM', timestr, .true.)
+         end if
+
+         if (itype .eq. 2) then !LRU
+            xhat = xhat + ghat
          end if
 
          !-----------------------------------------
@@ -231,6 +234,20 @@ subroutine da_output_increments(grid,config_flags,mz, &
             do i = 1, hess_REF%neign
                LAM_REF(i) = hess_REF%eignval(i) - 1.D0
             end do
+
+            allocate(nuhat_REF(cv_size,0:nmodes_REF))
+            nuhat_REF = 0.D0
+            do j = 1, nmodes_REF
+               do i = 1, nmodes_REF
+                  nuhat_REF(:,j) = nuhat_REF(:,j) + qhat_REF(:,i) * hess_REF%eignvec(i,j)
+               end do
+            end do
+
+            if (ASSOCIATED(qhat_REF,qhat)) then
+               NULLIFY(qhat_REF)
+            else
+               deallocate(qhat_REF)
+            end if
          end if
 
          !diffvec
@@ -243,8 +260,8 @@ subroutine da_output_increments(grid,config_flags,mz, &
 
          call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
                                 nmodes_REF,nmodes_REF,hess_REF%neign, &
-                                LAM_REF,hess_REF%eignvec,qhat_REF, &
-                                xhat,dvnorm_)
+                                LAM_REF,hess_REF%eignvec,nuhat_REF, &
+                                xhat,dvnorm_,.true.)
 
          !(2) (I + L^T H^T R^-1 H L) * diffvec
          dvnorm_ = dvnorm_ + xhat
@@ -295,11 +312,21 @@ subroutine da_output_increments(grid,config_flags,mz, &
    end do
    deallocate(temp_e)
 
+   allocate(nuhat(cv_size,0:nmodes))
+   nuhat = 0.D0
+   do j = 1, neign
+      do i = 1, neign
+         nuhat(:,j) = nuhat(:,j) + qhat(:,i) * eignvec(i,j)
+      end do
+   end do
 
    write(unit=stdout,fmt='(A)') &
       'EUCNORM_BY_FINAL_MODES: imode,neign,min(lambda),EUCNORM_xPa[LRA,LRU],EUCNORM_v[LRA,LRU], SUM(LAM), SUM(LAM^3) = '
 
-   do imode = 0, nmodes
+!   dmode = floor(real(nmodes) / 400.D0) + 1
+   dmode = 1
+
+   do imode = 0, nmodes, dmode
       EUCNORM_xPa = 0.D0
       EUCNORM_v = 0.D0
  
@@ -332,18 +359,17 @@ subroutine da_output_increments(grid,config_flags,mz, &
 
             call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
                                    nmodes,neign,imode, &
-                                   LAM,eignvec,qhat, &
-                                   ghat,xhat)
-
-            if (itype .eq. 2) then !LRU
-               xhat = xhat + ghat
-            end if
+                                   LAM,eignvec,nuhat, &
+                                   ghat,xhat,.true.)
 
             if (spectral_precon .and. it.gt.1) &
                call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
                                        it-1, xhat, xhat, 'TL' )
          end if
 
+         if (itype .eq. 2) then !LRU
+            xhat = xhat + ghat
+         end if
 
          !diffvec
          xhat = cvt + xhat - cvt_REF
@@ -354,8 +380,8 @@ subroutine da_output_increments(grid,config_flags,mz, &
 
          call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
                                 nmodes_REF,nmodes_REF,hess_REF%neign, &
-                                LAM_REF,hess_REF%eignvec,qhat_REF, &
-                                xhat,dvnorm_)
+                                LAM_REF,hess_REF%eignvec,nuhat_REF, &
+                                xhat,dvnorm_,.true.)
 
          !(2) (I + L^T H^T R^-1 H L) * diffvec
          dvnorm_ = dvnorm_ + xhat
@@ -371,18 +397,14 @@ subroutine da_output_increments(grid,config_flags,mz, &
          imode,neign,minval(eignval),EUCNORM_xPa, EUCNORM_v, SUMLAM, SUMLAM3
    end do
 
+   deallocate(nuhat)
    deallocate(eignval)
    deallocate(eignvec)
 
    deallocate(LAM_REF)
    deallocate(hess_REF%eignval)
    deallocate(hess_REF%eignvec)
-!   if (read_hess_REF.gt.0) then
-   if (ASSOCIATED(qhat_REF,qhat)) then
-      NULLIFY(qhat_REF)
-   else
-      deallocate(qhat_REF)
-   end if
+   deallocate(nuhat_REF)
 
    deallocate(LAM)
    deallocate(qhat)

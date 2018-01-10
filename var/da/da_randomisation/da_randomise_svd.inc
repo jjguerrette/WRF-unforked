@@ -203,6 +203,13 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
 !      end do
 !REMOVE EVENTUALLY or add option since very useful for debugging
 
+      call da_rsvd56(grid, mz, jp_start, jp_end, &
+                     omega, yhat, qhat, cv_size, &
+                     eignval, eignvec, nens)
+
+      ! Add 1.0 to get eigenvalues of full preconditioned Hessian
+      eignval = eignval + 1.D0
+
       if ( var4d_inc_out &
            .and. present(hessian_info) &
            .and. allocated(hessian_info%ghat) ) then
@@ -218,21 +225,20 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
             allocate(hessian_info%eigs(iens)%eignval(1:iens))
             allocate(hessian_info%eigs(iens)%eignvec(1:iens,1:iens))
 
-            call da_rsvd56(grid, mz, jp_start, jp_end, &
-                          omega(:,1:iens), yhat(:,1:iens), qhat(:,0:iens), cv_size, &
-                          hessian_info%eigs(iens)%eignval, hessian_info%eigs(iens)%eignvec, &
-                          iens)
             hessian_info%eigs(iens)%neign = iens
-            hessian_info%eigs(iens)%eignval = hessian_info%eigs(iens)%eignval + 1.D0
+            if (iens.eq.nens) then
+               hessian_info%eigs(iens)%eignval = eignval
+               hessian_info%eigs(iens)%eignvec = eignvec
+            else
+               call da_rsvd56(grid, mz, jp_start, jp_end, &
+                             omega(:,1:iens), yhat(:,1:iens), qhat(:,0:iens), cv_size, &
+                             hessian_info%eigs(iens)%eignval, hessian_info%eigs(iens)%eignvec, &
+                             iens)
+               hessian_info%eigs(iens)%eignval = hessian_info%eigs(iens)%eignval + 1.D0
+            end if
          end do
       end if
 
-      call da_rsvd56(grid, mz, jp_start, jp_end, &
-                     omega, yhat, qhat, cv_size, &
-                     eignval, eignvec, nens)
-
-      ! Add 1.0 to get eigenvalues of full preconditioned Hessian
-      eignval = eignval + 1.D0
 
       ! Print current eigenpairs
       ! ----------------------------------------------
