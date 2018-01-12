@@ -146,12 +146,15 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
               )
       grad_jo = - grad_jo    !! Compensate for sign in calculation of grad_v (Jo)
 
-#if defined(LAPACK)
-      if ( use_randomblock .and. spectral_precon .and. it.gt.1) then
-         !Account for the fact that use_randblock multiplies vector only by obs. Hessian
-         grad_jo = cv_spectral + grad_jo
-      end if
-#endif
+!DELETE THIS CODE
+!#if defined(LAPACK)
+!      if ( use_randomblock .and. spectral_precon .and. it.gt.1) then
+!         !Account for the fact that use_randblock multiplies vector only by obs. Hessian
+!         grad_jo = cv_spectral + grad_jo
+!      end if
+!#endif
+!DELETE THIS CODE
+
    end if
 
     

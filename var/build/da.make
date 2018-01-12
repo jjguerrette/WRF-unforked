@@ -334,7 +334,7 @@ da_gen_be.o gen_be_ensmean.o gen_be_addmean.o:
         fi
 	$(SFC) -c $(FCFLAGS) $(PROMOTION) $*.f
 
-da_etkf.o da_tools.o da_chem_tools.o :
+da_etkf.o da_tools.o :
 	$(RM) $@
 	$(SED_FTN) $*.f90 > $*.b
 	$(CPP) $(CPPFLAGS) $(OMPCPP) $(FPPFLAGS) $*.b  > $*.f

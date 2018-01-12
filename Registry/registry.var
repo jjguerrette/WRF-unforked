@@ -401,8 +401,7 @@ rconfig   logical   use_randomblock         namelist,wrfvar6  1  .false.  - "use
 rconfig   integer   dgn_search              namelist,wrfvar6  max_outer_iterations  0  - "dgn_search"            ""  ""
 rconfig   real      dgn_tol                 namelist,wrfvar6  max_outer_iterations  0.05  - "dgn_tol"            ""  ""
 rconfig   logical   spectral_precon         namelist,wrfvar6  1  .false.  -  "spectral_precon"         ""  ""
-rconfig   integer   spectral_trunc          namelist,wrfvar6  max_outer_iterations  200  - "spectral_trunc"        ""  ""
-
+rconfig   integer   spectral_trunc          namelist,wrfvar6  max_outer_iterations  -1  - "spectral_trunc"        ""  ""
 rconfig   logical   rotate_omega            namelist,wrfvar6  1  .false.  -  "rotate_omega"            ""  ""
 rconfig   logical   use_global_cv_io        namelist,wrfvar6  1  .true.   - "use_global_cv_io"         ""  ""
 rconfig   logical   rewrite_ahat_ascii      namelist,wrfvar6  1  .false.  - "rewrite_ahat_ascii"       ""  ""

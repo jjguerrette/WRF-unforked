@@ -20,7 +20,7 @@ module da_randomisation
        num_ob_indexes, read_omega, svd_p, ierr, comm, &
        use_randomblock, nens_compare, tsvd_compare, cglz_compare, rsvd_compare, &
        use_global_cv_io, ntmax, var4d_inc_out, inc_out_interval, &
-       spectral_precon, riot_precon, rotate_omega, &
+       spectral_precon, riot_precon, rotate_omega, spectral_trunc, &
        hess_comp_x, &
        hess_comp_Pav_LRU, hess_comp_Pav_LRA, &
        hess_comp_Pa_LRU, hess_comp_Pa_LRA, &

@@ -41,7 +41,7 @@ subroutine da_cv_io_global (io_config, grid, filename, cv_size, rcv, mz, ascii_b
 
    if (io_config == 'r') then
       if (rootproc) then
-         write(*,*) 'Reading randomized SVD cv vector from '//trim(filename)
+         write(*,*) 'Reading cv vector from '//trim(filename)
          if (present(ascii_bool)) then
             open (unit=cv_unit, file = trim(filename), form = 'formatted', status = 'old',access='sequential')
             read(unit=cv_unit,fmt='(I10)') dummy
@@ -80,7 +80,7 @@ subroutine da_cv_io_global (io_config, grid, filename, cv_size, rcv, mz, ascii_b
 #endif
 
       if (rootproc) then
-         write(*,*) 'Writing randomized SVD cv vector to '//trim(filename)
+         write(*,*) 'Writing cv vector to '//trim(filename)
          if (present(ascii_bool)) then
             open (unit=cv_unit, file = trim(filename), form = 'formatted', status = 'replace',access='sequential')
             write(unit=cv_unit,fmt='(I10)') cv_size_domain
@@ -98,7 +98,7 @@ subroutine da_cv_io_global (io_config, grid, filename, cv_size, rcv, mz, ascii_b
 #endif
 
    else
-      write(*,*) 'Unknown configuration for randomized SVD I/O routine'
+      write(*,*) 'Unknown configuration for CV I/O routine'
    end if
 
    deallocate(cv_global)

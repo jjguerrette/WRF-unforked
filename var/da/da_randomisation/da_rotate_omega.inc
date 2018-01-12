@@ -68,14 +68,16 @@ subroutine da_rotate_omega(grid, cv_size, mz, jp_start, jp_end, nouter_prev, cv_
 
       ! Precondition with the l leading eigen modes from iteration it
       !  (requires eignval/eignvec to be sorted by decreasing value)
-      l = min(neign,spectral_trunc(it))
-      do imode = 1, l
-         eig_count = eig_count + 1
-         lam_all(eig_count) = eignval(imode)
-         do i = 1, nmodes
-            nuhat_all(:,eig_count) = nuhat_all(:,eig_count) + qhat(:,i) * eignvec(i,imode)
+      l = max(min(neign,spectral_trunc(it)),0)
+      if (l .gt. 0) then
+         do imode = 1, l
+            eig_count = eig_count + 1
+            lam_all(eig_count) = eignval(imode)
+            do i = 1, nmodes
+               nuhat_all(:,eig_count) = nuhat_all(:,eig_count) + qhat(:,i) * eignvec(i,imode)
+            end do
          end do
-      end do
+      end if
 
       deallocate(eignvec)
       deallocate(eignval)
@@ -113,7 +115,7 @@ subroutine da_rotate_omega(grid, cv_size, mz, jp_start, jp_end, nouter_prev, cv_
 
       ! Precondition with the l leading eigen modes from iteration it
       !  (requires eignval/eignvec to be sorted by decreasing value)
-      l = min(neign,spectral_trunc(it))
+      l = max(min(neign,spectral_trunc(it)),0)
       if (l .gt. 0) then
          eignval = 0.D0
          do imode = 1, l

@@ -82,7 +82,7 @@ subroutine da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, nouter_prev, 
 
       ! Precondition with the l leading eigen modes from iteration it
       !  (requires eignval/eignvec to be sorted by decreasing value)
-      l = min(neign,spectral_trunc(it))
+      l = max(min(neign,spectral_trunc(it)),0)
       if (l .gt. 0) then
          do imode = 1, l
             eignval(imode) = eignval(imode)**expon - 1.D0

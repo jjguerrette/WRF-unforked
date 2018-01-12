@@ -662,8 +662,10 @@
       else
 #endif
          if ( outer_loop_restart ) then
-            !call da_get_unit(cvt_unit)
-            cvt_unit=600
+            global_it = iouter_restart
+
+            call da_get_unit(cvt_unit)
+            !cvt_unit=600
             if ( max_ext_its > 1 ) then
               max_ext_its=1
               write(unit=message(1),fmt='(a)') "Re-set max_ext_its = 1 for outer_loop_restart"
@@ -683,8 +685,6 @@
               read(cvt_unit) cvt
               close(cvt_unit)
 
-              global_it = iouter_restart
-
 !!USED FOR DEBUGGING ONLY
 !      if (var4d_inc_out) then
 !         write(cproc,fmt='(i4.4)') myproc
@@ -703,10 +703,18 @@
 !!USED FOR DEBUGGING ONLY
 
             else
-              outer_loop_restart = .false.
               write(unit=message(1),fmt='(a)') "cvt file '"//trim(cvtfile)//"' does not exists, initiallizing cvt."
               call da_message(message(1:1))
               call da_initialize_cv (cv_size, cvt)
+
+              if (iouter_restart .gt. 1) then
+                 write(unit=message(1),fmt='(a)') "Re-set outer_loop_restart=.false. and iouter_restart=1."
+                 call da_message(message(1:1))
+
+                 outer_loop_restart = .false.
+                 iouter_restart = 1
+                 global_it = 1
+              end if
             end if
          else
             call da_initialize_cv (cv_size, cvt)
@@ -1042,7 +1050,7 @@
                allocate(hessian_info%ghat(cv_size))
             end if
 
-            call da_minimise_lz(grid, config_flags, it, cv_size, xbx,& 
+            call da_minimise_lz(grid, config_flags, global_it, cv_size, xbx,& 
                              be, iv, j_grad_norm_target, xhat, qhat, cvt, re, y, j, eignvec, eignval, neign, j0_cost, j0_total, hessian_info=hessian_info)
 #ifdef VAR4D
 #if (WRF_CHEM == 1)

@@ -33,7 +33,7 @@ subroutine da_cv_io (io_config, filename, cv_size, rcv, grid, mz, ascii_bool)
       call da_get_unit (cv_unit)
 
       if (io_config == 'r') then
-         write(*,*) 'Reading randomized SVD cv vector from '//trim(filename)
+         write(*,*) 'Reading cv vector from '//trim(filename)
          if (present(ascii_bool)) then
             open (unit=cv_unit, file = trim(filename), form = 'formatted', status = 'old',access='sequential')
             read(unit=cv_unit,fmt='(I10)') dummy
@@ -45,7 +45,7 @@ subroutine da_cv_io (io_config, filename, cv_size, rcv, grid, mz, ascii_bool)
          end if
          close(unit=cv_unit)
       else if (io_config == 'w') then
-         write(*,*) 'Writing randomized SVD cv vector to '//trim(filename)
+         write(*,*) 'Writing cv vector to '//trim(filename)
          if (present(ascii_bool)) then
             open (unit=cv_unit, file = trim(filename), form = 'formatted', status = 'replace',access='sequential')
             write(unit=cv_unit,fmt='(I10)') cv_size
@@ -57,7 +57,7 @@ subroutine da_cv_io (io_config, filename, cv_size, rcv, grid, mz, ascii_bool)
          end if
          close(unit=cv_unit)
       else
-         write(*,*) 'Unknow configuration for randomized SVD I/O routine'
+         write(*,*) 'Unknow configuration for CV I/O routine'
       end if
 
       call da_free_unit (cv_unit)

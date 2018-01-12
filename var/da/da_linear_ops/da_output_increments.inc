@@ -137,9 +137,6 @@ subroutine da_output_increments(grid,config_flags,mz, &
                                    LAM(1:imode),eignvec,qhat(:,0:imode), &
                                    ghat,xhat)
 
-            if (spectral_precon .and. it.gt.1) &
-               call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
-                                       it-1, xhat, xhat, 'TL' )
 
 !            call da_transform_vtox (grid,be%cv%size_jb,xbx,be,grid%ep,&
 !                                    xhat(1:be%cv%size_jb),grid%vv,grid%vp &
@@ -157,6 +154,10 @@ subroutine da_output_increments(grid,config_flags,mz, &
          if (itype .eq. 2) then !LRU
             xhat = xhat + ghat
          end if
+
+         if (spectral_precon .and. it.gt.1) &
+            call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
+                                    it-1, xhat, xhat, 'TL' )
 
          !-----------------------------------------
          ! Calculate ||dx - dx_REF||^2_{Pa_REF^-1}
