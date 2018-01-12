@@ -40,7 +40,7 @@ subroutine da_dgn(grid, config_flags, cv_size, xhat, cv, &
    integer, dimension(1:ncv_type) :: &
              cv_s, cv_e, ncv, branch
    logical, dimension(1:ncv_type) :: &
-             exit_array
+             exit_array, linear_bool
    character(1) :: ncv_char
 
    integer :: jl_start, jl_end
@@ -161,6 +161,7 @@ subroutine da_dgn(grid, config_flags, cv_size, xhat, cv, &
 
    branch = 2
    isearch = 2
+   linear_bool = .false.
    do while ( .not.all(exit_array) )
       isearch = isearch + 1
       call da_evaluate_j(grid, config_flags, cv_size, be%cv%size_jb, &
@@ -181,6 +182,15 @@ subroutine da_dgn(grid, config_flags, cv_size, xhat, cv, &
          end if
          write(unit=stdout,fmt='("DGN:",2I4,4F7.3,4F11.3)') &
             i, isearch, eta_a(i), eta_c(i), eta_d(i), eta_b(i), ja(i), jc(i), jd(i), jb(i)
+         if (ja(i).gt.1e-6 &
+                .and. jb(i) .lt. jd(i) &
+                .and. jd(i) .lt. jc(i) &
+                .and. jc(i) .lt. ja(i) &
+                ) then
+            exit_array(i) = .true.
+            linear_bool(i) = .true.
+            write(unit=stdout,fmt='("DGN: Accepting eta=1 for icv=",I4)') i
+         end if
 
          if (jc(i) .lt. jd(i)) then
             eta_b(i) = eta_d(i)
@@ -209,8 +219,9 @@ subroutine da_dgn(grid, config_flags, cv_size, xhat, cv, &
             end if
 
             if (eta(i).gt.(1.d0 - dgn_tol(it))) then
-               eta(i) = 1.D0
                exit_array(i) = .true.
+               linear_bool(i) = .true.
+               write(unit=stdout,fmt='("DGN: Accepting eta=1 for icv=",I4)') i
             end if
 
             if ((eta_b(i) - eta_a(i)) .le. dgn_tol(it)) exit_array(i) = .true.
@@ -220,7 +231,8 @@ subroutine da_dgn(grid, config_flags, cv_size, xhat, cv, &
 
    do i = 1, ncv_type
       if ( ncv(i) .le. 0 ) cycle
-      if (eta(i) .lt. 1.d0 ) eta(i) = (eta_a(i) + eta_b(i)) / 2.D0
+      if (linear_bool(i)) eta(i) = 1.D0
+      if (eta(i) .lt. 1.D0 ) eta(i) = (eta_a(i) + eta_b(i)) / 2.D0
       xhat(cv_s(i):cv_e(i)) = eta(i) * xhat(cv_s(i):cv_e(i))
    end do
    write(ncv_char,fmt='(I1)') ncv_type
