@@ -51,7 +51,7 @@ subroutine da_output_increments(grid,config_flags,mz, &
 
    character(len=10) :: PREFIX
    character(len=256) :: timestr
-   character(len=256) :: dummy_name
+!   character(len=256) :: dummy_name
    character(len=filename_len)     :: filename
    character(len=filename_len)     :: cvtfile
    character*10                    :: cproc
@@ -78,10 +78,10 @@ subroutine da_output_increments(grid,config_flags,mz, &
    allocate(qhat(cv_size,0:nmodes))
    allocate(LAM(1:nmodes))
 
-   dummy_name = trim(config_flags%auxhist18_outname)
-   call nl_set_io_form_auxhist18 ( grid%id, 2 )
-   config_flags%io_form_auxhist18 = 2
-   config_flags%frames_per_auxhist18 = 1
+!   dummy_name = trim(config_flags%auxhist18_outname)
+!   call nl_set_io_form_auxhist18 ( grid%id, 2 )
+!   config_flags%io_form_auxhist18 = 2
+!   config_flags%frames_per_auxhist18 = 1
 
    iend = 2
    if (use_lanczos) iend = 1
@@ -284,6 +284,7 @@ subroutine da_output_increments(grid,config_flags,mz, &
 
 
    !Calculate Euclidean norm by modes
+   if (nmodes_final .gt. 0) nmodes = nmodes_final
    allocate(eignval(1:nmodes))
    allocate(eignvec(1:nmodes,1:nmodes))
 
@@ -410,9 +411,9 @@ subroutine da_output_increments(grid,config_flags,mz, &
    deallocate(qhat)
 
 
-   config_flags%auxhist18_outname = trim(dummy_name)
-   call nl_set_io_form_auxhist18 ( grid%id, 0 )
-   config_flags%io_form_auxhist18 = 0
+!   config_flags%auxhist18_outname = trim(dummy_name)
+!   call nl_set_io_form_auxhist18 ( grid%id, 0 )
+!   config_flags%io_form_auxhist18 = 0
 
    if (trace_use) call da_trace_exit("da_output_increments")
 
