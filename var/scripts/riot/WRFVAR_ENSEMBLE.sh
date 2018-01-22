@@ -80,6 +80,7 @@ do
    cp $CWD/namelist.input ./
    ex -c :"/ensmember" +:":s/=.*/=$iENS,/" +:wq namelist.input
 
+#SHOULD SEPERATE INTO TWO LOOPS HERE TO CLOSE EFFICIENCY GAP (IDLE PROCESSES AFTER $EXECUTABLE CALL)
    ## Assign the processes to the hostlist for the current ensemble member
    # Reverse consecutive process placement (tail)
    if [ $rand_stage -eq 99 ]; then
