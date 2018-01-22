@@ -161,7 +161,8 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
    call da_deallocate_y(jo_grad_y)
 
 #if defined(LAPACK)
-   if ( present(re) .or. spectral_precon.and.it.gt.1 .or. .not.use_randomblock ) then
+   if ( present(re) .or. .not.use_randomblock .or. &
+        (spectral_precon .and. it.gt.1) )then
 #endif
 
    !-------------------------------------------------------------------------
@@ -255,8 +256,9 @@ subroutine da_calculate_gradj(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size
    grad = grad_jo + grad_jb + grad_je + grad_jd + grad_jp + grad_js + grad_jl
 
    !Apply preconditioner: 
-   ! Hessian: P^T * (I_n + L^T H^T R^-1 H L * P * cv)
-   ! gradient: P^T * (cv + L^T H^T R^-1 d)
+   ! Full Hessian - Lanczos: P^T * (I_n + L^T H^T R^-1 H L * P * cv) = P^T * grad
+   ! Obs. Hessian - RSVD:    P^T * (I_n + L^T H^T R^-1 H L * P * cv) - I_n * cv = P^T * grad - cv
+   ! gradient: P^T * (cv + L^T H^T R^-1 d) = P^T * grad
    if (spectral_precon .and. it.gt.1 .and. ( use_lanczos &
 #if defined(LAPACK)
          .or. use_randomblock &

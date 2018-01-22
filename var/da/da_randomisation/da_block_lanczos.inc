@@ -104,19 +104,19 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
 !!!!!!!!!!!!!!
 
             ! Calculate J and grad J (ghat)
-            if (ensmember .eq. 1) use_randomblock = .false.
+!            if (ensmember .eq. 1) use_randomblock = .false.
             call da_calculate_j(rand_outer, 0, cv_size, be%cv%size_jb, be%cv%size_je, be%cv%size_jp, &
                                 be%cv%size_jl, xbx, be, iv, xhat, cv, re, y, j_cost, ghat, grid, config_flags)
-            if (ensmember .eq. 1) use_randomblock = .true.
+!            if (ensmember .eq. 1) use_randomblock = .true.
 
             j0_total = j_cost%total
             if (j0_total == 0.0) return
 
-            beta = SQRT(da_dot_cv(cv_size, ghat, ghat, grid, mz, jp_start, jp_end))
-
-            write(unit=stdout,fmt='("Starting outer iteration : ",i3)') rand_outer
-            write(unit=stdout,fmt=11) j0_total, beta
-11          format('Starting cost function: ' ,1PD15.8,', Gradient: ',1PD15.8)
+!            beta = SQRT(da_dot_cv(cv_size, ghat, ghat, grid, mz, jp_start, jp_end))
+!
+!            write(unit=stdout,fmt='("Starting outer iteration : ",i3)') rand_outer
+!            write(unit=stdout,fmt=11) j0_total, beta
+!11          format('Starting cost function: ' ,1PD15.8,', Gradient: ',1PD15.8)
 
             ghat = - ghat
 
