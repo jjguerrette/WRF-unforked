@@ -14,7 +14,8 @@ module da_randomisation
 #endif
       PARAM_FIRST_SCALAR
 
-   use da_control, only : rand_stage, ensmember, rand_outer, &
+   use da_control, only : ensmember, &
+       rand_outer, rand_stage, rand_inner, max_rand_inner, &
        myproc, filename_len, test_dm_exact, rootproc, cv_size_domain, &
        var4d_lbc, stdout, trace_use, adapt_svd, prepend_rsvd_basis, &
        num_ob_indexes, read_omega, svd_p, ierr, comm, &
@@ -40,7 +41,7 @@ module da_randomisation
        da_calculate_grady, da_calculate_j, da_calculate_gradj
    use da_linear_ops, only:  da_gram_schmidt, da_amat_mul_trunc, &
        da_cv_io, da_cv_io_global, da_spectral_precon, da_hessian_io, &
-       da_dot_cv, da_dot
+       da_dot_cv, da_dot, da_mat_io
    use da_vtox_transforms, only : da_transform_vtox, da_transform_vtox_adj
    use da_define_structures, only : iv_type, y_type, j_type, be_type, xbx_type, &
 #if defined(LAPACK)
@@ -125,6 +126,8 @@ contains
 #endif
 #include "da_randomise_svd.inc"
 #include "da_randomise_svd_51.inc"
+#include "da_block_lanczos.inc"
+
 #include "da_force_grad_hess.inc"
 
 #include "da_calculate_hessian.inc"

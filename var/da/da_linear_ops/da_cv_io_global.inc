@@ -55,7 +55,7 @@ subroutine da_cv_io_global (io_config, grid, filename, cv_size, rcv, mz, ascii_b
             call da_wrf_error_fatal('Incorrect cv_size_domain in global cv I/O')
          end if
          if (present(ascii_bool)) then
-            read(unit=cv_unit,fmt='(E27.16E3)') cv_global(1:cv_size_domain)
+            read(unit=cv_unit,fmt='(E27.18E3)') cv_global(1:cv_size_domain)
          else
             read(unit=cv_unit) cv_global(1:cv_size_domain)
          end if
@@ -84,7 +84,7 @@ subroutine da_cv_io_global (io_config, grid, filename, cv_size, rcv, mz, ascii_b
          if (present(ascii_bool)) then
             open (unit=cv_unit, file = trim(filename), form = 'formatted', status = 'replace',access='sequential')
             write(unit=cv_unit,fmt='(I10)') cv_size_domain
-            write(unit=cv_unit,fmt='(E27.16E3)') cv_global(1:cv_size_domain)
+            write(unit=cv_unit,fmt='(E27.18E3)') cv_global(1:cv_size_domain)
          else
             open (unit=cv_unit, file = trim(filename), form = 'unformatted', status = 'replace')
             write(unit=cv_unit) cv_size_domain

@@ -359,7 +359,7 @@ subroutine da_calculate_j(it, iter, cv_size, cv_size_jb, cv_size_je, cv_size_jp,
        .or. osse_chem &
 #endif
        )) then
-      write(unit=stdout,fmt='("Outer SVD iteration : ",i3)') it
+      write(unit=stdout,fmt='("Outer Randomization iteration : ",i3)') it
       write(unit=stdout,fmt='("Starting cost function: ",1PD15.3)') j%total
    end if
 #endif

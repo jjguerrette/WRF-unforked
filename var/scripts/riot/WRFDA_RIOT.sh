@@ -53,9 +53,8 @@ echo "MPI Calling Wrapper = "
 echo "==> "$MPICALL
 
 if [ -z "$WRF_CHEM" ]; then #Could be defined externally
-   # Set to 0 (default) to conduct MET DA
+   # Set to 0 (default) to not conduct CHEM DA
    # 1 to conduct chemical emission inversion (requires WRFDA-Chem)
-   # 2 to conduct simultaneous MET and chemical emission inversion (requires WRFDA-Chem)
    export WRF_CHEM=0
 fi
 if [ $WRF_CHEM -eq 1 ]; then
@@ -67,6 +66,15 @@ if [ $WRF_CHEM -eq 1 ]; then
       #Set to 0 (default) or 1 to conduct chemical emission inversion (requires WRFDA-Chem)
       export FORCE_AIRCRAFT=1
    fi
+fi
+if [ -z "$WRF_MET" ]; then #Could be defined externally
+   # Set to 0 (default) to not conduct MET DA
+   # 1 to conduct MET DA
+   export WRF_MET=0
+fi
+if [ $WRF_CHEM -eq 0 ] && [ $WRF_MET -eq 0 ]; then
+   echo "ERROR: Either WRF_CHEM or WRF_MET must be set to 1"
+   echo 1; exit 1
 fi
 #=======================================================================================
 # Begin User Options
@@ -136,7 +144,7 @@ echo " * valid rand_type options: "
 echo "   + 6-RSVD5.6"
 echo "   + 2-Full Hessian(Requires SVDN=Nobs)"
 echo " * only rand_type=6 is functional in WRFDA for non-CHEM variables"
-if [ $rand_type -ne 6 ] && [ $rand_type -ne 2 ]; then echo "ERROR: unknown rand_type=$rand_type"; echo 1; exit 1; fi
+if [ $rand_type -ne 6 ] && [ $rand_type -ne 2 ]; then echo "ERROR: unknown rand_type=$rand_type"; echo 2; exit 2; fi
 echo ""
 echo "(2) RIOT_RESTART=$RIOT_RESTART"
 echo ""
@@ -164,7 +172,7 @@ ex -c :"/ntmax" +:":s/=.*/=$ntmax/" +:wq namelist.input
 echo ""
 echo "(7) LRA-LRU Adaptation: ADAPT_SVD=$ADAPT_SVD"
 #if [ "$ADAPT_SVD" != "false" ] && [ "$ADAPT_SVD" != "true" ]; then
-#   echo "ERROR: ADAPT_SVD must either be true or false"; echo 2; exit 2
+#   echo "ERROR: ADAPT_SVD must either be true or false"; echo 3; exit 3
 #fi
 echo ""
 echo "(8) Preconditioning Option: GRAD_PRECON=$GRAD_PRECON"
@@ -176,7 +184,7 @@ done
 if [ "$GRAD_PRECON" -lt 0 ] || [ $valid_precon -eq 0 ]; then
 #if [ "$GRAD_PRECON" -lt 0 ] || [ "$GRAD_PRECON" -gt 4 ]; then
    echo "ERROR: GRAD_PRECON must be >= 0 and valid values are"
-   echo " 0, 1, 2, 3, 4, 12, 13, 14, or 15"; echo 3; exit 3
+   echo " 0, 1, 2, 3, 4, 12, 13, 14, or 15"; echo 4; exit 4
 fi
 echo ""
 if [ -z "$GLOBAL_OPT" ]; then
@@ -193,7 +201,7 @@ if [ "$GLOBAL_OPT" == "true" ]; then
 else if [ "$GLOBAL_OPT" == "false" ]; then
    echo "Note: Global I/O is necessary to change number of processors per ensemble member between outer iterations"
 else
-   echo "ERROR: GLOBAL_OPT must either be true or false"; echo 4; exit 4
+   echo "ERROR: GLOBAL_OPT must either be true or false"; echo 5; exit 5
 fi
 fi
 
@@ -204,13 +212,13 @@ PPN=  #Use this to override the number of processors per node
 if [ -z "$PBS_NODEFILE" ]; then
    echo "ERROR: Using SVD requires PBS_NODEFILE to be set to your host file."
    echo "ERROR: This tool requires a large number of processors (> 100)"
-   echo 5; exit 5
+   echo 6; exit 6
 fi
 PBSNODE0=$PBS_NODEFILE
 NUMNODES=`cat $PBSNODE0 | uniq | wc -l`
 if [ $NUMNODES -lt $((SVDN+1)) ]; then
    echo "ERROR: NUMNODES must be set >= SVDN+1 (i.e., $((SVDN+1)))"
-   echo 6; exit 6
+   echo 7; exit 7
 fi
 
 if [ -n "$PPN" ]; then
@@ -226,7 +234,7 @@ if [ $NPpJMAX -gt $NUMPROC ]; then
    NPpJMAX=$NUMPROC
    export NPpJMAX=$NPpJMAX
 #   echo "ERROR: NPpJMAX must be set <= total number of processors"
-#   echo 7; exit 7
+#   echo 8; exit 8
 fi
 #Use as many of the cores as possible for ensemble members
 #NODES_per_ens=$((NUMNODES/NENS))
@@ -254,7 +262,7 @@ if [ "$GLOBAL_OPT" == "false" ] && [ $NPpJ_grad -ne $NPpJ ]; then
     echo "ERROR: nproc_local and nproc_local_grad must be equal when GLOBAL_OPT==false"
     echo "NPpJ=$NPpJ"
     echo "NPpJ_grad=$NPpJ_grad"
-    echo 8; exit 8
+    echo 9; exit 9
 fi
 
 echo "Cores per ensemble job: "$NPpJ
@@ -264,7 +272,7 @@ if [ $((NPpJ % PPN)) -ne 0 ] || [ $((NPpJ_grad % PPN)) -ne 0 ] || [ $NPpJ -eq 0 
     echo "NPpJ=$NPpJ"
     echo "NPpJ_grad=$NPpJ_grad"
     echo "PPN=$PPN"
-    echo 9; exit 9
+    echo 10; exit 10
 fi
 
 # Set processor counts for: 
@@ -381,7 +389,7 @@ if [ $RIOT_RESTART ] && [ $RIOT_RESTART -eq 1 ]; then
 
    itstart=2
    NOUTER=$((NOUTER+1))
-   ex -c :"/svd_minimise" +:":s/=.*/=false,/" +:wq namelist.input
+   ex -c :"/rand_minimise" +:":s/=.*/=false,/" +:wq namelist.input
 else if [ $RIOT_RESTART ] && [ $RIOT_RESTART -eq 2 ]; then
 #------------------------------------------------------------------
 # Option to restart RIOT minimization from previous outer iteration
@@ -499,6 +507,7 @@ export GLOBAL_OPT
 export GRAD_PRECON
 export CPDT
 export WRF_CHEM
+export WRF_MET
 export RIOT_RESTART
 export nproc_local
 export nproc_local_grad
@@ -589,7 +598,7 @@ do
    fi
 
    if [ $STAGE1 -le 0 ]; then
-      echo "EXIT: STAGE1 > 0 required for multiple outer iterations"; echo 10; exit 10;
+      echo "EXIT: STAGE1 > 0 required for multiple outer iterations"; echo 11; exit 11;
    fi
 
    if [ "$GLOBAL_OMEGA" == "true" ]; then
@@ -603,7 +612,7 @@ do
          echo "$dummy present of $NENS omega files"
          if [ $dummy -ne $NENS ]; then 
             echo "ERROR: Missing or extra omega.e*.p0000"
-            echo 11; exit 11
+            echo 12; exit 12
          fi
          mv -v omega.e*.p* ../vectors_$it0
       else
@@ -615,14 +624,14 @@ do
    # Check for presence of checkpoint and obs output files (CHEM only)
    #-------------------------------------------------------------------
    if [ $CPDT -gt 0 ]; then
-      if [ $(ls "$CWD"/wrf_checkpoint_d01* | wc -l) -eq 0 ]; then echo "ERROR: Missing checkpoint files"; echo 12; exit 12; fi
-      if [ $WRF_CHEM -eq 2]; then
-         if [ $(ls "$CWD"/xtraj_for_obs_d01* | wc -l) -eq 0 ]; then echo "ERROR: Missing xtraj_for_obs files"; echo 13; exit 13; fi
+      if [ $(ls "$CWD"/wrf_checkpoint_d01* | wc -l) -eq 0 ]; then echo "ERROR: Missing checkpoint files"; echo 13; exit 13; fi
+      if [ $WRF_MET -gt 0]; then
+         if [ $(ls "$CWD"/xtraj_for_obs_d01* | wc -l) -eq 0 ]; then echo "ERROR: Missing xtraj_for_obs files"; echo 14; exit 14; fi
       fi
    fi
    if [ $WRF_CHEM -gt 0 ]; then
-      if [ $FORCE_SURFACE -eq 1 ] && [ $(ls "$CWD"/SURFACE_Hx_y* | wc -l) -eq 0 ]; then echo "ERROR: Missing SURFACE_Hx_y files"; echo 12; exit 12; fi
-      if [ $FORCE_AIRCRAFT -eq 1 ] && [ $(ls "$CWD"/AIRCRAFT_Hx_y* | wc -l) -eq 0 ]; then echo "ERROR: Missing AIRCRAFT_Hx_y files"; echo 13; exit 13; fi
+      if [ $FORCE_SURFACE -eq 1 ] && [ $(ls "$CWD"/SURFACE_Hx_y* | wc -l) -eq 0 ]; then echo "ERROR: Missing SURFACE_Hx_y files"; echo 15; exit 15; fi
+      if [ $FORCE_AIRCRAFT -eq 1 ] && [ $(ls "$CWD"/AIRCRAFT_Hx_y* | wc -l) -eq 0 ]; then echo "ERROR: Missing AIRCRAFT_Hx_y files"; echo 16; exit 16; fi
 # Something like this would allow storing checkpoint files in a temporary directory (hard disk, not memory due to size)
 #         if [ $it -gt $itstart ]; then
 #            pbsdsh -- rm $TMPDIR/wrf_checkpoint_d01*
@@ -699,7 +708,7 @@ do
 
             cd ../run.$jj
             ls $diri/omega_precon.e$jj.p*
-            if [ $? -ne 0 ]; then echo "ERROR: Missing run.$ii/omega.e$jj.p*"; echo 16; exit 16; fi
+            if [ $? -ne 0 ]; then echo "ERROR: Missing run.$ii/omega.e$jj.p*"; echo 17; exit 17; fi
 
             for file in $diri/omega_precon.e$jj.p*
             do
@@ -736,7 +745,7 @@ do
          if [ $((NPpJ/PPN)) -eq 0 ]; then
             echo "ERROR: cores per ensemble less than cores per node"
             echo "$NUMPROC, $NODES_per_ens, $PPN, $NPpJ"
-            echo 17; exit 17
+            echo 18; exit 18
          fi
          if [ $NPpJ -gt $NPpJMAX ]; then NPpJ=$(($((NPpJMAX/PPN))*PPN)); fi
 
@@ -745,7 +754,7 @@ do
 
          dummy=$(($((nproc_local*NENS))+$(($((NJOBS-NENS))*nproc_local_grad))))
          if [ $dummy -gt $NUMPROC ]; then
-            echo "ERROR: Too many processors requested in it=$it, NUMPROC_request=$dummy, NUMPROC_avail=$NUMPROC"; echo 18; exit 18
+            echo "ERROR: Too many processors requested in it=$it, NUMPROC_request=$dummy, NUMPROC_avail=$NUMPROC"; echo 19; exit 19
          fi
       fi
       ##--------------------------------------------------------------------------
@@ -760,7 +769,7 @@ do
    ./WRFVAR_ENSEMBLE.sh "$it" "1" "$NENS" "$NJOBS" "1"
 
    if [ $STAGE2 -le 0 ]; then
-      echo "EXIT: STAGE2 > 0 required for multiple outer iterations"; echo 19; exit 19;
+      echo "EXIT: STAGE2 > 0 required for multiple outer iterations"; echo 20; exit 20;
    fi
 
 #===================================================================================

@@ -426,6 +426,8 @@ rconfig   real      scale_hcheck            namelist,wrfvar6  1  1.0       - "sc
 rconfig   integer   ensmember               namelist,wrfvar6  1  0        - "ensmember"                ""  ""
 rconfig   integer   svd_p                   namelist,wrfvar6  1  0        - "svd_p"                    ""  ""
 rconfig   integer   rand_outer              namelist,wrfvar6  1  0        - "rand_outer"               ""  ""
+rconfig   integer   rand_inner              namelist,wrfvar6  1  0        - "rand_inner"               ""  ""
+rconfig   integer   max_rand_inner          namelist,wrfvar6  1  0        - "max_rand_inner"           ""  ""
 rconfig   integer   rand_type               namelist,wrfvar6  1  6        - "rand_type"                ""  ""
 rconfig   logical   read_omega              namelist,wrfvar6  1  .false.  - "read_omega"               ""  ""
 rconfig   integer   riot_precon             namelist,wrfvar6  1  0        - "riot_precon"              ""  ""

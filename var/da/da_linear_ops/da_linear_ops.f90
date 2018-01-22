@@ -46,6 +46,7 @@ contains
 #include "da_cv_io_global.inc"
 #include "da_hessian_io.inc"
 #include "da_hessian_io_global.inc"
+#include "da_mat_io.inc"
 
 #include "da_gram_schmidt.inc"
 #include "da_amat_mul_trunc.inc"

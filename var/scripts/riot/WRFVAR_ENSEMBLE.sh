@@ -26,6 +26,7 @@ do
    if [ $iENS -lt 1000 ]; then ii=0$ii; fi
 
    cd ../run.$ii
+
    if [ $rand_stage -eq 1 ] && [ $iENS -le $NENS ] && \
       [ "$GLOBAL_OMEGA" == "true" ] && \
       ([ $it -eq 1 ] || [ $GRAD_PRECON -eq 0 ]); then
@@ -43,7 +44,7 @@ do
    if [ $rand_stage -eq 1 ] || [ $rand_stage -eq 99 ]; then
       if [ $CPDT -gt 0 ]; then
          ln -sf $CWD_rel/wrf_checkpoint_d01_* ./
-         if [ $WRF_CHEM -eq 2 ]; then
+         if [ $WRF_MET -gt 0 ]; then
            ln -sf $CWD_rel/xtraj_for_obs_d01_* ./
          fi
       fi

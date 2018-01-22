@@ -37,7 +37,7 @@ subroutine da_cv_io (io_config, filename, cv_size, rcv, grid, mz, ascii_bool)
          if (present(ascii_bool)) then
             open (unit=cv_unit, file = trim(filename), form = 'formatted', status = 'old',access='sequential')
             read(unit=cv_unit,fmt='(I10)') dummy
-            read(unit=cv_unit,fmt='(E27.16E3)') rcv(1:cv_size)
+            read(unit=cv_unit,fmt='(E27.18E3)') rcv(1:cv_size)
          else
             open (unit=cv_unit, file = trim(filename), form = 'unformatted', status = 'old')
             read(unit=cv_unit) dummy
@@ -49,7 +49,7 @@ subroutine da_cv_io (io_config, filename, cv_size, rcv, grid, mz, ascii_bool)
          if (present(ascii_bool)) then
             open (unit=cv_unit, file = trim(filename), form = 'formatted', status = 'replace',access='sequential')
             write(unit=cv_unit,fmt='(I10)') cv_size
-            write(unit=cv_unit,fmt='(E27.16E3)') rcv(1:cv_size)
+            write(unit=cv_unit,fmt='(E27.18E3)') rcv(1:cv_size)
          else
             open (unit=cv_unit, file = trim(filename), form = 'unformatted', status = 'replace')
             write(unit=cv_unit) cv_size

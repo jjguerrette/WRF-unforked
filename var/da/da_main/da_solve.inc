@@ -64,6 +64,12 @@
    integer                      :: run_hours0
    integer                      :: iens, nens
    real(wp), allocatable        :: omega(:,:) ! Gaussian draw
+!   real*8, allocatable          :: cvt_pert(:)      ! Control variable structure.
+
+   integer                      :: je_start, je_end       ! Start/end indices of Je.
+   integer                      :: jp_start, jp_end       ! Start/end indices of Jp.
+   integer                      :: jl_start, jl_end       ! Start/end indices of Jl.
+
 #endif
 
 #if (WRF_CHEM != 1)
@@ -832,7 +838,7 @@
       end if
       if (.not.outer_loop_restart) global_it = it
 #if defined(LAPACK)
-      if (use_randomblock) then
+      if (use_randomblock .and. var4d) then
          global_it = rand_outer
          use_lanczos = .false.
          nens = ntmax(rand_outer)
@@ -871,6 +877,78 @@
                return
             end if
          end if
+         if (.not.use_block_lanczos) then
+            if (rand_type.eq.3) use_block_lanczos = .true.
+         else
+            rand_type = 3
+         end if
+        
+         if ( use_block_lanczos .and. rand_stage.eq.1 .and. rand_inner.eq.1 ) then
+            allocate(omega(cv_size,1))
+
+!!!! This perturbation and gradient code needs to be fixed still, need to perturb observations
+            !Perturb initial state of all but first ensemble member (mean)
+            if (ensemember .gt. 1) then
+               write(cproc,fmt='(i4.4)') myproc
+               write(cens,fmt='(i4.4)') ensmember
+
+               if (read_omega) then
+                  !Read omega from file
+                  filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+                  call da_cv_io ('w', filename, cv_size, omega(1:cv_size,1), grid, mz)
+               else
+                  call da_gen_omega(omega, cv_size, 1, grid, mz)
+               end if
+               je_start   = be%cv%size_jb + 1
+               je_end     = be%cv%size_jb + be%cv%size_je
+               jp_start   = be%cv%size_jb + be%cv%size_je + 1
+               jp_end     = be%cv%size_jb + be%cv%size_je + be%cv%size_jp
+               jl_start   = be%cv%size_jb + be%cv%size_je + be%cv%size_jp + 1
+               jl_end     = be%cv%size_jb + be%cv%size_je + be%cv%size_jp + be%cv%size_jl
+
+               if ( be%cv%size_jp.gt.0) omega(jp_start:jp_end,:) = 0.D0
+               if ( be%cv%size_je.gt.0) omega(je_start:je_end,:) = 0.D0
+               if ( .not. var4d_lbc .and. be%cv%size_jl.gt.0) omega(jl_start:jl_end,:) = 0.D0
+
+               call da_transform_vtox (grid,be%cv%size_jb,xbx,be,grid%ep,&
+                                        omega(1:be%cv%size_jb,1),grid%vv,grid%vp &
+#if (WRF_CHEM == 1)
+                                        , grid%vch &
+#endif
+                                        )
+
+               !Transfer random update to boundary condition updates
+               call da_transform_xatowrftl_lbc_wrapper( &
+                       global_it, cv_size, be, grid%ep, &
+                       xhat, iv, grid%vp6, grid%vv6, xbx, &
+                       grid, config_flags &
+!#if (WRF_CHEM == 1)
+!                      , grid%vch6 &
+!#endif
+                       )
+
+               call da_transform_xtoxa (grid)
+
+               call da_transfer_xatoanalysis (it, xbx, grid, config_flags)
+
+               write(outerloop,'(i2.2)') it
+               call da_update_firstguess(grid,'wrfvar_input_'//outerloop//'.e'//cens)
+
+               call da_transfer_headtomodel (grid)
+
+               cvt = cvt + omega(:,1)
+
+               !Need to perturb observations here or below after da_nl_model...hmmm
+               !num_qcstat_conv=0
+               !call da_get_innov_vector (global_it, num_qcstat_conv, ob, iv, grid , config_flags)
+
+            else
+               omega = 0.D0
+            end if
+
+            deallocate(omega)
+         end if
+
          allocate (qhat(1:cv_size, 0:nens))
          allocate (eignvec(nens, nens))
          allocate (eignval(nens))
@@ -1066,11 +1144,11 @@
                                            be,iv,xhat,qhat,cvt,y,eignvec,eignval,neign )
 #ifdef VAR4D
 #if defined(LAPACK)
-      else if ( use_randomblock) then
+      else if ( use_randomblock .and. var4d) then
          j0_total = 0.D0
-         if ( nens.gt.0  .and.  rand_outer.gt.0  .and.  it.eq.1 ) then
-            if (rand_stage .eq. 1 .and. &
-                (ensmember .eq. nens+1)) then
+         if ( nens.gt.0 .and. rand_outer.gt.0 .and. it.eq.1 ) then
+            if (rand_stage.eq.1 .and. &
+                ((ensmember.eq.nens+1) .or. rand_type.eq.3)) then
                select case (rand_type)
 #if (WRF_CHEM == 1)
 !Need proper obs handling for non-chem vars still
@@ -1079,6 +1157,11 @@
                            grid, mz, config_flags, cv_size, xbx, &
                            be, iv, cvt, re, y, xhat, nens, j_cost = j)
 #endif
+                  case(3)
+                     call da_block_lanczos( &
+                           grid, mz, config_flags, cv_size, xbx, &
+                           be, iv, cvt, re, y, xhat, nens, j_cost = j)
+
                   case(6)
                      call da_randomise_svd( &
                            grid, mz, config_flags, cv_size, xbx, &
@@ -1118,6 +1201,19 @@
                               be, iv, cvt, re, y, xhat, nens)
                      end if
 #endif
+                  case(3)
+!                     if (var4d_inc_out) then
+!                        allocate(hessian_info%eigs(nens))
+!                        allocate(hessian_info%qhat(cv_size,0:nens))
+!                        allocate(hessian_info%ghat(cv_size))
+!                     end if
+
+                     call da_block_lanczos( &
+                           grid, mz, config_flags, cv_size, xbx, &
+                           be, iv, cvt, re, y, xhat, nens, &
+                           qhat=qhat, eignval=eignval, &
+                           eignvec=eignvec, neign=neign, &
+                           hessian_info=hessian_info)
                   case(6)
                      if (rand_stage .eq. 2) then
                         if (var4d_inc_out) then
@@ -1186,7 +1282,9 @@
                 (rand_type .eq. 6 .and. rand_stage .ne. 2) .or. &
                 (rand_type .eq. 2 .and. rand_stage .ne. 2) .or. &
                 (rand_type .eq. 10) .or. &
-                (rand_type .eq. 11)) then
+                (rand_type .eq. 11) .or. &
+                (rand_type .eq. 3 .and. rand_inner.lt.max_rand_inner) &
+                ) then
 
                call da_deallocate_observations (iv)
                call da_deallocate_y (ob)
