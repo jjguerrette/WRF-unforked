@@ -1,6 +1,6 @@
 subroutine da_randomise_svd(grid, mz, config_flags,        &
                            cv_size, xbx, be, iv, cv,   &
-                           re, y, xhat, nens, j_cost,  &
+                           re, y, xhat, nsamp, j_cost,  &
                            qhat, eignval, eignvec, neign, hessian_info)
 
    !-------------------------------------------------------------------------
@@ -31,16 +31,17 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
    type (y_type), intent(inout)      :: re                       ! residual (o-a) structure.
    type (y_type), intent(inout)      :: y                        ! y = H(x_inc) structure.
    real,   intent(out)               :: xhat(1:cv_size)          ! control variable (local).
-   integer, intent(in)               :: nens                     ! Total number of eigenpairs
+   integer, intent(in)               :: nsamp                     ! Total number of eigenpairs
    type (j_type), optional, intent(out) :: j_cost                ! cost function
-   real, optional, intent(out)       :: qhat(1:cv_size, 0:nens)  ! orthonormal basis set of A = Q * B * Q^T
-   real,      optional, intent(out) :: eignvec(nens, nens)
-   real,      optional, intent(out) :: eignval(nens)
+   real, optional, intent(out)       :: qhat(1:cv_size, 0:nsamp)  ! orthonormal basis set of A = Q * B * Q^T
+   real,      optional, intent(out) :: eignvec(nsamp, nsamp)
+   real,      optional, intent(out) :: eignval(nsamp)
    integer,   optional, intent(out) :: neign                         ! Number of non-truncated eigenpairs
    type(hessian_type), optional, intent(inout) :: hessian_info
 
 #if defined(LAPACK)
-   real                         :: LAM(1:nens)
+   real                         :: LAM(1:nsamp)
+   real                         :: hess_trace(1:nsamp)
    real, allocatable            :: yhat(:,:)  ! yhat = A * omega
    real, allocatable            :: omega(:,:) ! Gaussian draw
   
@@ -55,7 +56,7 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
    real                         :: j0_total
    character*10                 :: cproc, cens
    character(len=filename_len)  :: filename
-   character(len=4) :: cnens=""
+   character(len=4) :: cnsamp=""
    logical          :: swapped
 
    if (trace_use) call da_trace_entry("da_randomise_svd")
@@ -80,7 +81,7 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
       ! Generate vectors in Y = A*OMEGA (Halko, Algorithm 4.1), where A = L^T * H^T * R^-1 * H * L 
       write(cens,fmt='(i4.4)') ensmember
 
-      if ( ensmember .eq. nens+1 ) then 
+      if ( ensmember .eq. nsamp+1 ) then 
          ! Calculate J and grad J (ghat)
 !         use_randomblock = .false.
          call da_calculate_j(rand_outer, 0, cv_size, be%cv%size_jb, be%cv%size_je, be%cv%size_jp, &
@@ -90,28 +91,28 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
          j0_total = j_cost%total
          if (j0_total == 0.0) return
 
-!         beta = SQRT(da_dot_cv(cv_size, ghat, ghat, grid, mz, jp_start, jp_end))
-!
-!         write(unit=stdout,fmt='("Starting outer iteration : ",i3)') rand_outer
-!         write(unit=stdout,fmt=11) j0_total, beta
-!11       format('Starting cost function: ' ,1PD15.8,', Gradient: ',1PD15.8)
+         beta = SQRT(da_dot_cv(cv_size, ghat, ghat, grid, mz, jp_start, jp_end))
+
+         write(unit=stdout,fmt='("Starting outer iteration : ",i3)') rand_outer
+         write(unit=stdout,fmt=11) j0_total, beta
+11       format('Starting cost function: ' ,1PD15.8,', Gradient: ',1PD15.8)
 
          ghat = - ghat
 
          ! Write ghat to file
-         filename = 'ghat.p'//trim(adjustl(cproc))
+         filename = trim(randvecdir)//'ghat.p'//trim(adjustl(cproc))
          call da_cv_io ('w', filename, cv_size, ghat, grid, mz)
 
-         if (any(riot_precon.eq.(/1,2,3,4/)) .and. rand_outer.gt.1 .and. sum(ntmax(1:rand_outer-1)).gt.nens) &
-            call da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat)
+         if (any(riot_precon.eq.(/1,2,3,4/)) .and. rand_outer.gt.1 .and. sum(ntmax(1:rand_outer-1)).gt.nsamp) &
+            call da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nsamp, ghat)
 
-      else if (ensmember .gt. 0 .and. ensmember .le. nens) then
+      else if (ensmember .gt. 0 .and. ensmember .le. nsamp) then
          !Generate OMEGA
          allocate(omega(1:cv_size,1))
          if (read_omega) then
             ! Read in omega vector for this ensemble member
-            write(unit=stdout,fmt='("Reading omega ensemble member ",i4," of ",i4)') ensmember,nens
-            filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+            write(unit=stdout,fmt='("Reading omega ensemble member ",i4," of ",i4)') ensmember,nsamp
+            filename = trim(randvecdir)//'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
             call da_cv_io ('r', filename, cv_size, omega(1:cv_size,1), grid, mz)
          else
             call da_set_randomcv(cv_size, omega(:,1))
@@ -131,7 +132,7 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
 
          if (.not. read_omega) then
             !Write omega to file
-            filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+            filename = trim(randvecdir)//'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
             call da_cv_io ('w', filename, cv_size, omega(1:cv_size,1), grid, mz)
          end if
 
@@ -144,17 +145,17 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
          deallocate(omega)
 
          ! Write yhat to file
-         filename = 'yhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+         filename = trim(randvecdir)//'yhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
          call da_cv_io ('w', filename, cv_size, yhat(1:cv_size,1), grid, mz)
 
          deallocate(yhat)
       else
-         write(unit=stdout,fmt='(A,I4)') 'FATAL ERROR: ensmember should be between 1 and nens+1, not ',ensmember
+         write(unit=stdout,fmt='(A,I4)') 'FATAL ERROR: ensmember should be between 1 and nsamp+1, not ',ensmember
          CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
       end if
    else if ( rand_stage .eq. 2 ) then
-      allocate(yhat(1:cv_size,nens))
-      allocate(omega(1:cv_size,nens))
+      allocate(yhat(1:cv_size,nsamp))
+      allocate(omega(1:cv_size,nsamp))
 
 
 #ifdef DM_PARALLEL
@@ -162,17 +163,17 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
 #endif
 
       ! Read gradient
-      filename = 'ghat.p'//trim(adjustl(cproc))
+      filename = trim(randvecdir)//'ghat.p'//trim(adjustl(cproc))
       call da_cv_io ('r', filename, cv_size, ghat, grid, mz)
 
       ! Read in yhat and omega vectors from all ensembles on each processor
-      do iens = 1, nens
+      do iens = 1, nsamp
          write(unit=stdout,fmt='("Reading yhat and omega ensemble member : ",i4)') iens
          write(cens,fmt='(i4.4)') iens
-         filename = 'yhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+         filename = trim(randvecdir)//'yhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
          call da_cv_io ('r', filename, cv_size, yhat(1:cv_size,iens), grid, mz)
 
-         filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+         filename = trim(randvecdir)//'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
          call da_cv_io ('r', filename, cv_size, omega(1:cv_size,iens), grid, mz)
       end do
       if ( be%cv%size_jp.gt.0) omega(jp_start:jp_end,:) = 0.D0
@@ -184,28 +185,28 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
 #endif
 
       if (prepend_rsvd_basis(rand_outer) .eq. 1) then
-         qhat(:,2:nens)  = yhat(:,1:nens-1) 
+         qhat(:,2:nsamp)  = yhat(:,1:nsamp-1) 
          qhat(:,1) = ghat
       else
-         qhat(:,1:nens) = yhat(:,1:nens)
+         qhat(:,1:nsamp) = yhat(:,1:nsamp)
       end if
 
       call da_gram_schmidt(grid,mz,jp_start,jp_end, &
-                            qhat,cv_size,nens)
+                            qhat,cv_size,nsamp)
 
 !REMOVE EVENTUALLY or add option since very useful for debugging
 !      ! Write qhat vectors to disk
-!      do iens = 1, nens
+!      do iens = 1, nsamp
 !         write(unit=stdout,fmt='("Writing qhat vectors to disk: ",i4)') iens
 !         write(cens,fmt='(i4.4)') iens
-!         filename = 'qhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+!         filename = trim(trim(randvecdir))//'qhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
 !         call da_cv_io ('w', filename, cv_size, qhat(1:cv_size,iens), grid, mz)
 !      end do
 !REMOVE EVENTUALLY or add option since very useful for debugging
 
       call da_rsvd56(grid, mz, jp_start, jp_end, &
                      omega, yhat, qhat, cv_size, &
-                     eignval, eignvec, nens)
+                     eignval, eignvec, nsamp, hess_trace_approx = hess_trace)
 
       ! Add 1.0 to get eigenvalues of full preconditioned Hessian
       eignval = eignval + 1.D0
@@ -214,19 +215,22 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
            .and. present(hessian_info) &
            .and. allocated(hessian_info%ghat) ) then
 
+         write(cnsamp,fmt='(I0)') nsamp
+         write(unit=stdout,fmt='(A,'//trim(cnsamp)//'E27.16E3)') 'HESS_TRACE: ',hess_trace(1:nsamp)
+
          hessian_info%ghat = ghat
 
-         hessian_info%nmodes_max = nens
-         do iens = 0, nens
+         hessian_info%nmodes_max = nsamp
+         do iens = 0, nsamp
             hessian_info%qhat(:,iens) = qhat(:,iens)
          end do
 
-         do iens = nens, 1, -inc_out_interval
+         do iens = nsamp, 1, -inc_out_interval
             allocate(hessian_info%eigs(iens)%eignval(1:iens))
             allocate(hessian_info%eigs(iens)%eignvec(1:iens,1:iens))
 
             hessian_info%eigs(iens)%neign = iens
-            if (iens.eq.nens) then
+            if (iens.eq.nsamp) then
                hessian_info%eigs(iens)%eignval = eignval
                hessian_info%eigs(iens)%eignvec = eignvec
             else
@@ -242,16 +246,16 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
 
       ! Print current eigenpairs
       ! ----------------------------------------------
-      write(cnens,fmt='(I0)') nens
-      write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'Eigenvalues(r): ',eignval(1:nens)
+      write(cnsamp,fmt='(I0)') nsamp
+      write(unit=stdout,fmt='(A,'//trim(cnsamp)//'E27.16E3)') 'Eigenvalues(r): ',eignval(1:nsamp)
 
-      do iens = 1, nens
-         write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'EIGENVECTOR_MATRIX: ',eignvec(iens,1:nens)
-      end do
+!      do iens = 1, nsamp
+!         write(unit=stdout,fmt='(A,'//trim(cnsamp)//'D25.16)') 'EIGENVECTOR_MATRIX: ',eignvec(iens,1:nsamp)
+!      end do
 
-      neign = nens
+      neign = nsamp
       write(unit=stdout,fmt='(A)') ' '
-      write(unit=stdout,fmt='(A,I5,A,I5,A)') 'Using ', neign, ' of ', nens, ' eigenpairs'
+      write(unit=stdout,fmt='(A,I5,A,I5,A)') 'Using ', neign, ' of ', nsamp, ' eigenpairs'
       write(unit=stdout,fmt='(A)') ' '
 
       np = neign
@@ -273,7 +277,7 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
       end if
 
       call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
-                             nens,nens,neign, &
+                             nsamp,nsamp,neign, &
                              LAM,eignvec,qhat, &
                              ghat,xhat)
 

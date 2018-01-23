@@ -11,7 +11,7 @@ module da_linear_ops
 
    use da_control, only : &
 #if defined(LAPACK)
-       use_randomblock, &
+       use_randomblock, rand_type, &
 #endif
        myproc, filename_len, test_dm_exact, rootproc, cv_size_domain, &
        stdout, trace_use, ierr, comm, &

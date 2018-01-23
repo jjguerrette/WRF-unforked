@@ -1,4 +1,4 @@
-subroutine da_hessian_io (io_config, grid, cv_size, it, nens, neign, eignvec, eignval, qhat, mz, ghat, hess_file)
+subroutine da_hessian_io (io_config, grid, cv_size, it, nmodes, neign, eignvec, eignval, qhat, mz, ghat, hess_file)
 
    !-------------------------------------------------------------------------
    ! Purpose:        Read / Write Hessian eigenpairs
@@ -14,12 +14,12 @@ subroutine da_hessian_io (io_config, grid, cv_size, it, nens, neign, eignvec, ei
    character,        intent(in)    :: io_config              ! 'r' = Read; 'w' = Write
    integer,          intent(in)    :: cv_size
    integer,          intent(in)    :: it
-   integer,          intent(inout) :: nens
+   integer,          intent(inout) :: nmodes
    integer,          intent(inout) :: neign
 
-   real*8, optional, intent(inout) :: eignvec(nens, nens)
-   real*8, optional, intent(inout) :: eignval(nens)
-   real*8, optional, intent(inout) :: qhat(1:cv_size, 0:nens)
+   real*8, optional, intent(inout) :: eignvec(nmodes, nmodes)
+   real*8, optional, intent(inout) :: eignval(nmodes)
+   real*8, optional, intent(inout) :: qhat(1:cv_size, 0:nmodes)
    integer, optional,intent(in)    :: mz(:)
    real*8, optional, intent(inout) :: ghat(1:cv_size)
    character(len=filename_len), optional, intent(in)  :: hess_file  ! I/O filename
@@ -42,7 +42,7 @@ subroutine da_hessian_io (io_config, grid, cv_size, it, nens, neign, eignvec, ei
 
    if ( io_config == 'r' .and. .not.any((/present(eignvec),present(eignval),present(qhat)/)) ) then
       if (rootproc) then
-         write(*,*) 'Reading nens and neign from Hessian eigenpair file: ',trim(filename)
+         write(*,*) 'Reading nmodes and neign from Hessian eigenpair file: ',trim(filename)
          call da_get_unit (ep_unit)
          open (unit=ep_unit, file = trim(filename), form = 'unformatted', iostat =  iostat, status = 'old')
          if (iostat .ne. 0) then
@@ -52,12 +52,12 @@ subroutine da_hessian_io (io_config, grid, cv_size, it, nens, neign, eignvec, ei
          end if
 
          read(unit=ep_unit) neign, dummy
-         read(unit=ep_unit) nens
+         read(unit=ep_unit) nmodes
       end if
 #ifdef DM_PARALLEL
       call mpi_barrier(comm, ierr)
       call wrf_dm_bcast_integer(neign,1)
-      call wrf_dm_bcast_integer(nens,1)
+      call wrf_dm_bcast_integer(nmodes,1)
 #endif
       if (rootproc) then
          close(unit=ep_unit)
@@ -67,14 +67,14 @@ subroutine da_hessian_io (io_config, grid, cv_size, it, nens, neign, eignvec, ei
       if (use_global_cv_io) then
          if (present(eignvec) .and. present(eignval) .and. present(qhat)) then
             if (present(ghat)) then
-               call da_hessian_io_global(io_config, grid, cv_size, nens, neign, filename, &
+               call da_hessian_io_global(io_config, grid, cv_size, nmodes, neign, filename, &
                                          eignvec,eignval,qhat,mz,ghat)
             else
-               call da_hessian_io_global(io_config, grid, cv_size, nens, neign, filename, &
+               call da_hessian_io_global(io_config, grid, cv_size, nmodes, neign, filename, &
                                          eignvec,eignval,qhat,mz)
             end if
 !         else
-!            call da_hessian_io_global(io_config, grid, cv_size, nens, neign, filename)
+!            call da_hessian_io_global(io_config, grid, cv_size, nmodes, neign, filename)
          end if
       else
 
@@ -97,9 +97,9 @@ subroutine da_hessian_io (io_config, grid, cv_size, it, nens, neign, eignvec, ei
             end if
             if (present(eignvec) .and. present(eignval) .and. present(qhat)) then
                read(unit=ep_unit) dummy
-               do i = 1, nens
+               do i = 1, nmodes
                   read(unit=ep_unit) eignval(i)
-                  read(unit=ep_unit) eignvec(1:nens,i)
+                  read(unit=ep_unit) eignvec(1:nmodes,i)
                   read(unit=ep_unit) qhat(1:cv_size,i)
                end do
                if (present(ghat)) read(unit=ep_unit) ghat(1:cv_size)
@@ -115,12 +115,12 @@ subroutine da_hessian_io (io_config, grid, cv_size, it, nens, neign, eignvec, ei
             end if
 
             write(unit=ep_unit) neign, cv_size
-            write(unit=ep_unit) nens
+            write(unit=ep_unit) nmodes
 
             if (present(eignvec) .and. present(eignval) .and. present(qhat)) then
-               do i = 1, nens
+               do i = 1, nmodes
                   write(unit=ep_unit) eignval(i)
-                  write(unit=ep_unit) eignvec(1:nens,i)
+                  write(unit=ep_unit) eignvec(1:nmodes,i)
                   write(unit=ep_unit) qhat(1:cv_size,i)
                end do
                if (present(ghat)) write(unit=ep_unit) ghat(1:cv_size)

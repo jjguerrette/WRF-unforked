@@ -25,7 +25,7 @@ echo ""
 #   generate directories such as ../run.0001, ../run.0002, etc. that are essential.
 # Fill in the environment variables in RIOT_settings.sh and the User Options section. 
 #   - nout_RIOT takes the place of max_ext_its in namelist.input as the # outer iterations
-#   - ntmax(1) in namelist.input is replaced by SVDN
+#   - ntmax(1) in namelist.input is replaced by NBLOCK
 #   - ntmax(2:nout_RIOT) should be set in namelist.input
 #   - Follow the instructions for individual options below
 # 
@@ -76,6 +76,11 @@ if [ $WRF_CHEM -eq 0 ] && [ $WRF_MET -eq 0 ]; then
    echo "ERROR: Either WRF_CHEM or WRF_MET must be set to 1"
    echo 1; exit 1
 fi
+
+if [ -z "$nin_RIOT" ]; then #Could be defined externally
+   export nin_RIOT=1
+fi
+
 #=======================================================================================
 # Begin User Options
 #=======================================================================================
@@ -112,7 +117,7 @@ DEBUGSTR=
 
 export MPI_VERBOSE=1
 export BACKG_STRING="< /dev/null &> out.run &"
-export EXECUTABLE="./da_wrfvar.exe"
+export RIOT_EXECUTABLE="./da_wrfvar.exe"
 
 #------------------------------------
 CLEANUP=2 #Takes extra time or space:
@@ -134,7 +139,7 @@ STAGE2=1 #Set to 1 to perform final SVD and increment CVs
 echo "=================================================="
 echo " Critical RIOT Options"
 echo "=================================================="
-#Retrieve ntmax array from namelist - set NENS for it>1
+#Retrieve ntmax array from namelist - set NSAMP for it>1
 ntmax_all=`grep ntmax namelist.input`
 ntmax_all=${ntmax_all#*=}
 IFS=',' read -ra ntmax_array <<< "$ntmax_all"
@@ -142,9 +147,10 @@ IFS=',' read -ra ntmax_array <<< "$ntmax_all"
 echo "(1) rand_type=$rand_type"
 echo " * valid rand_type options: "
 echo "   + 6-RSVD5.6"
-echo "   + 2-Full Hessian(Requires SVDN=Nobs)"
-echo " * only rand_type=6 is functional in WRFDA for non-CHEM variables"
-if [ $rand_type -ne 6 ] && [ $rand_type -ne 2 ]; then echo "ERROR: unknown rand_type=$rand_type"; echo 2; exit 2; fi
+echo "   + 2-Full Hessian(Requires NBLOCK=Nobs)"
+echo "   + 3-Block Lanczos"
+echo " * rand_type=[3,6] are functional in WRFDA for CHEM and non-CHEM variables"
+if [ $rand_type -ne 6 ] && [ $rand_type -ne 2 ] && [ $rand_type -ne 3 ]; then echo "ERROR: unknown rand_type=$rand_type"; echo 2; exit 2; fi
 echo ""
 echo "(2) RIOT_RESTART=$RIOT_RESTART"
 echo ""
@@ -156,14 +162,21 @@ echo ""
 #NOUTER=`grep max_ext_its namelist.input`
 #NOUTER=${NOUTER//[!0-9]/}
 NOUTER=$nout_RIOT # overwrites NOUTER with environment variable
+NINNER=$nin_RIOT # overwrites NINNER with environment variable
+if [ $rand_type -ne 3 ]; then NINNER=1; fi
+
 echo "(5) # of outer iterations: nout_RIOT=$NOUTER"
 ex -c :"/max_ext_its" +:":s/=.*/=1,/" +:wq namelist.input
 
-NENS=$SVDN
-ntmax_array[0]=$SVDN
+NSAMP=$NBLOCK
+# Set number of parallel jobs
+NJOBS=$((NSAMP+1)) #Extra parallel ensemble member for gradient member
+if [ $rand_type -eq 3 ]; then  NJOBS=$NSAMP; fi #Not for Block Lanczos
+
+ntmax_array[0]=$NBLOCK
 for it in $(seq 1 $nout_RIOT)
 do
-   echo "# ensembles in outer iteration $it: ntmax($it)=${ntmax_array[$((it-1))]}"
+   echo "# samples in outer iteration $it: ntmax($it)=${ntmax_array[$((it-1))]}"
    ntmax=$ntmax${ntmax_array[$((it-1))]}","
 done
 ntmax=$ntmax${ntmax_array[$((nout_RIOT-1))]}","
@@ -177,7 +190,7 @@ echo "(7) LRA-LRU Adaptation: ADAPT_SVD=$ADAPT_SVD"
 echo ""
 echo "(8) Preconditioning Option: GRAD_PRECON=$GRAD_PRECON"
 valid_precon=0
-for i in 1 2 3 4 12 13 14 15
+for i in 0 1 2 3 4 12 13 14 15
 do
    if [ "$GRAD_PRECON" -eq $i ]; then valid_precon=1; fi
 done
@@ -216,8 +229,10 @@ if [ -z "$PBS_NODEFILE" ]; then
 fi
 PBSNODE0=$PBS_NODEFILE
 NUMNODES=`cat $PBSNODE0 | uniq | wc -l`
-if [ $NUMNODES -lt $((SVDN+1)) ]; then
-   echo "ERROR: NUMNODES must be set >= SVDN+1 (i.e., $((SVDN+1)))"
+if [ $NUMNODES -lt $NJOBS ]; then
+   echo "ERROR: NUMNODES must be set >= NJOBS (i.e., $NJOBS)"
+   echo "For RSVD (rand_type=6), NJOBS=NBLOCK+1"
+   echo "For Block Lanczos (rand_type=3), NJOBS=NBLOCK+1"
    echo 7; exit 7
 fi
 
@@ -237,38 +252,41 @@ if [ $NPpJMAX -gt $NUMPROC ]; then
 #   echo 8; exit 8
 fi
 #Use as many of the cores as possible for ensemble members
-#NODES_per_ens=$((NUMNODES/NENS))
-#NPpJ=$((NODES_per_ens*PPN))
+#NODES_all_ens=$((NUMNODES/NSAMP))
+#NPpJ=$((NODES_all_ens*PPN))
 
-NPpJ=$(($((NUMNODES/NENS))*PPN)) 
+NPpJ=$(($((NUMNODES/NSAMP))*PPN)) 
 if [ $NPpJ -gt $NPpJMAX ]; then NPpJ=$(($((NPpJMAX/PPN))*PPN)); fi
-NODES_per_ens=$((NPpJ/PPN*NENS))
+NODES_all_ens=$((NPpJ/PPN*NSAMP))
 
-#Use remaining cores for gradient member
-NODES_grad=$((NUMNODES-NODES_per_ens))
-#Fail-safe for when mod(NUMNODES,NENS)==0
-if [ $NODES_grad -lt 1 ]; then
-   #NODES_per_ens=$(($((NUMNODES-1))/NENS))
-   #NPpJ=$((NODES_per_ens*PPN))
-   NPpJ=$(($(($((NUMNODES-1))/NENS))*PPN)) 
-   NODES_per_ens=$((NPpJ/PPN*NENS))
-   NODES_grad=$((NUMNODES-NODES_per_ens))
-fi
+#Use remaining cores for gradient member (if needed)
+NODES_grad=$((NUMNODES-NODES_all_ens))
 NPpJ_grad=$((NODES_grad*PPN))
-if [ $NPpJ_grad -gt $NPpJMAX ]; then NPpJ_grad=$(($((NPpJMAX/PPN))*PPN)); fi
-NODES_grad=$((NPpJ_grad/PPN))
+if [ $NJOBS -gt $NSAMP ]; then
+   #Fail-safe for when mod(NUMNODES,NSAMP)==0
+   if [ $NODES_grad -lt 1 ]; then
+      #NODES_all_ens=$(($((NUMNODES-1))/NSAMP))
+      #NPpJ=$((NODES_all_ens*PPN))
+      NPpJ=$(($(($((NUMNODES-1))/NSAMP))*PPN)) 
+      NODES_all_ens=$((NPpJ/PPN*NSAMP))
+      NODES_grad=$((NUMNODES-NODES_all_ens))
+   fi
+   NPpJ_grad=$((NODES_grad*PPN))
+   if [ $NPpJ_grad -gt $NPpJMAX ]; then NPpJ_grad=$(($((NPpJMAX/PPN))*PPN)); fi
+   NODES_grad=$((NPpJ_grad/PPN))
 
-if [ "$GLOBAL_OPT" == "false" ] && [ $NPpJ_grad -ne $NPpJ ]; then
-    echo "ERROR: nproc_local and nproc_local_grad must be equal when GLOBAL_OPT==false"
-    echo "NPpJ=$NPpJ"
-    echo "NPpJ_grad=$NPpJ_grad"
-    echo 9; exit 9
+   if [ "$GLOBAL_OPT" == "false" ] && [ $NPpJ_grad -ne $NPpJ ]; then
+       echo "ERROR: nproc_local and nproc_local_grad must be equal when GLOBAL_OPT==false"
+       echo "NPpJ=$NPpJ"
+       echo "NPpJ_grad=$NPpJ_grad"
+       echo 9; exit 9
+   fi
 fi
 
-echo "Cores per ensemble job: "$NPpJ
+echo "Cores per ensemble member job: "$NPpJ
 echo "Cores per non-global gradient job: "$NPpJ_grad
-if [ $((NPpJ % PPN)) -ne 0 ] || [ $((NPpJ_grad % PPN)) -ne 0 ] || [ $NPpJ -eq 0 ] || [ $NPpJ_grad -eq 0 ]; then
-    echo "ERROR: cores per ensemble must be equal to PPN times a positive integer multiplier"
+if [ $((NPpJ % PPN)) -ne 0 ] || [ $((NPpJ_grad % PPN)) -ne 0 ] || [ $NPpJ -eq 0 ] || ([ $NPpJ_grad -eq 0 ] && [ $NJOBS -gt $NSAMP ]); then
+    echo "ERROR: cores per ensemble member must be equal to PPN times a positive integer multiplier"
     echo "NPpJ=$NPpJ"
     echo "NPpJ_grad=$NPpJ_grad"
     echo "PPN=$PPN"
@@ -300,15 +318,9 @@ echo "LOCAL PROCS = $nproc_local"
 echo "GRAD PROCS = $nproc_local_grad"
 echo "GLOBAL PROCS = $nproc_global"
 
-# Set number of parallel jobs
-NJOBS=$NENS
-NJOBS=$((NENS+1)) #Extra parallel ensemble for gradient member
-
-
 echo "=================================================================="
 echo " Automatically initialize 4D-Var namelist.input settings for RIOT"
 echo "=================================================================="
-
 #------------------------------------------------------------------
 # Set checkpoint interval and OSSE from environment variables
 # - only meaningful for CHEM so far
@@ -345,8 +357,8 @@ if (grep -q use_lanczos namelist.input); then
 fi
 
 # Add or modify RIOT namelist options
-SVD_VARS=("rand_outer" "rand_minimise" "ensmember" "rand_stage" "use_randomblock" "rand_type" "quick_rand" "adapt_svd" "svd_p" "riot_precon" "read_omega" "use_global_cv_io" "prepend_rsvd_basis")
-SVD_VALS=("1" "true" "0" "0" "true" "$rand_type" "$quick_rand" "$ADAPT_SVD" "$svd_p" "$GRAD_PRECON" "$GLOBAL_OMEGA" "$GLOBAL_OPT" "0")
+SVD_VARS=("rand_outer" "rand_minimise" "ensmember" "rand_stage" "use_randomblock" "rand_type" "quick_rand" "adapt_svd" "svd_p" "riot_precon" "read_omega" "use_global_cv_io" "prepend_rsvd_basis" "rand_inner_it" "max_rand_inner")
+SVD_VALS=("1" "true" "0" "0" "true" "$rand_type" "$quick_rand" "$ADAPT_SVD" "$svd_p" "$GRAD_PRECON" "$GLOBAL_OMEGA" "$GLOBAL_OPT" "0" "1" "$NINNER")
 ivar=0
 for var in ${SVD_VARS[@]}
 do
@@ -366,7 +378,7 @@ ex -c :"/prepend_basis" +:":s/=.*/=$prepend_basis/" +:wq namelist.input
 
 
 echo "=================================================="
-echo " Setup ensemble directories"
+echo " Setup ensemble member directories"
 echo "=================================================="
 CWD=$(pwd)
 echo "WORKING DIRECTORY: "$CWD
@@ -378,14 +390,18 @@ cd $CWD
 
 dummy=$(ls ../run.*)
 if [ $? -eq 0 ]; then  rm -r ../run.[0-9]*; fi
+dummy=$(ls ../cost_fn*)
+if [ $? -eq 0 ]; then  rm -r ../cost_fn*; fi
+dummy=$(ls ../grad_fn*)
+if [ $? -eq 0 ]; then  rm -r ../grad_fn*; fi
 
 if [ $RIOT_RESTART ] && [ $RIOT_RESTART -eq 1 ]; then
 #----------------------------------------------------------------
 # Option to perform posterior error calculation w/o minimization
 #----------------------------------------------------------------
 # Either setup links here or externally
-   ln -sf $ALT_START ./fg
-   ln -sf $ALT_START ./wrfinput_d01
+   ln -sfv $ALT_START ./fg
+   ln -sfv $ALT_START ./wrfinput_d01
 
    itstart=2
    NOUTER=$((NOUTER+1))
@@ -395,8 +411,8 @@ else if [ $RIOT_RESTART ] && [ $RIOT_RESTART -eq 2 ]; then
 # Option to restart RIOT minimization from previous outer iteration
 #------------------------------------------------------------------
 # Either setup links here or externally
-   ln -sf $ALT_START ./fg
-   ln -sf $ALT_START ./wrfinput_d01
+   ln -sfv $ALT_START ./fg
+   ln -sfv $ALT_START ./wrfinput_d01
 
    itstart=$ALT_it1
    if [ -z "$itstart" ]; then
@@ -409,14 +425,14 @@ else if [ $RIOT_RESTART ] && [ $RIOT_RESTART -eq 2 ]; then
    xhat_current="./xhat.it"$ii".p0000"
    wrfvar_current="./wrfvar_output_$ii"
 
-   if [ "$cvt_current" -ne "$ALT_CVT" ]; then ln -sf $ALT_CVT ./cvt.it"$ii".p0000; fi
-   if [ "$xhat_current" -ne "$ALT_XHAT" ]; then ln -sf $ALT_XHAT ./xhat.it"$ii".p0000; fi
+   if [ "$cvt_current" -ne "$ALT_CVT" ]; then ln -sfv $ALT_CVT ./cvt.it"$ii".p0000; fi
+   if [ "$xhat_current" -ne "$ALT_XHAT" ]; then ln -sfv $ALT_XHAT ./xhat.it"$ii".p0000; fi
    if [ "$wrfvar_current" -ne "$ALT_START" ]; then cp -v $ALT_START ./wrfvar_output_$ii; fi
 
    if [ $GRAD_PRECON -gt 0 ] || [ $SPECTRAL_PRECON -gt 0 ]; then
       cd ../
-      ln -sf $ALT_hess_dir/hessian_eigenpairs.it* ./
-#      ln -sf $ALT_hess ./hessian_eigenpairs.it"$ii".0000
+      ln -sfv $ALT_hess_dir/hessian_eigenpairs.it* ./
+#      ln -sfv $ALT_hess ./hessian_eigenpairs.it"$ii".0000
       cd $CWD
    fi
 else
@@ -430,14 +446,17 @@ if [ $OSSE -gt 0 ]; then
    if [ $OSSE -eq 1 ]; then
       ex -c :"/osse_chem" +:":s/=.*,/=false,/g" +:wq namelist.input
       ex -c :"/init_osse_chem" +:":s/=.*,/=true,/g" +:wq namelist.input
-      mpistring="$MPICALL $DEBUGSTR -np $nproc_max $EXECUTABLE"
+      mpistring="$MPICALL $DEBUGSTR -np $nproc_max $RIOT_EXECUTABLE"
       #COULD MAKE THIS FASTER (MORE MEMORY) by distributing across more nodes (currently chooses first $npiens processors in $PBS_NODEFILE)
       
       echo "$mpistring"
       eval "$mpistring"
-      
+
+      mpireturn=$?
+      echo "WRFDA return value: $mpireturn"
+
       mkdir rsl_init_osse
-      cp rsl.* rsl_init_osse
+      cp -v rsl.* rsl_init_osse
    fi    
    if [ $OSSE -eq 2 ]; then
       if [ -z "$DIRpert" ]; then
@@ -459,23 +478,23 @@ if [ $OSSE -gt 0 ]; then
       mv fg fg_0
 
       cp -v ./fg_pert ./fg
-      ln -sf ./fg ./wrfinput_d01
+      ln -sfv ./fg ./wrfinput_d01
    fi
 
    ex -c :"/osse_chem" +:":s/=.*,/=true,/g" +:wq namelist.input
    ex -c :"/init_osse_chem" +:":s/=.*,/=false,/g" +:wq namelist.input
 fi 
 
-#Populate ensemble directories
+#Populate ensemble member directories
 if [ $(ls "../run.*" | wc -l) -gt 0 ]; then  rm -r ../run.[0-9]*; fi
 if [ $WRF_CHEM -gt 0 ]; then rm *Hx*; fi
 
-for (( iENS = 1 ; iENS <= $NJOBS ; iENS++))
+for (( iSAMP = 1 ; iSAMP <= $NJOBS ; iSAMP++))
 do
-   ii=$iENS
-   if [ $iENS -lt 10 ]; then ii=0$ii; fi
-   if [ $iENS -lt 100 ]; then ii=0$ii; fi
-   if [ $iENS -lt 1000 ]; then ii=0$ii; fi
+   ii=$iSAMP
+   if [ $iSAMP -lt 10 ]; then ii=0$ii; fi
+   if [ $iSAMP -lt 100 ]; then ii=0$ii; fi
+   if [ $iSAMP -lt 1000 ]; then ii=0$ii; fi
 
    mkdir ../run.$ii
    cd ../run.$ii
@@ -516,7 +535,7 @@ export NUMPROC
 export PBSNODE0
 export MPICALL
 export DEBUGSTR
-export EXECUTABLE
+export RIOT_EXECUTABLE
 export BACKG_STRING
 
 ## BEGIN Outer Loop
@@ -535,35 +554,37 @@ do
    echo ""
    echo ""
    ex -c :"/rand_outer" +:":s/=.*/=$it,/" +:wq namelist.input
+   ex -c :"/rand_inner_it" +:":s/=.*/=1,/" +:wq namelist.input
    it0=$it
    if [ $it -lt 10 ]; then it0="0"$it0; fi
 
    cd $CWD
 
-   if [ $(ls -d "../vectors_$it0" | wc -l) -gt 0 ]; then rm -rv ../vectors_$it0; fi
+   if [ $(ls -d "../vectors_$it0" | wc -l) -gt 0 ]; then rm -rv ../vectors_$it0*; fi
    mkdir -v ../vectors_$it0
    rm omega.e*.p*
    rm yhat.e*.p*
 
-   NENS=${ntmax_array[$((it-1))]}
-   #Hard constraint that NENS must be <= SVDN (necessary?)
-   if [ $NENS -gt $SVDN ]; then
-      echo "WARNING SVDN=$SVDN, ntmax(it)=$NENS, setting NENS=$SVDN"
-      NENS=$SVDN
-      ntmax_array[$((it-1))]=$NENS
+   NSAMP=${ntmax_array[$((it-1))]}
+   #Hard constraint that NSAMP must be <= NBLOCK (necessary?)
+   if [ $NSAMP -gt $NBLOCK ]; then
+      echo "WARNING NBLOCK=$NBLOCK, ntmax(it)=$NSAMP, setting NSAMP=$NBLOCK"
+      NSAMP=$NBLOCK
+      ntmax_array[$((it-1))]=$NSAMP
       ntmax=
       for it in $(seq 1 $nout_RIOT)
       do
-         echo "# ensembles in outer iteration $it: ntmax($it)=${ntmax_array[$((it-1))]}"
+         echo "# samples in outer iteration $it: ntmax($it)=${ntmax_array[$((it-1))]}"
          ntmax=$ntmax${ntmax_array[$((it-1))]}","
       done
       ntmax=$ntmax${ntmax_array[$((nout_RIOT-1))]}","
       ex -c :"/ntmax" +:":s/=.*/=$ntmax/" +:wq namelist.input
    fi
    echo ""
-   echo "Using ensemble size $NENS in iteration $it, according to ntmax in namelist.input."
+   echo "Using ensemble size $NSAMP in iteration $it, according to ntmax in namelist.input."
    echo ""
-   NJOBS=$((NENS+1))
+   NJOBS=$((NSAMP+1))
+   if [ $rand_type -eq 3 ]; then  NJOBS=$NSAMP; fi # no. of ensemble members = NSAMP for Block Lanczos
    ii_grad=$NJOBS
    if [ $NJOBS -lt 10 ]; then ii_grad=0$ii_grad; fi
    if [ $NJOBS -lt 100 ]; then ii_grad=0$ii_grad; fi
@@ -588,10 +609,13 @@ do
             # - currently chooses first $npiens processors in $PBS_NODEFILE
          fi
 
-         mpistring="$MPICALL $DEBUGSTR -np $npiens $EXECUTABLE"
-#         mpistring="$MPICALL $DEBUGSTR -np $nproc_max $EXECUTABLE"
+         mpistring="$MPICALL $DEBUGSTR -np $npiens $RIOT_EXECUTABLE"
+#         mpistring="$MPICALL $DEBUGSTR -np $nproc_max $RIOT_EXECUTABLE"
          echo "$mpistring"
          eval "$mpistring"
+
+         mpireturn=$?
+         echo "WRFDA return value: $mpireturn"
 
          if [ $SUBTIMING -eq 1 ]; then grep da_end_timing rsl.out.0000 > ../bench_time_stage0.it$it0; fi
       fi
@@ -601,24 +625,24 @@ do
       echo "EXIT: STAGE1 > 0 required for multiple outer iterations"; echo 11; exit 11;
    fi
 
-   if [ "$GLOBAL_OMEGA" == "true" ]; then
-      if [ $it -eq 1 ] || [ $GRAD_PRECON -eq 0 ]; then
-         echo "Distributing global omega files"
-
-         #Test for the presence of each vector type
-         cd $CWD
-         ls omega.e*.p0000
-         dummy=`ls omega.e*.p0000 | wc -l`
-         echo "$dummy present of $NENS omega files"
-         if [ $dummy -ne $NENS ]; then 
-            echo "ERROR: Missing or extra omega.e*.p0000"
-            echo 12; exit 12
-         fi
-         mv -v omega.e*.p* ../vectors_$it0
-      else
-         rm omega.e*.p*
-      fi
-   fi
+#   if [ "$GLOBAL_OMEGA" == "true" ]; then
+#      if [ $it -eq 1 ] || [ $GRAD_PRECON -eq 0 ]; then
+#         echo "Distributing global omega files"
+#
+#         #Test for the presence of each vector type
+#         cd $CWD
+#         ls omega.e*.p0000
+#         dummy=`ls omega.e*.p0000 | wc -l`
+#         echo "$dummy present of $NSAMP omega files"
+#         if [ $dummy -ne $NSAMP ]; then 
+#            echo "ERROR: Missing or extra omega.e*.p0000"
+#            echo 12; exit 12
+#         fi
+#         mv -v omega.e*.p* ../vectors_$it0
+#      else
+#         rm omega.e*.p*
+#      fi
+#   fi
 
    #-------------------------------------------------------------------
    # Check for presence of checkpoint and obs output files (CHEM only)
@@ -652,6 +676,8 @@ do
    cd $CWD
    ex -c :"/rand_stage" +:":s/=.*/=1,/" +:wq namelist.input
 
+   dependent_grad=0
+   if [ $rand_type -eq 3 ]; then dependent_grad=1; fi
    if [ $it -gt $itstart ] || ([ $it -gt 1 ] && [ $RIOT_RESTART -eq 2 ]); then
 
       #Gradient preconditioning will likely be replaced by spectral preconditioning
@@ -666,17 +692,16 @@ do
          #Calculate gradient and preconditioned OMEGA vectors first
          ii=$ii_grad
 
-         NENS_PREV=0
+         NSAMP_PREV=0
          for itprev in $(seq 1 $((it-1)))
          do
-            NENS_PREV=$((NENS_PREV+${ntmax_array[$((itprev-1))]}))
-            echo "NENS_PREV=$NENS_PREV"
+            NSAMP_PREV=$((NSAMP_PREV+${ntmax_array[$((itprev-1))]}))
+            echo "NSAMP_PREV=$NSAMP_PREV"
          done
 
-         # This test avoids extra wall time when GRAD_PRECON=[1,3] and NENS in 
+         # This test avoids extra wall time when GRAD_PRECON=[1,3] and NSAMP in 
          # current iteration is larger than number of potential preconditioning vectors
-         dependent_grad=0
-         if [ $NENS_PREV -gt $NENS ] && \
+         if [ $NSAMP_PREV -gt $NSAMP ] && \
            ([ $GRAD_PRECON -eq 1 ] || [ $GRAD_PRECON -eq 3 ]); then dependent_grad=1; fi
          if [ $GRAD_PRECON -eq 2 ] || [ $GRAD_PRECON -eq 4 ]; then dependent_grad=1; fi
 
@@ -685,12 +710,13 @@ do
             #Calculate gradient and preconditioned OMEGA vectors before ensemble
 
             echo "Calulating gradient-eignevector dot products, "
-            echo "and selecting $NENS preconditioned perturbation "
+            echo "and selecting $NSAMP preconditioned perturbation "
             echo "members (omega_i=eignevector_i) with largest values."
 
-            ./WRFVAR_ENSEMBLE.sh "$it" "$NJOBS" "$NENS" "$NJOBS" "99"
+            ./WRFVAR_ENSEMBLE.sh "$it" "$NJOBS" "$NSAMP" "$NJOBS" "99" "1"
+            err=$?; if [ $err -ne 0 ]; then echo $err; exit $err; fi
 
-            NJOBS=$NENS
+            NJOBS=$NSAMP
             diri=../run.$ii
          else
             #GRAD_PRECON=12,13,14,15 --> EXTRACT omega_precon.e*.p* only
@@ -699,12 +725,12 @@ do
 
          echo ""
          echo "Transfer preconditioned OMEGA vectors before STAGE 1..."
-         for (( iENS = 1 ; iENS <= $NENS ; iENS++))
+         for (( iSAMP = 1 ; iSAMP <= $NSAMP ; iSAMP++))
          do
-            jj=$iENS
-            if [ $iENS -lt 10 ]; then jj=0$jj; fi
-            if [ $iENS -lt 100 ]; then jj=0$jj; fi
-            if [ $iENS -lt 1000 ]; then jj=0$jj; fi
+            jj=$iSAMP
+            if [ $iSAMP -lt 10 ]; then jj=0$jj; fi
+            if [ $iSAMP -lt 100 ]; then jj=0$jj; fi
+            if [ $iSAMP -lt 1000 ]; then jj=0$jj; fi
 
             cd ../run.$jj
             ls $diri/omega_precon.e$jj.p*
@@ -720,7 +746,7 @@ do
       fi
 
       #----------------------------------------------------
-      # Redistribute cores among ensembles as NENS changes
+      # Redistribute cores among samples as NSAMP changes
       #----------------------------------------------------
       # When max(ntmax_array(iteration>=it)) ~= max(ntmax_array(iteration<it)), 
       # or ntmax_array(it) ~= ntmax_array(it-1), there are several
@@ -733,26 +759,26 @@ do
       ##--------------------------------------------------------------------------
 
       ##--------------------------------------------------------------------------
-      ##2 - Adjust cores per job to fit NUMPROC as NENS changes
+      ##2 - Adjust cores per job to fit NUMPROC as NSAMP changes
       #      (possible only with global CV I/O in WRFDA)
-      if [ "$GLOBAL_OPT" == "true" ]; then # && [ $NENS -ne $NENS_last ]; then
+      if [ "$GLOBAL_OPT" == "true" ]; then # && [ $NSAMP -ne $NSAMP_last ]; then
          if [ $dependent_grad -eq 1 ]; then
-            NODES_per_ens=$NUMNODES
+            NODES_all_ens=$NUMNODES
          else
-            NODES_per_ens=$((NUMNODES-NODES_grad))
+            NODES_all_ens=$((NUMNODES-NODES_grad))
          fi
-         NPpJ=$(($((NODES_per_ens/NENS))*PPN)) #Use remaining cores for gradient member
+         NPpJ=$(($((NODES_all_ens/NSAMP))*PPN)) #Use remaining cores for gradient member
          if [ $((NPpJ/PPN)) -eq 0 ]; then
-            echo "ERROR: cores per ensemble less than cores per node"
-            echo "$NUMPROC, $NODES_per_ens, $PPN, $NPpJ"
+            echo "ERROR: cores per ensemble member less than cores per node"
+            echo "$NUMPROC, $NODES_all_ens, $PPN, $NPpJ"
             echo 18; exit 18
          fi
          if [ $NPpJ -gt $NPpJMAX ]; then NPpJ=$(($((NPpJMAX/PPN))*PPN)); fi
 
-         echo "Cores per ensemble job: "$NPpJ
+         echo "Cores per ensemble member job: "$NPpJ
          export nproc_local=$NPpJ
 
-         dummy=$(($((nproc_local*NENS))+$(($((NJOBS-NENS))*nproc_local_grad))))
+         dummy=$(($((nproc_local*NSAMP))+$(($((NJOBS-NSAMP))*nproc_local_grad))))
          if [ $dummy -gt $NUMPROC ]; then
             echo "ERROR: Too many processors requested in it=$it, NUMPROC_request=$dummy, NUMPROC_avail=$NUMPROC"; echo 19; exit 19
          fi
@@ -766,57 +792,183 @@ do
    echo "SVD STAGE 1: Multiply A * OMEGA, and calculate GRAD(J)"
    echo "======================================================="
 
-   ./WRFVAR_ENSEMBLE.sh "$it" "1" "$NENS" "$NJOBS" "1"
+   ./WRFVAR_ENSEMBLE.sh "$it" "1" "$NSAMP" "$NJOBS" "1" "1"
+   err=$?; if [ $err -ne 0 ]; then echo $err; exit $err; fi
 
    if [ $STAGE2 -le 0 ]; then
       echo "EXIT: STAGE2 > 0 required for multiple outer iterations"; echo 20; exit 20;
    fi
 
+   #Store cost_fn and grad_fn values
+   cd $CWD
+   if [ $it -eq $itstart ]; then
+      if [ $rand_type -eq 3 ]; then
+         for (( iSAMP = 1 ; iSAMP <= $NSAMP ; iSAMP++))
+         do
+            ii=$iSAMP
+            if [ $iSAMP -lt 10 ]; then ii=0$ii; fi
+            if [ $iSAMP -lt 100 ]; then ii=0$ii; fi
+            if [ $iSAMP -lt 1000 ]; then ii=0$ii; fi
+            cat ../run.$ii/cost_fn > ../cost_fn.$ii
+            cat ../run.$ii/grad_fn > ../grad_fn.$ii
+         done
+      else
+         cat ../run.$ii_grad/cost_fn > ../cost_fn
+         cat ../run.$ii_grad/grad_fn > ../grad_fn
+      fi
+   else
+      if [ $rand_type -eq 3 ]; then
+         for (( iSAMP = 1 ; iSAMP <= $NSAMP ; iSAMP++))
+         do
+            ii=$iSAMP
+            if [ $iSAMP -lt 10 ]; then ii=0$ii; fi
+            if [ $iSAMP -lt 100 ]; then ii=0$ii; fi
+            if [ $iSAMP -lt 1000 ]; then ii=0$ii; fi
+            grep [0-9] ../run.$ii/cost_fn >> ../cost_fn.$ii
+            grep [0-9] ../run.$ii/grad_fn >> ../grad_fn.$ii
+         done
+      else
+         # Use these lines if cost_fn file is overwritten each outer iteration
+         grep [0-9] ../run.$ii_grad/cost_fn >> ../cost_fn
+         grep [0-9] ../run.$ii_grad/grad_fn >> ../grad_fn
+      fi
+   fi
+
+
 #===================================================================================
 #===================================================================================
-   echo "================================================="
-   echo "SVD STAGE 2: Perform Eigen Decomp + Increment CVs"
-   echo "================================================="
 
-   ./gather_vectors_stage2.sh
+   if [ $rand_type -eq 6 ] || [ $rand_type -eq 2 ]; then
+      echo "================================================="
+      echo "SVD STAGE 2: Perform Eigen Decomp + Increment CVs"
+      echo "================================================="
+   fi
+   if [ $rand_type -eq 3 ]; then
+      echo "================================================="
+      echo "SVD STAGE 2: Orthogonalize Gradient Realizations"
+      echo "================================================="
+   fi
 
-   #---------------------------------------------------------
-   # Perform Eigen Decomp + Calculate Increment and Analysis 
-   #---------------------------------------------------------
+   ./check_vectors.sh "$it" "$NSAMP" "2" "1"
+   err=$?; if [ $err -ne 0 ]; then echo $err; exit $err; fi
+
    cd $CWD
    ex -c :"/rand_stage" +:":s/=.*/=2,/" +:wq namelist.input
 
    npiens=$nproc_global
-   mpistring="$MPICALL $DEBUGSTR -np $npiens $EXECUTABLE"
+   mpistring="$MPICALL $DEBUGSTR -np $npiens $RIOT_EXECUTABLE"
    #Could make this faster (more memory) by distributing across more nodes 
    # - currently chooses first $npiens processors in $PBS_NODEFILE
 
    echo "$mpistring"
    eval "$mpistring"
 
-   if [ $rand_type -eq 6 ] && [ $SUBTIMING -eq 1 ]; then
+   mpireturn=$?
+   echo "WRFDA return value: $mpireturn"
+
+   if ([ $rand_type -eq 6 ] || [ $rand_type -eq 3 ]) && [ $SUBTIMING -eq 1 ]; then
       grep da_end_timing ../run.*/rsl.out.0000 > ../bench_time_hess-vec.it$it0
       grep da_end_timing rsl.out.0000 > ../bench_time_finalize-riot.it$it0
    fi
+
+
+#===================================================================================
+#===================================================================================
+   if [ $rand_type -eq 3 ]; then
+      cd $CWD
+      mkdir oldrsl_$it0".iter0001.stage2"
+      mv -v rsl.* oldrsl_$it0".iter0001.stage2"
+
+      hr0=$(($SECONDS / 3600))
+      if [ $hr0 -lt 10 ]; then hr0="0"$hr0; fi
+      min0=$((($SECONDS / 60) % 60))
+      if [ $min0 -lt 10 ]; then min0="0"$min0; fi
+      sec0=$(($SECONDS % 60))
+      if [ $sec0 -lt 10 ]; then sec0="0"$sec0; fi
+      echo "Iteration $it gradient realization time: $hr0:$min0:$sec0"
+
+      for (( innerit = 1 ; innerit <= $NINNER ; innerit++))
+      do
+         echo ""
+         echo "========================================================="
+         echo "==                                                     =="
+         echo "==  Starting inner loop iteration $innerit of $NINNER  =="
+         echo "==                                                     =="
+         echo "========================================================="
+         echo ""
+         innerit0=$innerit
+         if [ $innerit -lt 10 ]; then innerit0="0"$innerit0; fi
+         if [ $innerit -lt 100 ]; then innerit0=0$innerit0; fi
+         if [ $innerit -lt 1000 ]; then innerit0=0$innerit0; fi
+         ex -c :"/rand_inner_it" +:":s/=.*/=$innerit,/" +:wq namelist.input
+
+         echo "====================================================="
+         echo "SVD STAGE 3: Multiply Hessian by Q, inner = $innerit"
+         echo "====================================================="
+         ex -c :"/rand_stage" +:":s/=.*/=3,/" +:wq namelist.input
+
+         ./WRFVAR_ENSEMBLE.sh "$it" "1" "$NSAMP" "$NJOBS" "3" "$innerit"
+         err=$?; if [ $err -ne 0 ]; then echo $err; exit $err; fi         
+
+         echo "==========================================================="
+         echo "SVD STAGE 4: Finish Block Lanczos inner iteration $innerit"
+         echo "==========================================================="
+
+         ./check_vectors.sh "$it" "$NSAMP" "4" "$innerit"
+         err=$?; if [ $err -ne 0 ]; then echo $err; exit $err; fi
+
+         cd $CWD
+         ex -c :"/rand_stage" +:":s/=.*/=4,/" +:wq namelist.input
+
+         npiens=$nproc_global
+         mpistring="$MPICALL $DEBUGSTR -np $npiens $RIOT_EXECUTABLE"
+         #Could make this faster (more memory) by distributing across more nodes 
+         # - currently chooses first $npiens processors in $PBS_NODEFILE
+
+         echo "$mpistring"
+         eval "$mpistring"
+
+         mpireturn=$?
+         echo "WRFDA return value: $mpireturn"
+
+         if [ $SUBTIMING -eq 1 ]; then
+            grep da_end_timing ../run.*/rsl.out.0000 > ../bench_time_hess-vec.it$it0"."$innerit0
+            grep da_end_timing rsl.out.0000 > ../bench_time_finalize-riot.it$it0"."$innerit0
+         fi
+
+         if [ $innerit -lt $NINNER ]; then
+            mkdir oldrsl_$it0".iter"$innerit0".stage4"
+            mv -v rsl.* oldrsl_$it0".iter"$innerit0".stage4"
+         fi
+
+         hr0=$(($SECONDS / 3600))
+         if [ $hr0 -lt 10 ]; then hr0="0"$hr0; fi
+         min0=$((($SECONDS / 60) % 60))
+         if [ $min0 -lt 10 ]; then min0="0"$min0; fi
+         sec0=$(($SECONDS % 60))
+         if [ $sec0 -lt 10 ]; then sec0="0"$sec0; fi
+         echo "Inner iteration $innerit cumulative compute time: $hr0:$min0:$sec0"
+      done
+   fi
+
 
 #==============================================================================
    echo ""
    echo "Extract analysis for current outer loop, and initialize the next one..."
    echo ""
 #==============================================================================
-
    if [ $it -lt $NOUTER ]; then
-      if [ $it -eq $itstart ]; then cp fg fg_it0; fi
+      if [ $it -eq $itstart ]; then cp -v fg fg_it0; fi
       mv -v wrfvar_output wrfvar_output_$it0
-      ln -sf ./wrfvar_output_$it0 ./fg 
-      ln -sf ./wrfvar_output_$it0 ./wrfinput_d01
+      ln -sfv ./wrfvar_output_$it0 ./fg 
+      ln -sfv ./wrfvar_output_$it0 ./wrfinput_d01
 
-      if [ $WRF_CHEM -eq 0 ]; then
+      if [ $WRF_MET -gt 0 ]; then
          it1=$it
          if [ $it -lt 10 ]; then it1="0"$it1; fi
          mv -v wrfbdy_d01 wrfbdy_d01_$it1
          mv -v wrfvar_bdyout wrfvar_bdyout_$it0
-         ln -sf ./wrfvar_bdyout_$it0 ./wrfbdy_d01
+         ln -sfv ./wrfvar_bdyout_$it0 ./wrfbdy_d01
       fi
 
       mkdir oldrsl_$it0
@@ -825,15 +977,6 @@ do
    if [ $WRF_CHEM -gt 0 ]; then
       if [ $it -eq $itstart ]; then mkdir oldhxy; fi
       mv -v *Hx_y* oldhxy/
-   fi
-
-   if [ $it -eq $itstart ]; then
-      cat ../run.$ii_grad/cost_fn > ../cost_fn
-      cat ../run.$ii_grad/grad_fn > ../grad_fn
-   else
-      # Use these lines if cost_fn file is overwritten each outer iteration
-      grep [0-9] ../run.$ii_grad/cost_fn >> ../cost_fn
-      grep [0-9] ../run.$ii_grad/grad_fn >> ../grad_fn
    fi
 
    hr0=$(($SECONDS / 3600))
@@ -860,9 +1003,7 @@ do
       if [ $CLEANUP -eq 1 ] || [ $CLEANUP -eq 2 ]; then
          tar -czf vectors_$it0.tar.gz vectors_$it0
          echo "Completed tar of vectors_$it0.tar.gz"
-      fi
-
-   
+      fi 
       rm -r vectors_$it0
 
       hr0=$(($SECONDS / 3600))
@@ -895,13 +1036,13 @@ SECONDS=0
 OUTLOC="../../$OUTDIR/$PBS_JOBNAME"
 mkdir ../../$OUTDIR
 mkdir $OUTLOC
-cp wrfvar_out* $OUTLOC/
-if [ $WRF_CHEM -gt 0 ]; then cp AminusB* $OUTLOC/; fi
-cp ../cost_fn $OUTLOC/
-cp ../grad_fn $OUTLOC/
+cp -v wrfvar_out* $OUTLOC/
+if [ $WRF_CHEM -gt 0 ]; then cp -v AminusB* $OUTLOC/; fi
+cp -v ../cost_fn $OUTLOC/
+cp -v ../grad_fn $OUTLOC/
 cp -r oldrsl_* $OUTLOC/
-cp rsl.* $OUTLOC/
-if [ $WRF_CHEM -gt 0 ]; then cp oldhxy/* $OUTLOC/; fi
+cp -v rsl.* $OUTLOC/
+if [ $WRF_CHEM -gt 0 ]; then cp -v oldhxy/* $OUTLOC/; fi
 
 if [ $CLEANUP -gt 0 ]; then
    echo "CLEANING UP SVD $(date)"
@@ -938,3 +1079,5 @@ if [ $sec0 -lt 10 ]; then sec0="0"$sec0; fi
 echo "Total accum. cleanup time: $hr0:$min0:$sec0"
 
 echo "FINISHED RIOT $(date)"
+
+exit 0

@@ -29,7 +29,7 @@ subroutine da_check_max_iv_chem_acft(iv,ob, it, num_qcstat_conv)
       failed=.false.
       if ( iv%chem_acft(n)%chem(ichem,iplt)%qc >= obs_qc_pointer ) then 
          call da_max_error_qc (it, iv%info(chem_acft), n, iv%chem_acft(n)%chem(ichem,iplt), max_error_chem_acft, failed)
-         if ( iv%info(chem_acft)%proc_domain(1,n) ) then
+         if ( iv%info(chem_acft)%proc_domain(iplt,n) ) then
             num_qcstat_conv(1,chem_acft,10,1)= num_qcstat_conv(1,chem_acft,10,1) + 1
             if (failed) then
                num_qcstat_conv(2,chem_acft,10,1)= num_qcstat_conv(2,chem_acft,10,1) + 1

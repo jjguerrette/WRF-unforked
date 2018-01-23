@@ -47,9 +47,9 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
    ! Lanczos eval vars
    real(wp)                     :: ghat(1:cv_size)
    real(wp)                     :: fhat(1:cv_size)
-   real*8                       :: alpha(nens_compare), beta(0:nens_compare)
-   real*8                       :: subdiag(nens_compare)
-   real*8                       :: sstwrk(2*nens_compare-2)
+   real*8                       :: alpha(nsamp_compare), beta(0:nsamp_compare)
+   real*8                       :: subdiag(nsamp_compare)
+   real*8                       :: sstwrk(2*nsamp_compare-2)
    integer                      :: nsstwrk, info
 
    !Shared eval vars
@@ -66,7 +66,7 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
    real*8, allocatable          :: eignval(:)
    real(wp), allocatable        :: qhat(:,:)
    real(wp)                     :: LAM_hess(1:rankA)
-   integer                      :: iens, jens, nens, neign, ntrunc, &
+   integer                      :: iens, jens, nsamp, neign, ntrunc, &
                                    i, j, p, dummy, iter, isamp, cv_s, cv_f
    integer                      :: ounit, iostat
 
@@ -115,13 +115,13 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
    ! [2.0] TSVD:
    !-------------------------------------------------------------------------
    if (tsvd_compare) then
-      nens = nens_compare
+      nsamp = nsamp_compare
 
       ! Compare to TSVD for different ranks of the approximate Hessian
       suffix = "tsvd"
       write(unit=stdout,fmt='(3A)') 'Evaluating ',suffix ,' dv, dx, Pav, and Pa'
 
-      do neign = 1, nens
+      do neign = 1, nsamp
          call da_evaluate_decomp(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
                                  rank_rsvd_Pa, rankA, rankA, neign, &
                                  xhat_hess, ghat0, &
@@ -155,9 +155,9 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
    if (cglz_compare) then
       write(unit=stdout,fmt='(A)') 'Evaluating CG-Lanczos dv, dx, Pav, and Pa'
 
-      nens = nens_compare
+      nsamp = nsamp_compare
 
-      allocate(qhat(1:cv_size,0:nens))
+      allocate(qhat(1:cv_size,0:nsamp))
 
       ghat = ghat0
       beta(0)   = SQRT(da_dot_cv(cv_size, ghat, ghat, grid, mz, jp_start, jp_end))
@@ -165,7 +165,7 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
 
       LAM_hess = eignval_hess - 1.D0
 
-      do iter=1, nens
+      do iter=1, nsamp
          qhat(:,iter) = ghat / beta(iter-1)
 
          !fhat = qhat + AMAT * AMAT^T * qhat (AMAT is sqrt obs HESSIAN)
@@ -192,7 +192,7 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
       end do
 
       suffix = "cg-lanczos"
-      do neign=1, nens
+      do neign=1, nsamp
        ! Determine eigenvalues and eigenvectors of the Lanczos tri-diagonal matrix
        !--------------------------------------------------------------------------
          allocate(eignvec(1:neign,1:neign))
@@ -244,24 +244,24 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
 
    if (rsvd_compare) then
 
-      nens = nens_compare + max_oversamp
-!      nens = nens_compare
+      nsamp = nsamp_compare + max_oversamp
+!      nsamp = nsamp_compare
 
       write(unit=stdout,fmt='(A)') 'Evaluating RSVD5.6 dv, dx, Pav, and Pa'
 
       !Initialize yhat, qhat, omega for RSVD
-      allocate(qhat(1:cv_size,0:nens))
-      allocate(yhat(1:cv_size,1:nens))
+      allocate(qhat(1:cv_size,0:nsamp))
+      allocate(yhat(1:cv_size,1:nsamp))
 
-      allocate(omega(cv_size,nens))
-      call da_gen_omega(omega, cv_size, nens, grid, mz)
+      allocate(omega(cv_size,nsamp))
+      call da_gen_omega(omega, cv_size, nsamp, grid, mz)
 
       !Multiply obs Hessian by omega (Y=A_obs * omega)
       LAM_hess = eignval_hess - 1.D0
 
       yhat = 0.D0
-      do iens = 1, nens
-         write(unit=stdout,fmt='(A,I5,A,I5)') 'Initialize Pav*OMEGA_i, i = ', iens ,' of ',nens
+      do iens = 1, nsamp
+         write(unit=stdout,fmt='(A,I5,A,I5)') 'Initialize Pav*OMEGA_i, i = ', iens ,' of ',nsamp
          call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
                                 rankA,rankA,rankA, &
                                 LAM_hess,eignvec_hess,qhat_hess, &
@@ -269,11 +269,11 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
 
       end do
 
-      qhat(:,1:nens) = yhat(:,1:nens)
+      qhat(:,1:nsamp) = yhat(:,1:nsamp)
       call da_gram_schmidt(grid,mz,jp_start,jp_end, &
-                            qhat,cv_size,nens)
+                            qhat,cv_size,nsamp)
 
-      do neign = 1, nens
+      do neign = 1, nsamp
          allocate(eignvec(1:neign,1:neign))
          allocate(eignval(1:neign))
 
@@ -289,7 +289,7 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
 
             p = oversamps(isamp)
             ntrunc = neign - p
-            if  (ntrunc.gt.0 .and. ntrunc.le.nens_compare ) then
+            if  (ntrunc.gt.0 .and. ntrunc.le.nsamp_compare ) then
  
                call da_evaluate_decomp(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
                                        rank_rsvd_Pa, rankA, neign, ntrunc, &

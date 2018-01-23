@@ -18,7 +18,8 @@ subroutine da_read_obs_chem_again ( iv, ob, it, model_grid )
    real, dimension(:,:), allocatable :: dummy_surf
    real, dimension(:,:), allocatable :: dummy_acft
 
-   real :: k_at_p, conc, dumr
+   real :: k_at_p, dumr
+   real, allocatable :: conc(:)
 
    character*256         :: surf_file! = "SURFACE_Hx_y.txt"
    character*256         :: acft_file! = "AIRCRAFT_Hx_y.txt"  
@@ -26,6 +27,7 @@ subroutine da_read_obs_chem_again ( iv, ob, it, model_grid )
    character*3         :: dummychar1="", dummychar2=""
 
    if (num_surf_obs > 0) then
+      call da_message((/"Reading in chem SURFACE observations and model concentrations to avoid NL model integration"/))
 
       write(surf_file,'("SURFACE_Hx_y_i",I2.2,".txt")') it
       if(rootproc) then
@@ -49,6 +51,7 @@ subroutine da_read_obs_chem_again ( iv, ob, it, model_grid )
       end if
 
       allocate ( dummy_surf (2,num_chem_surf-1) )
+      allocate ( conc (num_surf_hx-1) )
 
       ilocal = 0
       do iobs = 1, iv%info(chem_surf)%ntotal !num_surf_obs
@@ -74,7 +77,7 @@ subroutine da_read_obs_chem_again ( iv, ob, it, model_grid )
 #ifdef DM_PARALLEL
          call mpi_barrier(comm, ierr)
 
-         call wrf_dm_bcast_real(conc, 1)
+         call wrf_dm_bcast_real(conc, num_surf_hx-1)
 
          model_grid%surf_hx(iobs,2:num_surf_hx) = conc
          head_grid%surf_hx(iobs,2:num_surf_hx) = conc
@@ -83,6 +86,7 @@ subroutine da_read_obs_chem_again ( iv, ob, it, model_grid )
       end do
 
       deallocate ( dummy_surf )
+      deallocate ( conc )
 
       if (rootproc) then
          close(iunit)
@@ -94,6 +98,9 @@ subroutine da_read_obs_chem_again ( iv, ob, it, model_grid )
 #endif
 
    if (num_acft_obs(1) > 0) then  
+
+      call da_message((/"Reading in chem AIRCRAFT observations and model concentrations to avoid NL model integration"/))
+
       write(acft_file,'("AIRCRAFT_Hx_y_i",I2.2,".txt")') it
 
       if(rootproc) then
@@ -117,6 +124,7 @@ subroutine da_read_obs_chem_again ( iv, ob, it, model_grid )
       end if
 
       allocate ( dummy_acft (2,num_chem_acft-1) )
+      allocate ( conc (num_acft_hx-1) )
 
       do iplt = 1, num_platform
          ilocal = 0
@@ -148,7 +156,7 @@ subroutine da_read_obs_chem_again ( iv, ob, it, model_grid )
             head_grid%k_acft(itime,iplt) = k_at_p
             model_grid%k_acft(itime,iplt) = k_at_p
 
-            call wrf_dm_bcast_real(conc, 1)
+            call wrf_dm_bcast_real(conc, num_acft_hx-1)
             model_grid%acft_hx(itime,iplt,2:num_acft_hx) = conc
             head_grid%acft_hx(itime,iplt,2:num_acft_hx) = conc
 #endif
@@ -157,6 +165,7 @@ subroutine da_read_obs_chem_again ( iv, ob, it, model_grid )
       end do
 
       deallocate ( dummy_acft )
+      deallocate ( conc )
 
       if(rootproc) then
          close(iunit)

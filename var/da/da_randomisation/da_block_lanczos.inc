@@ -1,7 +1,7 @@
 subroutine da_block_lanczos(grid, mz, config_flags,        &
                            cv_size, xbx, be, iv, cv,   &
-                           re, y, xhat, nens, j_cost,  &
-                           qhat_out, eignval, eignvec, neign, hessian_info)
+                           re, y, xhat, nsamp, j_cost,  &
+                           qhat, eignval, eignvec, neign, hessian_info)
 
    !-------------------------------------------------------------------------
    ! Purpose:         Main Block Lanczos routine, separated into 2 stages, and 2 type of inner iteration
@@ -31,23 +31,27 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
    type (y_type), intent(inout)      :: re                       ! residual (o-a) structure.
    type (y_type), intent(inout)      :: y                        ! y = H(x_inc) structure.
    real,   intent(out)               :: xhat(1:cv_size)          ! control variable (local).
-   integer, intent(in)               :: nens                     ! Block size
+   integer, intent(in)               :: nsamp                     ! Block size
 
    type (j_type), optional, intent(out) :: j_cost                ! cost function
-   real, optional, alocatable, intent(out) :: qhat(:,:)  ! Hessian basis vectors
-   real,      optional, intent(out) :: eignvec(nens*rand_inner, nens*rand_inner)
-   real,      optional, intent(out) :: eignval(nens*rand_inner)
-   integer,   optional, intent(out) :: neign                         ! Number of non-truncated eigenpairs
+   real, optional, intent(out)      :: qhat(cv_size,0:nmodes_global)  ! Hessian basis vectors
+   real, optional, intent(out)      :: eignvec(nmodes_global, nmodes_global)
+   real, optional, intent(out)      :: eignval(nmodes_global)
+   integer, optional, intent(out)   :: neign                     ! Number of non-truncated eigenpairs
    type(hessian_type), optional, intent(inout) :: hessian_info
 
 #if defined(LAPACK)
-   real                         :: LAM(1:nens*rand_inner)
+   real, allocatable :: qhat_(:,:)  ! Hessian basis vectors
+   real                         :: LAM(1:nmodes_global)
    real, allocatable            :: yhat(:,:)  ! yhat = A * omega
    real, allocatable            :: omega(:)   ! Current inner iteration hessian basis vectors
    real, allocatable            :: qB(:,:), qM(:,:)
+   real, allocatable            :: MMAT(:,:,:), BMAT(:,:,:), TMAT(:,:), RMAT(:,:)
 
  
    integer                      :: iens, jens, i, j, nmodes, info
+   integer                      :: iiens, jjens, block_start, block_end, iter
+
    integer                      :: je_start, je_end       ! Start/end indices of Je.
    integer                      :: jp_start, jp_end       ! Start/end indices of Jp.
    integer                      :: jl_start, jl_end       ! Start/end indices of Jl.
@@ -55,20 +59,17 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
    real                         :: ghat(1:cv_size)        ! cv copy.
 
    real*8                       :: temp_l
-   real*8                       :: temp_e(nens*rand_inner)
-   real*8                       :: temp_mat(nens,nens)
+   real*8                       :: temp_e(nmodes_global)
    real                         :: beta
    real                         :: j0_total
+   real                         :: hess_trace_approx
    character*10                 :: cproc, cens, cinner
    character(len=filename_len)  :: filename
    integer                      :: mat_unit
-   character(len=3) :: cnens=""
+   character(len=5) :: cnsamp=""
    logical          :: swapped
 
    if (trace_use) call da_trace_entry("da_block_lanczos")
-
-   write(unit=stdout,fmt='(A)') 'Minimize cost function using randomized SVD method'
-   write(unit=stdout,fmt=*) ' '
 
    !-------------------------------------------------------------------------
    ! [1.0] Initialization:
@@ -82,96 +83,143 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
 
    xhat = 0.D0
    write(cproc,fmt='(i4.4)') myproc
+   write(cens,fmt='(i4.4)') ensmember
+   write(cinner,fmt='(i4.4)') rand_inner_it
 
-   if ( rand_stage .eq. 1) then
-      ! Generate vectors in Y = A*OMEGA (Halko, Algorithm 4.1), where A = L^T * H^T * R^-1 * H * L 
-      write(cens,fmt='(i4.4)') ensmember
-      write(cinner,fmt='(i4.4)') rand_inner
+   if ( rand_stage .eq. 1 ) then
+   !-------------------------------------------------------------------------
+   ! [2.0] Stage 1: Calculate the ensemember gradient vector realization
+   !-------------------------------------------------------------------------
+      write(unit=stdout,fmt='(A)') 'Stage 1 of Block Lanczos'
+      write(unit=stdout,fmt=*) ' '
 
-      if ( ensmember.gt.0 .and. ensmember.le.nens) then
+      if ( ensmember.gt.0 .and. ensmember.le.nsamp) then
+
+         ! Calculate J and grad J (ghat)
+!         if (ensmember .eq. 1) use_randomblock = .false.
+         call da_calculate_j(rand_outer, 0, cv_size, be%cv%size_jb, be%cv%size_je, be%cv%size_jp, &
+                             be%cv%size_jl, xbx, be, iv, xhat, cv, re, y, j_cost, ghat, grid, config_flags)
+!         if (ensmember .eq. 1) use_randomblock = .true.
+
+         j0_total = j_cost%total
+         if (j0_total == 0.0) return
+
+         beta = SQRT(da_dot_cv(cv_size, ghat, ghat, grid, mz, jp_start, jp_end))
+
+         write(unit=stdout,fmt='("Starting outer iteration : ",i3)') rand_outer
+         write(unit=stdout,fmt=11) j0_total, beta
+11       format('Starting cost function: ' ,1PD15.8,', Gradient: ',1PD15.8)
+
+         ghat = - ghat
+
+         ! Write ghat realization to file
+         filename = trim(randvecdir)//'ghat.e'//trim(adjustl(cens))// &
+                        '.p'//trim(adjustl(cproc))
+         call da_cv_io ('w', filename, cv_size, ghat, grid, mz )
+      else
+         write(unit=stdout,fmt='(A,I4)') 'FATAL ERROR: ensmember should be between 1 and nsamp, not ',ensmember
+         CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
+      end if
+
+   else if ( rand_stage .eq. 2 ) then
+   !-------------------------------------------------------------------------
+   ! [3.0] Stage 2: Orthonormalize all gradient vector realizations,
+   !    store in qhat vector files for Block Lanczos Initialization
+   !-------------------------------------------------------------------------
+      write(unit=stdout,fmt='(A)') 'Stage 2 of Block Lanczos'
+      write(unit=stdout,fmt=*) ' '
+
+      allocate(qhat_(1:cv_size,0:nsamp))
+      qhat_ = 0.D0
+
+      do iens = 1, nsamp
+         write(cens,fmt='(i4.4)') iens
+         write(unit=stdout,fmt='("Reading ghat vectors; iens,iter = ",i3)') iens
+         filename = trim(randvecdir)//'ghat.e'//trim(adjustl(cens))// &
+                        '.p'//trim(adjustl(cproc))
+         call da_cv_io ('r', filename, cv_size, qhat_(1:cv_size,iens), grid, mz )
+      end do
+
+!      if ( be%cv%size_jp.gt.0) omega(jp_start:jp_end) = 0.D0
+!      if ( be%cv%size_je.gt.0) omega(je_start:je_end) = 0.D0
+!      if ( .not. var4d_lbc .and. be%cv%size_jl.gt.0) omega(jl_start:jl_end) = 0.D0
+
+!      if (rotate_omega .and. spectral_precon .and. rand_outer.gt.1) &
+!         call da_rotate_omega(grid, cv_size, mz, jp_start, jp_end, &
+!                                 rand_outer-1, omega, omega)
+
+      call da_gram_schmidt(grid,mz,jp_start,jp_end, &
+                      qhat_,cv_size,nsamp)
+
+      do iens = 1, nsamp
+         write(cens,fmt='(i4.4)') iens
+         write(unit=stdout,fmt='("Writing qhat ensemble member ",i3," of ",i3)') iens,nsamp
+         filename = trim(randvecdir)//'qhat.e'//trim(adjustl(cens))// &
+                        '.p'//trim(adjustl(cproc))// &
+                        '.iter'//trim(adjustl(cinner))
+         call da_cv_io ('w', filename, cv_size, qhat_(1:cv_size,iens), grid, mz )
+      end do
+
+      deallocate(qhat_)
+
+   else if ( rand_stage .eq. 3 ) then
+   !-------------------------------------------------------------------------
+   ! [4.0] Stage 3: Multiply Hessian by current inner iteration ensemember 
+   !                qhat vector
+   !-------------------------------------------------------------------------
+      write(unit=stdout,fmt='(A)') 'Stage 3 of Block Lanczos'
+      write(unit=stdout,fmt=*) ' '
+
+      if ( ensmember.gt.0 .and. ensmember.le.nsamp) then
          allocate(omega(1:cv_size))
+         write(unit=stdout,fmt='("Reading qhat ensemble member ",i3," of ",i3)') ensmember,nsamp
+         filename = trim(randvecdir)//'qhat.e'//trim(adjustl(cens))// &
+                        '.p'//trim(adjustl(cproc))// &
+                        '.iter'//trim(adjustl(cinner))
 
-         if ( rand_inner .eq. 1 ) then 
-!!!!!!!!!!!!!!
-         ! The random vectors used in perturbed initial conditions must be orthogonal!
-         ! Make sure this happens in da_main.inc
-!Also remove irrellevant portions of omega for adjoint perturbation
-!      if ( be%cv%size_jp.gt.0) omega(jp_start:jp_end,:) = 0.D0
-!      if ( be%cv%size_je.gt.0) omega(je_start:je_end,:) = 0.D0
-!      if ( .not. var4d_lbc .and. be%cv%size_jl.gt.0) omega(jl_start:jl_end,:) = 0.D0
-
-
-!!!!!!!!!!!!!!
-
-            ! Calculate J and grad J (ghat)
-!            if (ensmember .eq. 1) use_randomblock = .false.
-            call da_calculate_j(rand_outer, 0, cv_size, be%cv%size_jb, be%cv%size_je, be%cv%size_jp, &
-                                be%cv%size_jl, xbx, be, iv, xhat, cv, re, y, j_cost, ghat, grid, config_flags)
-!            if (ensmember .eq. 1) use_randomblock = .true.
-
-            j0_total = j_cost%total
-            if (j0_total == 0.0) return
-
-!            beta = SQRT(da_dot_cv(cv_size, ghat, ghat, grid, mz, jp_start, jp_end))
-!
-!            write(unit=stdout,fmt='("Starting outer iteration : ",i3)') rand_outer
-!            write(unit=stdout,fmt=11) j0_total, beta
-!11          format('Starting cost function: ' ,1PD15.8,', Gradient: ',1PD15.8)
-
-            ghat = - ghat
-
-            ! Write ghat to file
-            filename = 'qhat.e'//trim(adjustl(cens))// &
-                        '.iter'//trim(adjustl(cinner))// &
-                           '.p'//trim(adjustl(cproc))
-            call da_cv_io ('w', filename, cv_size, ghat, grid, mz)
-
-!            if ( be%cv%size_jp.gt.0) omega(jp_start:jp_end) = 0.D0
-!            if ( be%cv%size_je.gt.0) omega(je_start:je_end) = 0.D0
-!            if ( .not. var4d_lbc .and. be%cv%size_jl.gt.0) omega(jl_start:jl_end) = 0.D0
-
-!            if (rotate_omega .and. spectral_precon .and. rand_outer.gt.1) &
-!               call da_rotate_omega(grid, cv_size, mz, jp_start, jp_end, &
-!                                       rand_outer-1, omega, omega)
-
-            omega = ghat            
-         else
-            write(unit=stdout,fmt='("Reading qhat ensemble member ",i3," of ",i3)') ensmember,nens
-            filename = 'qhat.e'//trim(adjustl(cens))// &
-                           '.iter'//trim(adjustl(cinner))// &
-                           '.p'//trim(adjustl(cproc))
-            call da_cv_io ('r', filename, cv_size, omega(1:cv_size), grid, mz)
-         end if
+         call da_cv_io ('r', filename, cv_size, omega(1:cv_size), grid, mz )
 
          allocate(yhat(1:cv_size,1))
          yhat = 0.D0
 
-         call da_calculate_gradj(rand_outer, 1, cv_size,be%cv%size_jb,be%cv%size_je,be%cv%size_jp, &
+         call da_calculate_gradj(rand_outer, rand_inner_it, cv_size,be%cv%size_jb,be%cv%size_je,be%cv%size_jp, &
                                  be%cv%size_jl, xbx,be,iv,omega(1:cv_size),y,yhat(1:cv_size,1),grid,config_flags)
+
+         hess_trace_approx = &
+            da_dot_cv(cv_size, omega(:), yhat(:,1), grid, mz, jp_start, jp_end)
+         write(unit=stdout,fmt='(A,E27.16E3)') 'HESS_TRACE: ',hess_trace_approx
 
          deallocate(omega)
 
          ! Write yhat to file
-         filename = 'yhat.e'//trim(adjustl(cens))// &
-                           '.iter'//trim(adjustl(cinner))// &
-                           '.p'//trim(adjustl(cproc))
-         call da_cv_io ('w', filename, cv_size, yhat(1:cv_size,1), grid, mz)
+         filename = trim(randvecdir)//'yhat.e'//trim(adjustl(cens))// &
+                           '.p'//trim(adjustl(cproc))// &
+                           '.iter'//trim(adjustl(cinner))
+
+         call da_cv_io ('w', filename, cv_size, yhat(1:cv_size,1), grid, mz )
 
          deallocate(yhat)
-
       else
-         write(unit=stdout,fmt='(A,I4)') 'FATAL ERROR: ensmember should be between 1 and nens, not ',ensmember
+         write(unit=stdout,fmt='(A,I4)') 'FATAL ERROR: ensmember should be between 1 and nsamp, not ',ensmember
          CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
       end if
-   else if ( rand_stage .eq. 2 ) then
-      nmodes = nens*rand_inner
+   else if ( rand_stage .eq. 4 ) then
+   !-------------------------------------------------------------------------
+   ! [5.0] Stage 4: Gather qhat/yhat from previous/current inner iterations
+   !                Carry out Block Lanczos algorithm for eigendecomposition
+   !                  and increment 
+   !-------------------------------------------------------------------------
+      write(unit=stdout,fmt='(A)') 'Stage 4 of Block Lanczos'
+      write(unit=stdout,fmt=*) ' '
 
-      allocate(qhat(1:cv_size,0:nmodes+nens))
-      allocate(MMAT(nens,nens,rand_inner))
-      allocate(BMAT(nens,nens,rand_inner))
+      nmodes = nmodes_global
+
+      allocate(qhat_(1:cv_size,0:nmodes+nsamp))
+      allocate(MMAT(nsamp,nsamp,rand_inner_it))
+      allocate(BMAT(nsamp,nsamp,rand_inner_it))
       allocate(TMAT(nmodes,nmodes))
 
-      qhat=0.D0
+      qhat_=0.D0
 
       TMAT = 0.D0
       MMAT = 0.D0
@@ -180,120 +228,101 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
    IF ( rootproc ) CALL start_timing
 #endif
 
-      ! Read gradient
-      filename = 'yhat.e0001.iter0001.p'//trim(adjustl(cproc))
-      call da_cv_io ('r', filename, cv_size, ghat, grid, mz)
-
-      do iter = 1, rand_inner
-         vstart = nens*(iter-1) + 1
-         vend = vstart + nens - 1
+      do iter = 1, rand_inner_it
+         block_start = nsamp*(iter-1) + 1
+         block_end = block_start + nsamp - 1
 
          write(cinner,fmt='(i4.4)') iter
-         do iens = 1, nens
+         write(unit=stdout,fmt='("Reading qhat vectors; iter = ",i3)') iter
+         do iens = 1, nsamp
             write(cens,fmt='(i4.4)') iens
-            write(unit=stdout,fmt='("Reading qhat vectors; iens,iter = ",i3,",",i3)') iens, iter
-            filename = 'qhat.e'//trim(adjustl(cens))// &
-                           '.iter'//trim(adjustl(cinner))// &
-                           '.p'//trim(adjustl(cproc))
-            call da_cv_io ('r', filename, cv_size, qhat(1:cv_size,vstart+iens-1), grid, mz)
+            filename = trim(randvecdir)//'qhat.e'//trim(adjustl(cens))// &
+                           '.p'//trim(adjustl(cproc))// &
+                           '.iter'//trim(adjustl(cinner))
+            call da_cv_io ('r', filename, cv_size, qhat_(1:cv_size,block_start+iens-1), grid, mz )
          end do
 
-         if (iter .gt. 1) then
-            !Read BMAT(:,:,iter) from file
-            write(cinner,fmt='(i4.4)') iter-1
-            filename = 'BMAT.iter'//trim(adjustl(cinner))// &
-                           '.p'//trim(adjustl(cproc))
-            call da_mat_io ('r', filename, nens, nens, BMAT(:,:,iter-1))
-
-            TMAT(vstart-nens:vend-nens,vstart:vend) = BMAT(:,:,iter-1)
-            TMAT(vstart:vend,vstart-nens:vend-nens) = TRANSPOSE(BMAT(:,:,iter-1))
-         end if
-
-         if (iter .lt. rand_inner)
+         ! Populate TMAT with MMAT and BMAT blocks
+         if (iter .lt. rand_inner_it) then
             !Read MMAT(:,:,iter) from file
-            filename = 'MMAT.iter'//trim(adjustl(cinner))// &
+!            write(cinner,fmt='(i4.4)') iter
+            filename = trim(randvecdir)//'MMAT.iter'//trim(adjustl(cinner))// &
                            '.p'//trim(adjustl(cproc))
-            call da_mat_io ('r', filename, nens, nens, MMAT(:,:,iter))
+            call da_mat_io ('r', filename, nsamp, nsamp, MMAT(:,:,iter) )
          else
-            allocate(yhat(1:cv_size,vstart:vend))
-            do iens = 1, nens
-               write(cens,fmt='(i4.4)') iens
-               write(unit=stdout,fmt='("Reading yhat vectors; iens,iter = ",i3,",",i3)') iens, iter
-               filename = 'yhat.e'//trim(adjustl(cens))// &
-                              '.iter'//trim(adjustl(cinner))// &
-                              '.p'//trim(adjustl(cproc))
-               call da_cv_io ('r', filename, cv_size, yhat(1:cv_size,vstart+iens-1), grid, mz)
-            end do
+            !Calculate MMAT(:,:,rand_inner_it) from latest yhat and qhat vectors
+!            write(cinner,fmt='(i4.4)') iter
 
+            write(unit=stdout,fmt='("Reading yhat vectors; iter = ",i3)') iter
+            allocate(yhat(1:cv_size,block_start:block_end))
+            do iens = 1, nsamp
+               write(cens,fmt='(i4.4)') iens
+               filename = trim(randvecdir)//'yhat.e'//trim(adjustl(cens))// &
+                              '.p'//trim(adjustl(cproc))// &
+                              '.iter'//trim(adjustl(cinner))
+               call da_cv_io ('r', filename, cv_size, yhat(1:cv_size,block_start+iens-1), grid, mz )
+            end do
+#ifdef DM_PARALLEL
+            call mpi_barrier(comm, ierr)
+#endif
+            write(unit=stdout,fmt='("Generating current MMAT")')
             !MMAT = Q^T * Y
-            do iens = 1,nens
-               iiens = vstart+iens-1
-               do jens = 1, nens
-                  jjens = vstart+jens-1
-                  MMAT(iens,jens,iter) = da_dot_cv(cv_size, qhat(:,iiens), &
+            do iens = 1,nsamp
+               iiens = block_start+iens-1
+               do jens = 1, nsamp
+                  jjens = block_start+jens-1
+                  MMAT(iens,jens,iter) = da_dot_cv(cv_size, qhat_(:,iiens), &
                                                     yhat(:,jjens), grid, mz, jp_start, jp_end)
                end do
             end do
             MMAT(:,:,iter) = (MMAT(:,:,iter) + TRANSPOSE(MMAT(:,:,iter))) / 2.D0
 
-            deallocate(yhat)
+            !Write MMAT(:,:,iter) to file
+            filename = trim(randvecdir)//'MMAT.iter'//trim(adjustl(cinner))// &
+                           '.p'//trim(adjustl(cproc))
+            call da_mat_io ('w', filename, nsamp, nsamp, MMAT(:,:,iter) )
 
+            if (rand_inner_it .eq. max_rand_inner) deallocate(yhat)
          end if
 
-         TMAT(vstart:vend,vstart:vend) = MMAT(:,:,iter)
+         TMAT(block_start:block_end,block_start:block_end) = MMAT(:,:,iter)
+
+
+         if (iter .gt. 1) then
+            !Read BMAT(:,:,iter) from file
+            write(cinner,fmt='(i4.4)') iter-1
+            filename = trim(randvecdir)//'BMAT.iter'//trim(adjustl(cinner))// &
+                           '.p'//trim(adjustl(cproc))
+            call da_mat_io ('r', filename, nsamp, nsamp, BMAT(:,:,iter-1) )
+
+            TMAT(block_start-nsamp:block_end-nsamp,block_start:block_end) = TRANSPOSE(BMAT(:,:,iter-1))
+            TMAT(block_start:block_end,block_start-nsamp:block_end-nsamp) = BMAT(:,:,iter-1)
+         end if
+
       end do
 
-      !Write MMAT(:,:,iter) to file
-      filename = 'MMAT.iter'//trim(adjustl(cinner))// &
-                     '.p'//trim(adjustl(cproc))
-      call da_mat_io ('w', filename, nens, nens, MMAT(:,:,rand_inner))
-
-
-      !Everything is in place to approximate Hessian and increment.  Do it now.
+!      !Write TMAT to file (not necessary, only for debugging)
+!      write(cinner,fmt='(i4.4)') rand_inner_it
+!      filename = trim(randvecdir)//'TMAT.iter'//trim(adjustl(cinner))// &
+!                     '.p'//trim(adjustl(cproc))
+!      call da_mat_io ('w', filename, nmodes, nmodes, TMAT, .true.)
 
       ! Construct eigendecomposition of TMAT
+      if (rand_inner_it.eq.max_rand_inner .or. var4d_inc_out) then
 
-!      if ( var4d_inc_out &
-!           .and. present(hessian_info) &
-!           .and. allocated(hessian_info%ghat) ) then
-!
-!         hessian_info%ghat = ghat
-!
-!         hessian_info%nmodes_max = nens
-!         do iens = 0, nens
-!            hessian_info%qhat(:,iens) = qhat(:,iens)
-!         end do
-!
-!         do iens = nens, 1, -inc_out_interval
-!            allocate(hessian_info%eigs(iens)%eignval(1:iens))
-!            allocate(hessian_info%eigs(iens)%eignvec(1:iens,1:iens))
-!
-!!!            call da_rsvd56(grid, mz, jp_start, jp_end, &
-!!!                          omega(:,1:iens), yhat(:,1:iens), qhat(:,0:iens), cv_size, &
-!!!                          hessian_info%eigs(iens)%eignval, hessian_info%eigs(iens)%eignvec, &
-!!!                          iens, hessian_info%eigs(iens)%neign)
-!!!
-!            hessian_info%eigs(iens)%eignval = hessian_info%eigs(iens)%eignval + 1.D0
-!         end do
-!      end if
-
-!!!      call da_rsvd56(grid, mz, jp_start, jp_end, &
-!!!                     omega, yhat, qhat, cv_size, &
-!!!                     eignval, eignvec, nens, neign)
-
-
-      if (rand_inner .eq. max_rand_inner) then
-
-!ENCAPUSLATE THIS EIGENDECOMP --> Same as second half of rsvd56
-    ! Determine eigenvalues and eigenvectors of the symmetric TMAT matrix
-    !-----------------------------------------------------------------
-      info = 0
-      call SYEV(TMAT, LAM, JOBZ = 'V' , INFO = info) !F95
-
-      if (info /=0) then
-         write(stdout,*) 'Error in Block Lanczos: SYEV returned ',info
-         CALL wrf_error_fatal('Canceling Block Lanczos')
-      end if
+!BEGIN ENCAPUSLATE THIS EIGENDECOMP --> Same as second half of da_rsvd56
+       ! Determine eigenvalues and eigenvectors of the symmetric TMAT matrix
+       !-----------------------------------------------------------------
+         write(unit=stdout,fmt='("Decomposing TMAT")')
+         info = 0
+         call SYEV(TMAT, LAM, JOBZ = 'V' , INFO = info) !F95
+#ifdef DM_PARALLEL
+         call mpi_barrier(comm, ierr)
+#endif
+         if (info /=0) then
+            write(stdout,*) 'Error in Block Lanczos: SYEV returned ',info
+            CALL wrf_error_fatal('Canceling Block Lanczos')
+         end if
 
          do iens = 1, nmodes
             do jens = 1, nmodes
@@ -302,16 +331,16 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
          end do
          deallocate(TMAT)
 
-         temp_e = 1.D0
-         if (all(LAM .le. 0.D0)) then
-            if(.not.present(print_messages)) write(unit=stdout,fmt='(A)') &
-               'WARNING: Preconditioned Hessian: all(eigs <= 0), setting them positive.'
-            LAM = - LAM
-         else if ( sum(sign(temp_e,LAM)) .lt. 0.D0 ) then
-            if(.not.present(print_messages)) write(unit=stdout,fmt='(A,F10.1,A)') &
-               'WARNING: Preconditioned Hessian: More negative than positive eigenvalues,', sum(sign(temp_e,LAM)), ', setting LAM=-LAM'
-            LAM = - LAM
-         end if
+!         temp_e = 1.D0
+!         if (all(LAM .le. 0.D0)) then
+!            write(unit=stdout,fmt='(A)') &
+!               'WARNING: Preconditioned Hessian: all(eigs <= 0), setting them positive.'
+!            LAM = - LAM
+!         else if ( sum(sign(temp_e,LAM)) .lt. 0.D0 ) then
+!            write(unit=stdout,fmt='(A,F10.1,A)') &
+!               'WARNING: Preconditioned Hessian: More negative than positive eigenvalues,', sum(sign(temp_e,LAM)), ', setting LAM=-LAM'
+!            LAM = - LAM
+!         end if
 
          !Sort eigenvalues and eigenvectors in descending order
          do j = nmodes-1, 1, -1
@@ -332,137 +361,187 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
            if (.NOT. swapped) exit
          end do
 
-         !Preconditioned observation Hessian should be positive semi-definite
-         do iens = 1, nmodes
-            LAM(iens) = max(LAM(iens),0.D0)
+         !neign should be less than nobs or rank of Hessian update
+         ! (only a concern for small problems)
+!         neign = nmodes
+
+         ! Adjust neign according to how many eigenvalues are positive
+         neign = nmodes
+         do i = 1, nmodes
+            if (i.gt.1 .and. LAM(i) .lt. 0.D0) then
+               neign = i-1
+               exit
+            end if
          end do
+
+!         !Preconditioned observation Hessian should be positive semi-definite
+!         do i = 1, nmodes
+!            LAM(i) = max(LAM(i),0.D0)
+!         end do
          eignval = LAM
+!END ENCAPUSLATE THIS EIGENDECOMP --> Same as second half of da_rsvd56
 
          ! Add 1.0 to get eigenvalues of full preconditioned Hessian
          eignval = eignval + 1.D0
 
          ! Print current eigenpairs
          ! ----------------------------------------------
-         write(cnens,fmt='(I0)') nens
-         write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'Eigenvalues(r): ',eignval(1:nens)
+         write(cnsamp,fmt='(I0)') nmodes
+         write(unit=stdout,fmt='(A,'//trim(cnsamp)//'E27.16E3)') 'Eigenvalues(r): ',eignval(1:nmodes)
 
-         do iens = 1, nens
-            write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'EIGENVECTOR_MATRIX: ',eignvec(iens,1:nens)
-         end do
+!         do i = 1, nmodes
+!            write(unit=stdout,fmt='(A,'//trim(cnsamp)//'D25.16)') 'EIGENVECTOR_MATRIX: ',eignvec(i,1:nmodes)
+!         end do
 
-         write(unit=stdout,fmt='(A)') ' '
-         write(unit=stdout,fmt='(A,I5,A)') 'Using ', nmodes, ' eigenpairs'
-         write(unit=stdout,fmt='(A)') ' '
+         ! Read gradient
+         filename = trim(randvecdir)//'ghat.e0001.p'//trim(adjustl(cproc))
+         call da_cv_io ('r', filename, cv_size, ghat, grid, mz )
+
+         if ( var4d_inc_out &
+              .and. present(hessian_info) &
+              .and. allocated(hessian_info%ghat) ) then
+
+            hessian_info%ghat = ghat
+
+            hessian_info%nmodes_max = nmodes
+            hessian_info%qhat = 0.D0
+            hessian_info%qhat = qhat_
+
+            allocate(hessian_info%eigs(1)%eignval(1:nmodes))
+            allocate(hessian_info%eigs(1)%eignvec(1:nmodes,1:nmodes))
+
+            !neign should be less than nobs or rank of Hessian update 
+            ! (only a concern for small problems)
+            hessian_info%eigs(1)%neign = neign
+            hessian_info%eigs(1)%eignval = eignval
+            hessian_info%eigs(1)%eignvec = eignvec
+         end if
 
 
-         !! Calculate increment
-         do i = 1, nmodes
-            LAM(i) = - (eignval(i) - 1.D0) / eignval(i)
-         end do
+         if (rand_inner_it.eq.max_rand_inner) then
+            !! Calculate increment
+            write(unit=stdout,fmt='(A)') ' '
+            write(unit=stdout,fmt='(A,I5,A)') 'Using ', nmodes, ' eigenpairs'
+            write(unit=stdout,fmt='(A)') ' '
 
-         write(unit=stdout,fmt='(A)') 'Carrying out RIOT w/ Block Lanczos, LRU'
+!            ! Adaptive increment
+!            if (minval(eignval(1:neign)) .lt. 2.D0) then
+!               write(unit=stdout,fmt='(A)') 'Carrying out RIOT w/ Block Lanczos, LRU'
+!               do i = 1, nmodes
+!                  LAM(i) = - (eignval(i) - 1.D0) / eignval(i)
+!               end do
+!            else
+               write(unit=stdout,fmt='(A)') 'Calculating Block Lanczos Increment'
+               do i = 1, nmodes
+                  LAM(i) =  1.D0 / eignval(i)
+               end do
+!            end if
 
-         call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
-                                nmodes,nmodes,nmodes, &
-                                LAM,eignvec,qhat, &
-                                ghat,xhat)
+            call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
+                                   nmodes,nmodes,neign, &
+                                   LAM,eignvec,qhat_(:,0:nmodes), &
+                                   ghat,xhat)
 
-         xhat = xhat + ghat
+!            if (minval(eignval(1:neign)) .lt. 2.D0) xhat = xhat + ghat
 
-         if (spectral_precon .and. rand_outer.gt.1) &
-            call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
-                                    rand_outer-1, xhat, xhat, 'TL' )
+            if (spectral_precon .and. rand_outer.gt.1) &
+               call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
+                                       rand_outer-1, xhat, xhat, 'TL' )
 
-         if (riot_precon.ge.1 .or. spectral_precon) &
-            call da_hessian_io ('w',grid, cv_size,rand_outer,nmodes,nmodes,&
-                               eignvec,eignval,qhat,mz,ghat)
-
-         
+            if (spectral_precon) &
+               call da_hessian_io ('w',grid, cv_size,rand_outer,nmodes,nmodes,&
+                                  eignvec,eignval,qhat_(:,0:nmodes),mz,ghat)
+         end if
       end if
 
       !Perhaps put a test here for convergence (similar to Lanczos/CG)
       ! Increment max_rand_inner if test fails
-
       !if (INCREMENT_FAILS_CONVERGENCE_TEST) max_rand_inner = max_rand_inner + 1
 
-      if (rand_inner .lt. max_rand_inner) then
-         !This sections pepares for next inner iteration
+      !if (present(qhat)) qhat = qhat_(:,0:nmodes)
+      qhat = qhat_(:,0:nmodes)
 
-         iter = rand_inner
-         vstart = nens*(iter-1) + 1
-         vend = vstart + nens - 1
+      if (rand_inner_it .lt. max_rand_inner) then
+         write(unit=stdout,fmt= &
+         '("Generate RMAT basis residual matrix")')
+
+         !This section pepares for next inner iteration
+         iter = rand_inner_it
+         block_start = nsamp*(iter-1) + 1
+         block_end = block_start + nsamp - 1
 
          ! Construct new residual matrix, RMAT
-         allocate(RMAT(1:cv_size,nens))
+         allocate(RMAT(1:cv_size,0:nsamp))
+         RMAT = 0.D0
 
          !qM = Q * MMAT
-         allocate(qM(1:cv_size,nmodes)
+         allocate(qM(1:cv_size,nsamp))
          qM = 0.D0
-         do iens = 1,nens
-            iiens = vstart+iens-1
-            do jens = 1, nens
-               qM(:,jens) = qM(:,jens) + qhat(:,iiens) * MMAT(iens,jens,iter)
+         do iens = 1,nsamp
+            iiens = block_start+iens-1
+            do jens = 1, nsamp
+               qM(:,jens) = qM(:,jens) + qhat_(:,iiens) * MMAT(iens,jens,iter)
             end do
          end do
-         do iens = 1,nens
-            iiens = vstart+iens-1
-            RMAT(:,iens) = yhat(:,iens) - qM(:,iens)
+         do iens = 1,nsamp
+            iiens = block_start+iens-1
+            RMAT(:,iens) = yhat(:,iiens) - qM(:,iens)
          end do
          deallocate(qM)
          deallocate(MMAT)
-
+         deallocate(yhat)
 
          !qB = Q * B^T
          if (iter .gt. 1) then
-            allocate(qB(1:cv_size,nmodes)
+            allocate(qB(1:cv_size,nsamp))
             qB = 0.D0
-            do iens = 1,nens
-               iiens = vstart+iens-1
-               do jens = 1, nens
-                  qB(:,jens) = qB(:,jens) + qhat(:,iiens) * BMAT(jens,iens,iter-1)
+            do iens = 1,nsamp
+               iiens = block_start+iens-1 - nsamp
+               do jens = 1, nsamp
+                  qB(:,jens) = qB(:,jens) + qhat_(:,iiens) * BMAT(jens,iens,iter-1)
                end do
             end do
-            do iens = 1,nens
+            do iens = 1,nsamp
                RMAT(:,iens) = RMAT(:,iens) - qB(:,iens)
             end do
             deallocate(qB)
          end if
 
-         vstart = nens*(rand_inner) + 1
-         vend = vstart + nens - 1
+         block_start = nmodes + 1
+         block_end = block_start + nsamp - 1
 
-!!!!!!!!!
-         !Decompose RMAT into QR = qhat(:,vstart:vend) * BMAT(:,:,iter)
-          !NEED QR decomposition that produces next sections of qhat and BMAT
-!!!!!!!!!
-
+         write(unit=stdout,fmt=&
+         '("Generate qhat and BMAT for next inner iteraion")')
+         !Decompose RMAT into QR = qhat_(:,block_start:block_end) * BMAT(:,:,iter)
+         call da_gram_schmidt(grid,mz,jp_start,jp_end, &
+                         Q=RMAT,cv_size=cv_size,nvec=nsamp, &
+                         R=BMAT(:,:,iter))
+         qhat_(:,block_start:block_end) = RMAT(:,1:nsamp)
          deallocate(RMAT)
 
          !Write BMAT(:,:,iter) to file
          write(cinner,fmt='(i4.4)') iter
-         filename = 'BMAT.iter'//trim(adjustl(cinner))// &
+         filename = trim(randvecdir)//'BMAT.iter'//trim(adjustl(cinner))// &
                         '.p'//trim(adjustl(cproc))
-         call da_mat_io ('w', filename, nens, nens, BMAT(:,:,iter))
+         call da_mat_io ('w', filename, nsamp, nsamp, BMAT(:,:,iter) )
+
          deallocate(BMAT)
 
-         !Orthonormalize most recent qhat vectors w.r.t. previous vectors
+         !Orthonormalize most recent qhat vectors w.r.t. previous vectors and write to disk
          call da_gram_schmidt(grid,mz,jp_start,jp_end, &
-                         qhat,cv_size,nmodes+nens,nmodes+1)
-
-
-         write(cinner,fmt='(i4.4)') rand_inner+1
-         do iens = 1, nens
+                         qhat_,cv_size,nmodes+nsamp,nmodes+1)
+         write(cinner,fmt='(i4.4)') rand_inner_it+1
+         do iens = 1, nsamp
             write(cens,fmt='(i4.4)') iens
-            write(unit=stdout,fmt='("Writing qhat vector for next iteration; iens,iter = ",i3,",",i3)') iens, rand_inner+1
-
-            filename = 'qhat.e'//trim(adjustl(cens))// &
-                           '.iter'//trim(adjustl(cinner))// &
-                           '.p'//trim(adjustl(cproc))
-            call da_cv_io ('r', filename, cv_size, qhat(1:cv_size,vstart+iens-1), grid, mz)
+            write(unit=stdout,fmt='("Writing qhat vector for next iteration; iens,iter = ",i3,",",i3)') iens, rand_inner_it+1
+            filename = trim(randvecdir)//'qhat.e'//trim(adjustl(cens))// &
+                           '.p'//trim(adjustl(cproc))// &
+                           '.iter'//trim(adjustl(cinner))
+            call da_cv_io ('w', filename, cv_size, qhat_(1:cv_size,block_start+iens-1), grid, mz )
          end do
       end if !end prep for next iteration
 
-      deallocate(qhat)
+      deallocate(qhat_)
 
 #ifdef DM_PARALLEL
    IF ( rootproc ) CALL end_timing('da_end_timing: Block_Lanczos')

@@ -15,12 +15,12 @@ module da_randomisation
       PARAM_FIRST_SCALAR
 
    use da_control, only : ensmember, &
-       rand_outer, rand_stage, rand_inner, max_rand_inner, &
+       rand_outer, rand_stage, rand_inner_it, max_rand_inner, &
        myproc, filename_len, test_dm_exact, rootproc, cv_size_domain, &
        var4d_lbc, stdout, trace_use, adapt_svd, prepend_rsvd_basis, &
        num_ob_indexes, read_omega, svd_p, ierr, comm, &
-       use_randomblock, nens_compare, tsvd_compare, cglz_compare, rsvd_compare, &
-       use_global_cv_io, ntmax, var4d_inc_out, inc_out_interval, &
+       use_randomblock, nsamp_compare, tsvd_compare, cglz_compare, rsvd_compare, &
+       use_global_cv_io, ntmax, nmodes_global, var4d_inc_out, inc_out_interval, &
        spectral_precon, riot_precon, rotate_omega, spectral_trunc, &
        hess_comp_x, &
        hess_comp_Pav_LRU, hess_comp_Pav_LRA, &
@@ -110,6 +110,8 @@ module da_randomisation
 
 !   private :: da_dot, da_dot_cv, da_dot_obs
    private :: da_dot_obs
+
+   character(len=14) :: randvecdir
 
 contains
 

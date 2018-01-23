@@ -1,6 +1,6 @@
 subroutine da_randomise_svd_51(grid, mz, config_flags,     &
                            cv_size, xbx, be, iv, cv,   &
-                           re, y, xhat, nens, j_cost,  &
+                           re, y, xhat, nsamp, j_cost,  &
                            qhat, eignval, eignvec, neign, hessian_info)
 
    !-------------------------------------------------------------------------
@@ -33,19 +33,19 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
    type (y_type), intent(inout)      :: re                       ! residual (o-a) structure.
    type (y_type), intent(inout)      :: y                        ! y = H(x_inc) structure.
    real,   intent(out)               :: xhat(1:cv_size)          ! control variable (local).
-   integer, intent(in)               :: nens                     ! Total number of eigenpairs
+   integer, intent(in)               :: nsamp                     ! Total number of eigenpairs
    type (j_type), optional, intent(out) :: j_cost                ! cost function
-   real,   optional, intent(out)     :: qhat(1:cv_size, 0:nens)  ! orthonormal basis set of A = Q * B * Q^T
-   real*8, optional, intent(out)     :: eignvec(nens, nens)
-   real*8, optional, intent(out)     :: eignval(nens)
+   real,   optional, intent(out)     :: qhat(1:cv_size, 0:nsamp)  ! orthonormal basis set of A = Q * B * Q^T
+   real*8, optional, intent(out)     :: eignvec(nsamp, nsamp)
+   real*8, optional, intent(out)     :: eignval(nsamp)
    integer, optional, intent(out)    :: neign                         ! Number of non-truncated eigenpairs
    type(hessian_type), optional, intent(inout) :: hessian_info
 
 
 #if defined(LAPACK)
 
-   real(wp)                     :: SIG(1:nens)
-   real(wp)                     :: LAM(1:nens)
+   real(wp)                     :: SIG(1:nsamp)
+   real(wp)                     :: LAM(1:nsamp)
 
    real(wp), allocatable   :: KMAT(:,:)  ! B = Q ^T * A  or  B^T = A^T * Q, where A = R^-1/2 * H * U
    real(wp), allocatable   :: KMAT_g(:,:)  ! B = Q ^T * A  or  B^T = A^T * Q, where A = R^-1/2 * H * U
@@ -82,7 +82,7 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
    real                        :: j0_total
    character*10                 :: cproc, cens
    character(len=filename_len)  :: filename
-   character(len=4) :: cnens=""
+   character(len=4) :: cnsamp=""
 
    if (trace_use) call da_trace_entry("da_randomise_svd_51")
 
@@ -106,7 +106,7 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
       write(cproc,fmt='(i4.4)') myproc
       write(cens,fmt='(i4.4)') ensmember
 
-      if ( ensmember .eq. nens+1 ) then 
+      if ( ensmember .eq. nsamp+1 ) then 
          ! Calculate J and grad J (ghat)
          use_randomblock = .false.
          call da_calculate_j(rand_outer, 0, cv_size, be%cv%size_jb, be%cv%size_je, be%cv%size_jp, &
@@ -128,10 +128,10 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
          filename = 'ghat.p'//trim(adjustl(cproc))
          call da_cv_io ('w', filename, cv_size, ghat, grid, mz)
 
-         if (any(riot_precon.eq.(/1,2,3,4/)) .and. rand_outer.gt.1 .and. sum(ntmax(1:rand_outer-1)).gt.nens) &
-            call da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat)
+         if (any(riot_precon.eq.(/1,2,3,4/)) .and. rand_outer.gt.1 .and. sum(ntmax(1:rand_outer-1)).gt.nsamp) &
+            call da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nsamp, ghat)
 
-      else if (ensmember .gt. 0 .and. ensmember .le. nens) then
+      else if (ensmember .gt. 0 .and. ensmember .le. nsamp) then
          ! Generate vectors in Y = A*OMEGA (Halko, Algorithm 4.1), where A = R^-1/2 * H * U 
          allocate(omega(1:cv_size,1))
          if (read_omega) then
@@ -187,18 +187,18 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
          deallocate(omega)
 
       else
-         write(unit=stdout,fmt='(A,I4)') 'FATAL ERROR: ensmember should be between 1 and nens+1, not ',ensmember
+         write(unit=stdout,fmt='(A,I4)') 'FATAL ERROR: ensmember should be between 1 and nsamp+1, not ',ensmember
          CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
 
       end if
 
    else if ( rand_stage .eq. 2 ) then
 
-      allocate(nobs(nens))
+      allocate(nobs(nsamp))
       write(cproc,fmt='(i4.4)') myproc
 
       ! Read in yhat vector from all ensembles on each processor
-      do iens = 1, nens
+      do iens = 1, nsamp
          write(unit=stdout,fmt='("Reading yhat ensemble member : ",i4)') iens
          write(cens,fmt='(i4.4)') iens
          filename = 'yhat_obs.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
@@ -207,7 +207,7 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
 
          if (iens .eq. 1) then
             if (nobs(iens) .gt. 0) then
-               allocate(YHAT(1:nobs(1),nens))
+               allocate(YHAT(1:nobs(1),nsamp))
             else
 !               deallocate(yhat_obs)
                exit
@@ -231,11 +231,11 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
       call mpi_barrier(comm, ierr)
 
 !      if (nobs(1) .gt. 0) then
-         allocate(qhat_ens(1:nobs(1),nens))
+         allocate(qhat_ens(1:nobs(1),nsamp))
 !      end if
 
       ! Generate qhat basis vectors by Modified Gram-Schmidt orthonormalization
-      do iens = 1, nens
+      do iens = 1, nsamp
          if (nobs(1) .gt. 0) qhat_ens(:,iens) = YHAT(:,iens)
          if (iens .gt. 1) then
             do i = 1,2 !Second iteration improves orthogonalization for numerical precision (Bjorck, 1994)
@@ -253,7 +253,7 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
 
       allocate(qhat_obs(1:nobs(1)))
       ! Write qhat vectors to disk
-      do iens = 1, nens
+      do iens = 1, nsamp
          write(unit=stdout,fmt='("Writing qhat vectors to disk: ",i4)') iens
          write(cens,fmt='(i4.4)') iens
          filename = 'qhat_obs.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
@@ -305,14 +305,14 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
    else if ( rand_stage .eq. 4 ) then
       ! Eigen decomposition of A (Algorithm 5.1 of Halko)
 
-      allocate(KMAT(nens,1:cv_size))
-      allocate(nuhat_T(nens,1:cv_size))
+      allocate(KMAT(nsamp,1:cv_size))
+      allocate(nuhat_T(nsamp,1:cv_size))
       nuhat_T = 0.D0
 
       write(cproc,fmt='(i4.4)') myproc
 
       ! Read in KMAT for all rows on each processor, KMAT = (A^T * Q)^T
-      do iens = 1, nens
+      do iens = 1, nsamp
          write(unit=stdout,fmt='("Reading KMAT row : ",i4)') iens
          write(cens,fmt='(i4.4)') iens
          filename = 'bhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
@@ -329,15 +329,15 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
       if (.not.rootproc) cv_size_domain = 1
 
 !      if (rootproc) then
-         allocate(KMAT_g(nens,1:cv_size_domain))
-         allocate(nuhat_T_g(nens,1:cv_size_domain))
+         allocate(KMAT_g(nsamp,1:cv_size_domain))
+         allocate(nuhat_T_g(nsamp,1:cv_size_domain))
 !      else
-!         allocate(KMAT_g(1:nens,1))
-!         allocate(nuhat_T_g(1:nens,1))
+!         allocate(KMAT_g(1:nsamp,1))
+!         allocate(nuhat_T_g(1:nsamp,1))
 !      end if
       allocate(dumcv(1:cv_size))
       allocate(dumcv_g(1:cv_size_domain))
-      do iens = 1, nens
+      do iens = 1, nsamp
          dumcv = KMAT(iens,1:cv_size)
 
 !REMOVE EVENTUALLY or add option
@@ -366,13 +366,13 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
 
       call mpi_barrier(comm, ierr)
 
-      call wrf_dm_bcast_real(SIG,nens)
+      call wrf_dm_bcast_real(SIG,nsamp)
 
       call wrf_dm_bcast_integer(info,1)
 
       allocate(dumcv(1:cv_size))
       allocate(dumcv_g(1:cv_size_domain))
-      do iens = 1, nens
+      do iens = 1, nsamp
          if(rootproc) then
             dumcv_g = nuhat_T_g(iens,:)
          else
@@ -399,11 +399,11 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
       end if
 
       !Eigenvalues of A^T * A = U^T H^T R^-1 H U are the square of singular values of A
-      do i = 1, nens
+      do i = 1, nsamp
          LAM(i) = SIG(i) * SIG(i)
       end do
 
-      neign = nens
+      neign = nsamp
 
 !REMOVE EVENTUALLY or add option
 !      ! Write nuhat vectors to disk
@@ -421,16 +421,16 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
          eignvec(i,i) = 1.D0
          eignval(i) = LAM(i) + 1.D0
       end do
-      qhat(1:cv_size,1:nens) = TRANSPOSE(nuhat_T)
+      qhat(1:cv_size,1:nsamp) = TRANSPOSE(nuhat_T)
 
 
       ! Print current eigenvalues
       ! ----------------------------------------------
-      write(cnens,fmt='(I0)') nens
-      write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'Eigenvalues(r): ',eignval(1:nens)
+      write(cnsamp,fmt='(I0)') nsamp
+      write(unit=stdout,fmt='(A,'//trim(cnsamp)//'E27.16E3)') 'Eigenvalues(r): ',eignval(1:nsamp)
 
       write(unit=stdout,fmt='(A)') ' '
-      write(unit=stdout,fmt='(A,I5,A,I5,A)') 'Using ', neign, ' of ', nens, ' eigenpairs'
+      write(unit=stdout,fmt='(A,I5,A,I5,A)') 'Using ', neign, ' of ', nsamp, ' eigenpairs'
       write(unit=stdout,fmt='(A)') ' '
 
       ! (2) Construct low rank estimate of A^-1 * ghat with leading neign modes of A
@@ -453,7 +453,7 @@ subroutine da_randomise_svd_51(grid, mz, config_flags,     &
       end if
 
       call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
-                             nens,nens,neign, &
+                             nsamp,nsamp,neign, &
                              LAM,eignvec,qhat, &
                              ghat,xhat,.true.)
 

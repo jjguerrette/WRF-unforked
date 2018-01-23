@@ -88,7 +88,7 @@ subroutine da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, nouter_prev, 
             eignval(imode) = eignval(imode)**expon - 1.D0
          end do
 
-         ! cv_z^it = (I_n + V (LAM^-0.5 - I_l) V^T ) * cv_z^it-1
+         ! cv_z^it = (I_n + V (LAM^expon - I_l) V^T ) * cv_z^it-1
          cv_z0 = 0.D0
          call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size,&
                                 nmodes,neign,l, &

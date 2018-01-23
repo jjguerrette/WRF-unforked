@@ -1,4 +1,4 @@
-subroutine da_hessian_io_global (io_config, grid, cv_size, nens, neign, filename, eignvec, eignval, qhat, mz, ghat)
+subroutine da_hessian_io_global (io_config, grid, cv_size, nmodes, neign, filename, eignvec, eignval, qhat, mz, ghat)
 
    !-------------------------------------------------------------------------
    ! Purpose:        Read / Write Hessian eigenpairs
@@ -13,13 +13,13 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, nens, neign, filename
    type(domain), intent(inout)     :: grid
    character,        intent(in)    :: io_config              ! 'r' = Read; 'w' = Write
    integer,          intent(in)    :: cv_size
-   integer,          intent(in)    :: nens
+   integer,          intent(in)    :: nmodes
    integer,          intent(inout) :: neign
    character(len=filename_len), intent(in)  :: filename               ! I/O filename
 
-   real*8, optional, intent(inout) :: eignvec(nens, nens)
-   real*8, optional, intent(inout) :: eignval(nens)
-   real*8, optional, intent(inout) :: qhat(1:cv_size, 0:nens)
+   real*8, optional, intent(inout) :: eignvec(nmodes, nmodes)
+   real*8, optional, intent(inout) :: eignval(nmodes)
+   real*8, optional, intent(inout) :: qhat(1:cv_size, 0:nmodes)
    integer, optional,intent(in)    :: mz(:)
    real*8, optional, intent(inout) :: ghat(1:cv_size)
 
@@ -30,8 +30,8 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, nens, neign, filename
 
    real*8, allocatable             :: dumcv(:)
    real*8, allocatable             :: dumcv_g(:)
-   real*8, dimension(1:nens)       :: temp
-   real*8, dimension(1:nens)       :: tempa
+   real*8, dimension(1:nmodes)       :: temp
+   real*8, dimension(1:nmodes)       :: tempa
 
 
    if (trace_use) call da_trace_entry("da_hessian_io_global")
@@ -83,7 +83,7 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, nens, neign, filename
          dumcv_g = 0.D0
 
          if (rootproc) read(unit=ep_unit) dummy
-         do i = 1, nens
+         do i = 1, nmodes
             if (rootproc) then
                read(unit=ep_unit) temp(i)
                read(unit=ep_unit) tempa
@@ -93,7 +93,7 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, nens, neign, filename
             call mpi_barrier(comm, ierr)
             call da_global_to_cv(cv_size, cv_size_domain, dumcv, grid, mz, dumcv_g)
             qhat(1:cv_size,i) = dumcv
-            call wrf_dm_bcast_real(tempa,nens)
+            call wrf_dm_bcast_real(tempa,nmodes)
 #else
             qhat(1:cv_size,i) = dumcv_g
 #endif
@@ -101,7 +101,7 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, nens, neign, filename
          end do
 #ifdef DM_PARALLEL
          call mpi_barrier(comm, ierr)
-         call wrf_dm_bcast_real(temp,nens)
+         call wrf_dm_bcast_real(temp,nmodes)
 #endif
          eignval = temp
 
@@ -131,11 +131,11 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, nens, neign, filename
          end if
 
          write(unit=ep_unit) neign, cv_size_domain
-         write(unit=ep_unit) nens
+         write(unit=ep_unit) nmodes
       end if
 
       if (present(eignvec) .and. present(eignval) .and. present(qhat)) then
-         do i = 1, nens
+         do i = 1, nmodes
 #ifdef DM_PARALLEL
             dumcv = qhat(1:cv_size,i)
             call mpi_barrier(comm, ierr)
@@ -145,7 +145,7 @@ subroutine da_hessian_io_global (io_config, grid, cv_size, nens, neign, filename
 #endif
             if (rootproc) then
                write(unit=ep_unit) eignval(i)
-               write(unit=ep_unit) eignvec(1:nens,i)
+               write(unit=ep_unit) eignvec(1:nmodes,i)
                write(unit=ep_unit) dumcv_g
             end if
          end do

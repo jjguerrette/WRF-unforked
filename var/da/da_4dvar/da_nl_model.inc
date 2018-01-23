@@ -14,11 +14,13 @@ subroutine da_nl_model (it)
 
    if (trace_use_dull) call da_trace_entry("da_nl_model")
 
+!NEED TO PLACE INITIALIZATION INTO SEPARATE SUBROUTINE FOR IMPROVED MODULARITY
 #if (WRF_CHEM != 1)
-   if ( it == 1 ) then
+   if ( it == 1 &
 #else
-   if ( it == 1 .or. init_osse_chem ) then
+   if ( (it == 1 .or. init_osse_chem) &
 #endif
+       .and. nl_called.eq.0) then
 #ifdef _OPENMP
       call setfeenv()
 #endif
@@ -38,25 +40,27 @@ subroutine da_nl_model (it)
 !   if (.not. evalj) call init_4dvar
    call init_4dvar
 
+#if (WRF_CHEM == 1)
+   if ( use_chemobs .and. cv_options_chem .gt. 0 ) then
+      call da_copy_chem_to_model( head_grid, it )
+
+      !Adds scaleant, scalebb, or other variables initialized in WRFDA to fg file
+      if ( it == 1 .and. init_chem_scale .and. nl_called.eq.0) then
+         call da_add_var_to_firstguess()
+      end if
+   end if
+#endif
+!NEED TO PLACE INITIALIZATION INTO SEPARATE SUBROUTINE FOR IMPROVED MODULARITY
+
    if (it .gt. 0) then
       nl_called = 1 
    else
       nl_called = nl_called + 1
    end if
 
-
-#if (WRF_CHEM == 1)
-   if ( use_chemobs .and. cv_options_chem .gt. 0 ) then
-      call da_copy_chem_to_model( head_grid, it )
-
-      !Adds scaleant, scalebb, or other variables initialized in WRFDA to fg file
-      if ( it == 1 .and. init_chem_scale ) then
-         call da_add_var_to_firstguess()
-      end if
-   end if
+#if defined(LAPACK)
+   if (disable_traj) return
 #endif
-
-   if (write_checkpoints .eq. 2) return
 
    ! Turn off  history output
    call nl_set_history_begin_y (head_grid%id, 9999)

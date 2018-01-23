@@ -45,6 +45,7 @@ rconfig   logical   crossval_chem_surfobs   namelist,wrfvarchem  1  .false.  - "
 rconfig   logical   crossval_chem_acftobs   namelist,wrfvarchem  1  .false.  - "crossval_chem_acftobs"   ""  ""
 rconfig   logical   use_nonchemobs          namelist,wrfvarchem  1  .true.   - "use_nonchemobs"          ""  ""
 rconfig   logical   use_offlineobs          namelist,wrfvarchem  1  .true.   - "use_offlineobs"          ""  ""
+rconfig   logical   use_onlineobs           namelist,wrfvarchem  1  .true.   - "use_onlineobs"           ""  ""
 rconfig   logical   use_chemobs             namelist,wrfvarchem  1  .false.  - "use_chemobs"             ""  ""
 
 rconfig   integer   cv_options_chem         namelist,wrfvarchem  1  0        - "cv_options_chem"         ""  ""

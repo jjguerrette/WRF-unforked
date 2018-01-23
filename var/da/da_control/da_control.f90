@@ -365,6 +365,9 @@ module da_control
 
    ! Line Search
    logical       :: evalj=.false.
+#if defined(LAPACK)
+   logical       :: disable_traj=.false.
+#endif
 
    ! Namelist variables in future?:
    real, parameter :: maximum_rh = 100.0
@@ -672,5 +675,7 @@ module da_control
 #if (WRF_CHEM == 1)
    logical :: init_chem_scale = .false.
 #endif
+
+   integer :: nmodes_global
 
 end module da_control

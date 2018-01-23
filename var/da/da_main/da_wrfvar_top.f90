@@ -86,6 +86,9 @@ module da_wrfvar_top
 #if (WRF_CHEM == 1)
       da_zero_xch_type, da_allocate_y_chem, &
 #endif
+#if defined(LAPACK)
+      da_random_seed, &
+#endif
       da_deallocate_y, da_zero_x, hessian_type
    use da_minimisation, only : da_get_innov_vector,da_minimise_cg, &
       da_minimise_lz, da_write_diagnostics, da_calculate_residual, &
@@ -102,12 +105,13 @@ module da_wrfvar_top
 
 #if defined(LAPACK)
    use da_randomisation, only: &
-      da_randomise_svd, da_randomise_svd_B, da_randomise_svd_B11, &
+      da_randomise_svd, da_block_lanczos, &
+      da_randomise_svd_B, da_randomise_svd_B11, &
 #if (WRF_CHEM == 1)
       da_randomise_svd_51, da_calculate_hessian, &
       da_evaluate_increment, da_evaluate_hessian, &
 #endif
-      da_gen_omega
+      da_gen_omega, randvecdir
 
    use f95_precision, only: WP => DP
 #endif

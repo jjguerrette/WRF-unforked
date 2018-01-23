@@ -85,6 +85,7 @@ subroutine da_output_increments(grid,config_flags,mz, &
 
    iend = 2
    if (use_lanczos) iend = 1
+!   if (use_lanczos .or. rand_type.eq.3) iend = 1
 
    do imode = 1, nmodes
       qhat(:,imode) = hessian_info%qhat(:,imode)
@@ -95,14 +96,24 @@ subroutine da_output_increments(grid,config_flags,mz, &
    write(unit=stdout,fmt='(A)') &
       'EUCNORM_BY_ITER_AND_SAMPLE: imode,neign,min(lambda),EUCNORM_xPa[LRA,LRU],EUCNORM_v[LRA,LRU] = '
 
-   do imode = nmodes, 0, -inc_out_interval
+   dmode = min(inc_out_interval,nmodes)
+   if (use_randomblock .and. rand_type.eq.3) then
+      dmode = nmodes
+   end if
+   do imode = nmodes, 0, -dmode
       allocate(eignval(1:imode))
       allocate(eignvec(1:imode,1:imode))
 
       if (imode .gt. 0) then 
-         neign = hessian_info%eigs(imode)%neign
-         eignval = hessian_info%eigs(imode)%eignval
-         eignvec = hessian_info%eigs(imode)%eignvec
+         if (use_randomblock .and. rand_type.eq.3) then
+            neign = hessian_info%eigs(1)%neign
+            eignval = hessian_info%eigs(1)%eignval
+            eignvec = hessian_info%eigs(1)%eignvec
+         else
+            neign = hessian_info%eigs(imode)%neign
+            eignval = hessian_info%eigs(imode)%eignval
+            eignvec = hessian_info%eigs(imode)%eignvec
+         end if
       else
          neign = 0
       end if
@@ -289,9 +300,15 @@ subroutine da_output_increments(grid,config_flags,mz, &
    allocate(eignval(1:nmodes))
    allocate(eignvec(1:nmodes,1:nmodes))
 
-   neign = hessian_info%eigs(nmodes)%neign
-   eignval = hessian_info%eigs(nmodes)%eignval
-   eignvec = hessian_info%eigs(nmodes)%eignvec
+   if (use_randomblock .and. rand_type.eq.3) then
+      neign = hessian_info%eigs(1)%neign
+      eignval = hessian_info%eigs(1)%eignval
+      eignvec = hessian_info%eigs(1)%eignvec
+   else
+      neign = hessian_info%eigs(nmodes)%neign
+      eignval = hessian_info%eigs(nmodes)%eignval
+      eignvec = hessian_info%eigs(nmodes)%eignvec
+   end if
 
    !Sort eigenvalues and eigenvectors in descending order
    allocate(temp_e(1:nmodes))
@@ -316,17 +333,18 @@ subroutine da_output_increments(grid,config_flags,mz, &
 
    allocate(nuhat(cv_size,0:nmodes))
    nuhat = 0.D0
-   do j = 1, neign
-      do i = 1, neign
+   do j = 1, nmodes
+      do i = 1, nmodes
          nuhat(:,j) = nuhat(:,j) + qhat(:,i) * eignvec(i,j)
       end do
    end do
 
    write(unit=stdout,fmt='(A)') &
-      'EUCNORM_BY_FINAL_MODES: imode,neign,min(lambda),EUCNORM_xPa[LRA,LRU],EUCNORM_v[LRA,LRU], SUM(LAM), SUM(LAM^3) = '
+      'EUCNORM_BY_FINAL_MODES: imode,neign,lambda(i),EUCNORM_xPa[LRA,LRU],EUCNORM_v[LRA,LRU], SUM(LAM), SUM(LAM^3) = '
 
 !   dmode = floor(real(nmodes) / 400.D0) + 1
-   dmode = 1
+!   dmode = 1
+   dmode = min(inc_out_interval,nmodes)
 
    do imode = 0, nmodes, dmode
       EUCNORM_xPa = 0.D0
@@ -344,13 +362,13 @@ subroutine da_output_increments(grid,config_flags,mz, &
 
          if (imode .gt. 0) then
             if (itype .eq. 2) then
-               do i = 1, neign
+               do i = 1, nmodes
                   LAM(i) = - (eignval(i) - 1.D0) / eignval(i)
                end do
 
                PREFIX = 'LRU'
             else
-               do i = 1, neign
+               do i = 1, nmodes
                   LAM(i) = 1.D0 / eignval(i)
                end do
 
@@ -360,7 +378,7 @@ subroutine da_output_increments(grid,config_flags,mz, &
             write(unit=filename,fmt='(2a,i2.2,a,i4.4)') trim(PREFIX),'inc_it',it,'_nmode',imode
 
             call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size, &
-                                   nmodes,neign,imode, &
+                                   nmodes,nmodes,imode, &
                                    LAM,eignvec,nuhat, &
                                    ghat,xhat,.true.)
 
@@ -396,7 +414,7 @@ subroutine da_output_increments(grid,config_flags,mz, &
 
       write(unit=stdout,fmt='(A,2I6,7E27.16E3)') &
          'EUCNORM_BY_FINAL_MODES: ',&
-         imode,neign,minval(eignval),EUCNORM_xPa, EUCNORM_v, SUMLAM, SUMLAM3
+         imode,neign,eignval(max(1,imode)),EUCNORM_xPa, EUCNORM_v, SUMLAM, SUMLAM3
    end do
 
    deallocate(nuhat)

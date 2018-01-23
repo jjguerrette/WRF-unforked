@@ -78,6 +78,7 @@ subroutine da_transfer_headtomodel ( grid )
 
    end if
 
+   !T0 met boundary updates
    if (cv_options.gt.0) then
 #endif
 
@@ -142,17 +143,19 @@ subroutine da_transfer_headtomodel ( grid )
 #if (WRF_CHEM == 1)
    end if
 
-   if (cv_options_chem .gt. 0 .and. chem_opt(1) .gt. 0) then
-      model_grid%chem_bxs = grid%chem_bxs
-      model_grid%chem_bxe = grid%chem_bxe
-      model_grid%chem_bys = grid%chem_bys
-      model_grid%chem_bye = grid%chem_bye
-
-      model_grid%chem_btxs = grid%chem_btxs
-      model_grid%chem_btxe = grid%chem_btxe
-      model_grid%chem_btys = grid%chem_btys
-      model_grid%chem_btye = grid%chem_btye
-   end if
+!Uncomment this when chem state updates are turned on
+!   !T0 chem boundary updates
+!   if (cv_options_chem .gt. 0 .and. chem_opt(1) .gt. 0) then
+!      model_grid%chem_bxs = grid%chem_bxs
+!      model_grid%chem_bxe = grid%chem_bxe
+!      model_grid%chem_bys = grid%chem_bys
+!      model_grid%chem_bye = grid%chem_bye
+!
+!      model_grid%chem_btxs = grid%chem_btxs
+!      model_grid%chem_btxe = grid%chem_btxe
+!      model_grid%chem_btys = grid%chem_btys
+!      model_grid%chem_btye = grid%chem_btye
+!   end if
 #endif
 
    if (trace_use) call da_trace_exit("da_transfer_headtomodel")

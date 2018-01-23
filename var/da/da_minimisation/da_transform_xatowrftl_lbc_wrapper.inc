@@ -58,7 +58,7 @@ subroutine da_transform_xatowrftl_lbc_wrapper(it, cv_size, be, ep, cv, iv, vp6, 
       call domain_clock_get( grid, start_timestr=timestr1 )
       call domain_clock_set( grid, current_timestr=timestr1 )
 
-      if (nl_called .eq. 1) then
+      if (nl_called.eq.1 .and. .not.disable_traj) then
          call da_read_basicstates ( xbx, grid, config_flags, timestr1 )
       else
          if (it .eq. 1) then

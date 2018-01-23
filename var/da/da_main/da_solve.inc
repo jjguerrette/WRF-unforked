@@ -62,14 +62,16 @@
    character(len=filename_len)  :: cvtfile_rand
    character(len=filename_len)  :: filename
    integer                      :: run_hours0
-   integer                      :: iens, nens
+   integer                      :: iens, nsamp
+   logical                      :: rand_exit = .false.
    real(wp), allocatable        :: omega(:,:) ! Gaussian draw
 !   real*8, allocatable          :: cvt_pert(:)      ! Control variable structure.
 
    integer                      :: je_start, je_end       ! Start/end indices of Je.
    integer                      :: jp_start, jp_end       ! Start/end indices of Jp.
-   integer                      :: jl_start, jl_end       ! Start/end indices of Jl.
 
+   integer              :: seed_size
+   integer, allocatable :: seed_array(:)
 #endif
 
 #if (WRF_CHEM != 1)
@@ -157,12 +159,17 @@
               use_iasiobs, use_radarobs, use_radar_rv, use_radar_rf/))
    end if
 
+
+   !Add all chem obs as they become available
+   use_chemobs = any((/use_chem_surfobs,use_chem_acftobs/))
+
    !Replace false below with applicable chem obs as they become available (e.g., AOD?)
    use_offlineobs = any((/(use_nonchemobs.and.cv_options.gt.0),&
                           (.false..and.cv_options_chem.gt.0)/)) 
 
-   !Add all chem obs as they become available
-   use_chemobs = any((/use_chem_surfobs,use_chem_acftobs/))
+   !Replace false below with applicable non-chem obs as they become available
+   use_onlineobs = any((/(.false..and.cv_options.gt.0),&
+                          (any((/use_chem_surfobs,use_chem_acftobs/)).and.cv_options_chem.gt.0)/)) 
 
    init_chem_scale = &
       ( cv_options_chem.eq.1 .and. chem_opt(1).gt.0 .and. .not.osse_chem &
@@ -831,18 +838,30 @@
 #endif
 
 !  Dynamically allocate the variables which depend on ntmax
-      if (use_lanczos) then
-         allocate (qhat(1:cv_size, 0:ntmax(it)))
-         allocate (eignvec(ntmax(it), ntmax(it)))
-         allocate (eignval(ntmax(it)))
-      end if
       if (.not.outer_loop_restart) global_it = it
 #if defined(LAPACK)
       if (use_randomblock .and. var4d) then
          global_it = rand_outer
          use_lanczos = .false.
-         nens = ntmax(rand_outer)
+      end if
+#endif
+      nmodes_global=ntmax(global_it)      
+      if (use_lanczos) then
+         allocate (qhat(1:cv_size, 0:nmodes_global))
+         allocate (eignvec(nmodes_global, nmodes_global))
+         allocate (eignval(nmodes_global))
+#if defined(LAPACK)
+         rand_type = 0
+         rand_stage = 0
+         rand_inner_it = 0
+#endif
+      end if
+#if defined(LAPACK)
+      if (use_randomblock .and. var4d) then
+         nsamp = nmodes_global
+         write(randvecdir,fmt='(A,i2.2,A)')'../vectors_', rand_outer,'/'
 
+         if (rand_type .eq. 3) nmodes_global=nsamp*rand_inner_it
          if (riot_precon.ge.1 .and. rand_outer .gt. 1) then
             if (rand_type .ne. 6 .and. rand_type .ne. 1) then
                CALL wrf_error_fatal('RIOT preconditioning is only available for rand_type=[6,1] at this time.')
@@ -850,15 +869,20 @@
          end if
          if ( rand_stage.eq.0 .and. read_omega ) then
             call wrf_message("Generating global omega")
-            allocate(omega(cv_size,nens))
-            call da_gen_omega(omega, cv_size, nens, grid, mz)
+            allocate(omega(cv_size,nsamp))
+
+!            put_rand_seed = .true.
+!            seed_array1 = 2343*nsamp
+!            seed_array2 = 5677*global_it
+
+            call da_gen_omega(omega, cv_size, nsamp, grid, mz)
 
             !Write omega to file
             write(cproc,fmt='(i4.4)') myproc
-            do iens = 1, nens
+            do iens = 1, nsamp
                write(cens,fmt='(i4.4)') iens
 
-               filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+               filename = trim(randvecdir)//'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
                call da_cv_io ('w', filename, cv_size, omega(1:cv_size,iens), grid, mz)
             end do
             deallocate(omega)
@@ -873,29 +897,47 @@
                IF ( rootproc ) CALL end_timing('da_end_timing: GEN_OMEGA')
 #endif
                call wrf_message("*** WRF-Var-RIOT generated OMEGA successfully ***")
-               if (trace_use) call da_trace_exit("da_wrfvar_main")
+               if (trace_use) call da_trace_exit ("da_solve")
                return
             end if
          end if
-         if (.not.use_block_lanczos) then
-            if (rand_type.eq.3) use_block_lanczos = .true.
-         else
-            rand_type = 3
-         end if
-        
-         if ( use_block_lanczos .and. rand_stage.eq.1 .and. rand_inner.eq.1 ) then
+
+         if ( rand_type.eq.3 .and. rand_stage.eq.1 .and. rand_inner_it.eq.1 ) then
             allocate(omega(cv_size,1))
 
-!!!! This perturbation and gradient code needs to be fixed still, need to perturb observations
-            !Perturb initial state of all but first ensemble member (mean)
-            if (ensemember .gt. 1) then
+            !Perturb initial state and observations of all but first ensemble member (mean)
+            if (ensmember .gt. 1) then
+               put_rand_seed = .true.
+               seed_array1 = 10*ensmember 
+               seed_array2 = 10*nsamp*global_it
+
+!               call random_seed(size=seed_size)              ! Get size of seed array.
+!               allocate(seed_array(1:seed_size))
+!               seed_array(1:seed_size) = 1
+!               call random_seed
+!               call random_seed(get=seed_array(1:seed_size))
+!               seed_array2 = floor(max(real(seed_array(1),8)/real(seed_array(2),8),&
+!                                       real(seed_array(2),8)/real(seed_array(1),8)))
+
+               write(unit=message(1),fmt='(a,2i16)') 'Ensemble random number seed_array1, seed_array2 = ', seed_array1, seed_array2
+               call da_message(message(1:1))
+!               deallocate(seed_array)
+
+
+               !! Initialize model grid
+               disable_traj = .true.
+               call da_nl_model(1)
+
+               !!-------------------------------------------------------------------
+               !! Perturb initial state and T0 boundary conditions with random noise
+               !!-------------------------------------------------------------------
                write(cproc,fmt='(i4.4)') myproc
                write(cens,fmt='(i4.4)') ensmember
 
                if (read_omega) then
                   !Read omega from file
-                  filename = 'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
-                  call da_cv_io ('w', filename, cv_size, omega(1:cv_size,1), grid, mz)
+                  filename = trim(randvecdir)//'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+                  call da_cv_io ('r', filename, cv_size, omega(:,1), grid, mz)
                else
                   call da_gen_omega(omega, cv_size, 1, grid, mz)
                end if
@@ -906,9 +948,9 @@
                jl_start   = be%cv%size_jb + be%cv%size_je + be%cv%size_jp + 1
                jl_end     = be%cv%size_jb + be%cv%size_je + be%cv%size_jp + be%cv%size_jl
 
-               if ( be%cv%size_jp.gt.0) omega(jp_start:jp_end,:) = 0.D0
-               if ( be%cv%size_je.gt.0) omega(je_start:je_end,:) = 0.D0
-               if ( .not. var4d_lbc .and. be%cv%size_jl.gt.0) omega(jl_start:jl_end,:) = 0.D0
+!               if ( be%cv%size_jp.gt.0) omega(jp_start:jp_end,1) = 0.D0
+!               if ( be%cv%size_je.gt.0) omega(je_start:je_end,1) = 0.D0
+!               if ( .not. var4d_lbc .and. be%cv%size_jl.gt.0) omega(jl_start:jl_end,1) = 0.D0
 
                call da_transform_vtox (grid,be%cv%size_jb,xbx,be,grid%ep,&
                                         omega(1:be%cv%size_jb,1),grid%vv,grid%vp &
@@ -917,10 +959,10 @@
 #endif
                                         )
 
-               !Transfer random update to boundary condition updates
+               !Transform initial state update to T0 boundary condition update
                call da_transform_xatowrftl_lbc_wrapper( &
                        global_it, cv_size, be, grid%ep, &
-                       xhat, iv, grid%vp6, grid%vv6, xbx, &
+                       omega(:,1), iv, grid%vp6, grid%vv6, xbx, &
                        grid, config_flags &
 !#if (WRF_CHEM == 1)
 !                      , grid%vch6 &
@@ -938,20 +980,37 @@
 
                cvt = cvt + omega(:,1)
 
-               !Need to perturb observations here or below after da_nl_model...hmmm
-               !num_qcstat_conv=0
-               !call da_get_innov_vector (global_it, num_qcstat_conv, ob, iv, grid , config_flags)
+               disable_traj = .false.
+
+
+               !!-------------------------------------------------------------------
+               !! Perturb observations with random noise
+               !!-------------------------------------------------------------------
+               omb_add_noise = .true.
 
             else
                omega = 0.D0
             end if
 
+            if (.not.read_omega) then
+               filename = trim(randvecdir)//'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+               call da_cv_io ('w', filename, cv_size, omega(1:cv_size,1), grid, mz)
+            end if
+
             deallocate(omega)
          end if
-
-         allocate (qhat(1:cv_size, 0:nens))
-         allocate (eignvec(nens, nens))
-         allocate (eignval(nens))
+         if ( rand_type.eq.3 .and. rand_stage.eq.4 ) then
+            allocate (qhat(1:cv_size, 0:nmodes_global))
+         else if ( &
+             (rand_type.eq.6 .and. rand_stage.eq.2) &
+             ) then
+!       .or. (rand_type.eq.1 .and. rand_stage.eq.4) &
+!       .or. (rand_type.eq.2 .and. rand_stage.eq.2) &
+!             ) then
+            allocate (qhat(1:cv_size, 0:nmodes_global))
+         end if
+         allocate (eignvec(nmodes_global, nmodes_global))
+         allocate (eignval(nmodes_global))
       end if
 #endif
 
@@ -987,26 +1046,55 @@
          !Restore default trajectory setting
          write_checkpoints = 0
 
+#if defined(LAPACK)
+         if (use_randomblock .and. (&
+             (rand_type.eq.6 .and. rand_stage.eq.2) &
+        .or. (rand_type.eq.3 .and. any(rand_stage.eq.(/2,4/))) &
+             ) .and. (.not.var4d_lbc .or. checkpoint_interval.gt.0)) disable_traj = .true.
+
+!!!        .or. (rand_type.eq.1 .and. any( rand_stage.eq.(/2,4/) )) &
+!!!        .or. (rand_type.eq.2 .and. rand_stage.eq.2) &
+#endif
+
          if ( checkpoint_interval .gt. 0) then
             write_checkpoints = 1
-#if defined(LAPACK)
-            if (use_randomblock .and. rand_stage.gt.0) then
-               if (quick_rand) write_checkpoints = 2
-            end if
-#endif
          end if
+
+#if defined(LAPACK)
+         ! Avoid re-calling nl model if it has already been called in this outer iteration:
+         ! (currently only chemobs or non-chemobs with checkpoint_interval>0 
+         !   have been enabled to read H(x) from files instead of calling NL model)
+         if ( &
+             (checkpoint_interval.gt.0 &
+#if (WRF_CHEM == 1)
+              .or. (.not.use_offlineobs  &
+             .and. use_onlineobs .and. use_chemobs) &
+#endif
+             ) .and. use_randomblock .and. rand_stage.gt.0 .and. quick_rand) then
+            write_checkpoints = 2
+            disable_traj = .true.
+         end if
+#endif
 
          call da_nl_model(it)
 
 #if (WRF_CHEM == 1)
-         if ( use_chemobs ) &
-            call da_retrieve_chem_hx( model_grid, iv )
-
-         if (write_checkpoints.eq.1) then
-            call da_write_obs_chem( iv, ob, global_it )
+         if ( use_chemobs ) then
 #if defined(LAPACK)
-         else if ( write_checkpoints.eq.2) then
-            call da_read_obs_chem_again( iv, ob, rand_outer, model_grid)
+            if (.not.disable_traj) then
+#endif
+               if (use_onlineobs) then
+                  call da_retrieve_chem_hx( model_grid, iv )
+                  call da_write_obs_chem( iv, ob, global_it )
+               end if
+#if defined(LAPACK)
+            else
+               if (write_checkpoints.eq.2) then
+                  call da_read_obs_chem_again( iv, ob, rand_outer, model_grid)
+               else
+                  use_onlineobs = .false.
+               end if
+            end if
 #endif
          end if
 
@@ -1016,7 +1104,8 @@
 
          if(config_flags%calc_hx_only) ii = ii + 1
 #if defined(LAPACK)
-         if (use_randomblock .and. rand_type.ne.11 .and. rand_stage.le.0) ii = ii + 1
+!         if (use_randomblock .and. rand_type.ne.11 .and. rand_stage.le.0) ii = ii + 1
+         if (use_randomblock .and. rand_stage.le.0) ii = ii + 1
 #endif
          if (ii .gt. 0) then
             call da_deallocate_observations (iv)
@@ -1061,7 +1150,14 @@
       call wrf_message("*** WRF-Var Part 8.2 ***")
 
       num_qcstat_conv=0
-      call da_get_innov_vector (global_it, num_qcstat_conv, ob, iv, grid , config_flags)
+#if defined(LAPACK)
+      if ((.not.disable_traj &
+#if (WRF_CHEM == 1)
+           .and. use_offlineobs) .or. (use_onlineobs .and. use_chemobs &
+#endif
+         )) &
+#endif
+         call da_get_innov_vector (global_it, num_qcstat_conv, ob, iv, grid , config_flags)
       if ( multi_inc == 1 ) then 
          if (trace_use) call da_trace_exit ("da_solve")
          return
@@ -1110,217 +1206,270 @@
       !=======================================================
       ! 3 options (use_lanczos, use_randomblock, default - cg)
       !=======================================================
-      if (use_lanczos) then
-         if (read_lanczos) then
-            call da_lanczos_io('r',cv_size,ntmax(it),neign,eignvec,eignval,qhat)
+      if (use_lanczos .or. use_randomblock) then
+         if (use_lanczos) then
+            if (read_lanczos) then
+               call da_lanczos_io('r',cv_size,ntmax(it),neign,eignvec,eignval,qhat)
 
-            call da_kmat_mul(grid,config_flags,it,cv_size,xbx, &
-                             be,iv,xhat,qhat,cvt,re,y,j,eignvec,eignval,neign)
-          ! Output Cost Function
-            call da_calculate_j(it, 1, cv_size, be%cv%size_jb, be%cv%size_je, be%cv%size_jp, &
-                             be%cv%size_jl, xbx, be, iv, xhat, cvt, re, y, j, xhat, grid, config_flags )
+               call da_kmat_mul(grid,config_flags,it,cv_size,xbx, &
+                                be,iv,xhat,qhat,cvt,re,y,j,eignvec,eignval,neign)
+             ! Output Cost Function
+               call da_calculate_j(it, 1, cv_size, be%cv%size_jb, be%cv%size_je, be%cv%size_jp, &
+                                be%cv%size_jl, xbx, be, iv, xhat, cvt, re, y, j, xhat, grid, config_flags )
 
-         else
-            if (var4d_inc_out) then
-               hessian_info%nmodes_max = 0
-               allocate(hessian_info%eigs(ntmax(it)))
-               allocate(hessian_info%qhat(cv_size,0:ntmax(it)))
-               allocate(hessian_info%ghat(cv_size))
+            else
+               if (var4d_inc_out) then
+                  hessian_info%nmodes_max = 0
+                  allocate(hessian_info%eigs(nmodes_global))
+                  allocate(hessian_info%qhat(cv_size,0:nmodes_global))
+                  allocate(hessian_info%ghat(cv_size))
+               end if
+
+               call da_minimise_lz(grid, config_flags, global_it, cv_size, xbx,& 
+                                be, iv, j_grad_norm_target, xhat, qhat, cvt, re, y, j, eignvec, eignval, neign, j0_cost, j0_total, hessian_info=hessian_info)
             end if
 
-            call da_minimise_lz(grid, config_flags, global_it, cv_size, xbx,& 
-                             be, iv, j_grad_norm_target, xhat, qhat, cvt, re, y, j, eignvec, eignval, neign, j0_cost, j0_total, hessian_info=hessian_info)
-#ifdef VAR4D
-#if (WRF_CHEM == 1)
-            if (calc_aminusb) call da_calculate_aminusb(grid,config_flags,it,cv_size,xbx, &
-                                be,qhat,eignvec,eignval,neign,ntmax(it))
-#endif
-#endif
-         end if
+            if (write_lanczos) call da_lanczos_io('w',cv_size,ntmax(it),neign,eignvec,eignval,qhat)
 
-         if (write_lanczos) call da_lanczos_io('w',cv_size,ntmax(it),neign,eignvec,eignval,qhat)
-
-         if (adj_sens) call da_sensitivity(grid,config_flags,it,cv_size,xbx, &
-                                           be,iv,xhat,qhat,cvt,y,eignvec,eignval,neign )
+            if (adj_sens) call da_sensitivity(grid,config_flags,it,cv_size,xbx, &
+                                              be,iv,xhat,qhat,cvt,y,eignvec,eignval,neign )
 #ifdef VAR4D
 #if defined(LAPACK)
-      else if ( use_randomblock .and. var4d) then
-         j0_total = 0.D0
-         if ( nens.gt.0 .and. rand_outer.gt.0 .and. it.eq.1 ) then
-            if (rand_stage.eq.1 .and. &
-                ((ensmember.eq.nens+1) .or. rand_type.eq.3)) then
-               select case (rand_type)
-#if (WRF_CHEM == 1)
-!Need proper obs handling for non-chem vars still
-                  case(1)
-                     call da_randomise_svd_51( &
-                           grid, mz, config_flags, cv_size, xbx, &
-                           be, iv, cvt, re, y, xhat, nens, j_cost = j)
-#endif
-                  case(3)
-                     call da_block_lanczos( &
-                           grid, mz, config_flags, cv_size, xbx, &
-                           be, iv, cvt, re, y, xhat, nens, j_cost = j)
-
-                  case(6)
-                     call da_randomise_svd( &
-                           grid, mz, config_flags, cv_size, xbx, &
-                           be, iv, cvt, re, y, xhat, nens, j_cost = j)
-#if (WRF_CHEM == 1)
-!Need proper obs handling for non-chem vars still
-                  case(2)
-                     call da_calculate_hessian( &
-                           grid, mz, config_flags, cv_size, xbx, &
-                           be, iv, cvt, re, y, xhat, nens, j_cost = j)
-#endif
-                  case default
-                     write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: Invalid selection for rand_type', rand_type
-                     CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
-               end select
-            else
-               select case (rand_type)
-#if (WRF_CHEM == 1)
-!Need proper obs handling for non-chem vars still
-                  case(1)
-                     if (rand_stage .eq. 4) then
-!                        if (var4d_inc_out) then
-!                           allocate(hessian_info%eigs(nens))
-!                           allocate(hessian_info%qhat(cv_size,0:nens))
-!                           allocate(hessian_info%ghat(cv_size))
-!                        end if
-
-                        call da_randomise_svd_51( &
+         else if ( use_randomblock .and. var4d) then
+            j0_total = 0.D0
+            if ( nsamp.gt.0 .and. rand_outer.gt.0 .and. it.eq.1 ) then
+               if (rand_stage.eq.1 .and. &
+                   ((ensmember.eq.nsamp+1) .or. rand_type.eq.3)) then
+                  select case (rand_type)
+!!!#if (WRF_CHEM == 1)
+!!!!Need proper obs handling for non-chem vars still
+!!!                     case(1)
+!!!                        call da_randomise_svd_51( &
+!!!                              grid, mz, config_flags, cv_size, xbx, &
+!!!                              be, iv, cvt, re, y, xhat, nsamp, j_cost = j)
+!!!#endif
+                     case(3)
+                        call da_block_lanczos( &
                               grid, mz, config_flags, cv_size, xbx, &
-                              be, iv, cvt, re, y, xhat, nens, &
-                              qhat=qhat, eignval=eignval, &
-                              eignvec=eignvec, neign=neign)!, &
-!                              hessian_info=hessian_info)
-                     else
-                        call da_randomise_svd_51( &
-                              grid, mz, config_flags, cv_size, xbx, &
-                              be, iv, cvt, re, y, xhat, nens)
-                     end if
-#endif
-                  case(3)
-!                     if (var4d_inc_out) then
-!                        allocate(hessian_info%eigs(nens))
-!                        allocate(hessian_info%qhat(cv_size,0:nens))
-!                        allocate(hessian_info%ghat(cv_size))
-!                     end if
+                              be, iv, cvt, re, y, xhat, nsamp, j_cost = j)
 
-                     call da_block_lanczos( &
-                           grid, mz, config_flags, cv_size, xbx, &
-                           be, iv, cvt, re, y, xhat, nens, &
-                           qhat=qhat, eignval=eignval, &
-                           eignvec=eignvec, neign=neign, &
-                           hessian_info=hessian_info)
-                  case(6)
-                     if (rand_stage .eq. 2) then
-                        if (var4d_inc_out) then
-                           allocate(hessian_info%eigs(nens))
-                           allocate(hessian_info%qhat(cv_size,0:nens))
-                           allocate(hessian_info%ghat(cv_size))
+                     case(6)
+                        call da_randomise_svd( &
+                              grid, mz, config_flags, cv_size, xbx, &
+                              be, iv, cvt, re, y, xhat, nsamp, j_cost = j)
+!!!#if (WRF_CHEM == 1)
+!!!!Need proper obs handling for non-chem vars still
+!!!                     case(2)
+!!!                        call da_calculate_hessian( &
+!!!                              grid, mz, config_flags, cv_size, xbx, &
+!!!                              be, iv, cvt, re, y, xhat, nsamp, j_cost = j)
+#endif
+                     case default
+                        write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: Invalid selection for rand_type', rand_type
+                        CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
+                  end select
+               else
+                  select case (rand_type)
+!!!#if (WRF_CHEM == 1)
+!!!!Need proper obs handling for non-chem vars still
+!!!                     case(1)
+!!!                        if (rand_stage .eq. 4) then
+!!!!                           if (var4d_inc_out) then
+!!!!                              allocate(hessian_info%eigs(nmodes_global))
+!!!!                              allocate(hessian_info%qhat(cv_size,0:nmodes_global))
+!!!!                              allocate(hessian_info%ghat(cv_size))
+!!!!                           end if
+!!!
+!!!                           call da_randomise_svd_51( &
+!!!                                 grid, mz, config_flags, cv_size, xbx, &
+!!!                                 be, iv, cvt, re, y, xhat, nsamp, &
+!!!                                 qhat=qhat, eignval=eignval, &
+!!!                                 eignvec=eignvec, neign=neign)!, &
+!!!!                                 hessian_info=hessian_info)
+!!!                        else
+!!!                           call da_randomise_svd_51( &
+!!!                                 grid, mz, config_flags, cv_size, xbx, &
+!!!                                 be, iv, cvt, re, y, xhat, nsamp)
+!!!                        end if
+!!!#endif
+                     case(3)
+                        if (rand_stage .eq. 4) then
+                           if (var4d_inc_out) then
+                              allocate(hessian_info%eigs(1))
+                              allocate(hessian_info%qhat(cv_size,0:nmodes_global))
+                              allocate(hessian_info%ghat(cv_size))
+                           end if
+
+                           call da_block_lanczos( &
+                                 grid, mz, config_flags, cv_size, xbx, &
+                                 be, iv, cvt, re, y, xhat, nsamp, &
+                                 qhat=qhat, eignval=eignval, &
+                                 eignvec=eignvec, neign=neign , &
+                                 hessian_info=hessian_info)
+                        else
+                           call da_block_lanczos( &
+                                 grid, mz, config_flags, cv_size, xbx, &
+                                 be, iv, cvt, re, y, xhat, nsamp)
                         end if
+                     case(6)
+                        if (rand_stage .eq. 2) then
+                           if (var4d_inc_out) then
+                              allocate(hessian_info%eigs(nmodes_global))
+                              allocate(hessian_info%qhat(cv_size,0:nmodes_global))
+                              allocate(hessian_info%ghat(cv_size))
+                           end if
 
-                        call da_randomise_svd( &
-                              grid, mz, config_flags, cv_size, xbx, &
-                              be, iv, cvt, re, y, xhat, nens, &
-                              qhat=qhat, eignval=eignval, &
-                              eignvec=eignvec, neign=neign, &
-                              hessian_info=hessian_info)
-                     else
-                        call da_randomise_svd( &
-                              grid, mz, config_flags, cv_size, xbx, &
-                              be, iv, cvt, re, y, xhat, nens)
-                     end if
-                  case(10)
-                     if (rand_stage .eq. 2) then
-                        call da_randomise_svd_B( &
-                              grid, mz, config_flags, cv_size, xbx, &
-                              be, iv, cvt, re, y, xhat, nens, &
-                              qhat=qhat, eignval=eignval, &
-                              eignvec=eignvec, neign=neign)
-                     else
-                        call da_randomise_svd_B( &
-                              grid, mz, config_flags, cv_size, xbx, &
-                              be, iv, cvt, re, y, xhat, nens)
-                     end if
-                  case(11)
-                        call da_randomise_svd_B11( &
-                              grid, mz, config_flags, cv_size, xbx, &
-                              be, iv, cvt, re, y, xhat, nens, &
-                              qhat=qhat, eignval=eignval, &
-                              eignvec=eignvec, neign=neign)
-#if (WRF_CHEM == 1)
-!Need proper obs handling for non-chem vars still
-                  case(2)
-                     if (rand_stage .eq. 2) then
-!                        if (var4d_inc_out) then
-!                           allocate(hessian_info%eigs(nens))
-!                           allocate(hessian_info%qhat(cv_size,0:nens))
-!                           allocate(hessian_info%ghat(cv_size))
-!                        end if
+                           call da_randomise_svd( &
+                                 grid, mz, config_flags, cv_size, xbx, &
+                                 be, iv, cvt, re, y, xhat, nsamp, &
+                                 qhat=qhat, eignval=eignval, &
+                                 eignvec=eignvec, neign=neign, &
+                                 hessian_info=hessian_info)
+                        else
+                           call da_randomise_svd( &
+                                 grid, mz, config_flags, cv_size, xbx, &
+                                 be, iv, cvt, re, y, xhat, nsamp)
+                        end if
+!!!                     case(10)
+!!!                        if (rand_stage .eq. 2) then
+!!!                           call da_randomise_svd_B( &
+!!!                                 grid, mz, config_flags, cv_size, xbx, &
+!!!                                 be, iv, cvt, re, y, xhat, nsamp, &
+!!!                                 qhat=qhat, eignval=eignval, &
+!!!                                 eignvec=eignvec, neign=neign)
+!!!                        else
+!!!                           call da_randomise_svd_B( &
+!!!                                 grid, mz, config_flags, cv_size, xbx, &
+!!!                                 be, iv, cvt, re, y, xhat, nsamp)
+!!!                        end if
+!!!                     case(11)
+!!!                           call da_randomise_svd_B11( &
+!!!                                 grid, mz, config_flags, cv_size, xbx, &
+!!!                                 be, iv, cvt, re, y, xhat, nsamp, &
+!!!                                 qhat=qhat, eignval=eignval, &
+!!!                                 eignvec=eignvec, neign=neign)
+!!!#if (WRF_CHEM == 1)
+!!!!Need proper obs handling for non-chem vars still
+!!!                     case(2)
+!!!                        if (rand_stage .eq. 2) then
+!!!!                           if (var4d_inc_out) then
+!!!!                              allocate(hessian_info%eigs(nsamp))
+!!!!                              allocate(hessian_info%qhat(cv_size,0:nmodes_global))
+!!!!                              allocate(hessian_info%ghat(cv_size))
+!!!!                           end if
+!!!
+!!!                           call da_calculate_hessian( &
+!!!                                 grid, mz, config_flags, cv_size, xbx, &
+!!!                                 be, iv, cvt, re, y, xhat, nsamp, &
+!!!                                 qhat=qhat, eignval=eignval, &
+!!!                                 eignvec=eignvec, neign=neign) !, &
+!!!!                                 hessian_info=hessian_info)
+!!!                        else
+!!!                           call da_calculate_hessian( &
+!!!                                 grid, mz, config_flags, cv_size, xbx, &
+!!!                                 be, iv, cvt, re, y, xhat, nsamp)
+!!!                        end if
+!!!#endif
+                     case default
+                        write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: Invalid selection for rand_type', rand_type
+                        CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
+                  end select
+               end if
+               if ( &
+                   (rand_type .eq. 6 .and. rand_stage .ne. 2) &
+              .or. (rand_type .eq. 3 .and. rand_stage .ne. 4) &
+                   ) then
+!!!              .or. (rand_type .eq. 1 .and. rand_stage .ne. 4) &
+!!!              .or. (rand_type .eq. 2 .and. rand_stage .ne. 2) &
+!!!              .or. (rand_type .eq. 10) &
+!!!              .or. (rand_type .eq. 11) &
 
-                        call da_calculate_hessian( &
-                              grid, mz, config_flags, cv_size, xbx, &
-                              be, iv, cvt, re, y, xhat, nens, &
-                              qhat=qhat, eignval=eignval, &
-                              eignvec=eignvec, neign=neign) !, &
-!                              hessian_info=hessian_info)
-                     else
-                        call da_calculate_hessian( &
-                              grid, mz, config_flags, cv_size, xbx, &
-                              be, iv, cvt, re, y, xhat, nens)
-                     end if
+                   var4d_inc_out = .false.
+                   rand_exit = .true.
+               end if
+            else
+               write(unit=stdout,fmt='("nsamp, rand_outer, it = ",3I4)') &
+                   nsamp, rand_outer, it
+
+               CALL wrf_error_fatal('In randomised SVD. Check namelist settings.')
+            end if
 #endif
-                  case default
-                     write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: Invalid selection for rand_type', rand_type
-                     CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
-               end select
-            end if
-            if ((rand_type .eq. 1 .and. rand_stage .ne. 4) .or. &
-                (rand_type .eq. 6 .and. rand_stage .ne. 2) .or. &
-                (rand_type .eq. 2 .and. rand_stage .ne. 2) .or. &
-                (rand_type .eq. 10) .or. &
-                (rand_type .eq. 11) .or. &
-                (rand_type .eq. 3 .and. rand_inner.lt.max_rand_inner) &
-                ) then
-
-               call da_deallocate_observations (iv)
-               call da_deallocate_y (ob)
-               if (use_background_errors) call da_deallocate_background_errors (be)
-
-               call da_wrfvar_finalize
-               if (var4d) call da_finalize_model
-
-#ifdef DM_PARALLEL
-               IF ( rootproc ) CALL end_timing('da_end_timing: RSVD_step')   
-#endif
-
-
-               write(unit=message(1),fmt='(A,I2,A,I2,A)') &
-                 "***Completed Stage ",rand_stage," of Randomized SVD in outer iteration",rand_outer,"***"
-               call wrf_message(message(1))
-
-               if (trace_use) call da_trace_exit("da_wrfvar_main")
-               if (trace_use) call da_trace_report
-
-               call wrfu_finalize
-               call wrf_shutdown
-               stop
-            end if
-#if (WRF_CHEM == 1)
-            if (calc_aminusb) then
-               call da_calculate_aminusb(grid,config_flags,rand_outer,cv_size,xbx, &
-                                         be,qhat,eignvec,eignval,neign,nens)
-            end if
 #endif
          else
-            write(unit=stdout,fmt='("nens, rand_outer, it = ",3I4)') &
-                nens, rand_outer, it
-
-            CALL wrf_error_fatal('In randomised SVD. Check namelist settings.')
+            CALL wrf_error_fatal('RIOT can only be used with 4D-Var and requires LAPACK (e.g., from MKL).')
          end if
+
+#ifdef DM_PARALLEL
+         IF ( rootproc ) CALL end_timing('da_end_timing: HESS_vector_multiply')
+#endif
+
+         if ( var4d .and. var4d_inc_out .and. allocated(hessian_info%ghat) ) then
+#ifdef DM_PARALLEL
+            IF ( rootproc ) CALL start_timing
+#endif
+            call da_output_increments( grid,config_flags,mz, &
+                                       global_it,cv_size,xbx,be, &
+                                       cvt,hessian_info)
+
+            if (rand_type .eq. 3) then
+               if(allocated(hessian_info%eigs(1)%eignval)) &
+                  deallocate(hessian_info%eigs(1)%eignval)
+               if(allocated(hessian_info%eigs(1)%eignvec)) &
+                  deallocate(hessian_info%eigs(1)%eignvec)
+            else
+               do ii = 1, hessian_info%nmodes_max
+                  if(allocated(hessian_info%eigs(ii)%eignval)) &
+                     deallocate(hessian_info%eigs(ii)%eignval)
+                  if(allocated(hessian_info%eigs(ii)%eignvec)) &
+                     deallocate(hessian_info%eigs(ii)%eignvec)
+               end do
+            end if
+
+            deallocate(hessian_info%eigs)
+            deallocate(hessian_info%qhat)
+            deallocate(hessian_info%ghat)
+#ifdef DM_PARALLEL
+            IF ( rootproc ) CALL end_timing('da_end_timing: increment_diagnostics')
+#endif
+         end if
+
+#ifdef VAR4D
+#if defined(LAPACK)
+         if ( use_randomblock .and. var4d .and. &
+              ((rand_type .eq. 3 .and. rand_inner_it.lt.max_rand_inner) .or. rand_exit)) then
+            call da_deallocate_observations (iv)
+            call da_deallocate_y (ob)
+            if (use_background_errors) call da_deallocate_background_errors (be)
+
+            call da_wrfvar_finalize
+            if (var4d) call da_finalize_model
+
+#ifdef DM_PARALLEL
+            IF ( rootproc ) CALL end_timing('da_end_timing: Block_Lanczos_inner')   
+#endif
+            if (rand_type .ne. 3 .or. rand_stage.lt.4) then
+               write(unit=message(1),fmt='(A,I2,A,I2,A)') &
+                 "***Completed Stage ",rand_stage," of RIOT in outer iteration",rand_outer,"***"
+               if (rand_type .eq. 3) &
+                  write(unit=message(1),fmt='(A,I2,A)') &
+                    "***Continuing Block Lanczos inner iteration ",rand_inner_it,"...***"
+            else
+               write(unit=message(1),fmt='(A,I2,A,I2,A)') &
+                 "***Completed Block Lanczos inner iteration ",rand_inner_it," of RIOT in outer iteration",rand_outer,"***"
+            end if
+            call wrf_message(message(1))
+
+            if (trace_use) call da_trace_exit("da_wrfvar_main")
+            if (trace_use) call da_trace_report
+
+            call wrfu_finalize
+            call wrf_shutdown
+            stop
+         end if
+#endif
+#if (WRF_CHEM == 1)
+         if (calc_aminusb) call da_calculate_aminusb(grid,config_flags,global_it,cv_size,xbx, &
+                             be,qhat,eignvec,eignval,neign,ntmax(global_it))
 #endif
 #endif
       else
@@ -1328,32 +1477,7 @@
               xbx, be, iv, j_grad_norm_target, xhat, cvt, re, y, j, j0_cost, j0_total)
       end if
 
-#ifdef DM_PARALLEL
-      IF ( rootproc ) CALL end_timing('da_end_timing: HESS_vector_multiply')
-#endif
 
-      if ( var4d .and. var4d_inc_out .and. allocated(hessian_info%ghat) ) then
-#ifdef DM_PARALLEL
-         IF ( rootproc ) CALL start_timing
-#endif
-         call da_output_increments( grid,config_flags,mz, &
-                                    global_it,cv_size,xbx,be, &
-                                    cvt,hessian_info)
-
-         do ii = 1, hessian_info%nmodes_max
-            if(allocated(hessian_info%eigs(ii)%eignval)) &
-               deallocate(hessian_info%eigs(ii)%eignval)
-            if(allocated(hessian_info%eigs(ii)%eignvec)) &
-               deallocate(hessian_info%eigs(ii)%eignvec)
-         end do
-
-         deallocate(hessian_info%eigs)
-         deallocate(hessian_info%qhat)
-         deallocate(hessian_info%ghat)
-#ifdef DM_PARALLEL
-         IF ( rootproc ) CALL end_timing('da_end_timing: increment_diagnostics')
-#endif
-      end if
 
 #ifdef VAR4D
       if (var4d) then
@@ -1448,7 +1572,7 @@
             write(cit,fmt='(i2.2)') rand_outer
             cvtfile_rand = 'xhat.it'//trim(adjustl(cit))//'.p'//trim(adjustl(cproc))
             call da_cv_io ('w', cvtfile_rand, cv_size, xhat(1:cv_size), grid, mz)
-            neign = nens
+            neign = nsamp
          else if(it .lt. max_ext_its .and. .not.use_randomblock) then
 #endif
             allocate(xhat_prev(1:cv_size))
@@ -1484,8 +1608,10 @@
 
 #ifdef VAR4D
 #if defined(LAPACK)
-         ! Should make this code section general (even for non-random),
+         ! Should always call this subroutine (even for non-random),
          ! and eliminate final call to da_calculate_gradj in both minimise_cg/lz routines
+
+         !Transform initial state update to T0 boundary condition update
          if (use_randomblock) &
             call da_transform_xatowrftl_lbc_wrapper( &
                     global_it, cv_size, be, grid%ep, &
@@ -1572,6 +1698,7 @@
 #ifdef VAR4D
         if (var4d .and. (&
             outer_loop_restart &
+            .or. output_wrfvar_bdy &
             .or. (var4d .and. dgn_search(global_it+1).eq.1 .and. .not.var4d_lbc) &
 #if defined(LAPACK)
             .or. (use_randomblock .and. rand_minimise) &
@@ -1614,6 +1741,7 @@
       if (var4d .and. (&
             outer_loop_restart &
             .or. (var4d .and. dgn_search(global_it+1).eq.1 .and. .not.var4d_lbc) &
+            .or. output_wrfvar_bdy &
 #if defined(LAPACK)
             .or. (use_randomblock .and. rand_minimise) &
 #endif

@@ -219,9 +219,9 @@ subroutine da_minimise_lz(grid, config_flags,            &
       write(unit=stdout,fmt='(A,2I5)') 'it, iter = ',it,iter
       write(dummychar,fmt='(I0)') iter
       write(unit=stdout,fmt='(A,'//trim(dummychar)//'E27.16E3)') 'Ritz eigenvalues: ',eignval(1:iter)     
-      do ii = 1,iter
-         write(unit=stdout,fmt='(A,I3,A,'//trim(dummychar)//'E27.16E3)') 'EIGENVECTOR',ii,': ',eignvec(ii,1:iter) 
-      end do
+!      do ii = 1,iter
+!         write(unit=stdout,fmt='(A,I3,A,'//trim(dummychar)//'E27.16E3)') 'EIGENVECTOR',ii,': ',eignvec(ii,1:iter) 
+!      end do
       write(unit=stdout,fmt='(A,I5)') 'Number of converged eigenpairs: ', neign
 
       if ( var4d_inc_out &

@@ -1,7 +1,7 @@
 #if defined(LAPACK)
 subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
                      omega, yhat, qhat, cv_size, &
-                     eignval, eignvec, nens, print_messages)
+                     eignval, eignvec, nsamp, print_messages, hess_trace_approx)
 
    !-------------------------------------------------------------------------
    ! Purpose:         Second stage of RSVD 5.6
@@ -29,32 +29,33 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
 
    integer, intent(in)      :: cv_size        ! Total cv size
 
-   integer, intent(in)     :: nens                     ! Number of total eigenpairs
-   real, intent(in)        :: yhat(1:cv_size, 1:nens)  ! yhat = A * omega
-   real, intent(in)        :: omega(1:cv_size, 1:nens) ! Gaussian draw
-   real, intent(in)        :: qhat(1:cv_size, 0:nens)  ! orthonormal basis set 
+   integer, intent(in)     :: nsamp                     ! Number of total eigenpairs
+   real, intent(in)        :: yhat(1:cv_size, 1:nsamp)  ! yhat = A * omega
+   real, intent(in)        :: omega(1:cv_size, 1:nsamp) ! Gaussian draw
+   real, intent(in)        :: qhat(1:cv_size, 0:nsamp)  ! orthonormal basis set 
 
-   real, intent(out)       :: eignvec(nens, nens)
-   real, intent(out)       :: eignval(nens)
+   real, intent(out)       :: eignvec(nsamp, nsamp)
+   real, intent(out)       :: eignval(nsamp)
+   real, optional, intent(out) :: hess_trace_approx(nsamp)
 
    logical, optional, intent(in) :: print_messages
 
-   real(wp)                     :: LAM(nens)
+   real(wp)                     :: LAM(nsamp)
    integer                      :: iens, jens, i, j, p1
-   real(wp)                     :: F1(nens, nens) ! intermediate matrix
-   real(wp)                     :: F2(nens, nens) ! intermediate matrix
-   real(wp)                     :: U(nens, nens)
-   real(wp)                     :: VT(nens, nens)
-   real(wp)                     :: SIG(nens)
-   real(wp)                     :: UTF2(nens,nens), VSIGinvT(nens,nens)
-   real(wp)                     :: KMAT(nens, nens)  ! KMAT = Q^T * A * Q
+   real(wp)                     :: F1(nsamp, nsamp) ! intermediate matrix
+   real(wp)                     :: F2(nsamp, nsamp) ! intermediate matrix
+   real(wp)                     :: U(nsamp, nsamp)
+   real(wp)                     :: VT(nsamp, nsamp)
+   real(wp)                     :: SIG(nsamp)
+   real(wp)                     :: UTF2(nsamp,nsamp), VSIGinvT(nsamp,nsamp)
+   real(wp)                     :: KMAT(nsamp, nsamp)  ! KMAT = Q^T * A * Q
 
-   integer                      :: piv(nens)
+   integer                      :: piv(nsamp)
    integer                      :: info
 
    real(wp)                     :: temp_l
-   real(wp)                     :: temp_e(nens)
-   character(len=4) :: cnens=""
+   real(wp)                     :: temp_e(nsamp)
+   character(len=4) :: cnsamp=""
    logical          :: swapped
   
    if (trace_use) call da_trace_entry("da_rsvd56")
@@ -63,37 +64,48 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
    IF ( rootproc ) CALL start_timing
 #endif
 
-   if(.not.present(print_messages)) write(unit=stdout,fmt='(A,I5,A)') 'Performing Stage 2 of RSVD5.6 for ', nens ,' ensembles'
+   if(.not.present(print_messages)) write(unit=stdout,fmt='(A,I5,A)') 'Performing Stage 2 of RSVD5.6 for ', nsamp ,' ensembles'
    if(.not.present(print_messages)) write(unit=stdout,fmt=*) ' '
 
-   do iens = 1, nens
-      do jens = 1, nens
+   do iens = 1, nsamp
+      do jens = 1, nsamp
          !F1 = OMEGA^T * Q
          F1(iens,jens) = da_dot_cv(cv_size, omega(:,iens), qhat(:,jens), grid, mz, jp_start, jp_end)
 
          !F2 = Y^T * Q
          F2(iens,jens) = da_dot_cv(cv_size, yhat(:,iens), qhat(:,jens), grid, mz, jp_start, jp_end)
       end do
+      if (present(hess_trace_approx)) then
+         if (iens .eq. 1) then
+            hess_trace_approx(iens) = &
+               da_dot_cv(cv_size, omega(:,iens), yhat(:,iens), grid, mz, jp_start, jp_end)
+         else
+            hess_trace_approx(iens) = ( &
+               hess_trace_approx(iens-1) * real(iens-1,8) + &
+               da_dot_cv(cv_size, omega(:,iens), yhat(:,iens), grid, mz, jp_start, jp_end) &
+               )  / real(iens,8)
+         end if
+      end if
    end do
 
-   write(cnens,fmt='(I0)') nens
+   write(cnsamp,fmt='(I0)') nsamp
 
    info = 0
 
    !! Solve F1*KMAT = F2
 
    ! DECOMPOSE F1 = U * SIG * VT 
-   call GESVD(F1(1:nens,1:nens), &
-              SIG(1:nens), &
-              U = U(1:nens,1:nens), &
-              VT = VT(1:nens,1:nens), &
+   call GESVD(F1(1:nsamp,1:nsamp), &
+              SIG(1:nsamp), &
+              U = U(1:nsamp,1:nsamp), &
+              VT = VT(1:nsamp,1:nsamp), &
               INFO = info)
 
    call mpi_barrier(comm, ierr)
 
    if (info .ne. 0) then
-      do iens = 1, nens
-         write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'F1: ',F1(iens,1:nens)
+      do iens = 1, nsamp
+         write(unit=stdout,fmt='(A,'//trim(cnsamp)//'E27.16E3)') 'F1: ',F1(iens,1:nsamp)
       end do
 
       write(stdout,*) 'Error in randomised SVD: GESV returned ',info
@@ -101,16 +113,16 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
    end if
 
    ! KMAT = VT^T * SIG^-1 * U^T * F2 
-   do iens = 1, nens
-      VSIGinvT(iens,1:nens) = VT(iens,1:nens) / SIG(iens)
-      do jens = 1, nens
-         UTF2(iens,jens) = da_dot(nens,U(1:nens,iens),F2(1:nens,jens))
+   do iens = 1, nsamp
+      VSIGinvT(iens,1:nsamp) = VT(iens,1:nsamp) / SIG(iens)
+      do jens = 1, nsamp
+         UTF2(iens,jens) = da_dot(nsamp,U(1:nsamp,iens),F2(1:nsamp,jens))
       end do
    end do
 
-   do iens = 1, nens
-      do jens = 1, nens
-         KMAT(jens,iens) = da_dot(nens,VSIGinvT(:,iens),UTF2(:,jens))
+   do iens = 1, nsamp
+      do jens = 1, nsamp
+         KMAT(jens,iens) = da_dot(nsamp,VSIGinvT(:,iens),UTF2(:,jens))
       end do
    end do
 
@@ -122,24 +134,24 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
  !-----------------------------------------------------------------
    info = 0
    call SYEV(KMAT, LAM, JOBZ = 'V' , INFO = info) !F95
-
+#ifdef DM_PARALLEL
    call mpi_barrier(comm, ierr)
-
+#endif
    if (info .ne. 0) then
-      do iens = 1, nens
-         write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'F2: ',F2(iens,1:nens)
+      do iens = 1, nsamp
+         write(unit=stdout,fmt='(A,'//trim(cnsamp)//'E27.16E3)') 'F2: ',F2(iens,1:nsamp)
       end do
 
-      do iens = 1, nens
-         write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'KMAT: ',KMAT(iens,1:nens)
+      do iens = 1, nsamp
+         write(unit=stdout,fmt='(A,'//trim(cnsamp)//'E27.16E3)') 'KMAT: ',KMAT(iens,1:nsamp)
       end do
 
       write(stdout,*) 'Error in randomised SVD: SYEV returned ',info
       CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
    end if
 
-   do iens = 1, nens
-      do jens = 1, nens 
+   do iens = 1, nsamp
+      do jens = 1, nsamp 
          eignvec(iens,jens) = KMAT(iens,jens)
       end do
    end do
@@ -156,7 +168,7 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
    end if
   
    !Sort eigenvalues and eigenvectors in descending order
-   do j = nens-1, 1, -1
+   do j = nsamp-1, 1, -1
      swapped = .false.
      do i = 1, j
        if (LAM(i) .lt. LAM(i+1)) then
@@ -175,8 +187,8 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
    end do
 
    !Preconditioned observation Hessian should be positive semi-definite
-!   neign = nens
-   do iens = 1, nens
+!   neign = nsamp
+   do iens = 1, nsamp
       LAM(iens) = max(LAM(iens),0.D0)
    end do
    eignval = LAM

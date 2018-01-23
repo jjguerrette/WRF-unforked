@@ -1,12 +1,12 @@
 subroutine da_calculate_hessian(grid, mz, config_flags, &
                                 cv_size, xbx, be, iv, cv, &
-                                re, y, xhat, nens, j_cost, &
+                                re, y, xhat, nsamp, j_cost, &
                                 qhat, eignval, eignvec, neign, hessian_info)
 
    !-------------------------------------------------------------------------
    ! Purpose: Direct Hessian calculation, separated into 2 stages 
    !          + Comparisons of alternative Hessian decomps and increments
-   !          --> Requires nens to be equal to the number of observations
+   !          --> Requires nsamp to be equal to the number of observations
    !
    ! Here 
    !    cv   is updated in outer-loop.
@@ -33,19 +33,19 @@ subroutine da_calculate_hessian(grid, mz, config_flags, &
    type (y_type), intent(inout)      :: re                       ! residual (o-a) structure.
    type (y_type), intent(inout)      :: y                        ! y = H(x_inc) structure.
    real*8, intent(out)               :: xhat(1:cv_size)          ! control variable (local).
-   integer, intent(in)               :: nens                     ! Total number of eigenpairs
+   integer, intent(in)               :: nsamp                     ! Total number of eigenpairs
    type (j_type), optional, intent(out) :: j_cost                ! cost function
-   real*8, optional, intent(out)     :: qhat(1:cv_size, 0:nens)  ! orthonormal basis set of A = Q * B * Q^T
-   real*8, optional, intent(out)     :: eignvec(nens, nens)
-   real*8, optional, intent(out)     :: eignval(nens)
+   real*8, optional, intent(out)     :: qhat(1:cv_size, 0:nsamp)  ! orthonormal basis set of A = Q * B * Q^T
+   real*8, optional, intent(out)     :: eignvec(nsamp, nsamp)
+   real*8, optional, intent(out)     :: eignval(nsamp)
    integer, optional, intent(out)    :: neign                         ! Number of non-truncated eigenpairs
    type(hessian_type), optional, intent(inout) :: hessian_info
 
 
 #if defined(LAPACK)
 
-   real(wp)                     :: SIG(1:nens)
-   real(wp)                     :: LAM(1:nens)
+   real(wp)                     :: SIG(1:nsamp)
+   real(wp)                     :: LAM(1:nsamp)
 
    real(wp), allocatable   :: AMAT(:,:)  ! B = Q ^T * A  or  B^T = A^T * Q, where A = R^-1/2 * H * U
    real(wp), allocatable   :: AMAT_g(:,:)  ! B = Q ^T * A  or  B^T = A^T * Q, where A = R^-1/2 * H * U
@@ -86,7 +86,7 @@ subroutine da_calculate_hessian(grid, mz, config_flags, &
    jp_start   = be % cv % size_jb + be % cv % size_je + 1
    jp_end     = be % cv % size_jb + be % cv % size_je + be % cv % size_jp
 
-   nyobs = nens
+   nyobs = nsamp
 
    xhat = 0.D0
 
@@ -273,7 +273,7 @@ subroutine da_calculate_hessian(grid, mz, config_flags, &
 
 
       write(cnyobs,fmt='(I0)') neign
-      write(unit=stdout,fmt='(A,'//trim(cnyobs)//'E25.16E3)') 'Eigenvalues(r): ',LAM(1:nens)
+      write(unit=stdout,fmt='(A,'//trim(cnyobs)//'E25.16E3)') 'Eigenvalues(r): ',LAM(1:nsamp)
 
       ! Store output vectors
       eignvec(:,:) = 0.D0
@@ -314,7 +314,7 @@ subroutine da_calculate_hessian(grid, mz, config_flags, &
 
       !Used for performance comparison of different increment and Pa estimation methods.
       !Fully implemented for chem CVs at this time, partially for non-chem
-      if (nens_compare .gt. 0) then
+      if (nsamp_compare .gt. 0) then
          call da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
                                           neign, eignval, eignvec, qhat, &
                                           ghat, xhat, AMAT)

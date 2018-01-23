@@ -55,7 +55,7 @@ subroutine da_evaluate_j(grid, config_flags, cv_size, cv_size_jb, &
    integer, dimension(1:ncv_type) :: ncv
    integer          :: rc
    character(len=filename_len) :: fg_filename
-
+   logical :: original_disable
    integer :: jl_start, jl_end
    character*256 :: timestr, timestr1
    type(x_type) :: shuffle
@@ -129,7 +129,10 @@ subroutine da_evaluate_j(grid, config_flags, cv_size, cv_size_jb, &
       call da_model_lbc_off
 
    if ( checkpoint_interval .gt. 0 ) write_checkpoints = 3
+   original_disable = disable_traj
+   disable_traj = .false.
    call da_nl_model(-1)
+   disable_traj = original_disable
    if ( checkpoint_interval .gt. 0 ) write_checkpoints = 0
 
    ! Calculate new cost function

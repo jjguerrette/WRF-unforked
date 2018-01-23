@@ -60,7 +60,7 @@ module da_minimisation
       use_nonchemobs, use_chemobs, &
 #endif
 #if defined(LAPACK)
-      use_randomblock, rand_stage, rotate_omega, &
+      use_randomblock, rand_stage, rand_type, disable_traj, &
 #endif
       use_global_cv_io, var4d_inc_out, inc_out_interval, &
       use_lanczos, spectral_precon, info_stop, grm_shmt_order, &

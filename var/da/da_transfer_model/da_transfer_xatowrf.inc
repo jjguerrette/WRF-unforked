@@ -647,9 +647,14 @@ subroutine da_transfer_xatowrf(grid, config_flags)
    IF ( var4d ) THEN
 
       ! We need to transfer LBC perturbation from model_grid to grid for output
+#if (WRF_CHEM == 1)
 !      if ( all(dgn_search(1:max_ext_its).eq.0) .or. var4d_lbc ) then
 
-      if (var4d_lbc .or. checkpoint_interval.eq.0 .or. .not.boundary_io) then
+      !T0 met boundary updates
+      if (use_nonchemobs .and. cv_options.gt.0 .and. &
+            (var4d_lbc .or. checkpoint_interval.eq.0 .or. .not.boundary_io)) then
+#endif
+
       grid%u_bxs = grid%u_bxs + model_grid%g_u_bxs
       grid%u_bxe = grid%u_bxe + model_grid%g_u_bxe
       grid%u_bys = grid%u_bys + model_grid%g_u_bys
@@ -707,10 +712,25 @@ subroutine da_transfer_xatowrf(grid, config_flags)
       grid%moist_btxe = grid%moist_btxe + model_grid%g_moist_btxe
       grid%moist_btys = grid%moist_btys + model_grid%g_moist_btys
       grid%moist_btye = grid%moist_btye + model_grid%g_moist_btye
+
+#if (WRF_CHEM == 1)
       end if
 
+!Uncomment this when chem state updates are turned on
+!      !T0 chem boundary updates
+!      if (cv_options_chem .gt. 0 .and. chem_opt(1) .gt. 0) then
+!         grid%chem_bxs = grid%chem_bxs + model_grid%g_chem_bxs
+!         grid%chem_bxe = grid%chem_bxe + model_grid%g_chem_bxe
+!         grid%chem_bys = grid%chem_bys + model_grid%g_chem_bys
+!         grid%chem_bye = grid%chem_bye + model_grid%g_chem_bye
+!
+!         grid%chem_btxs = grid%chem_btxs + model_grid%g_chem_btxs
+!         grid%chem_btxe = grid%chem_btxe + model_grid%g_chem_btxe
+!         grid%chem_btys = grid%chem_btys + model_grid%g_chem_btys
+!         grid%chem_btye = grid%chem_btye + model_grid%g_chem_btye
 !      end if
-#if (WRF_CHEM == 1)
+
+!      end if
       ! Don't ever want scale < 0; alpha < 0 is no problem
       do ic = PARAM_FIRST_SCALAR, num_scaleant
          do j=jts,jte

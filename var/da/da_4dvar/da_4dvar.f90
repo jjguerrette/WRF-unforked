@@ -11,7 +11,7 @@ use da_control, only : comm, var4d_bin, var4d_lbc, trace_use_dull, num_fgat_time
                        init_chem_scale, &
                        rootproc, &
 #endif
-                       checkpoint_interval, write_checkpoints, cycle_interval
+                       checkpoint_interval, write_checkpoints, disable_traj, cycle_interval
 
 #ifdef VAR4D
 

@@ -56,7 +56,7 @@ subroutine da_evaluate_decomp_init(grid, xbx, be, mz, jp_start, jp_end, cv_size,
    real(wp)        :: UTomega(1:cv_size)
    real(wp)        :: LAM_hess(1:rankA)
    real*8          :: temp
-   integer         :: iens, jens, nens, neign, i, j, k, ij, ic, cv_s, cv_f, itype
+   integer         :: iens, jens, i, j, k, ij, ic, cv_s, cv_f, itype
 
    if (trace_use) call da_trace_entry("da_evaluate_decomp_init")
    write(unit=stdout,fmt='(A)') 'Initialize Comparison'

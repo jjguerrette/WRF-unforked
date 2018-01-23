@@ -1,4 +1,4 @@
-subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
+subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nsamp, ghat )
 
    !-------------------------------------------------------------------------
    ! Purpose:   Select preconditioned omega vectors for next RIOT outer loop
@@ -18,9 +18,9 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
    integer, intent(in)          :: mz(:)
    integer, intent(in)          :: jp_start, jp_end
    real*8, intent(in)           :: ghat(1:cv_size)        ! control variable (local).
-   integer, intent(in)          :: nens                   ! Total number of eigenpairs
+   integer, intent(in)          :: nsamp                   ! Total number of eigenpairs
 
-   real*8                       :: omega(cv_size,nens) ! Selected Hessian eigenvectors
+   real*8                       :: omega(cv_size,nsamp) ! Selected Hessian eigenvectors
    real*8                       :: nuhat(cv_size,1) ! Eigenvectors of A
    real*8                       :: ghat_prev(cv_size)
 
@@ -37,10 +37,10 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
    real*8, allocatable   :: lam_all(:)
 
    real*8   :: gdot, gdot_prev
-   real*8   :: crit_save(nens)
-   integer  :: precon_list(nens)
+   real*8   :: crit_save(nsamp)
+   integer  :: precon_list(nsamp)
    integer    :: it, eig_count, eig_total, crit_imin(1), &
-                 nens_it, neign_it, num_omega_it, nouter_seed
+                 nsamp_it, neign_it, num_omega_it, nouter_seed
 
    if (trace_use) call da_trace_entry("da_precon_omega")
 
@@ -65,9 +65,9 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
    if ( any(riot_precon .eq. (/14,15/)) ) then
       eig_total = 0
       do it=nouter_seed, 1, -1
-         call da_hessian_io ('r',grid, cv_size,it,nens_it,neign_it)
+         call da_hessian_io ('r',grid, cv_size,it,nsamp_it,neign_it)
          if(riot_precon .eq. 14) eig_total = eig_total + neign_it
-         if(riot_precon .eq. 15) eig_total = eig_total + nens_it
+         if(riot_precon .eq. 15) eig_total = eig_total + nsamp_it
       end do
    end if
 
@@ -75,17 +75,17 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
    allocate(lam_all(sum(ntmax(1:nouter_seed))))
 
    do it=nouter_seed, 1, -1
-      call da_hessian_io ('r',grid, cv_size,it,nens_it,neign_it)
+      call da_hessian_io ('r',grid, cv_size,it,nsamp_it,neign_it)
 
-      allocate(eignvec_prev(nens_it,nens_it))
-      allocate(eignval_prev(nens_it))
-      allocate(qhat_prev(cv_size,0:nens_it))
+      allocate(eignvec_prev(nsamp_it,nsamp_it))
+      allocate(eignval_prev(nsamp_it))
+      allocate(qhat_prev(cv_size,0:nsamp_it))
 
-      call da_hessian_io ('r',grid, cv_size,it,nens_it,neign_it,&
+      call da_hessian_io ('r',grid, cv_size,it,nsamp_it,neign_it,&
                          eignvec_prev,eignval_prev,qhat_prev,mz)
 
       if (any(riot_precon .eq. (/3,4,15/))) then
-         num_omega_it = nens_it
+         num_omega_it = nsamp_it
       else
          num_omega_it = neign_it
       end if
@@ -94,7 +94,7 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
             nuhat(:,1) = qhat_prev(:,iens)
          else
             do i = 1, cv_size
-               nuhat(i,1) = da_dot(nens_it, qhat_prev(i,1:nens_it), eignvec_prev(1:nens_it,iens))
+               nuhat(i,1) = da_dot(nsamp_it, qhat_prev(i,1:nsamp_it), eignvec_prev(1:nsamp_it,iens))
             end do
          end if
          eig_count = eig_count + 1
@@ -112,7 +112,7 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
 
          lam_all(eig_count) = eignval_prev(iens)
 
-         if (eig_count .le. nens) then
+         if (eig_count .le. nsamp) then
             crit_save(eig_count) = crit(eig_count)
             precon_list(eig_count) = eig_count
             omega(:,eig_count) = nuhat(:,1)
@@ -132,15 +132,15 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
       deallocate(qhat_prev)
    end do
 
-   if (eig_count .lt. nens) then
-      crit_save(eig_count+1:nens) = 0.D0
+   if (eig_count .lt. nsamp) then
+      crit_save(eig_count+1:nsamp) = 0.D0
 
-      nouter_seed = nens-eig_count
+      nouter_seed = nsamp-eig_count
 
       allocate(qhat_prev(cv_size,nouter_seed))
       call da_gen_omega(qhat_prev, cv_size, nouter_seed, grid, mz)
 
-      omega(:,eig_count+1:nens) = qhat_prev
+      omega(:,eig_count+1:nsamp) = qhat_prev
 
       deallocate(qhat_prev)
    end if
@@ -150,7 +150,7 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
       write(unit=stdout,fmt='(2D26.16)') crit(iens), lam_all(iens)
    end do
 
-   do iens = 1, nens
+   do iens = 1, nsamp
       write(unit=stdout,fmt='("iens = ",i4,", ieig = ",i4,", crit(i) = ",D26.16)') iens, precon_list(iens), crit_save(iens)
    end do
 
@@ -159,18 +159,18 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
 
    !Prepend with gradient vector
    if (any(riot_precon .eq. (/2,4/))) then
-      omega(:,2:nens) = omega(:,1:nens-1)
+      omega(:,2:nsamp) = omega(:,1:nsamp-1)
       omega(:,1) = ghat / gdot
    end if
 
    !Orthonormalization - should do this every time
 !   if (any(riot_precon .eq. (/1,2,3,4,15/))) then
-      allocate(qhat_prev(cv_size,0:nens))
-      qhat_prev(:,1:nens) = omega(:,1:nens)
+      allocate(qhat_prev(cv_size,0:nsamp))
+      qhat_prev(:,1:nsamp) = omega(:,1:nsamp)
       call da_gram_schmidt(grid,mz,jp_start,jp_end, &
-                            qhat_prev,cv_size,nens)
+                            qhat_prev,cv_size,nsamp)
 
-      omega(:,1:nens) = qhat_prev(:,1:nens)
+      omega(:,1:nsamp) = qhat_prev(:,1:nsamp)
       deallocate(qhat_prev)
 !   end if
 
@@ -180,7 +180,7 @@ subroutine da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nens, ghat )
 
    ! Write preconditioned omega vectors from all ensembles on each processor
    write(cproc,fmt='(i4.4)') myproc
-   do iens = 1, nens
+   do iens = 1, nsamp
       write(unit=stdout,fmt='("Writing preconditioned omega ensemble; iens = ",i4)') iens
       write(cens,fmt='(i4.4)') iens
 

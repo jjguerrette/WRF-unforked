@@ -8,32 +8,35 @@
 #---------------------------------------------------------------------------------------
 
 export nout_RIOT=3 # number of outer iterations (overrides max_ext_its from namelist.input)
-export SVDN=40     # number of ensembles (inner iterations) in first outer iteration
+export nin_RIOT=1  # number of Block Lanczos inner iterations
+export NBLOCK=40   # number of ensemble members in first outer iteration
                    # - Similar to ntmax(1) in namelist.input, and should be a small factor
                    #    larger (x2-x5) than the CG inner iteration count to produce
                    #    equivalent results.
                    # - Ensemble counts in all other outer iterations should be set in 
-                   #    namelist.input as ntmax=$SVDN,nens[2],nens[3],nens[4], etc...
-                   # - Eventually SVDN can be replaced with retrieval of ntmax(1) 
+                   #    namelist.input as ntmax=$NBLOCK,nens[2],nens[3],nens[4], etc...
+                   # - Eventually NBLOCK can be replaced with retrieval of ntmax(1) 
                    #    from namelist.input.  For now, this separate setting is a
                    #    reminder to set the number of nodes/cores.
-                   # - NUMNODES must be >= $((SVDN+1)) [where the +1 accounts for the gradient]
-                   # - For 2 nodes per AD/TL simulation, set NUMNODES=$((2*$((SVDN+1)))), etc.
+                   # - NUMNODES must be >= $((NBLOCK+1)) [where the +1 accounts for the gradient]
+                   # - For 2 nodes per AD/TL simulation, set NUMNODES=$((2*$((NBLOCK+1)))), etc.
                    # FUTURE IDEA: it may reduce wall-time of 1st ensemble member (slowest one)
                    #  to request 1 extra independent head node for process management
-export svd_type=6  # 1-RSVD5.1 (chem only); 6-RSVD5.6 (default); 2-HESS(SVDN=Nobs, chem only); 10-B-cov debug
+export svd_type=6  # 3-Block Lanczos; 6-RSVD5.6 (default); 2-HESS(NBLOCK=Nobs, chem only)
+export nin_RIOT=1 # number of inner iterations for Block Lanczos
 export prepend_rsvd_basis=0 #If ==1, prepend RSVD basis with gradient vector in 
                             # all outer iterations after the first
 export GRAD_PRECON=0  #Set to 0 (default), 1, 2, 3, or 4 to control preconditioning for it > 1
 export ADAPT_SVD="1" #0, 1 (default), or 2
-export svd_p=0 #some small value (e.g., 5) between [0,min(SVDN)), only used when ADAPT_SVD==1
+export svd_p=0 #some small value (e.g., 5) between [0,min(NBLOCK)), only used when ADAPT_SVD==1
 export GLOBAL_OPT="true" #"true" or "false"
-export GLOBAL_OMEGA="false" #"true" or "false"
+export GLOBAL_OMEGA="true" #"true" or "false"
 
 export RIOT_RESTART=0 #If ==1, set nout_RIOT to the number of outer iterations 
                       # to complete after start file "ALT_START" 
                       #   --> posterior covariance only
-                      #If ==2, use ALT_it1 to set the alternative starting iteration
+                      #If ==2, set nout_RIOT to the number of outer iterations (including previous)
+                      #   --> use ALT_it1 to set the alternative starting iteration
                       #   --> minimisation and posterior covariance
 
 if [ $RIOT_RESTART -gt 0 ]; then
@@ -65,7 +68,7 @@ if [ $RIOT_RESTART -gt 0 ]; then
 
       export ALT_CVT="$DADIR/cvt.it"$ii".p0000"
       export ALT_XHAT="$DADIR/xhat.it"$ii".p0000"
-      export ALT_hess_dir="$WRFSUPER/DA/$PREVIOUS_RUN/"
+      if [ $GRAD_PRECON -gt 0 ]; then export ALT_hess_dir="$WRFSUPER/DA/$PREVIOUS_RUN/"; fi
    fi
 fi
 

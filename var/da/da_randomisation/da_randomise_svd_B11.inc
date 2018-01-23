@@ -1,6 +1,6 @@
 subroutine da_randomise_svd_B11(grid, mz, config_flags,            &
                            cv_size, xbx, be, iv, cv, &
-                           re, y, xhat, nens, j_cost, &
+                           re, y, xhat, nsamp, j_cost, &
                            qhat, eignval, eignvec, neign)
 
    !-------------------------------------------------------------------------
@@ -31,16 +31,16 @@ subroutine da_randomise_svd_B11(grid, mz, config_flags,            &
    type (y_type), intent(inout)      :: re                       ! residual (o-a) structure.
    type (y_type), intent(inout)      :: y                        ! y = H(x_inc) structure.
    real, intent(out)                 :: xhat(1:cv_size)          ! control variable (local).
-   integer, intent(in)               :: nens                     ! Total number of eigenpairs
+   integer, intent(in)               :: nsamp                     ! Total number of eigenpairs
    type (j_type), optional, intent(out) :: j_cost                ! cost function
-   real, optional, intent(out)       :: qhat(1:cv_size, 0:nens)  ! orthonormal basis set of A = Q * B * Q^T
-   real*8, optional, intent(out)     :: eignvec(nens, nens)
-   real*8, optional, intent(out)     :: eignval(nens)
+   real, optional, intent(out)       :: qhat(1:cv_size, 0:nsamp)  ! orthonormal basis set of A = Q * B * Q^T
+   real*8, optional, intent(out)     :: eignvec(nsamp, nsamp)
+   real*8, optional, intent(out)     :: eignval(nsamp)
    integer, optional, intent(out)    :: neign                         ! Number of non-truncated eigenpairs
 
 #if defined(LAPACK)
 
-   real(wp), dimension(1:nens) :: LAM, LAMinv
+   real(wp), dimension(1:nsamp) :: LAM, LAMinv
    real(wp), allocatable        :: yhat(:,:)  ! yhat = A * omega
    real(wp), allocatable        :: omega(:,:) ! Gaussian draw
    real(wp), allocatable        :: nuhat(:,:) ! Eigenvectors of A
@@ -52,28 +52,28 @@ subroutine da_randomise_svd_B11(grid, mz, config_flags,            &
    integer                      :: jl_start, jl_end       ! Start/end indices of Jl.
 
    real                         :: ghat(1:cv_size)        ! cv copy.
-   real(wp)                     :: F1(nens, nens) ! intermediate matrix
-   real(wp)                     :: F2(nens, nens) ! intermediate matrix
-   real(wp)                     :: U(nens, nens)
-   real(wp)                     :: VT(nens, nens)
-   real(wp)                     :: SIG(nens)
+   real(wp)                     :: F1(nsamp, nsamp) ! intermediate matrix
+   real(wp)                     :: F2(nsamp, nsamp) ! intermediate matrix
+   real(wp)                     :: U(nsamp, nsamp)
+   real(wp)                     :: VT(nsamp, nsamp)
+   real(wp)                     :: SIG(nsamp)
    real(wp), allocatable        :: TEMP1(:,:), TEMP2(:,:)
 
    integer                      :: SVD_unit
-   real(wp)                     :: KMAT(nens, nens)  ! B = Q^T * A * Q
-   real(wp)                     :: KMAT_antidiag(nens,2)
-   real(wp)                     :: KMAT_maxerr(nens)
-   integer                      :: KMAT_maxerri(nens)
+   real(wp)                     :: KMAT(nsamp, nsamp)  ! B = Q^T * A * Q
+   real(wp)                     :: KMAT_antidiag(nsamp,2)
+   real(wp)                     :: KMAT_maxerr(nsamp)
+   integer                      :: KMAT_maxerri(nsamp)
 
-   integer                      :: piv(nens)
+   integer                      :: piv(nsamp)
    integer                      :: info
 
    real                         :: gdot, beta, temp_l
-   real                         :: temp_e(nens)
+   real                         :: temp_e(nsamp)
    real                         :: j0_total, erri
    character*10                 :: cproc, cens
    character(len=filename_len)  :: filename
-   character(len=5) :: cnens=""
+   character(len=5) :: cnsamp=""
    logical          :: swapped
   
    if (trace_use) call da_trace_entry("da_randomise_svd_B11")
@@ -96,13 +96,13 @@ subroutine da_randomise_svd_B11(grid, mz, config_flags,            &
    !============================================================================================
    !SVD STAGE1
    ! Generate vectors in Y = A*OMEGA (Halko, Algorithm 4.1), where A = U^T * H^T * R^-1 * H * U 
-   allocate(yhat(1:cv_size,nens))
+   allocate(yhat(1:cv_size,nsamp))
 
    write(cproc,fmt='(i4.4)') myproc
 
-   allocate(omega(1:cv_size,nens))
+   allocate(omega(1:cv_size,nsamp))
 
-   do iens = 1,nens
+   do iens = 1,nsamp
       write(cens,fmt='(i4.4)') iens
 
       yhat(1:cv_size,iens) = 0.D0
@@ -154,7 +154,7 @@ subroutine da_randomise_svd_B11(grid, mz, config_flags,            &
 
    ! Generate qhat basis vectors by Modified Gram-Schmidt orthonormalization
    write(unit=stdout,fmt='("Generating qhat")')
-   do iens = 1, nens
+   do iens = 1, nsamp
       write(unit=stdout,fmt='("iens = ",I5)') iens
       qhat(:,iens) = yhat(:,iens)
       if (iens .gt. 1) then
@@ -171,7 +171,7 @@ subroutine da_randomise_svd_B11(grid, mz, config_flags,            &
    end do
 
 !   ! Write qhat vectors to disk
-!   do iens = 1, nens
+!   do iens = 1, nsamp
 !      write(unit=stdout,fmt='("Writing qhat vectors to disk: ",I5)') iens
 !      write(cens,fmt='(i4.4)') iens
 !      filename = 'qhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
@@ -180,9 +180,9 @@ subroutine da_randomise_svd_B11(grid, mz, config_flags,            &
 
    write(unit=stdout,fmt='("Generating F1 and F2")')
    ! Eigenvalue decomposition of A (Algorithm 5.6 of Halko)
-   do iens = 1, nens
+   do iens = 1, nsamp
       write(unit=stdout,fmt='("iens = ",I5)') iens
-      do jens = 1, nens
+      do jens = 1, nsamp
          F1(jens,iens) = da_dot_cv(cv_size, qhat(:,iens), omega(:,jens), grid, mz, jp_start, jp_end)
          F2(jens,iens) = da_dot_cv(cv_size, qhat(:,iens), yhat(:,jens), grid, mz, jp_start, jp_end)
       end do
@@ -194,12 +194,12 @@ subroutine da_randomise_svd_B11(grid, mz, config_flags,            &
    !  b = F2(:,iens)
    !  x = KMAT(iens,:)
    !-----------------------------------------------------------
-   write(cnens,fmt='(I0)') nens
-!      do iens = 1, nens
-!         write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'F1: ',F1(iens,1:nens)
+   write(cnsamp,fmt='(I0)') nsamp
+!      do iens = 1, nsamp
+!         write(unit=stdout,fmt='(A,'//trim(cnsamp)//'E27.16E3)') 'F1: ',F1(iens,1:nsamp)
 !      end do
-!      do iens = 1, nens
-!         write(unit=stdout,fmt='(A,'//trim(cnens)//'E27.16E3)') 'F2: ',F2(iens,1:nens)
+!      do iens = 1, nsamp
+!         write(unit=stdout,fmt='(A,'//trim(cnsamp)//'E27.16E3)') 'F2: ',F2(iens,1:nsamp)
 !      end do
 
    info = 0
@@ -209,32 +209,32 @@ subroutine da_randomise_svd_B11(grid, mz, config_flags,            &
       call GESV(F1, F2, piv, info) !F95
 
       ! GESV returns B^T in F2
-      do iens = 1, nens
-         do jens = 1, nens
+      do iens = 1, nsamp
+         do jens = 1, nsamp
             KMAT(iens,jens) = F2(jens,iens)
          end do
       end do
    else
       if (p .lt. 0) p = 0
       write(unit=stdout,fmt='("Running GESVD")')
-      call GESVD(F1(1:nens,1:nens-p), &
-                 SIG(1:nens-p), &
-                 U = U(1:nens,1:nens-p), &
-                 VT = VT(1:nens-p,1:nens-p), &
+      call GESVD(F1(1:nsamp,1:nsamp-p), &
+                 SIG(1:nsamp-p), &
+                 U = U(1:nsamp,1:nsamp-p), &
+                 VT = VT(1:nsamp-p,1:nsamp-p), &
                  INFO = info)
 
-      allocate(TEMP1(1:nens-p,1:nens-p))
-      allocate(TEMP2(1:nens-p,1:nens-p))
-      do iens = 1, nens-p
+      allocate(TEMP1(1:nsamp-p,1:nsamp-p))
+      allocate(TEMP2(1:nsamp-p,1:nsamp-p))
+      do iens = 1, nsamp-p
          TEMP2(iens,:) = (1.D0 / SIG(iens)) * VT(iens,:)
-         do jens = 1, nens-p
-            TEMP1(jens,iens) = sum(F2(1:nens,iens) * U(1:nens,jens))
+         do jens = 1, nsamp-p
+            TEMP1(jens,iens) = sum(F2(1:nsamp,iens) * U(1:nsamp,jens))
          end do
       end do
 
 
-      do iens = 1, nens-p
-         do jens = 1, nens-p
+      do iens = 1, nsamp-p
+         do jens = 1, nsamp-p
                KMAT(iens,jens) = sum(TEMP1(:,iens) * TEMP2(:,jens))
          end do
       end do
@@ -247,11 +247,11 @@ subroutine da_randomise_svd_B11(grid, mz, config_flags,            &
    end if
 
    write(unit=stdout,fmt='("Printing KMAT symmetry")')
-   do iens = 1, nens
-      KMAT_antidiag(iens,1)=KMAT(nens-iens+1,iens)
-      KMAT_antidiag(iens,2)=KMAT(iens,nens-iens+1)
+   do iens = 1, nsamp
+      KMAT_antidiag(iens,1)=KMAT(nsamp-iens+1,iens)
+      KMAT_antidiag(iens,2)=KMAT(iens,nsamp-iens+1)
       KMAT_maxerr(iens) = 0.D0
-!!      do jens = min(iens+1,nens), nens
+!!      do jens = min(iens+1,nsamp), nsamp
       do jens = 1, max(1,iens-1)
          erri = abs(2.D0 * (KMAT(iens,jens) - KMAT(jens,iens)) / &
                                 (KMAT(iens,jens) + KMAT(jens,iens)))
@@ -264,14 +264,14 @@ subroutine da_randomise_svd_B11(grid, mz, config_flags,            &
    call da_get_unit (SVD_unit)
    filename = 'KMAT_symm.txt'
    open (unit=SVD_unit, file = trim(filename), form = 'formatted', status = 'replace',access='sequential')
-   do iens = 1, nens
+   do iens = 1, nsamp
       write(unit=SVD_unit,fmt='(I5,3D25.16,I6)') iens, KMAT_antidiag(iens,1:2), KMAT_maxerr(iens), KMAT_maxerri(iens)
    end do
    call da_free_unit (SVD_unit)
 
    ! Force symmetry in B
-   do iens = 1, nens
-      do jens = min(iens+1,nens), nens
+   do iens = 1, nsamp
+      do jens = min(iens+1,nsamp), nsamp
          KMAT(iens,jens) = (KMAT(iens,jens) + KMAT(jens,iens)) / 2.D0
          KMAT(jens,iens) = KMAT(iens,jens)
       end do
@@ -289,15 +289,15 @@ subroutine da_randomise_svd_B11(grid, mz, config_flags,            &
       CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
    end if
 
-   do iens = 1, nens
-      do jens = 1, nens 
+   do iens = 1, nsamp
+      do jens = 1, nsamp 
          eignvec(iens,jens) = KMAT(iens,jens)
       end do
    end do
 
    write(unit=stdout,fmt='("Sorting Eigenmodes")')  
    !First sort eigenvalues and eigenvectors in descending order
-   do j = nens-1, 1, -1
+   do j = nsamp-1, 1, -1
      swapped = .false.
      do i = 1, j
        if (LAM(i) .lt. LAM(i+1)) then
@@ -315,10 +315,10 @@ subroutine da_randomise_svd_B11(grid, mz, config_flags,            &
      if (.NOT. swapped) exit
    end do
 
-   neign = nens
-   do iens = 1, nens
+   neign = nsamp
+   do iens = 1, nsamp
       eignval(iens) = LAM(iens)
-!      if (neign .eq. nens .and. LAM(iens) .lt. 0.D0) then
+!      if (neign .eq. nsamp .and. LAM(iens) .lt. 0.D0) then
 !         if (iens .gt. 1) then
 !            neign = iens - 1
 !         else
@@ -332,26 +332,26 @@ subroutine da_randomise_svd_B11(grid, mz, config_flags,            &
    ! Print current eigenpairs
    ! ----------------------------------------------
    write(unit=stdout,fmt='("Printing Eigenpairs")')
-   if (nens .le. 100) then
-      write(cnens,fmt='(I0)') nens
-      write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'Eigenvalues(r): ',LAM(1:nens)
-      do iens = 1, nens
-         write(unit=stdout,fmt='(A,'//trim(cnens)//'D25.16)') 'EIGENVECTOR_MATRIX: ',eignvec(iens,1:nens)
+   if (nsamp .le. 100) then
+      write(cnsamp,fmt='(I0)') nsamp
+      write(unit=stdout,fmt='(A,'//trim(cnsamp)//'D25.16)') 'Eigenvalues(r): ',LAM(1:nsamp)
+      do iens = 1, nsamp
+         write(unit=stdout,fmt='(A,'//trim(cnsamp)//'D25.16)') 'EIGENVECTOR_MATRIX: ',eignvec(iens,1:nsamp)
       end do
    else
       if(rootproc) then
          call da_get_unit (SVD_unit)
          filename = 'eigenvalues.txt'
          open (unit=SVD_unit, file = trim(filename), form = 'formatted', status = 'replace',access='sequential')
-         write(unit=SVD_unit,fmt='(D25.16)') LAM(1:nens)
+         write(unit=SVD_unit,fmt='(D25.16)') LAM(1:nsamp)
          call da_free_unit (SVD_unit)
 
-         do iens = 1, nens
+         do iens = 1, nsamp
             call da_get_unit (SVD_unit)
             write(cens,fmt='(i4.4)') iens
             filename = 'eigenvector.e'//trim(adjustl(cens))//'.txt'
             open (unit=SVD_unit, file = trim(filename), form = 'formatted', status = 'replace',access='sequential')
-            write(unit=SVD_unit,fmt='(D25.16)') eignvec(1:nens,iens)
+            write(unit=SVD_unit,fmt='(D25.16)') eignvec(1:nsamp,iens)
             call da_free_unit (SVD_unit)
          end do
       end if
@@ -362,7 +362,7 @@ subroutine da_randomise_svd_B11(grid, mz, config_flags,            &
 
 
    write(unit=stdout,fmt='(A)') ' '
-   write(unit=stdout,fmt='(A,I5,A)') 'Showing ', nens, ' eigenpairs'
+   write(unit=stdout,fmt='(A,I5,A)') 'Showing ', nsamp, ' eigenpairs'
    write(unit=stdout,fmt='(A)') ' '
 
    deallocate(yhat)

@@ -51,7 +51,7 @@ subroutine da_check_hess_symm( grid, xbx, be, mz, jp_start, jp_end, cv_size, &
    integer                      :: nall(num_ob_indexes)
    integer, allocatable         :: nobs(:)
    
-   integer                      :: iens, jens, i, j, imax(nens_compare), svd_unit, tempi
+   integer                      :: iens, jens, i, j, imax(nsamp_compare), svd_unit, tempi
    logical, allocatable         :: mask(:)
 
    character*10                 :: cproc, cens
@@ -81,7 +81,7 @@ subroutine da_check_hess_symm( grid, xbx, be, mz, jp_start, jp_end, cv_size, &
    mask(:) = .true.
 
    imax(:) = 0
-   do iens = 1, nens_compare
+   do iens = 1, nsamp_compare
       omega(:) = 0.D0
 #ifdef DM_PARALLEL
       allocate(dumcv(1:cv_size))

@@ -19,6 +19,9 @@ subroutine da_add_noise_to_ob( iv, ob )
 
    real                          :: z1, z2, z3, z4, z5, z6, z7, dum ! Random numbers.
    integer                       :: n, k, i     ! Loop counters.
+#if (WRF_CHEM == 1)
+   integer                       :: ichem, iplt     ! Loop counters.
+#endif
    integer                       :: ounit     ! Output unit
    integer                       :: num_obs, ios                 
    character(len=20)             :: ob_name, filename
@@ -806,6 +809,67 @@ subroutine da_add_noise_to_ob( iv, ob )
          end do                                ! end loop for channel
       end do                                   ! end loop for sensor
    end if
+
+
+#if (WRF_CHEM == 1)
+   ! CHEM SURFACE
+   if (iv%info(chem_surf)%nlocal .gt. 0) then
+      num_obs = 0
+      do n=1, iv%info(chem_surf)%nlocal
+         do ichem = 1, num_chem_surf-1
+            if(iv%info(chem_surf)%proc_domain(1,n)) num_obs = num_obs + 1
+         end do
+      end do
+      write(ounit,'(a20,i8)')'chem_surf', num_obs   
+
+      num_obs = 0 
+      do n=1, iv%info(chem_surf)%nlocal
+         do ichem = 1, num_chem_surf-1
+            if(iv%info(chem_surf)%proc_domain(1,n)) then
+               num_obs = num_obs + 1
+
+               write(ounit,'(i8)')  1
+               !Add random perturbation:
+               call da_add_noise(iv%chem_surf(n)%chem(ichem), ob%chem_surf(n)%chem(ichem), z1)
+
+               !Write out data:
+               write(ounit,'(2i8,2e15.7)')num_obs, 1, iv % chem_surf(n) % chem(ichem) % error, z1
+            end if
+         end do
+      end do
+   end if
+
+   ! CHEM AIRCRAFT
+   if (iv%info(chem_acft)%nlocal .gt. 0) then
+      num_obs = 0
+      do iplt = 1, num_platform
+         do n=1, iv%info(chem_acft)%nlocal
+            do ichem = 1, num_chem_acft-1
+               if(iv%info(chem_acft)%proc_domain(iplt,n)) num_obs = num_obs + 1
+            end do
+         end do
+      end do
+      write(ounit,'(a20,i8)')'chem_acft', num_obs   
+
+      num_obs = 0 
+      do iplt = 1, num_platform
+         do n=1, iv%info(chem_acft)%nlocal
+            do ichem = 1, num_chem_acft-1
+               if(iv%info(chem_acft)%proc_domain(iplt,n)) then
+                  num_obs = num_obs + 1
+
+                  write(ounit,'(i8)')  1
+                  !Add random perturbation:
+                  call da_add_noise(iv%chem_acft(n)%chem(ichem,iplt), ob%chem_acft(n)%chem(ichem,iplt), z1)
+
+                  !Write out data:
+                  write(ounit,'(2i8,2e15.7)')num_obs, 1, iv % chem_acft(n) % chem(ichem,iplt) % error, z1
+               end if
+            end do
+         end do
+      end do
+   end if
+#endif
 
   close (ounit)
   call da_free_unit(ounit)
