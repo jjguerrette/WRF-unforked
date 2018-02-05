@@ -113,7 +113,7 @@ subroutine da_calculate_hessian(grid, mz, config_flags, &
          ghat = - ghat
 
          ! Write ghat to file
-         filename = 'ghat.p'//trim(adjustl(cproc))
+         filename = trim(randvecdir)//'ghat.p'//trim(adjustl(cproc))
          call da_cv_io ('w', filename, cv_size, ghat, grid, mz)
 
       else if (ensmember .gt. 0 .and. ensmember .le. nyobs) then
@@ -140,7 +140,7 @@ subroutine da_calculate_hessian(grid, mz, config_flags, &
    !      grad_jo = - grad_jo    !! Compensate for sign in calculation of grad_v (Jo)
 
          ! Write AMAT row to file
-         filename = 'ahat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+         filename = trim(randvecdir)//'ahat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
          call da_cv_io ('w', filename, cv_size, grad_jo, grid, mz)
 
          call da_deallocate_y(jo_grad_y)
@@ -158,20 +158,20 @@ subroutine da_calculate_hessian(grid, mz, config_flags, &
       do iens = 1, nyobs
          write(unit=stdout,fmt='("Reading AMAT row : ",i4)') iens
          write(cens,fmt='(i4.4)') iens
-         filename = 'ahat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+         filename = trim(randvecdir)//'ahat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
          call da_cv_io ('r', filename, cv_size, AMAT(1:cv_size,iens), grid, mz)
 
          if (rewrite_ahat_ascii) then
-            filename = 'ahat_ascii.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+            filename = trim(randvecdir)//'ahat_ascii.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
             call da_cv_io ('w', filename, cv_size, AMAT(1:cv_size,iens), grid, mz, .true.)
          end if
       end do
 
       ! Read gradient
-      filename = 'ghat.p'//trim(adjustl(cproc))
+      filename = trim(randvecdir)//'ghat.p'//trim(adjustl(cproc))
       call da_cv_io ('r', filename, cv_size, ghat, grid, mz)
       if (rewrite_ahat_ascii) then
-         filename = 'ghat_ascii.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+         filename = trim(randvecdir)//'ghat_ascii.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
          call da_cv_io ('w', filename, cv_size, ghat, grid, mz, .true.)
       end if
 
@@ -194,7 +194,7 @@ subroutine da_calculate_hessian(grid, mz, config_flags, &
 
 !REMOVE THIS, JUST ADDS TO FOOTPRINT
 !         write(cens,fmt='(i4.4)') iens
-!         filename = 'dumcv.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+!         filename = trim(randvecdir)//'dumcv.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
 !         call da_cv_io ('w', filename, cv_size, dumcv, grid, mz)
 !REMOVE THIS, JUST ADDS TO FOOTPRINT
 
@@ -266,7 +266,7 @@ subroutine da_calculate_hessian(grid, mz, config_flags, &
 !      do i = 1, neign
 !         write(unit=stdout,fmt='("Writing nuhat vectors to disk: ",i4)') i
 !         write(cens,fmt='(i4.4)') i
-!         filename = 'nuhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
+!         filename = trim(randvecdir)//'nuhat.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
 !         call da_cv_io ('w', filename, cv_size, nuhat(1:cv_size,i), grid, mz)
 !      end do
 !REMOVE THIS, JUST ADDS TO FOOTPRINT

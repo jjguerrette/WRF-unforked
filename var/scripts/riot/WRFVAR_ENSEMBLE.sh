@@ -2,13 +2,14 @@
 
 #========================================================
 #WRFVAR_ENSEMBLE.sh is used to run the ensemble for:
-#stage 99 gradient preconditioning (rand_type==[1,6]) of WRFDA_RIOT.sh
-#stage 1 (rand_type==[1,2,3,6]) of WRFDA_RIOT.sh
-#stage 3 (rand_type==[1,3]) of WRFDA_RIOT.sh
+#stage 1 (rand_type==[3,6]) of WRFDA_RIOT.sh
+#stage 3 (rand_type==[3]) of WRFDA_RIOT.sh
 #========================================================
 
 #Probably should add a check for each of this I/O variables to make sure they are not empty
 it="$1"; iSAMP0="$2"; NSAMP="$3"; NJOBS="$4"; rand_stage="$5"; innerit="$6"
+
+if [ $NJOBS -gt $((NSAMP+1)) ]; then echo "ERROR: NJOBS should never be more than NSAMP+1"; echo $((rand_stage*100+4)); exit $((rand_stage*100+4)); fi
 
 it0=$it
 if [ $it -lt 10 ]; then it0="0"$it0; fi
@@ -32,19 +33,8 @@ do
 
    cd ../run.$ii
 
-#   if [ $rand_stage -eq 1 ] && [ $iSAMP -le $NSAMP ] && \
-#      [ "$GLOBAL_OMEGA" == "true" ] && \
-#      ([ $it -eq 1 ] || [ $GRAD_PRECON -eq 0 ]); then
-#      #Distribute omega vectors
-#      #Test for the presence of each vector type
-#      ls ../vectors_$it0/omega.e$ii.p0000
-#      dummy=`ls ../vectors_$it0/omega.e$ii.p0000 | wc -l`
-#      if [ $dummy -lt 1 ]; then
-#         echo "ERROR: Missing global omega.e$ii.p0000"
-#         echo $((rand_stage*100+1)); exit $((rand_stage*100+1))
-#      fi
-#      mv -v ../vectors_$it0/omega.e$ii* ./
-#   fi
+   cp $CWD/namelist.input ./
+   ex -c :"/ensmember" +:":s/=.*/=$iSAMP,/" +:wq namelist.input
 
    if [ $innerit -eq 1 ]; then
       if [ $rand_stage -eq 1 ]; then
@@ -63,16 +53,10 @@ do
    fi
 
 
-   if [ $rand_stage -eq 3 ]; then
-      vectors2=("" "")
-#      #Gather qhat_obs vectors for this ensemble (obs space)
-#      if [ $rand_type -eq 1 ]; then vectors=("qhat_obs.e"); fi
-
-      #Gather qhat vectors for this ensemble member (cv space)
-      if [ $rand_type -eq 3 ]; then 
-         vectors=("qhat.e")
-         vectors2=(".iter$innerit0")
-      fi
+   if [ $rand_stage -eq 3 ] && [ $rand_type -eq 3 ]; then
+      #Check for presence of qhat vectors for this ensemble member (cv space)
+      vectors=("qhat.e")
+      vectors2=(".iter$innerit0")
 
       vcount=0
       for var in ${vectors[@]}
@@ -90,19 +74,9 @@ do
 
          vcount=$((vcount+1))
       done
-
-#      if [ $innerit -gt 1 ]; then
-         innerit_last=$((innerit-1))
-         innerit_last0=$innerit_last
-         if [ $innerit_last -lt 10 ]; then innerit0_last=0$innerit_last0; fi
-         if [ $innerit_last -lt 100 ]; then innerit_last0=0$innerit_last0; fi
-         if [ $innerit_last -lt 1000 ]; then innerit_last0=0$innerit_last0; fi
-
-#      fi
    fi
 
-
-   if [ $rand_stage -eq 1 ] || [ $rand_stage -eq 99 ]; then
+   if [ $rand_stage -eq 1 ]; then
       if [ $CPDT -gt 0 ]; then
          ln -sfv $CWD_rel/wrf_checkpoint_d01_* ./
          if [ $WRF_MET -gt 0 ]; then
@@ -121,39 +95,21 @@ do
       fi
    fi
 
-   cp $CWD/namelist.input ./
-   ex -c :"/ensmember" +:":s/=.*/=$iSAMP,/" +:wq namelist.input
-
 #SHOULD SEPERATE INTO TWO LOOPS HERE TO CLOSE EFFICIENCY GAP (IDLE PROCESSES AFTER $RIOT_EXECUTABLE CALL)
    ## Assign the processes to the hostlist for the current ensemble member
-   # Reverse consecutive process placement (tail)
-   if [ $rand_stage -eq 99 ]; then
-      if [ "$GLOBAL_OPT" == "true" ]; then
-         npiens=$nproc_global
-         #Could make this faster (more memory) by distributing across more nodes 
-         # - currently chooses first $npiens processors in $PBS_NODEFILE
-      else
-         npiens=$nproc_local_grad
-      fi
-   else
-      npiens=$nproc_local
-      if [ $NSAMP -lt $NJOBS ] && [ $iSAMP -eq $NJOBS ]; then
-         npiens=$nproc_local_grad
-      fi
+   npiens=$nproc_local
+   if [ $iSAMP -eq $((NSAMP+1)) ]; then
+      npiens=$nproc_local_grad
    fi
 
-#DEBUG
-#   echo "proc_f=$proc_f$"
-#   echo "proc_f=$proc_i$"
-#   echo "npiens=$npiens$"
-#   echo "NUMPROC=$NUMPROC"
-#   echo "PBSNODE0=$PBSNODE0"
-#DEBUG
+   # Reverse consecutive process placement (tail)
    proc_f=$((proc_i+npiens-1))
    tail -$((NUMPROC-proc_i)) $PBSNODE0 | head -$npiens > hostlist
    proc_i=$((proc_i+npiens))
 
-   # Multiply A * w_i [iSAMP<=NSAMP] or A * (Hx - y) [iSAMP==NSAMP+1]
+   # Multiply A^T * A * q_i [iSAMP<=NSAMP] or A^T * R^-1/2 * [h(x + dx) - y + dy] [iSAMP==NSAMP+1]
+   # A = R^-1/2 * H * L
+   # dx and dy are only used in Block Lanczos (rand_type==3)
    # Note: The implementation through mpirun or mpiexec is 
    #       unique for your cluster and MPI implementation
 
@@ -174,28 +130,14 @@ do
    #      (may need earlier calls to mpdallexit and mpdboot)
    #mpistring="$MPICALL -np $npiens --hostfile $(pwd)/hostlist $RIOT_EXECUTABLE $BACKG_STRING"
 
-#   if [ $rand_stage -eq 1 ] && [ $rand_type -eq 1 ] && \
-#      [ $iSAMP -eq $NJOBS ] && [ $NSAMP -lt $NJOBS ]; then
-#      eval "$mpistring"
-#      echo "$mpistring"
-#   else
-      eval "$mpistring"; wait_pids+=($!)
-      echo "$mpistring"
-      echo "PID = "$!
-#   fi
+   eval "$mpistring"; wait_pids+=($!)
+   echo "$mpistring"
+   echo "PID = "$!
 
 ### Use these if eval above doesn't work
-#         if [ $rand_type -eq 1 ] && [ $iSAMP -eq $NJOBS ]; then
-#            $MPICALL $DEBUGSTR -np $npiens $RIOT_EXECUTABLE $BACKG_STRING
-#
-#            echo "PID = "$!
-#            echo "$mpistring"
-#         else
-#            $MPICALL $DEBUGSTR -np $npiens $RIOT_EXECUTABLE $BACKG_STRING wait_pids+=($!)
-#
-#            echo "PID = "$!
-#            echo "$mpistring"
-#         fi
+#   $MPICALL $DEBUGSTR -np $npiens $RIOT_EXECUTABLE $BACKG_STRING wait_pids+=($!)
+#   echo "PID = "$!
+#   echo "$mpistring"
 
 done
 

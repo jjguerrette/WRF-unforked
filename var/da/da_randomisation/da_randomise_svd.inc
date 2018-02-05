@@ -83,10 +83,8 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
 
       if ( ensmember .eq. nsamp+1 ) then 
          ! Calculate J and grad J (ghat)
-!         use_randomblock = .false.
          call da_calculate_j(rand_outer, 0, cv_size, be%cv%size_jb, be%cv%size_je, be%cv%size_jp, &
                              be%cv%size_jl, xbx, be, iv, xhat, cv, re, y, j_cost, ghat, grid, config_flags)
-!         use_randomblock = .true.
 
          j0_total = j_cost%total
          if (j0_total == 0.0) return
@@ -102,9 +100,6 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
          ! Write ghat to file
          filename = trim(randvecdir)//'ghat.p'//trim(adjustl(cproc))
          call da_cv_io ('w', filename, cv_size, ghat, grid, mz)
-
-         if (any(riot_precon.eq.(/1,2,3,4/)) .and. rand_outer.gt.1 .and. sum(ntmax(1:rand_outer-1)).gt.nsamp) &
-            call da_precon_omega(grid, cv_size, mz, jp_start, jp_end, nsamp, ghat)
 
       else if (ensmember .gt. 0 .and. ensmember .le. nsamp) then
          !Generate OMEGA
@@ -184,13 +179,7 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
    IF ( rootproc ) CALL end_timing('da_end_timing: READ_ghat_yhat_omega')
 #endif
 
-      if (prepend_rsvd_basis(rand_outer) .eq. 1) then
-         qhat(:,2:nsamp)  = yhat(:,1:nsamp-1) 
-         qhat(:,1) = ghat
-      else
-         qhat(:,1:nsamp) = yhat(:,1:nsamp)
-      end if
-
+      qhat(:,1:nsamp) = yhat(:,1:nsamp)
       call da_gram_schmidt(grid,mz,jp_start,jp_end, &
                             qhat,cv_size,nsamp)
 
@@ -289,17 +278,9 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
          call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
                                  rand_outer-1, xhat, xhat, 'TL' )
 
-      if (riot_precon.ge.1 .or. spectral_precon) &
+      if (spectral_precon) &
          call da_hessian_io ('w',grid, cv_size,rand_outer,neign,neign,&
                             eignvec(1:neign,1:neign),eignval(1:neign),qhat(:,0:neign),mz,ghat)
-
-      if (riot_precon.gt.0 .and. sum(ntmax(1:rand_outer)).lt.ntmax(rand_outer+1)) then
-         if ( riot_precon.eq.1 ) riot_precon=14
-         if ( riot_precon.eq.3 ) riot_precon=15
-      end if
-
-      if ( any(riot_precon.eq.(/12,13,14,15/)) ) &
-         call da_precon_omega(grid, cv_size, mz, jp_start, jp_end, ntmax(rand_outer+1), ghat)
 
       deallocate(yhat)
       deallocate(omega)

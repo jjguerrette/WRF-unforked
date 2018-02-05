@@ -96,7 +96,7 @@ fi
 # - limited by WRF patch overlap
 # - depends on domain (nx x ny) and PPN
 # - critical for speeding up single-job (serial) portions of RIOT 
-#    (e.g., GRAD_PRECON=1, STAGE 2 of RSVD5.6 and RSVD5.1, and STAGE 4 of RSVD5.1)
+#    (e.g., STAGE 2 of RSVD5.6 and Block Lanczos, and STAGE 4 of Block Lanczos)
 # - A good rule of thumb is (nx/10 * ny/10) <= NPpJMAX << (nx/5 * ny/5)
 # - Requirement: NPpJMAX <= NUMPROC (see below)
 if [ -z "$NPpJMAX" ]; then
@@ -147,10 +147,9 @@ IFS=',' read -ra ntmax_array <<< "$ntmax_all"
 echo "(1) rand_type=$rand_type"
 echo " * valid rand_type options: "
 echo "   + 6-RSVD5.6"
-echo "   + 2-Full Hessian(Requires NBLOCK=Nobs)"
 echo "   + 3-Block Lanczos"
 echo " * rand_type=[3,6] are functional in WRFDA for CHEM and non-CHEM variables"
-if [ $rand_type -ne 6 ] && [ $rand_type -ne 2 ] && [ $rand_type -ne 3 ]; then echo "ERROR: unknown rand_type=$rand_type"; echo 2; exit 2; fi
+if [ $rand_type -ne 6 ] && [ $rand_type -ne 3 ]; then echo "ERROR: unknown rand_type=$rand_type"; echo 2; exit 2; fi
 echo ""
 echo "(2) RIOT_RESTART=$RIOT_RESTART"
 echo ""
@@ -184,21 +183,6 @@ ex -c :"/ntmax" +:":s/=.*/=$ntmax/" +:wq namelist.input
 
 echo ""
 echo "(7) LRA-LRU Adaptation: ADAPT_SVD=$ADAPT_SVD"
-#if [ "$ADAPT_SVD" != "false" ] && [ "$ADAPT_SVD" != "true" ]; then
-#   echo "ERROR: ADAPT_SVD must either be true or false"; echo 3; exit 3
-#fi
-echo ""
-echo "(8) Preconditioning Option: GRAD_PRECON=$GRAD_PRECON"
-valid_precon=0
-for i in 0 1 2 3 4 12 13 14 15
-do
-   if [ "$GRAD_PRECON" -eq $i ]; then valid_precon=1; fi
-done
-if [ "$GRAD_PRECON" -lt 0 ] || [ $valid_precon -eq 0 ]; then
-#if [ "$GRAD_PRECON" -lt 0 ] || [ "$GRAD_PRECON" -gt 4 ]; then
-   echo "ERROR: GRAD_PRECON must be >= 0 and valid values are"
-   echo " 0, 1, 2, 3, 4, 12, 13, 14, or 15"; echo 4; exit 4
-fi
 echo ""
 if [ -z "$GLOBAL_OPT" ]; then
    GLOBAL_OPT="true" #default choice
@@ -232,7 +216,7 @@ NUMNODES=`cat $PBSNODE0 | uniq | wc -l`
 if [ $NUMNODES -lt $NJOBS ]; then
    echo "ERROR: NUMNODES must be set >= NJOBS (i.e., $NJOBS)"
    echo "For RSVD (rand_type=6), NJOBS=NBLOCK+1"
-   echo "For Block Lanczos (rand_type=3), NJOBS=NBLOCK+1"
+   echo "For Block Lanczos (rand_type=3), NJOBS=NBLOCK"
    echo 7; exit 7
 fi
 
@@ -328,7 +312,7 @@ echo "=================================================================="
 # - if non-zero, namelist values should already be set
 #------------------------------------------------------------------
 CPDT=$checkpoint_interval 
-quick_rand="true"
+#quick_rand="true"
 if [ -z "$CPDT" ]; then
    if [ $WRF_CHEM -eq 0 ]; then
       CPDT=0 #Or set to some other default for WRF_CHEM==0
@@ -337,7 +321,7 @@ if [ -z "$CPDT" ]; then
       CPDT=180 # (or manually, e.g., 5, 6, 10, 12, 15, 20, 30, 60, 180)
    fi
 fi
-if [ $CPDT -le 0 ]; then quick_rand="false"; fi
+#if [ $CPDT -le 0 ]; then quick_rand="false"; fi
 echo "checkpoint interval = "
 echo "==> "$CPDT
 
@@ -350,15 +334,14 @@ fi
 echo "OSSE = "
 echo "==> "$OSSE
 
-
 # Turn off lanczos
 if (grep -q use_lanczos namelist.input); then
    ex -c :"/use_lanczos" +:":s/use_lanczos.*/use_lanczos=false,/" +:wq namelist.input
 fi
 
 # Add or modify RIOT namelist options
-SVD_VARS=("rand_outer" "rand_minimise" "ensmember" "rand_stage" "use_randomblock" "rand_type" "quick_rand" "adapt_svd" "svd_p" "riot_precon" "read_omega" "use_global_cv_io" "prepend_rsvd_basis" "rand_inner_it" "max_rand_inner")
-SVD_VALS=("1" "true" "0" "0" "true" "$rand_type" "$quick_rand" "$ADAPT_SVD" "$svd_p" "$GRAD_PRECON" "$GLOBAL_OMEGA" "$GLOBAL_OPT" "0" "1" "$NINNER")
+SVD_VARS=("rand_outer" "rand_minimise" "ensmember" "rand_stage" "use_randomblock" "rand_type" "adapt_svd" "svd_p" "read_omega" "use_global_cv_io" "rand_inner_it" "max_rand_inner")
+SVD_VALS=("1" "true" "0" "0" "true" "$rand_type" "$ADAPT_SVD" "$svd_p" "$GLOBAL_OMEGA" "$GLOBAL_OPT" "1" "$NINNER")
 ivar=0
 for var in ${SVD_VARS[@]}
 do
@@ -369,13 +352,6 @@ do
    fi
    ivar=$((ivar+1))
 done
-prepend_basis=" 0," #For now, do not prepend in first iteration
-for it in $(seq 2 $nout_RIOT)
-do
-   prepend_basis=$prepend_basis" $prepend_rsvd_basis,"
-done
-ex -c :"/prepend_basis" +:":s/=.*/=$prepend_basis/" +:wq namelist.input
-
 
 echo "=================================================="
 echo " Setup ensemble member directories"
@@ -429,12 +405,12 @@ else if [ $RIOT_RESTART ] && [ $RIOT_RESTART -eq 2 ]; then
    if [ "$xhat_current" -ne "$ALT_XHAT" ]; then ln -sfv $ALT_XHAT ./xhat.it"$ii".p0000; fi
    if [ "$wrfvar_current" -ne "$ALT_START" ]; then cp -v $ALT_START ./wrfvar_output_$ii; fi
 
-   if [ $GRAD_PRECON -gt 0 ] || [ $SPECTRAL_PRECON -gt 0 ]; then
-      cd ../
-      ln -sfv $ALT_hess_dir/hessian_eigenpairs.it* ./
-#      ln -sfv $ALT_hess ./hessian_eigenpairs.it"$ii".0000
-      cd $CWD
-   fi
+#   if [ $GRAD_PRECON -gt 0 ] || [ $SPECTRAL_PRECON -gt 0 ]; then
+#      cd ../
+#      ln -sfv $ALT_hess_dir/hessian_eigenpairs.it* ./
+##      ln -sfv $ALT_hess ./hessian_eigenpairs.it"$ii".0000
+#      cd $CWD
+#   fi
 else
    itstart=1 #default
 fi
@@ -523,7 +499,6 @@ export CWD_rel
 export rand_type
 export GLOBAL_OMEGA
 export GLOBAL_OPT
-export GRAD_PRECON
 export CPDT
 export WRF_CHEM
 export WRF_MET
@@ -625,31 +600,12 @@ do
       echo "EXIT: STAGE1 > 0 required for multiple outer iterations"; echo 11; exit 11;
    fi
 
-#   if [ "$GLOBAL_OMEGA" == "true" ]; then
-#      if [ $it -eq 1 ] || [ $GRAD_PRECON -eq 0 ]; then
-#         echo "Distributing global omega files"
-#
-#         #Test for the presence of each vector type
-#         cd $CWD
-#         ls omega.e*.p0000
-#         dummy=`ls omega.e*.p0000 | wc -l`
-#         echo "$dummy present of $NSAMP omega files"
-#         if [ $dummy -ne $NSAMP ]; then 
-#            echo "ERROR: Missing or extra omega.e*.p0000"
-#            echo 12; exit 12
-#         fi
-#         mv -v omega.e*.p* ../vectors_$it0
-#      else
-#         rm omega.e*.p*
-#      fi
-#   fi
-
    #-------------------------------------------------------------------
    # Check for presence of checkpoint and obs output files (CHEM only)
    #-------------------------------------------------------------------
    if [ $CPDT -gt 0 ]; then
       if [ $(ls "$CWD"/wrf_checkpoint_d01* | wc -l) -eq 0 ]; then echo "ERROR: Missing checkpoint files"; echo 13; exit 13; fi
-      if [ $WRF_MET -gt 0]; then
+      if [ $WRF_MET -gt 0 ]; then
          if [ $(ls "$CWD"/xtraj_for_obs_d01* | wc -l) -eq 0 ]; then echo "ERROR: Missing xtraj_for_obs files"; echo 14; exit 14; fi
       fi
    fi
@@ -679,72 +635,6 @@ do
    dependent_grad=0
    if [ $rand_type -eq 3 ]; then dependent_grad=1; fi
    if [ $it -gt $itstart ] || ([ $it -gt 1 ] && [ $RIOT_RESTART -eq 2 ]); then
-
-      #Gradient preconditioning will likely be replaced by spectral preconditioning
-      if [ $GRAD_PRECON -gt 0 ] && ([ $RIOT_RESTART -eq 0 ] || [ $RIOT_RESTART -eq 2 ]); then
-         echo ""
-         echo "------------------------------------------------------"
-         echo "Setting up RIOT preconditioning for outer loop = $it"
-         echo "------------------------------------------------------"
-         echo ""
-         ex -c :"/read_omega" +:":s/=.*/=true,/" +:wq namelist.input
-
-         #Calculate gradient and preconditioned OMEGA vectors first
-         ii=$ii_grad
-
-         NSAMP_PREV=0
-         for itprev in $(seq 1 $((it-1)))
-         do
-            NSAMP_PREV=$((NSAMP_PREV+${ntmax_array[$((itprev-1))]}))
-            echo "NSAMP_PREV=$NSAMP_PREV"
-         done
-
-         # This test avoids extra wall time when GRAD_PRECON=[1,3] and NSAMP in 
-         # current iteration is larger than number of potential preconditioning vectors
-         if [ $NSAMP_PREV -gt $NSAMP ] && \
-           ([ $GRAD_PRECON -eq 1 ] || [ $GRAD_PRECON -eq 3 ]); then dependent_grad=1; fi
-         if [ $GRAD_PRECON -eq 2 ] || [ $GRAD_PRECON -eq 4 ]; then dependent_grad=1; fi
-
-
-         if [ $dependent_grad -eq 1 ]; then
-            #Calculate gradient and preconditioned OMEGA vectors before ensemble
-
-            echo "Calulating gradient-eignevector dot products, "
-            echo "and selecting $NSAMP preconditioned perturbation "
-            echo "members (omega_i=eignevector_i) with largest values."
-
-            ./WRFVAR_ENSEMBLE.sh "$it" "$NJOBS" "$NSAMP" "$NJOBS" "99" "1"
-            err=$?; if [ $err -ne 0 ]; then echo $err; exit $err; fi
-
-            NJOBS=$NSAMP
-            diri=../run.$ii
-         else
-            #GRAD_PRECON=12,13,14,15 --> EXTRACT omega_precon.e*.p* only
-            diri=$CWD
-         fi
-
-         echo ""
-         echo "Transfer preconditioned OMEGA vectors before STAGE 1..."
-         for (( iSAMP = 1 ; iSAMP <= $NSAMP ; iSAMP++))
-         do
-            jj=$iSAMP
-            if [ $iSAMP -lt 10 ]; then jj=0$jj; fi
-            if [ $iSAMP -lt 100 ]; then jj=0$jj; fi
-            if [ $iSAMP -lt 1000 ]; then jj=0$jj; fi
-
-            cd ../run.$jj
-            ls $diri/omega_precon.e$jj.p*
-            if [ $? -ne 0 ]; then echo "ERROR: Missing run.$ii/omega.e$jj.p*"; echo 17; exit 17; fi
-
-            for file in $diri/omega_precon.e$jj.p*
-            do
-               myfile=${file/_precon}
-               myfile=${myfile#$diri/}
-               mv -v $file ./$myfile
-            done
-         done
-      fi
-
       #----------------------------------------------------
       # Redistribute cores among samples as NSAMP changes
       #----------------------------------------------------
@@ -838,7 +728,7 @@ do
 #===================================================================================
 #===================================================================================
 
-   if [ $rand_type -eq 6 ] || [ $rand_type -eq 2 ]; then
+   if [ $rand_type -eq 6 ]; then
       echo "================================================="
       echo "SVD STAGE 2: Perform Eigen Decomp + Increment CVs"
       echo "================================================="

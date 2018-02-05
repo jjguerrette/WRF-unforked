@@ -94,12 +94,9 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
       write(unit=stdout,fmt=*) ' '
 
       if ( ensmember.gt.0 .and. ensmember.le.nsamp) then
-
          ! Calculate J and grad J (ghat)
-!         if (ensmember .eq. 1) use_randomblock = .false.
          call da_calculate_j(rand_outer, 0, cv_size, be%cv%size_jb, be%cv%size_je, be%cv%size_jp, &
                              be%cv%size_jl, xbx, be, iv, xhat, cv, re, y, j_cost, ghat, grid, config_flags)
-!         if (ensmember .eq. 1) use_randomblock = .true.
 
          j0_total = j_cost%total
          if (j0_total == 0.0) return

@@ -106,9 +106,7 @@ module da_wrfvar_top
 #if defined(LAPACK)
    use da_randomisation, only: &
       da_randomise_svd, da_block_lanczos, &
-      da_randomise_svd_B, da_randomise_svd_B11, &
 #if (WRF_CHEM == 1)
-      da_randomise_svd_51, da_calculate_hessian, &
       da_evaluate_increment, da_evaluate_hessian, &
 #endif
       da_gen_omega, randvecdir

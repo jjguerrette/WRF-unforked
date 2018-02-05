@@ -22,11 +22,10 @@ export NBLOCK=40   # number of ensemble members in first outer iteration
                    # - For 2 nodes per AD/TL simulation, set NUMNODES=$((2*$((NBLOCK+1)))), etc.
                    # FUTURE IDEA: it may reduce wall-time of 1st ensemble member (slowest one)
                    #  to request 1 extra independent head node for process management
-export svd_type=6  # 3-Block Lanczos; 6-RSVD5.6 (default); 2-HESS(NBLOCK=Nobs, chem only)
+export svd_type=6  # 3-Block Lanczos; 6-RSVD5.6 (default)
 export nin_RIOT=1 # number of inner iterations for Block Lanczos
 export prepend_rsvd_basis=0 #If ==1, prepend RSVD basis with gradient vector in 
                             # all outer iterations after the first
-export GRAD_PRECON=0  #Set to 0 (default), 1, 2, 3, or 4 to control preconditioning for it > 1
 export ADAPT_SVD="1" #0, 1 (default), or 2
 export svd_p=0 #some small value (e.g., 5) between [0,min(NBLOCK)), only used when ADAPT_SVD==1
 export GLOBAL_OPT="true" #"true" or "false"
@@ -68,7 +67,6 @@ if [ $RIOT_RESTART -gt 0 ]; then
 
       export ALT_CVT="$DADIR/cvt.it"$ii".p0000"
       export ALT_XHAT="$DADIR/xhat.it"$ii".p0000"
-      if [ $GRAD_PRECON -gt 0 ]; then export ALT_hess_dir="$WRFSUPER/DA/$PREVIOUS_RUN/"; fi
    fi
 fi
 

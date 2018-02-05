@@ -15,17 +15,9 @@ if [ $innerit -lt 10 ]; then innerit0=0$innerit0; fi
 if [ $innerit -lt 100 ]; then innerit0=0$innerit0; fi
 if [ $innerit -lt 1000 ]; then innerit0=0$innerit0; fi
 
-#if [ $rand_type -eq 1 ]; then
-#   vectors=("yhat_obs.e*.p")
-#   nvec=("$NSAMP")
-#fi
 vectors2=("" "" "")
 #ORIGDIR=("../run.*" "../run.*" "../run.*")
 #MVBOOL=("1" "1" "1");
-if [ $rand_type -eq 2 ]; then
-   vectors=("ahat.e*.p" "ghat.p")
-   nvec=("$NSAMP" "1")
-fi
 
 if [ $rand_type -eq 3 ]; then
    if [ $rand_stage -eq 2 ]; then
@@ -45,10 +37,6 @@ if [ $rand_type -eq 6 ]; then
    vectors=("omega.e*.p" "yhat.e*.p" "ghat.p")
    nvec=("$NSAMP" "$NSAMP" "1")
 fi
-#if [ $rand_type -eq 10 ]; then
-#   vectors=("omega.e*.p" "yhat.e*.p")
-#   nvec=("$NSAMP" "$NSAMP" "1")
-#fi
 
 vcount=0
 for var in ${vectors[@]}
