@@ -116,6 +116,8 @@ subroutine da_setup_osse_chem( grid, ob, iv, be, xbx)
                icount = icount + 1
                chemval = grid%acft_hx(itime,iplt,ichem+1)
                sigmaval = osse_chem_rel * chemval + osse_chem_abs
+!               sigmaval = sqrt((osse_chem_rel * chemval)**2 + osse_chem_abs**2) !ADDED 02062018, JJG, not used in Journal publication OSSE
+
                iv%chem_acft(itime)%chem(ichem,iplt)%inv = max(chemval + sigmaval * o_error(icount), osse_chem_abs)
                iv%chem_acft(itime)%chem(ichem,iplt)%error = sigmaval
                iv%chem_acft(itime)%chem(ichem,iplt)%qc = 0

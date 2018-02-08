@@ -13,6 +13,11 @@ module da_linear_ops
 #if defined(LAPACK)
        use_randomblock, rand_type, &
 #endif
+#if (WRF_CHEM == 1)
+       use_chemobs, chem_opt, osse_chem, &
+       num_ant_steps, num_bb_steps, &
+       its, ite, jts, jte, &
+#endif
        myproc, filename_len, test_dm_exact, rootproc, cv_size_domain, &
        stdout, trace_use, ierr, comm, &
        use_lanczos, use_global_cv_io, ntmax, inc_out_interval, &
@@ -20,6 +25,11 @@ module da_linear_ops
        spectral_precon, spectral_trunc
    use da_define_structures, only : iv_type, y_type, j_type, be_type, xbx_type, &
        hessian_type, hessian_eig_type
+
+#if (WRF_CHEM == 1)
+   use module_state_description, only :  &
+       num_scaleant, num_scalebb, PARAM_FIRST_SCALAR
+#endif
 
    use da_par_util, only : da_cv_to_global, da_global_to_cv, da_cv_to_vv, da_vv_to_cv
    use da_vtox_transforms, only : da_transform_vtox

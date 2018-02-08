@@ -31,7 +31,7 @@ subroutine da_output_increments(grid,config_flags,mz, &
    integer                      :: jp_start, jp_end       ! Start/end indices of Jp.
 !   integer                      :: jl_start, jl_end       ! Start/end indices of Jl.
 
-   integer :: i, j, imode, nmodes, nmodes_REF, neign, itype, iend, dmode, icount
+   integer :: i, j, k, ic, imode, nmodes, nmodes_REF, neign, itype, iend, dmode, icount
    real*8, allocatable :: LAM(:)
    real*8, allocatable :: eignval(:)
    real*8, allocatable :: eignvec(:,:)
@@ -43,7 +43,7 @@ subroutine da_output_increments(grid,config_flags,mz, &
    real*8 :: xhat(1:cv_size)
    real*8 :: cvt_REF(1:cv_size)
    real*8 :: dvnorm_(1:cv_size)
-   real*8 :: EUCNORM_xPa(2), EUCNORM_v(2), SUMLAM, SUMLAM3
+   real*8 :: EUCNORM_xPa(2), EUCNORM_v(2), EUCNORM_x(2), EUCNORM_xt(2), EUCNORM_xtPa(2), SUMLAM, SUMLAM3, temp_real
 !   real*8 :: minlam(1:1)
    type(hessian_eig_type) :: hess_REF
    real*8, pointer :: qhat_REF(:,:)
@@ -94,7 +94,7 @@ subroutine da_output_increments(grid,config_flags,mz, &
    icount = 0
 
    write(unit=stdout,fmt='(A)') &
-      'EUCNORM_BY_ITER_AND_SAMPLE: imode,neign,min(lambda),EUCNORM_xPa[LRA,LRU],EUCNORM_v[LRA,LRU] = '
+      'EUCNORM_BY_ITER_AND_SAMPLE: imode,neign,min(lambda),EUCNORM_xPa[LRA,LRU],EUCNORM_v[LRA,LRU],EUCNORM_x[LRA,LRU],EUCNORM_xt[LRA,LRU],EUCNORM_xtPa[LRA,LRU] = '
 
    dmode = min(inc_out_interval,nmodes)
    if (use_randomblock .and. rand_type.eq.3) then
@@ -120,7 +120,10 @@ subroutine da_output_increments(grid,config_flags,mz, &
 
       EUCNORM_xPa = 0.D0
       EUCNORM_v = 0.D0
-  
+      EUCNORM_x = 0.D0
+      EUCNORM_xt = 0.D0
+      EUCNORM_xtPa = 0.D0
+
       do itype = 1, iend
          icount = icount+ 1
          xhat = 0.D0
@@ -148,18 +151,6 @@ subroutine da_output_increments(grid,config_flags,mz, &
                                    LAM(1:imode),eignvec,qhat(:,0:imode), &
                                    ghat,xhat)
 
-
-!            call da_transform_vtox (grid,be%cv%size_jb,xbx,be,grid%ep,&
-!                                    xhat(1:be%cv%size_jb),grid%vv,grid%vp &
-!#if (WRF_CHEM == 1)
-!                                    , grid%vch &
-!#endif
-!                                    )
-!
-!            !Output increment for each imode value
-!            call domain_clock_get( grid, current_timestr=timestr )
-!            config_flags%auxhist18_outname = trim(filename)
-!            call da_transfer_xatowrftl(grid, config_flags, 'DUMM', timestr, .true.)
          end if
 
          if (itype .eq. 2) then !LRU
@@ -262,9 +253,64 @@ subroutine da_output_increments(grid,config_flags,mz, &
             end if
          end if
 
-         !diffvec
-         xhat = cvt + xhat - cvt_REF
+#if (WRF_CHEM == 1)
+         !Only for chem so far
+         if (use_chemobs .and. chem_opt(1).gt.0 .and. osse_chem) then
+            call da_transform_vtox (grid,be%cv%size_jb,xbx,be,grid%ep,&
+                                    xhat(1:be%cv%size_jb),grid%vv,grid%vp &
+!#if (WRF_CHEM == 1)
+                                    , grid%vch &
+!#endif
+                                    )
 
+            temp_real = 0.D0
+            do ic = PARAM_FIRST_SCALAR, num_scaleant
+            do k = 1, num_ant_steps
+            do j=jts,jte
+               do i=its,ite
+               temp_real = temp_real + &
+                           (grid%xbch%alpha_ant(i,j,k,ic) + &
+                            grid%xach%alpha_ant(i,j,k,ic)) ** 2
+            end do
+            end do
+            end do
+            end do
+
+            do ic = PARAM_FIRST_SCALAR, num_scalebb
+            do k = 1, num_bb_steps
+            do j=jts,jte
+            do i=its,ite
+               temp_real = temp_real + &
+                           (grid%xbch%alpha_bb(i,j,k,ic) + &
+                            grid%xach%alpha_bb(i,j,k,ic)) ** 2
+            end do
+            end do
+            end do
+            end do
+#ifdef DM_PARALLEL
+            EUCNORM_xt(itype) = wrf_dm_sum_real(temp_real)
+#else
+            EUCNORM_xt(itype) = temp_real
+#endif
+
+!            !Output increment for each imode value
+!            call domain_clock_get( grid, current_timestr=timestr )
+!            config_flags%auxhist18_outname = trim(filename)
+!            call da_transfer_xatowrftl(grid, config_flags, 'DUMM', timestr, .true.)
+
+            !Current increment
+!            inc_current = cvt + xhat
+!           Convert to ||x-xt||_Pa^-1 somehow
+!           Might need cvt_true...right?
+!           I know the true value of xbch + xach = 0, but not cvt.  
+!           That value is stored in reference directory...
+         end if
+#endif
+
+         
+
+         !Difference between current increment and REF increment
+         xhat = cvt + xhat - cvt_REF
 
          !Multiply Pav_REF^-1 * (dv - dv_REF) in two steps
          !(1) (L^T H^T R^-1 H L)_REF * diffvec
@@ -283,11 +329,48 @@ subroutine da_output_increments(grid,config_flags,mz, &
 
          EUCNORM_v(itype) = da_dot_cv(cv_size, xhat, xhat, grid, mz, jp_start, jp_end)
 
+#if (WRF_CHEM == 1)
+         !Only for chem so far
+         if (use_chemobs .and. chem_opt(1) .gt. 0) then
+            call da_transform_vtox (grid,be%cv%size_jb,xbx,be,grid%ep,&
+                                    xhat(1:be%cv%size_jb),grid%vv,grid%vp &
+!!#if (WRF_CHEM == 1)
+                                    , grid%vch &
+!!#endif
+                                    )
+
+            temp_real = 0.D0
+            do ic = PARAM_FIRST_SCALAR, num_scaleant
+            do k = 1, num_ant_steps
+            do j=jts,jte
+            do i=its,ite
+               temp_real = temp_real + grid%xach%alpha_ant(i,j,k,ic)**2
+            end do
+            end do
+            end do
+            end do
+
+            do ic = PARAM_FIRST_SCALAR, num_scalebb
+            do k = 1, num_bb_steps
+            do j=jts,jte
+            do i=its,ite
+               temp_real = temp_real + grid%xach%alpha_bb(i,j,k,ic)**2
+            end do
+            end do
+            end do
+            end do
+#ifdef DM_PARALLEL
+            EUCNORM_x(itype) = wrf_dm_sum_real(temp_real)
+#else
+            EUCNORM_x(itype) = temp_real
+#endif
+         end if
+#endif
       end do
 
-      write(unit=stdout,fmt='(A,2I6,5E27.16E3)') &
+      write(unit=stdout,fmt='(A,2I6,11E27.16E3)') &
          'EUCNORM_BY_ITER_AND_SAMPLE: ',&
-         imode,neign,minval(eignval),EUCNORM_xPa,EUCNORM_v
+         imode,neign,minval(eignval),EUCNORM_xPa,EUCNORM_v,EUCNORM_x,EUCNORM_xt,EUCNORM_xtPa
 
       deallocate(eignval)
       deallocate(eignvec)
@@ -340,7 +423,7 @@ subroutine da_output_increments(grid,config_flags,mz, &
    end do
 
    write(unit=stdout,fmt='(A)') &
-      'EUCNORM_BY_FINAL_MODES: imode,neign,lambda(i),EUCNORM_xPa[LRA,LRU],EUCNORM_v[LRA,LRU], SUM(LAM), SUM(LAM^3) = '
+      'EUCNORM_BY_FINAL_MODES: imode,neign,lambda(i),EUCNORM_xPa[LRA,LRU],EUCNORM_v[LRA,LRU],EUCNORM_x[LRA,LRU],EUCNORM_xt[LRA,LRU],EUCNORM_xtPa[LRA,LRU], SUM(LAM), SUM(LAM^3) = '
 
 !   dmode = floor(real(nmodes) / 400.D0) + 1
 !   dmode = 1
@@ -349,7 +432,10 @@ subroutine da_output_increments(grid,config_flags,mz, &
    do imode = 0, nmodes, dmode
       EUCNORM_xPa = 0.D0
       EUCNORM_v = 0.D0
- 
+      EUCNORM_x = 0.D0
+      EUCNORM_xt = 0.D0
+      EUCNORM_xtPa = 0.D0
+
       if (imode .gt. 0) then
          SUMLAM = sum(eignval(1:imode) - 1.D0)
          SUMLAM3 = sum((eignval(1:imode) - 1.D0)**3)
@@ -381,17 +467,59 @@ subroutine da_output_increments(grid,config_flags,mz, &
                                    nmodes,nmodes,imode, &
                                    LAM,eignvec,nuhat, &
                                    ghat,xhat,.true.)
-
-            if (spectral_precon .and. it.gt.1) &
-               call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
-                                       it-1, xhat, xhat, 'TL' )
          end if
 
          if (itype .eq. 2) then !LRU
             xhat = xhat + ghat
          end if
 
-         !diffvec
+         if (spectral_precon .and. it.gt.1) &
+            call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
+                                    it-1, xhat, xhat, 'TL' )
+
+#if (WRF_CHEM == 1)
+         !Only for chem so far
+         if (use_chemobs .and. chem_opt(1).gt.0 .and. osse_chem) then
+            call da_transform_vtox (grid,be%cv%size_jb,xbx,be,grid%ep,&
+                                    xhat(1:be%cv%size_jb),grid%vv,grid%vp &
+!#if (WRF_CHEM == 1)
+                                    , grid%vch &
+!#endif
+                                    )
+
+            temp_real = 0.D0
+            do ic = PARAM_FIRST_SCALAR, num_scaleant
+            do k = 1, num_ant_steps
+            do j=jts,jte
+               do i=its,ite
+               temp_real = temp_real + &
+                           (grid%xbch%alpha_ant(i,j,k,ic) + &
+                            grid%xach%alpha_ant(i,j,k,ic)) ** 2
+            end do
+            end do
+            end do
+            end do
+
+            do ic = PARAM_FIRST_SCALAR, num_scalebb
+            do k = 1, num_bb_steps
+            do j=jts,jte
+            do i=its,ite
+               temp_real = temp_real + &
+                           (grid%xbch%alpha_bb(i,j,k,ic) + &
+                            grid%xach%alpha_bb(i,j,k,ic)) ** 2
+            end do
+            end do
+            end do
+            end do
+#ifdef DM_PARALLEL
+            EUCNORM_xt(itype) = wrf_dm_sum_real(temp_real)
+#else
+            EUCNORM_xt(itype) = temp_real
+#endif
+         end if
+#endif
+
+         !Difference between current increment and REF increment
          xhat = cvt + xhat - cvt_REF
 
          !Multiply Pav_REF^-1 * (dv - dv_REF) in two steps
@@ -410,11 +538,49 @@ subroutine da_output_increments(grid,config_flags,mz, &
          EUCNORM_xPa(itype) = da_dot_cv(cv_size, xhat, dvnorm_, grid, mz, jp_start, jp_end)
 
          EUCNORM_v(itype) = da_dot_cv(cv_size, xhat, xhat, grid, mz, jp_start, jp_end)
+
+#if (WRF_CHEM == 1)
+         !Only for chem so far
+         if (use_chemobs .and. chem_opt(1).gt.0) then
+            call da_transform_vtox (grid,be%cv%size_jb,xbx,be,grid%ep,&
+                                    xhat(1:be%cv%size_jb),grid%vv,grid%vp &
+!!#if (WRF_CHEM == 1)
+                                    , grid%vch &
+!!#endif
+                                    )
+
+            temp_real = 0.D0
+            do ic = PARAM_FIRST_SCALAR, num_scaleant
+            do k = 1, num_ant_steps
+            do j=jts,jte
+            do i=its,ite
+               temp_real = temp_real + grid%xach%alpha_ant(i,j,k,ic)**2
+            end do
+            end do
+            end do
+            end do
+
+            do ic = PARAM_FIRST_SCALAR, num_scalebb
+            do k = 1, num_bb_steps
+            do j=jts,jte
+            do i=its,ite
+               temp_real = temp_real + grid%xach%alpha_bb(i,j,k,ic)**2
+            end do
+            end do
+            end do
+            end do
+#ifdef DM_PARALLEL
+            EUCNORM_x(itype) = wrf_dm_sum_real(temp_real)
+#else
+            EUCNORM_x(itype) = temp_real
+#endif
+         end if
+#endif
       end do
 
-      write(unit=stdout,fmt='(A,2I6,7E27.16E3)') &
+      write(unit=stdout,fmt='(A,2I6,13E27.16E3)') &
          'EUCNORM_BY_FINAL_MODES: ',&
-         imode,neign,eignval(max(1,imode)),EUCNORM_xPa, EUCNORM_v, SUMLAM, SUMLAM3
+         imode,neign,eignval(max(1,imode)),EUCNORM_xPa,EUCNORM_v,EUCNORM_x,EUCNORM_xt,EUCNORM_xtPa,SUMLAM,SUMLAM3
    end do
 
    deallocate(nuhat)
