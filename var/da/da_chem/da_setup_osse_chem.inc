@@ -24,7 +24,9 @@ subroutine da_setup_osse_chem( grid, ob, iv, be, xbx)
                                   icount, iostat, iunit
    character*10                :: cproc
    character(len=filename_len) :: filename
-   real, allocatable           :: e_error(:), o_error(:), dummy_out(:)
+!   real, allocatable           :: e_error(:), o_error(:), dummy_out(:)
+   real, allocatable           :: o_error(:)
+
    real                        :: sigmaval, chemval
    character*256               :: o_file = "O_ERROR.txt"
    character*256               :: e_file = "E_ERROR.txt"
@@ -97,13 +99,16 @@ subroutine da_setup_osse_chem( grid, ob, iv, be, xbx)
       end if
 
       ! [5] Write obs gaussian errors to other nodes
-      allocate( dummy_out (num_ts * num_platform * (num_chem_acft-1)) )
 #ifdef DM_PARALLEL
+!     allocate( dummy_out (num_ts * num_platform * (num_chem_acft-1)) )
+!     dummy_out = 0.D0
+
       call mpi_barrier(comm, ierr)
-      call wrf_dm_sum_reals(o_error,  dummy_out)
-      o_error = dummy_out
+      call wrf_dm_bcast_real(o_error, num_ts * num_platform * (num_chem_acft-1))
+!      call wrf_dm_sum_reals(o_error,  dummy_out)
+!     o_error = dummy_out
+!     deallocate( dummy_out )
 #endif
-      deallocate( dummy_out )
 
 !!   end if
 
@@ -115,8 +120,8 @@ subroutine da_setup_osse_chem( grid, ob, iv, be, xbx)
             if ( grid%acft_obs_count(itime,iplt) .gt. 0 ) then
                icount = icount + 1
                chemval = grid%acft_hx(itime,iplt,ichem+1)
-               sigmaval = osse_chem_rel * chemval + osse_chem_abs
-!               sigmaval = sqrt((osse_chem_rel * chemval)**2 + osse_chem_abs**2) !ADDED 02062018, JJG, not used in Journal publication OSSE
+!               sigmaval = osse_chem_rel * chemval + osse_chem_abs
+               sigmaval = sqrt((osse_chem_rel * chemval)**2 + osse_chem_abs**2) !ADDED 02062018, JJG, not used in version 1 results preparing for Journal publication
 
                iv%chem_acft(itime)%chem(ichem,iplt)%inv = max(chemval + sigmaval * o_error(icount), osse_chem_abs)
                iv%chem_acft(itime)%chem(ichem,iplt)%error = sigmaval
@@ -145,61 +150,61 @@ subroutine da_setup_osse_chem( grid, ob, iv, be, xbx)
    call da_read_obs_chem_multiplat(grid, iv, 'w')
 
 
-!================================================================================
-!================================================================================
-!NEXT FOR EMISSIONS
-   write(cproc,fmt='(i4.4)') myproc
-   if (read_omega) then
-      ! Read in omega vector portion for each processor
-      write(unit=stdout,fmt='("Reading omega ensemble member : ")') 
-      filename = 'e_error.p'//trim(adjustl(cproc))
-      call da_cv_io ('r', filename, be%cv%size_jb, omega(1:be%cv%size_jb))
-   else
-      call da_set_randomcv(be%cv%size_jb, omega)
-
-      !Write omega to file portion for each processor
-      filename = 'e_error.p'//trim(adjustl(cproc))
-      call da_cv_io ('w', filename, be%cv%size_jb, omega(1:be%cv%size_jb))
-   end if
-
-
-!NEED ...
-
-   call da_transform_vtox(grid, be%cv%size_jb, xbx, be, &
-                          grid%ep, omega(1:be%cv%size_jb), &
-                          grid%vv, grid%vp, grid%vch)
-
-!!   if (random_emiss_error) then
-
-      do ic = PARAM_FIRST_SCALAR, num_scaleant
-         do k = 1, num_ant_steps
-            do j=jts,jte
-               do i=its,ite
-                  grid%scaleant(i,j,k,ic) = exp( grid%xach%alpha_ant(i,j,k,ic) )
-               end do
-            end do
-         end do
-      end do
-
-      do ic = PARAM_FIRST_SCALAR, num_scalebb
-         do k = 1, num_bb_steps
-            do j=jts,jte
-               do i=its,ite
-                  grid%scalebb(i,j,k,ic) = exp( grid%xach%alpha_bb(i,j,k,ic) )
-               end do
-            end do
-         end do
-      end do
-
-!!   else
-!!      do i = PARAM_FIRST_SCALAR, num_scaleant
-!!         grid%scaleant(:,:,:,i) = REAL ( init_scale * scale_scale, 8 )
-!!      end do
-!!
-!!      do i = PARAM_FIRST_SCALAR, num_scalebb
-!!         grid%scalebb(:,:,:,i) = REAL ( init_scale * scale_scale, 8 )
-!!      end do
-!!   end if
+!!================================================================================
+!!================================================================================
+!!NEXT FOR EMISSIONS
+!   write(cproc,fmt='(i4.4)') myproc
+!   if (read_omega) then
+!      ! Read in omega vector portion for each processor
+!      write(unit=stdout,fmt='("Reading omega ensemble member : ")') 
+!      filename = 'e_error.p'//trim(adjustl(cproc))
+!      call da_cv_io ('r', filename, be%cv%size_jb, omega(1:be%cv%size_jb))
+!   else
+!      call da_set_randomcv(be%cv%size_jb, omega)
+!
+!      !Write omega to file portion for each processor
+!      filename = 'e_error.p'//trim(adjustl(cproc))
+!      call da_cv_io ('w', filename, be%cv%size_jb, omega(1:be%cv%size_jb))
+!   end if
+!
+!
+!!NEED ...
+!
+!   call da_transform_vtox(grid, be%cv%size_jb, xbx, be, &
+!                          grid%ep, omega(1:be%cv%size_jb), &
+!                          grid%vv, grid%vp, grid%vch)
+!
+!!!   if (random_emiss_error) then
+!
+!      do ic = PARAM_FIRST_SCALAR, num_scaleant
+!         do k = 1, num_ant_steps
+!            do j=jts,jte
+!               do i=its,ite
+!                  grid%scaleant(i,j,k,ic) = exp( grid%xach%alpha_ant(i,j,k,ic) )
+!               end do
+!            end do
+!         end do
+!      end do
+!
+!      do ic = PARAM_FIRST_SCALAR, num_scalebb
+!         do k = 1, num_bb_steps
+!            do j=jts,jte
+!               do i=its,ite
+!                  grid%scalebb(i,j,k,ic) = exp( grid%xach%alpha_bb(i,j,k,ic) )
+!               end do
+!            end do
+!         end do
+!      end do
+!
+!!!   else
+!!!      do i = PARAM_FIRST_SCALAR, num_scaleant
+!!!         grid%scaleant(:,:,:,i) = REAL ( init_scale * scale_scale, 8 )
+!!!      end do
+!!!
+!!!      do i = PARAM_FIRST_SCALAR, num_scalebb
+!!!         grid%scalebb(:,:,:,i) = REAL ( init_scale * scale_scale, 8 )
+!!!      end do
+!!!   end if
 
 
    if (trace_use) call da_trace_exit("da_setup_osse_chem")

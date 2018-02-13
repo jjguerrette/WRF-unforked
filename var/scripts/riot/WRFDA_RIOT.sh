@@ -437,23 +437,24 @@ if [ $OSSE -gt 0 ]; then
    if [ $OSSE -eq 2 ]; then
       if [ -z "$DIRpert" ]; then
          DIRpert="BCLARGE_osse_init"
+         DIRpert="BCLARGE_osse_init_xb=0"
       fi    
-      fg_pert="$CWD/../../"$DIRpert"/$CWD_rel0/fg_pert"
+      fg_osse="$CWD/../../"$DIRpert"/$CWD_rel0/fg_osse"
       osse_obs="$CWD/../../"$DIRpert"/$CWD_rel0/AIRCRAFT_DATA_*.txt"
       osse_var="$CWD/../../"$DIRpert"/$CWD_rel0/AIRCRAFT_MODEL_VARIANCE_*.txt"
 
-      echo "fg_pert="$fg_pert
+      echo "fg_osse="$fg_osse
       echo "osse_obs="$osse_obs
       echo "osse_var="$osse_var
 
-      cp -v $fg_pert ./fg_pert
+      cp -v $fg_osse ./fg_osse
       cp -v $osse_obs ./
       cp -v $osse_var ./
    fi    
    if [ $RIOT_RESTART -ne 2 ] || [ $itstart -eq 1 ]; then
       mv fg fg_0
 
-      cp -v ./fg_pert ./fg
+      cp -v ./fg_osse ./fg
       ln -sfv ./fg ./wrfinput_d01
    fi
 

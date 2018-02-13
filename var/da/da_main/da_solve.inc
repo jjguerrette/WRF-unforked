@@ -683,6 +683,16 @@
               write(unit=message(1),fmt='(a)') "Re-set max_ext_its = 1 for outer_loop_restart"
               call da_message(message(1:1))
             end if
+!            if (use_global_cv_io) then
+!               write(cproc,fmt='(i4.4)') myproc
+!               cvtfile = 'cvt.p'//trim(adjustl(cproc))
+!               if (rootproc) inquire(file=trim(cvtfile), exist=ex)
+!!               call da_cv_io ('w', cvtfile, cv_size, omega(1:cv_size,iens), grid, mz)
+!            else
+!               write(unit=cvtfile,fmt='(a,i4.4)') 'cvt_',myproc
+!               inquire(file=trim(cvtfile), exist=ex)
+!            end if
+
             write(unit=cvtfile,fmt='(a,i4.4)') 'cvt_',myproc
             inquire(file=trim(cvtfile), exist=ex)
             if ( ex ) then
@@ -758,6 +768,56 @@
 #if defined(LAPACK)
       if (.not.use_randomblock .or. (rand_stage.eq.0 .and. rand_outer.eq.1) ) then
 #endif
+      !! Initialize model grid
+      disable_traj = .true.
+      call da_nl_model(1)
+
+      ! Write OSSE background state vector from model_grid
+      call da_init_model_output(filename = "fg_osse")
+
+      call wrf_message("Generating global omega")
+      allocate(omega(cv_size,1))
+
+      call da_gen_omega(omega, cv_size, 1, grid, mz)
+
+      !Write omega to file
+      use_global_cv_io = .true.
+      write(cproc,fmt='(i4.4)') myproc
+      filename = 'cvt_true.p'//trim(adjustl(cproc))
+      call da_cv_io ('w', filename, cv_size, omega(1:cv_size,iens), grid, mz)
+
+      call da_transform_vtox (grid,be%cv%size_jb,xbx,be,grid%ep,&
+                               omega(1:be%cv%size_jb,1),grid%vv,grid%vp &
+#if (WRF_CHEM == 1)
+                               , grid%vch &
+#endif
+                               )
+
+      !Transform initial state update to T0 boundary condition update
+      call da_transform_xatowrftl_lbc_wrapper( &
+              global_it, cv_size, be, grid%ep, &
+              omega(:,1), iv, grid%vp6, grid%vv6, xbx, &
+              grid, config_flags &
+!#if (WRF_CHEM == 1)
+!                      , grid%vch6 &
+!#endif
+              )
+
+      call da_transform_xtoxa (grid)
+
+      call da_transfer_xatoanalysis (it, xbx, grid, config_flags)
+
+      call da_transfer_headtomodel (grid)
+
+      ! Write OSSE truth state vector from model_grid
+      call da_init_model_output(filename = "fg_truth")
+
+!Not used in init_osse_chem
+!      cvt = cvt + omega(:,1)
+
+      deallocate(omega)
+      disable_traj = .false.
+
       write_checkpoints = 0
 
       if ( checkpoint_interval .gt. 0) then
@@ -771,27 +831,29 @@
       write_checkpoints = 0
 
       call da_retrieve_chem_hx( model_grid, iv )
+      call da_write_obs_chem( iv, ob, 99 )
 
-      ! Re-read model inputs from fg file, then overwrite scaling factors.
-      call da_init_model_input
+!Not necessary with above fg_pert and fg_truth writing
+!      ! Re-read model inputs from fg file, then overwrite scaling factors.
+!      call da_init_model_input
 
-      ! Write out pseudo obs and perturb head_grid scaling factors
+      ! Write out pseudo obs !!!and perturb head_grid scaling factors
       call da_setup_osse_chem (grid, ob, iv, be, xbx)
 
-!     !Update xbch
-!      call da_transfer_wrftoxb_chem(grid) !Not necessary if not performing inversion in this execution
-
-      do i = PARAM_FIRST_SCALAR, num_scaleant
-         call kj_swap (grid%scaleant(:,:,:,i), model_grid%scaleant(:,:,:,i), &
-                       grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, 1, num_ant_steps)
-      enddo
-      do i = PARAM_FIRST_SCALAR, num_scalebb
-         call kj_swap (grid%scalebb(:,:,:,i), model_grid%scalebb(:,:,:,i), &
-                       grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, 1, num_bb_steps)
-      enddo
-
-      ! Write perturbed state vector from model_grid
-      call da_init_model_output(filename = "fg_pert")
+!!     !Update xbch
+!!      call da_transfer_wrftoxb_chem(grid) !Not necessary if not performing inversion in this execution
+!
+!      do i = PARAM_FIRST_SCALAR, num_scaleant
+!         call kj_swap (grid%scaleant(:,:,:,i), model_grid%scaleant(:,:,:,i), &
+!                       grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, 1, num_ant_steps)
+!      enddo
+!      do i = PARAM_FIRST_SCALAR, num_scalebb
+!         call kj_swap (grid%scalebb(:,:,:,i), model_grid%scalebb(:,:,:,i), &
+!                       grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, 1, num_bb_steps)
+!      enddo
+!
+!      ! Write perturbed state vector from model_grid
+!      call da_init_model_output(filename = "fg_pert")
 
       !Clean up and close WRFDA
       call da_deallocate_observations (iv)
@@ -927,13 +989,12 @@
                else
                   call da_gen_omega(omega, cv_size, 1, grid, mz)
                end if
-               je_start   = be%cv%size_jb + 1
-               je_end     = be%cv%size_jb + be%cv%size_je
-               jp_start   = be%cv%size_jb + be%cv%size_je + 1
-               jp_end     = be%cv%size_jb + be%cv%size_je + be%cv%size_jp
-               jl_start   = be%cv%size_jb + be%cv%size_je + be%cv%size_jp + 1
-               jl_end     = be%cv%size_jb + be%cv%size_je + be%cv%size_jp + be%cv%size_jl
-
+!               je_start   = be%cv%size_jb + 1
+!               je_end     = be%cv%size_jb + be%cv%size_je
+!               jp_start   = be%cv%size_jb + be%cv%size_je + 1
+!               jp_end     = be%cv%size_jb + be%cv%size_je + be%cv%size_jp
+!               jl_start   = be%cv%size_jb + be%cv%size_je + be%cv%size_jp + 1
+!               jl_end     = be%cv%size_jb + be%cv%size_je + be%cv%size_jp + be%cv%size_jl
 !               if ( be%cv%size_jp.gt.0) omega(jp_start:jp_end,1) = 0.D0
 !               if ( be%cv%size_je.gt.0) omega(je_start:je_end,1) = 0.D0
 !               if ( .not. var4d_lbc .and. be%cv%size_jl.gt.0) omega(jl_start:jl_end,1) = 0.D0
