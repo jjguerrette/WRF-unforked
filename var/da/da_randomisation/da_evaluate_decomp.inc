@@ -107,13 +107,14 @@ subroutine da_evaluate_decomp(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
    DIRNORM1_v=0.D0; DIRNORM1_x=0.D0
    DIRNORM2_v=0.D0; DIRNORM2_x=0.D0
 
-   if (neign .lt. rankA) then
-      neign_trunc = neign
-   else
-      neign_trunc = ntrunc
-   end if
 
 if (hess_comp_x) then
+!   if (neign .lt. rankA) then
+!      neign_trunc = neign
+!   else
+      neign_trunc = ntrunc
+!   end if
+
    !=====================================================================
    ! Compare xhat_approx to xhat_hess
    !  (1a)  v - increment in preconditioned v-space
@@ -324,6 +325,12 @@ end if
    !  (2b)  Pa  - posterior covariance in state x-space
    !  (2c)  Pa _ Pa^-1 - posterior covariance in state x-space normalized by Pa
    !=====================================================================
+
+!   if (neign .lt. rankA) then
+!      neign_trunc = neign
+!   else
+      neign_trunc = ntrunc
+!   end if
 
    !---------------
    ! (2a) ||Pav_ - Pav||

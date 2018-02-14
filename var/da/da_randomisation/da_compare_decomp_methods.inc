@@ -34,8 +34,6 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
    ! RSVD eval vars
    real(wp), allocatable        :: yhat(:,:)  ! yhat = A * omega
    real(wp), allocatable        :: omega(:,:) ! Gaussian draw
-   real(wp), allocatable        :: omega1d(:) ! Gaussian draw
-   real(wp), allocatable        :: omega_g(:,:)
    real(wp), allocatable        :: dumcv(:)
    real(wp), allocatable        :: dumcv_g(:)
 
@@ -99,7 +97,11 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
    rank_rsvd_Pa=floor(scale_hcheck*real(rankA,8))
 
    write(unit=stdout,fmt='(A)') 'Initialize OMEGA_Pa'
-   call da_gen_omega(omega_Pav, cv_size, rank_rsvd_Pa, grid, mz)
+   if ( hess_comp_Pa_LRA  .OR. hess_comp_Pa_LRU &
+   .OR. hess_comp_Pav_LRA .OR. hess_comp_Pav_LRU ) then
+      allocate(omega_Pav(cv_size,rank_rsvd_Pa))
+      call da_gen_omega(omega_Pav, cv_size, rank_rsvd_Pa, grid, mz)
+   end if
 
    call da_evaluate_decomp_init(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
                                    rank_rsvd_Pa, rankA, &

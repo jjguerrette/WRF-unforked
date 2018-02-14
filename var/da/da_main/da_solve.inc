@@ -1003,9 +1003,9 @@
             allocate (qhat(1:cv_size, 0:nmodes_global))
          else if ( &
              (rand_type.eq.6 .and. rand_stage.eq.2) &
+        .or. (rand_type.eq.2 .and. rand_stage.eq.2) &
              ) then
 !       .or. (rand_type.eq.1 .and. rand_stage.eq.4) &
-!       .or. (rand_type.eq.2 .and. rand_stage.eq.2) &
 !             ) then
             allocate (qhat(1:cv_size, 0:nmodes_global))
          end if
@@ -1049,11 +1049,11 @@
 #if defined(LAPACK)
          if (use_randomblock .and. (&
              (rand_type.eq.6 .and. rand_stage.eq.2) &
+        .or. (rand_type.eq.2 .and. rand_stage.eq.2) &
         .or. (rand_type.eq.3 .and. any(rand_stage.eq.(/2,4/))) &
              ) .and. (.not.var4d_lbc .or. checkpoint_interval.gt.0)) disable_traj = .true.
 
 !!!        .or. (rand_type.eq.1 .and. any( rand_stage.eq.(/2,4/) )) &
-!!!        .or. (rand_type.eq.2 .and. rand_stage.eq.2) &
 #endif
 
          if ( checkpoint_interval .gt. 0) then
@@ -1257,12 +1257,12 @@
                         call da_randomise_svd( &
                               grid, mz, config_flags, cv_size, xbx, &
                               be, iv, cvt, re, y, xhat, nsamp, j_cost = j)
-!!!#if (WRF_CHEM == 1)
-!!!!Need proper obs handling for non-chem vars still
-!!!                     case(2)
-!!!                        call da_calculate_hessian( &
-!!!                              grid, mz, config_flags, cv_size, xbx, &
-!!!                              be, iv, cvt, re, y, xhat, nsamp, j_cost = j)
+#if (WRF_CHEM == 1)
+!Need proper obs handling for non-chem vars still
+                     case(2)
+                        call da_calculate_hessian( &
+                              grid, mz, config_flags, cv_size, xbx, &
+                              be, iv, cvt, re, y, xhat, nsamp, j_cost = j)
 #endif
                      case default
                         write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: Invalid selection for rand_type', rand_type
@@ -1348,28 +1348,28 @@
 !!!                                 be, iv, cvt, re, y, xhat, nsamp, &
 !!!                                 qhat=qhat, eignval=eignval, &
 !!!                                 eignvec=eignvec, neign=neign)
-!!!#if (WRF_CHEM == 1)
-!!!!Need proper obs handling for non-chem vars still
-!!!                     case(2)
-!!!                        if (rand_stage .eq. 2) then
-!!!!                           if (var4d_inc_out) then
-!!!!                              allocate(hessian_info%eigs(nsamp))
-!!!!                              allocate(hessian_info%qhat(cv_size,0:nmodes_global))
-!!!!                              allocate(hessian_info%ghat(cv_size))
-!!!!                           end if
-!!!
-!!!                           call da_calculate_hessian( &
-!!!                                 grid, mz, config_flags, cv_size, xbx, &
-!!!                                 be, iv, cvt, re, y, xhat, nsamp, &
-!!!                                 qhat=qhat, eignval=eignval, &
-!!!                                 eignvec=eignvec, neign=neign) !, &
-!!!!                                 hessian_info=hessian_info)
-!!!                        else
-!!!                           call da_calculate_hessian( &
-!!!                                 grid, mz, config_flags, cv_size, xbx, &
-!!!                                 be, iv, cvt, re, y, xhat, nsamp)
-!!!                        end if
-!!!#endif
+#if (WRF_CHEM == 1)
+!Need proper obs handling for non-chem vars still
+                     case(2)
+                        if (rand_stage .eq. 2) then
+!                           if (var4d_inc_out) then
+!                              allocate(hessian_info%eigs(nsamp))
+!                              allocate(hessian_info%qhat(cv_size,0:nmodes_global))
+!                              allocate(hessian_info%ghat(cv_size))
+!                           end if
+
+                           call da_calculate_hessian( &
+                                 grid, mz, config_flags, cv_size, xbx, &
+                                 be, iv, cvt, re, y, xhat, nsamp, &
+                                 qhat=qhat, eignval=eignval, &
+                                 eignvec=eignvec, neign=neign) !, &
+!                                 hessian_info=hessian_info)
+                        else
+                           call da_calculate_hessian( &
+                                 grid, mz, config_flags, cv_size, xbx, &
+                                 be, iv, cvt, re, y, xhat, nsamp)
+                        end if
+#endif
                      case default
                         write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: Invalid selection for rand_type', rand_type
                         CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
@@ -1377,10 +1377,10 @@
                end if
                if ( &
                    (rand_type .eq. 6 .and. rand_stage .ne. 2) &
+              .or. (rand_type .eq. 2 .and. rand_stage .ne. 2) &
               .or. (rand_type .eq. 3 .and. rand_stage .ne. 4) &
                    ) then
 !!!              .or. (rand_type .eq. 1 .and. rand_stage .ne. 4) &
-!!!              .or. (rand_type .eq. 2 .and. rand_stage .ne. 2) &
 !!!              .or. (rand_type .eq. 10) &
 !!!              .or. (rand_type .eq. 11) &
 
