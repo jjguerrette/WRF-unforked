@@ -227,6 +227,9 @@ subroutine da_minimise_lz(grid, config_flags,            &
       if ( var4d_inc_out &
            .and. present(hessian_info) &
            .and. allocated(hessian_info%ghat) ) then
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
 
           if (iter .eq. 1) hessian_info%ghat = - ghat0
 
@@ -240,7 +243,11 @@ subroutine da_minimise_lz(grid, config_flags,            &
           hessian_info%eigs(iter)%neign = iter
 
           hessian_info%nmodes_max = hessian_info%nmodes_max + 1
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: increment_diagnostics1')
+#endif
       end if
+
    end do
 
    !-------------------------------------------------------------------------

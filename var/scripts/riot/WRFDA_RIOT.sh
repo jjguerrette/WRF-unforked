@@ -89,6 +89,7 @@ fi
 
 #Read in baseline RIOT settings
 if [ -z "$RIOT_SETTINGS_CALLED" ]; then
+   echo "Running default settings file: RIOT_settings.sh"
    . ./RIOT_settings.sh
 fi
 
@@ -116,7 +117,9 @@ DEBUGSTR=
 #DEBUGSTR="-verbose"
 
 export MPI_VERBOSE=1
-export BACKG_STRING="< /dev/null &> out.run &"
+#export BACKG_STRING="< /dev/null &> out.run &"
+export BACKG_STRING="< /dev/null &> out.run"
+
 export RIOT_EXECUTABLE="./da_wrfvar.exe"
 
 #------------------------------------
@@ -139,17 +142,12 @@ STAGE2=1 #Set to 1 to perform final SVD and increment CVs
 echo "=================================================="
 echo " Critical RIOT Options"
 echo "=================================================="
-#Retrieve ntmax array from namelist - set NSAMP for it>1
-ntmax_all=`grep ntmax namelist.input`
-ntmax_all=${ntmax_all#*=}
-IFS=',' read -ra ntmax_array <<< "$ntmax_all"
-
 echo "(1) rand_type=$rand_type"
 echo " * valid rand_type options: "
 echo "   + 6-RSVD5.6"
 echo "   + 3-Block Lanczos"
 echo " * rand_type=[3,6] are functional in WRFDA for CHEM and non-CHEM variables"
-if [ $rand_type -ne 6 ] && [ $rand_type -ne 3 ]; then echo "ERROR: unknown rand_type=$rand_type"; echo 2; exit 2; fi
+if [ $rand_type -ne 6 ] && [ $rand_type -ne 2 ] && [ $rand_type -ne 3 ]; then echo "ERROR: unknown rand_type=$rand_type"; echo 2; exit 2; fi
 echo ""
 echo "(2) RIOT_RESTART=$RIOT_RESTART"
 echo ""
@@ -167,19 +165,31 @@ if [ $rand_type -ne 3 ]; then NINNER=1; fi
 echo "(5) # of outer iterations: nout_RIOT=$NOUTER"
 ex -c :"/max_ext_its" +:":s/=.*/=1,/" +:wq namelist.input
 
+#Retrieve ntmax array from namelist - set NSAMP for it>1
+ntmax_all=`grep ntmax namelist.input`
+ntmax_all=${ntmax_all#*=}
+IFS=',' read -ra ntmax_array <<< "$ntmax_all"
+
+ntmax_array[0]=$NBLOCK
+for it in $(seq 1 $NOUTER)
+do
+   echo "# samples in outer iteration $it: ntmax($it)=${ntmax_array[$((it-1))]}"
+
+   #Hard constraint that NSAMP must be <= NBLOCK (necessary?)
+   if [ ${ntmax_array[$((it-1))]} -gt $NBLOCK ]; then
+      echo "WARNING ntmax($it)=$NSAMP > NBLOCK=$NBLOCK, setting ntmax($it)=$NBLOCK"
+      ${ntmax_array[$((it-1))]}=$NBLOCK
+   fi
+   ntmax=$ntmax${ntmax_array[$((it-1))]}","
+done
+ntmax=$ntmax${ntmax_array[$((NOUTER-1))]}","
+#ex -c :"/ntmax" +:":s/=.*/=$ntmax/" +:wq namelist.input
+ex -c :":%s/ntmax.*/ntmax=$ntmax/" +:wq namelist.input
+
 NSAMP=$NBLOCK
 # Set number of parallel jobs
 NJOBS=$((NSAMP+1)) #Extra parallel ensemble member for gradient member
 if [ $rand_type -eq 3 ]; then  NJOBS=$NSAMP; fi #Not for Block Lanczos
-
-ntmax_array[0]=$NBLOCK
-for it in $(seq 1 $nout_RIOT)
-do
-   echo "# samples in outer iteration $it: ntmax($it)=${ntmax_array[$((it-1))]}"
-   ntmax=$ntmax${ntmax_array[$((it-1))]}","
-done
-ntmax=$ntmax${ntmax_array[$((nout_RIOT-1))]}","
-ex -c :"/ntmax" +:":s/=.*/=$ntmax/" +:wq namelist.input
 
 echo ""
 echo "(7) LRA-LRU Adaptation: ADAPT_SVD=$ADAPT_SVD"
@@ -364,12 +374,23 @@ CWD_rel0=${CWD#$PARENTDIR"/"}
 CWD_rel="../"$CWD_rel0 #Use for linking, more stable
 cd $CWD
 
+#Cleanup Parent
 dummy=$(ls ../run.*)
 if [ $? -eq 0 ]; then  rm -r ../run.[0-9]*; fi
 dummy=$(ls ../cost_fn*)
 if [ $? -eq 0 ]; then  rm -r ../cost_fn*; fi
 dummy=$(ls ../grad_fn*)
 if [ $? -eq 0 ]; then  rm -r ../grad_fn*; fi
+
+#Cleanup CWD
+if [ $(ls -d RIOT_stash | wc -l) -gt 0 ]; then rm -rv RIOT_stash; fi
+if [ $(ls -d *rsl* | wc -l) -gt 0 ] || [ $(ls -d *_fn | wc -l) -gt 0 ]; then 
+   mkdir RIOT_stash
+   mv -v rsl.* RIOT_stash
+   mv -v oldrsl* RIOT_stash
+   mv -v cost_fn RIOT_stash
+   mv -v grad_fn RIOT_stash
+fi
 
 if [ $RIOT_RESTART ] && [ $RIOT_RESTART -eq 1 ]; then
 #----------------------------------------------------------------
@@ -395,7 +416,7 @@ else if [ $RIOT_RESTART ] && [ $RIOT_RESTART -eq 2 ]; then
       itstart=2
    fi
    ii=$((itstart-1))
-   if [ $ii -lt 10 ]; then ii=0$ii; fi
+   if [ $ii -lt 10 ]; then ii="0"$ii; fi
 
    cvt_current="./cvt.it"$ii".p0000"
    xhat_current="./xhat.it"$ii".p0000"
@@ -462,6 +483,7 @@ if [ $OSSE -gt 0 ]; then
    ex -c :"/init_osse_chem" +:":s/=.*,/=false,/g" +:wq namelist.input
 fi 
 
+
 #Populate ensemble member directories
 if [ $(ls "../run.*" | wc -l) -gt 0 ]; then  rm -r ../run.[0-9]*; fi
 if [ $WRF_CHEM -gt 0 ]; then rm *Hx*; fi
@@ -469,9 +491,9 @@ if [ $WRF_CHEM -gt 0 ]; then rm *Hx*; fi
 for (( iSAMP = 1 ; iSAMP <= $NJOBS ; iSAMP++))
 do
    ii=$iSAMP
-   if [ $iSAMP -lt 10 ]; then ii=0$ii; fi
-   if [ $iSAMP -lt 100 ]; then ii=0$ii; fi
-   if [ $iSAMP -lt 1000 ]; then ii=0$ii; fi
+   if [ $iSAMP -lt 10 ]; then ii="0"$ii; fi
+   if [ $iSAMP -lt 100 ]; then ii="0"$ii; fi
+   if [ $iSAMP -lt 1000 ]; then ii="0"$ii; fi
 
    mkdir ../run.$ii
    cd ../run.$ii
@@ -536,35 +558,37 @@ do
 
    cd $CWD
 
-   if [ $(ls -d "../vectors_$it0" | wc -l) -gt 0 ]; then rm -rv ../vectors_$it0*; fi
+   if [ $(ls -d "../vectors_"$it0* | wc -l) -gt 0 ]; then rm -rv ../vectors_$it0*; fi
    mkdir -v ../vectors_$it0
    rm omega.e*.p*
    rm yhat.e*.p*
 
    NSAMP=${ntmax_array[$((it-1))]}
-   #Hard constraint that NSAMP must be <= NBLOCK (necessary?)
-   if [ $NSAMP -gt $NBLOCK ]; then
-      echo "WARNING NBLOCK=$NBLOCK, ntmax(it)=$NSAMP, setting NSAMP=$NBLOCK"
-      NSAMP=$NBLOCK
-      ntmax_array[$((it-1))]=$NSAMP
-      ntmax=
-      for it in $(seq 1 $nout_RIOT)
-      do
-         echo "# samples in outer iteration $it: ntmax($it)=${ntmax_array[$((it-1))]}"
-         ntmax=$ntmax${ntmax_array[$((it-1))]}","
-      done
-      ntmax=$ntmax${ntmax_array[$((nout_RIOT-1))]}","
-      ex -c :"/ntmax" +:":s/=.*/=$ntmax/" +:wq namelist.input
-   fi
+#NOTE: The following constraint has been moved to start of script.
+#   #Hard constraint that NSAMP must be <= NBLOCK (necessary?)
+#   if [ $NSAMP -gt $NBLOCK ]; then
+#      echo "WARNING NBLOCK=$NBLOCK, ntmax(it)=$NSAMP, setting NSAMP=$NBLOCK"
+#      NSAMP=$NBLOCK
+#      ntmax_array[$((it-1))]=$NSAMP
+#      ntmax=
+#      for iit in $(seq 1 $NOUTER)
+#      do
+#         echo "# samples in outer iteration $iit: ntmax($iit)=${ntmax_array[$((iit-1))]}"
+#         ntmax=$ntmax${ntmax_array[$((iit-1))]}","
+#      done
+#      ntmax=$ntmax${ntmax_array[$((NOUTER-1))]}","
+##      ex -c :"/ntmax" +:":s/=.*/=$ntmax/" +:wq namelist.input
+#      ex -c :":%s/ntmax.*/ntmax=$ntmax/" +:wq namelist.input
+#   fi
    echo ""
    echo "Using ensemble size $NSAMP in iteration $it, according to ntmax in namelist.input."
    echo ""
    NJOBS=$((NSAMP+1))
    if [ $rand_type -eq 3 ]; then  NJOBS=$NSAMP; fi # no. of ensemble members = NSAMP for Block Lanczos
    ii_grad=$NJOBS
-   if [ $NJOBS -lt 10 ]; then ii_grad=0$ii_grad; fi
-   if [ $NJOBS -lt 100 ]; then ii_grad=0$ii_grad; fi
-   if [ $NJOBS -lt 1000 ]; then ii_grad=0$ii_grad; fi
+   if [ $NJOBS -lt 10 ]; then ii_grad="0"$ii_grad; fi
+   if [ $NJOBS -lt 100 ]; then ii_grad="0"$ii_grad; fi
+   if [ $NJOBS -lt 1000 ]; then ii_grad="0"$ii_grad; fi
 
    if [ $STAGE0 -gt 0 ]; then
 #====================================================================================
@@ -594,6 +618,9 @@ do
          echo "WRFDA return value: $mpireturn"
 
          if [ $SUBTIMING -eq 1 ]; then grep da_end_timing rsl.out.0000 > ../bench_time_stage0.it$it0; fi
+         mkdir oldrsl_$it0".stage0"
+         mv -v rsl.* oldrsl_$it0".stage0"
+
       fi
    fi
 
@@ -697,9 +724,9 @@ do
          for (( iSAMP = 1 ; iSAMP <= $NSAMP ; iSAMP++))
          do
             ii=$iSAMP
-            if [ $iSAMP -lt 10 ]; then ii=0$ii; fi
-            if [ $iSAMP -lt 100 ]; then ii=0$ii; fi
-            if [ $iSAMP -lt 1000 ]; then ii=0$ii; fi
+            if [ $iSAMP -lt 10 ]; then ii="0"$ii; fi
+            if [ $iSAMP -lt 100 ]; then ii="0"$ii; fi
+            if [ $iSAMP -lt 1000 ]; then ii="0"$ii; fi
             cat ../run.$ii/cost_fn > ../cost_fn.$ii
             cat ../run.$ii/grad_fn > ../grad_fn.$ii
          done
@@ -712,9 +739,9 @@ do
          for (( iSAMP = 1 ; iSAMP <= $NSAMP ; iSAMP++))
          do
             ii=$iSAMP
-            if [ $iSAMP -lt 10 ]; then ii=0$ii; fi
-            if [ $iSAMP -lt 100 ]; then ii=0$ii; fi
-            if [ $iSAMP -lt 1000 ]; then ii=0$ii; fi
+            if [ $iSAMP -lt 10 ]; then ii="0"$ii; fi
+            if [ $iSAMP -lt 100 ]; then ii="0"$ii; fi
+            if [ $iSAMP -lt 1000 ]; then ii="0"$ii; fi
             grep [0-9] ../run.$ii/cost_fn >> ../cost_fn.$ii
             grep [0-9] ../run.$ii/grad_fn >> ../grad_fn.$ii
          done
@@ -729,7 +756,7 @@ do
 #===================================================================================
 #===================================================================================
 
-   if [ $rand_type -eq 6 ]; then
+   if [ $rand_type -eq 6 ] || [ $rand_type -eq 2 ]; then
       echo "================================================="
       echo "SVD STAGE 2: Perform Eigen Decomp + Increment CVs"
       echo "================================================="
@@ -778,6 +805,8 @@ do
       if [ $sec0 -lt 10 ]; then sec0="0"$sec0; fi
       echo "Iteration $it gradient realization time: $hr0:$min0:$sec0"
 
+      innerSECONDS=$SECONDS
+      innerSECONDS0=$SECONDS
       for (( innerit = 1 ; innerit <= $NINNER ; innerit++))
       do
          echo ""
@@ -789,8 +818,8 @@ do
          echo ""
          innerit0=$innerit
          if [ $innerit -lt 10 ]; then innerit0="0"$innerit0; fi
-         if [ $innerit -lt 100 ]; then innerit0=0$innerit0; fi
-         if [ $innerit -lt 1000 ]; then innerit0=0$innerit0; fi
+         if [ $innerit -lt 100 ]; then innerit0="0"$innerit0; fi
+         if [ $innerit -lt 1000 ]; then innerit0="0"$innerit0; fi
          ex -c :"/rand_inner_it" +:":s/=.*/=$innerit,/" +:wq namelist.input
 
          echo "====================================================="
@@ -832,14 +861,32 @@ do
             mv -v rsl.* oldrsl_$it0".iter"$innerit0".stage4"
          fi
 
-         hr0=$(($SECONDS / 3600))
+         hr0=$(($((SECONDS-innerSECONDS)) / 3600))
          if [ $hr0 -lt 10 ]; then hr0="0"$hr0; fi
-         min0=$((($SECONDS / 60) % 60))
+         min0=$((($((SECONDS-innerSECONDS)) / 60) % 60))
          if [ $min0 -lt 10 ]; then min0="0"$min0; fi
-         sec0=$(($SECONDS % 60))
+         sec0=$(($((SECONDS-innerSECONDS)) % 60))
          if [ $sec0 -lt 10 ]; then sec0="0"$sec0; fi
-         echo "Inner iteration $innerit cumulative compute time: $hr0:$min0:$sec0"
+         echo "Inner iteration $innerit compute time: $hr0:$min0:$sec0"
+
+         innerSECONDS=$SECONDS
+
+         hr0=$(($((SECONDS-innerSECONDS0)) / 3600))
+         if [ $hr0 -lt 10 ]; then hr0="0"$hr0; fi
+         min0=$((($((SECONDS-innerSECONDS0)) / 60) % 60))
+         if [ $min0 -lt 10 ]; then min0="0"$min0; fi
+         sec0=$(($((SECONDS-innerSECONDS0)) % 60))
+         if [ $sec0 -lt 10 ]; then sec0="0"$sec0; fi
+         echo "Total accum. Inner iteration compute time: $hr0:$min0:$sec0"
       done
+
+      hr0=$(($innerSECONDS0 / 3600))
+      if [ $hr0 -lt 10 ]; then hr0="0"$hr0; fi
+      min0=$((($innerSECONDS0 / 60) % 60))
+      if [ $min0 -lt 10 ]; then min0="0"$min0; fi
+      sec0=$(($innerSECONDS0 % 60))
+      if [ $sec0 -lt 10 ]; then sec0="0"$sec0; fi
+      echo "Iteration $it gradient realization time: $hr0:$min0:$sec0"
    fi
 
 

@@ -12,6 +12,7 @@ module da_minimisation
    use module_comm_dm, only : halo_wpec_sub, halo_wpec_adj_sub
 #endif
    use module_io_domain, only : close_dataset
+   use module_timing
    use module_domain, only : domain, ep_type, vp_type, x_type, xb_type, domain_clockprint, &
 #if (WRF_CHEM == 1)
                              xch_type, &

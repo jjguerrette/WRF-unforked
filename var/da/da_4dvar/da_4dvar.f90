@@ -4,16 +4,17 @@ use da_tracing, only : da_trace_entry, da_trace_exit
 use da_reporting, only : da_error, message, da_message
 use da_control, only : comm, var4d_bin, var4d_lbc, trace_use_dull, num_fgat_time, multi_inc, &
                        run_hours, run_days, adtl_run_hours, evalj, &
+                       rootproc, &
 #if (WRF_CHEM == 1)
                        init_osse_chem, calc_hx_only, &
                        cv_options, cv_options_chem, &
                        use_chemobs, use_nonchemobs, use_offlineobs, &
                        init_chem_scale, &
-                       rootproc, &
 #endif
                        checkpoint_interval, write_checkpoints, disable_traj, cycle_interval
 
 #ifdef VAR4D
+use da_module_timing
 
 #if (WRF_CHEM == 1)
    use, intrinsic :: iso_c_binding,                       &

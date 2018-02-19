@@ -110,34 +110,34 @@ subroutine da_calculate_aminusb(grid, config_flags,   &
       lam = ( 1.D0 / eignval(jj)  - 1.D0 )
 
 #if (WRF_CHEM == 1)
-      ! Store Uv in corresponding I/O capable variables
-      do ic = PARAM_FIRST_SCALAR, num_scaleant
-         do k = 1, num_ant_steps
-            do j=jts,jte
-               do i=its,ite
-                     grid%g_scaleant(i,j,k,ic) = grid%xach%alpha_ant(i,j,k,ic)
-               end do
-            end do
-         end do
-      end do
-
-      do ic = PARAM_FIRST_SCALAR, num_scalebb
-         do k = 1, num_bb_steps
-            do j=jts,jte
-               do i=its,ite
-                     grid%g_scalebb(i,j,k,ic) = grid%xach%alpha_bb(i,j,k,ic)
-               end do
-            end do
-         end do
-      end do
-
-      WRITE(unit=kc,fmt='(I3.3)') jj
-
-      config_flags%auxhist18_outname = "Uv_k"//kc//"_l"//lc//"_it"//itc
-      config_flags%io_form_auxhist18 = 2
-      CALL nl_set_io_form_auxhist18 ( grid%id, 2 )
-      config_flags%frames_per_auxhist18 = 1
-      CALL  med_hist_out ( grid , AUXHIST18_ALARM , config_flags )
+!      ! Store Uv in corresponding I/O capable variables
+!      do ic = PARAM_FIRST_SCALAR, num_scaleant
+!         do k = 1, num_ant_steps
+!            do j=jts,jte
+!               do i=its,ite
+!                     grid%g_scaleant(i,j,k,ic) = grid%xach%alpha_ant(i,j,k,ic)
+!               end do
+!            end do
+!         end do
+!      end do
+!
+!      do ic = PARAM_FIRST_SCALAR, num_scalebb
+!         do k = 1, num_bb_steps
+!            do j=jts,jte
+!               do i=its,ite
+!                     grid%g_scalebb(i,j,k,ic) = grid%xach%alpha_bb(i,j,k,ic)
+!               end do
+!            end do
+!         end do
+!      end do
+!
+!      WRITE(unit=kc,fmt='(I3.3)') jj
+!
+!      config_flags%auxhist18_outname = "Uv_k"//kc//"_l"//lc//"_it"//itc
+!      config_flags%io_form_auxhist18 = 2
+!      CALL nl_set_io_form_auxhist18 ( grid%id, 2 )
+!      config_flags%frames_per_auxhist18 = 1
+!      CALL  med_hist_out ( grid , AUXHIST18_ALARM , config_flags )
 
       ! Store variances in Pa arrays
       do ic = PARAM_FIRST_SCALAR, num_scaleant

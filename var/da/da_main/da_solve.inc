@@ -104,7 +104,7 @@
 #endif
 
 #ifdef DM_PARALLEL
-   IF ( rootproc ) CALL start_timing
+   IF ( rootproc ) CALL start_timing !Level 1
 #endif
 
    if ( config_flags%use_baseparam_fr_nml ) then
@@ -862,6 +862,7 @@
 
       call da_wrfvar_finalize
 #ifdef VAR4D
+      if (var4d) call clean_4dvar
       if (var4d) call da_finalize_model
 #endif
       call wrf_message("*** WRF-Var initialized OSSE successfully ***")
@@ -895,16 +896,18 @@
    do it = 1, max_ext_its
 
 #ifdef DM_PARALLEL
-   IF ( rootproc ) CALL start_timing
+   IF ( rootproc ) CALL start_timing !Level 1
 #endif
 
 !  Dynamically allocate the variables which depend on ntmax
       if (.not.outer_loop_restart) global_it = it
 #if defined(LAPACK)
+#ifdef VAR4D
       if (use_randomblock .and. var4d) then
          global_it = rand_outer
          use_lanczos = .false.
       end if
+#endif
 #endif
       nmodes_global=ntmax(global_it)      
       if (use_lanczos) then
@@ -917,6 +920,7 @@
          rand_inner_it = 0
 #endif
       end if
+#ifdef VAR4D
 #if defined(LAPACK)
       if (use_randomblock .and. var4d) then
          nsamp = nmodes_global
@@ -948,13 +952,24 @@
                call da_deallocate_y (ob)
                if (use_background_errors) call da_deallocate_background_errors (be)
 
-               call da_wrfvar_finalize
 #ifdef DM_PARALLEL
                IF ( rootproc ) CALL end_timing('da_end_timing: GEN_OMEGA')
 #endif
+               call da_wrfvar_finalize
+
                call wrf_message("*** WRF-Var-RIOT generated OMEGA successfully ***")
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: WRFVARRUN')
+#endif
                if (trace_use) call da_trace_exit ("da_solve")
-               return
+
+               if (trace_use) call da_trace_exit("da_wrfvar_main")
+               if (trace_use) call da_trace_report
+
+               call wrfu_finalize
+               call wrf_shutdown
+               stop
             end if
          end if
 
@@ -971,10 +986,17 @@
                write(unit=message(1),fmt='(a,2i16)') 'Ensemble random number seed_array1, seed_array2 = ', seed_array1, seed_array2
                call da_message(message(1:1))
 
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: OUTER_it_INIT0')
+#endif
 
                !! Initialize model grid
                disable_traj = .true.
                call da_nl_model(1)
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing !Level 1
+#endif
 
                !!-------------------------------------------------------------------
                !! Perturb initial state and T0 boundary conditions with random noise
@@ -1052,6 +1074,7 @@
          allocate (eignval(nmodes_global))
       end if
 #endif
+#endif
 
 ! Re-scale the variances and the scale-length for outer-loop > 1:
       if (it > 1 .and. (cv_options == 5 .or. cv_options == 7)) then
@@ -1114,7 +1137,19 @@
          end if
 #endif
 
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: OUTER_it_INIT1')
+#endif
+
          call da_nl_model(it)
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing !Level 1
+#endif
+
+         ! Use this to exit after writing chem hx values
+         ! or after stage 0 of random minimisation
+         ii=0
 
 #if (WRF_CHEM == 1)
          if ( use_chemobs ) then
@@ -1134,16 +1169,15 @@
                end if
             end if
 #endif
+            if (config_flags%calc_hx_only) ii = ii + 1
+            call wrf_message("*** WRF-Var generated chem_hx successfully ***")
          end if
-
-         ! Use this to exit after writing chem hx values
-         ! or after stage 0 of random minimisation
-         ii=0
-
-         if(config_flags%calc_hx_only) ii = ii + 1
+#endif
 #if defined(LAPACK)
          if (use_randomblock .and. rand_stage.le.0) ii = ii + 1
 #endif
+
+#if defined(LAPACK) || (WRF_CHEM == 1)
          if (ii .gt. 0) then
             call da_deallocate_observations (iv)
             call da_deallocate_y (ob)
@@ -1151,23 +1185,27 @@
 
             call da_wrfvar_finalize
 
+#ifdef VAR4D
+            if (var4d) call clean_4dvar
             if (var4d) call da_finalize_model
+#endif
 
 #ifdef DM_PARALLEL
             IF ( rootproc ) CALL end_timing('da_end_timing: CHEM_HX')
 #endif
 
-            call wrf_message("*** WRF-Var generated chem_hx successfully ***")
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: WRFVARRUN')
+#endif
+
             if (trace_use) call da_trace_exit("da_wrfvar_main")
             if (trace_use) call da_trace_report
 
             call wrfu_finalize
             call wrf_shutdown
             stop
-
          end if
 #endif
-!end WRF_CHEM test
 
          !Restore default trajectory setting
          write_checkpoints = 0
@@ -1223,11 +1261,7 @@
 
 
 #ifdef DM_PARALLEL
-   IF ( rootproc ) CALL end_timing('da_end_timing: OUTER_it_INIT')
-#endif
-
-#ifdef DM_PARALLEL
-   IF ( rootproc ) CALL start_timing
+   IF ( rootproc ) CALL end_timing('da_end_timing: OUTER_it_INIT2')
 #endif
 
       ! [8.4] Minimize cost function:
@@ -1244,6 +1278,9 @@
       ! 3 options (use_lanczos, use_randomblock, default - cg)
       !=======================================================
       if (use_lanczos .or. use_randomblock) then
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing !Level 1
+#endif
          if (use_lanczos) then
             if (read_lanczos) then
                call da_lanczos_io('r',cv_size,ntmax(it),neign,eignvec,eignval,qhat)
@@ -1270,11 +1307,13 @@
 
             if (adj_sens) call da_sensitivity(grid,config_flags,it,cv_size,xbx, &
                                               be,iv,xhat,qhat,cvt,y,eignvec,eignval,neign )
+
 #ifdef VAR4D
 #if defined(LAPACK)
          else if ( use_randomblock .and. var4d) then
+
             j0_total = 0.D0
-            if ( nsamp.gt.0 .and. global_it.gt.0 .and. it.eq.1 ) then
+            if ( nsamp.gt.0 .and. global_it.gt.0 ) then
                if (rand_stage.eq.1 .and. &
                    ((ensmember.eq.nsamp+1) .or. rand_type.eq.3)) then
                   select case (rand_type)
@@ -1341,11 +1380,12 @@
                    (rand_type.eq.6 .and. rand_stage.ne.2) &
                    ) rand_exit = .true.
             else
-               write(unit=stdout,fmt='("nsamp, rand_outer, it = ",3I4)') &
-                   nsamp, global_it, it
+               write(unit=stdout,fmt='("nsamp, rand_outer = ",2I4)') &
+                   nsamp, global_it
 
                CALL wrf_error_fatal('In randomised SVD. Check namelist settings.')
             end if
+
 #endif
 #endif
          else
@@ -1356,9 +1396,10 @@
          IF ( rootproc ) CALL end_timing('da_end_timing: HESS_vector_multiply')
 #endif
 
+
          if ( var4d .and. var4d_inc_out .and. allocated(hessian_info%ghat) ) then
 #ifdef DM_PARALLEL
-            IF ( rootproc ) CALL start_timing
+            IF ( rootproc ) CALL start_timing !Level 1
 #endif
             call da_output_increments( grid,config_flags,mz, &
                                        global_it,cv_size,xbx,be, &
@@ -1382,7 +1423,7 @@
             deallocate(hessian_info%qhat)
             deallocate(hessian_info%ghat)
 #ifdef DM_PARALLEL
-            IF ( rootproc ) CALL end_timing('da_end_timing: increment_diagnostics')
+            IF ( rootproc ) CALL end_timing('da_end_timing: increment_diagnostics2')
 #endif
          end if
 
@@ -1394,11 +1435,9 @@
             if (use_background_errors) call da_deallocate_background_errors (be)
 
             call da_wrfvar_finalize
+            if (var4d) call clean_4dvar
             if (var4d) call da_finalize_model
 
-#ifdef DM_PARALLEL
-            IF ( rootproc ) CALL end_timing('da_end_timing: Block_Lanczos_inner')   
-#endif
             if (rand_type .ne. 3 .or. rand_stage.lt.4) then
                write(unit=message(1),fmt='(A,I2,A,I2,A)') &
                  "***Completed Stage ",rand_stage," of RIOT in outer iteration",global_it,"***"
@@ -1414,15 +1453,26 @@
             if (trace_use) call da_trace_exit("da_wrfvar_main")
             if (trace_use) call da_trace_report
 
+#ifdef DM_PARALLEL
+            IF ( rootproc ) CALL end_timing('da_end_timing: RIOT_STAGE')   
+#endif
             call wrfu_finalize
             call wrf_shutdown
             stop
          end if
 #endif
+
 #if (WRF_CHEM == 1)
+#ifdef DM_PARALLEL
+         IF ( rootproc ) CALL start_timing
+#endif
          if (calc_aminusb) call da_calculate_aminusb(grid,config_flags,global_it,cv_size,xbx, &
                              be,qhat,eignvec,eignval,neign,ntmax(global_it))
+#ifdef DM_PARALLEL
+         IF ( rootproc ) CALL end_timing('da_end_timing: aminusb')
 #endif
+#endif
+
 #endif
       else
          call da_minimise_cg( grid, config_flags, it, be % cv % size, & 
@@ -1434,8 +1484,9 @@
 #ifdef VAR4D
       if (var4d) then
 #ifdef DM_PARALLEL
-      IF ( rootproc ) CALL start_timing
+      IF ( rootproc ) CALL start_timing !Level 1
 #endif
+
       if (dgn_search(global_it).eq.1 .and. .not.var4d_lbc) then
          call da_dgn(grid, config_flags, cv_size, xhat, cvt, &
                      xbx, be, iv, ob, &
@@ -1445,6 +1496,7 @@
          call da_hdgn(global_it, cv_size, be, xhat)
 #endif
       end if
+
 #ifdef DM_PARALLEL
       IF ( rootproc ) CALL end_timing('da_end_timing: LINESEARCH')
 #endif
@@ -1452,7 +1504,7 @@
 #endif
 
 #ifdef DM_PARALLEL
-   IF ( rootproc ) CALL start_timing
+   IF ( rootproc ) CALL start_timing !Level 1
 #endif
       ! Update outer-loop control variable
       cvt = cvt + xhat
@@ -1681,7 +1733,7 @@
    end do !END OF OUTER ITERATION
 
 #ifdef DM_PARALLEL
-   IF ( rootproc ) CALL start_timing
+   IF ( rootproc ) CALL start_timing !Level 1
 #endif
 
    ! output wrfvar analysis

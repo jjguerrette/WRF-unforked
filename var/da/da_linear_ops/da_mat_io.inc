@@ -24,6 +24,10 @@ subroutine da_mat_io (io_config, filename, n, m, MAT, ascii_bool)
 
    if (trace_use) call da_trace_entry("da_mat_io")
 
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
+
    call da_get_unit (mat_unit)
 
    write(cm,fmt='(I0)') m
@@ -72,6 +76,10 @@ subroutine da_mat_io (io_config, filename, n, m, MAT, ascii_bool)
    end if
 
    call da_free_unit (mat_unit)
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: RIOT_IO_mat')
+#endif
 
    if (trace_use) call da_trace_exit ("da_mat_io")
 

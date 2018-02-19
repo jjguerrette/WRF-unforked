@@ -20,6 +20,9 @@ module da_wrfvar_top
 #if (WRF_CHEM == 1)
       da_ad_model, da_init_model_input, da_init_model_output, &
 #endif
+#if defined(LAPACK) || (WRF_CHEM == 1)
+      clean_4dvar, &
+#endif
       mu6_2, psfc6, moist6, kj_swap, da_finalize_model, da_model_lbc_off
    use da_wrfvar_io, only : da_med_initialdata_output_lbc
 #endif

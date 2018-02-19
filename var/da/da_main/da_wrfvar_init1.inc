@@ -73,6 +73,10 @@ subroutine da_wrfvar_init1(no_init1)
    end if
 
 #ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
+
+#ifdef DM_PARALLEL
    if (rootproc) then
       call initial_config
    end if
@@ -92,6 +96,10 @@ subroutine da_wrfvar_init1(no_init1)
 #include "config_assigns.inc"
 
    if (.NOT. rootproc) check_max_iv_print=.false.
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: WRFVARINIT1')
+#endif
 
 end subroutine da_wrfvar_init1
 

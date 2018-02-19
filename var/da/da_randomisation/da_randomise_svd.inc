@@ -192,6 +192,9 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
 !         call da_cv_io ('w', filename, cv_size, qhat(1:cv_size,iens), grid, mz)
 !      end do
 !REMOVE EVENTUALLY or add option since very useful for debugging
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
 
       call da_rsvd56(grid, mz, jp_start, jp_end, &
                      omega, yhat, qhat, cv_size, &
@@ -200,10 +203,16 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
       ! Add 1.0 to get eigenvalues of full preconditioned Hessian
       eignval = eignval + 1.D0
 
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: rsvd56')
+#endif
+
       if ( var4d_inc_out &
            .and. present(hessian_info) &
            .and. allocated(hessian_info%ghat) ) then
-
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
          write(cnsamp,fmt='(I0)') nsamp
          write(unit=stdout,fmt='(A,'//trim(cnsamp)//'E27.16E3)') 'HESS_TRACE: ',hess_trace(1:nsamp)
 
@@ -230,6 +239,9 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
                hessian_info%eigs(iens)%eignval = hessian_info%eigs(iens)%eignval + 1.D0
             end if
          end do
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: increment_diagnostics2')
+#endif
       end if
 
 

@@ -60,10 +60,6 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
   
    if (trace_use) call da_trace_entry("da_rsvd56")
 
-#ifdef DM_PARALLEL
-   IF ( rootproc ) CALL start_timing
-#endif
-
    if(.not.present(print_messages)) write(unit=stdout,fmt='(A,I5,A)') 'Performing Stage 2 of RSVD5.6 for ', nsamp ,' ensembles'
    if(.not.present(print_messages)) write(unit=stdout,fmt=*) ' '
 
@@ -100,9 +96,9 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
               U = U(1:nsamp,1:nsamp), &
               VT = VT(1:nsamp,1:nsamp), &
               INFO = info)
-
+#ifdef DM_PARALLEL
    call mpi_barrier(comm, ierr)
-
+#endif
    if (info .ne. 0) then
       do iens = 1, nsamp
          write(unit=stdout,fmt='(A,'//trim(cnsamp)//'E27.16E3)') 'F1: ',F1(iens,1:nsamp)
@@ -192,10 +188,6 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
       LAM(iens) = max(LAM(iens),0.D0)
    end do
    eignval = LAM
-
-#ifdef DM_PARALLEL
-   IF ( rootproc ) CALL end_timing('da_end_timing: rsvd56')
-#endif
 
    if (trace_use) call da_trace_exit("da_rsvd56")
 

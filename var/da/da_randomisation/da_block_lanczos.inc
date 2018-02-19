@@ -81,6 +81,10 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
    jl_start   = be % cv % size_jb + be % cv % size_je + be % cv % size_jp + 1
    jl_end     = be % cv % size_jb + be % cv % size_je + be % cv % size_jp + be % cv % size_jl
 
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
+
    xhat = 0.D0
    write(cproc,fmt='(i4.4)') myproc
    write(cens,fmt='(i4.4)') ensmember
@@ -129,6 +133,10 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
       allocate(qhat_(1:cv_size,0:nsamp))
       qhat_ = 0.D0
 
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
+
       do iens = 1, nsamp
          write(cens,fmt='(i4.4)') iens
          write(unit=stdout,fmt='("Reading ghat vectors; iens,iter = ",i3)') iens
@@ -136,6 +144,10 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
                         '.p'//trim(adjustl(cproc))
          call da_cv_io ('r', filename, cv_size, qhat_(1:cv_size,iens), grid, mz )
       end do
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: RIOT_IO_cv_ghat')
+#endif
 
 !      if ( be%cv%size_jp.gt.0) omega(jp_start:jp_end) = 0.D0
 !      if ( be%cv%size_je.gt.0) omega(je_start:je_end) = 0.D0
@@ -148,6 +160,10 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
       call da_gram_schmidt(grid,mz,jp_start,jp_end, &
                       qhat_,cv_size,nsamp)
 
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
+
       do iens = 1, nsamp
          write(cens,fmt='(i4.4)') iens
          write(unit=stdout,fmt='("Writing qhat ensemble member ",i3," of ",i3)') iens,nsamp
@@ -156,6 +172,10 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
                         '.iter'//trim(adjustl(cinner))
          call da_cv_io ('w', filename, cv_size, qhat_(1:cv_size,iens), grid, mz )
       end do
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: RIOT_IO_cv_qhat')
+#endif
 
       deallocate(qhat_)
 
@@ -221,13 +241,13 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
       TMAT = 0.D0
       MMAT = 0.D0
 
-#ifdef DM_PARALLEL
-   IF ( rootproc ) CALL start_timing
-#endif
-
       do iter = 1, rand_inner_it
          block_start = nsamp*(iter-1) + 1
          block_end = block_start + nsamp - 1
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
 
          write(cinner,fmt='(i4.4)') iter
          write(unit=stdout,fmt='("Reading qhat vectors; iter = ",i3)') iter
@@ -239,6 +259,10 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
             call da_cv_io ('r', filename, cv_size, qhat_(1:cv_size,block_start+iens-1), grid, mz )
          end do
 
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: RIOT_IO_cv_qhat')
+#endif
+
          ! Populate TMAT with MMAT and BMAT blocks
          if (iter .lt. rand_inner_it) then
             !Read MMAT(:,:,iter) from file
@@ -247,6 +271,9 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
                            '.p'//trim(adjustl(cproc))
             call da_mat_io ('r', filename, nsamp, nsamp, MMAT(:,:,iter) )
          else
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
             !Calculate MMAT(:,:,rand_inner_it) from latest yhat and qhat vectors
 !            write(cinner,fmt='(i4.4)') iter
 
@@ -259,8 +286,17 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
                               '.iter'//trim(adjustl(cinner))
                call da_cv_io ('r', filename, cv_size, yhat(1:cv_size,block_start+iens-1), grid, mz )
             end do
+
 #ifdef DM_PARALLEL
-            call mpi_barrier(comm, ierr)
+   IF ( rootproc ) CALL end_timing('da_end_timing: RIOT_IO_cv_yhat')
+#endif
+
+!#ifdef DM_PARALLEL
+!            call mpi_barrier(comm, ierr)
+!#endif
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
 #endif
             write(unit=stdout,fmt='("Generating current MMAT")')
             !MMAT = Q^T * Y
@@ -273,6 +309,10 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
                end do
             end do
             MMAT(:,:,iter) = (MMAT(:,:,iter) + TRANSPOSE(MMAT(:,:,iter))) / 2.D0
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: Block_MMAT')
+#endif
 
             !Write MMAT(:,:,iter) to file
             filename = trim(randvecdir)//'MMAT.iter'//trim(adjustl(cinner))// &
@@ -306,6 +346,10 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
 
       ! Construct eigendecomposition of TMAT
       if (rand_inner_it.eq.max_rand_inner .or. var4d_inc_out) then
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
 
 !BEGIN ENCAPUSLATE THIS EIGENDECOMP --> Same as second half of da_rsvd56
        ! Determine eigenvalues and eigenvectors of the symmetric TMAT matrix
@@ -364,12 +408,12 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
 
          ! Adjust neign according to how many eigenvalues are positive
          neign = nmodes
-         do i = 1, nmodes
-            if (i.gt.1 .and. LAM(i) .lt. 0.D0) then
-               neign = i-1
-               exit
-            end if
-         end do
+!         do i = 1, nmodes
+!            if (i.gt.1 .and. LAM(i) .lt. 0.D0) then
+!               neign = i-1
+!               exit
+!            end if
+!         end do
 
 !         !Preconditioned observation Hessian should be positive semi-definite
 !         do i = 1, nmodes
@@ -394,10 +438,17 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
          filename = trim(randvecdir)//'ghat.e0001.p'//trim(adjustl(cproc))
          call da_cv_io ('r', filename, cv_size, ghat, grid, mz )
 
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: Block_EIGENDECOMP')
+#endif
+
+
          if ( var4d_inc_out &
               .and. present(hessian_info) &
               .and. allocated(hessian_info%ghat) ) then
-
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
             hessian_info%ghat = ghat
 
             hessian_info%nmodes_max = nmodes
@@ -412,10 +463,15 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
             hessian_info%eigs(1)%neign = neign
             hessian_info%eigs(1)%eignval = eignval
             hessian_info%eigs(1)%eignvec = eignvec
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: increment_diagnostics1')
+#endif
          end if
 
-
          if (rand_inner_it.eq.max_rand_inner) then
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
             !! Calculate increment
             write(unit=stdout,fmt='(A)') ' '
             write(unit=stdout,fmt='(A,I5,A)') 'Using ', nmodes, ' eigenpairs'
@@ -448,6 +504,9 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
             if (spectral_precon) &
                call da_hessian_io ('w',grid, cv_size,rand_outer,nmodes,nmodes,&
                                   eignvec,eignval,qhat_(:,0:nmodes),mz,ghat)
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: Block_INCREMENT')
+#endif
          end if
       end if
 
@@ -461,7 +520,9 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
       if (rand_inner_it .lt. max_rand_inner) then
          write(unit=stdout,fmt= &
          '("Generate RMAT basis residual matrix")')
-
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
          !This section pepares for next inner iteration
          iter = rand_inner_it
          block_start = nsamp*(iter-1) + 1
@@ -516,6 +577,10 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
          qhat_(:,block_start:block_end) = RMAT(:,1:nsamp)
          deallocate(RMAT)
 
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: Block_RMAT')
+#endif
+
          !Write BMAT(:,:,iter) to file
          write(cinner,fmt='(i4.4)') iter
          filename = trim(randvecdir)//'BMAT.iter'//trim(adjustl(cinner))// &
@@ -524,6 +589,9 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
 
          deallocate(BMAT)
 
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
          !Orthonormalize most recent qhat vectors w.r.t. previous vectors and write to disk
          call da_gram_schmidt(grid,mz,jp_start,jp_end, &
                          qhat_,cv_size,nmodes+nsamp,nmodes+1)
@@ -536,19 +604,24 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
                            '.iter'//trim(adjustl(cinner))
             call da_cv_io ('w', filename, cv_size, qhat_(1:cv_size,block_start+iens-1), grid, mz )
          end do
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: RIOT_IO_cv_qhat')
+#endif
+
       end if !end prep for next iteration
 
       deallocate(qhat_)
+
+   else
+      write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: For Block Lanczos, rand_stage should be 0, 1, 2, 3, or 4, not ',rand_stage
+      CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
+   end if
+   if (trace_use) call da_trace_exit("da_block_lanczos")
 
 #ifdef DM_PARALLEL
    IF ( rootproc ) CALL end_timing('da_end_timing: Block_Lanczos')
 #endif
 
-   else
-      write(unit=stdout,fmt='(A,I2)') 'FATAL ERROR: For RSVD5.6, rand_stage should be 0, 1, or 2, not ',rand_stage
-      CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
-   end if
-   if (trace_use) call da_trace_exit("da_block_lanczos")
 
 #else
    call da_error(__FILE__,__LINE__, &

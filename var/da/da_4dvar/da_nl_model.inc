@@ -62,6 +62,10 @@ subroutine da_nl_model (it)
    if (disable_traj) return
 #endif
 
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
+
    ! Turn off  history output
    call nl_set_history_begin_y (head_grid%id, 9999)
    call nl_set_history_end_y (head_grid%id, 9999)
@@ -224,6 +228,10 @@ subroutine da_nl_model (it)
    ! Turn off boundary input from now.
    if ( checkpoint_interval.eq.0 .or. var4d_lbc ) &
       CALL nl_set_io_form_boundary( head_grid%id, 0 )
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: NL_MODEL')
+#endif
 
    if (trace_use_dull) call da_trace_exit("da_nl_model")
 
