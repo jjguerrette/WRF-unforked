@@ -1,7 +1,7 @@
 #if defined(LAPACK)
 subroutine da_evaluate_decomp(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
                               rank_rsvd_Pa, rankA, neign, ntrunc, &
-                              xhat_hess, ghat0, &
+                              xhat_REF, ghat0, &
                               omega_Pav, &
                               yhat_Pav_LRU, yhat_Pav_LRA, &
                               yhat_Pa_LRU, yhat_Pa_LRA, &
@@ -41,7 +41,7 @@ subroutine da_evaluate_decomp(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
    real*8,         intent(in) :: eignval_hess(rankA)
    real*8,         intent(in) :: qhat_hess(cv_size, 0:rankA)
 
-   real*8,         intent(in) :: xhat_hess(cv_size)
+   real*8,         intent(in) :: xhat_REF(cv_size,2)
    real*8,         intent(in) :: ghat0(cv_size)
 
    integer, intent(in)        :: jp_start, jp_end
@@ -90,7 +90,7 @@ subroutine da_evaluate_decomp(grid, xbx, be, mz, jp_start, jp_end, cv_size, &
    real*8          :: eignvec_res(rank_rsvd_Pa, rank_rsvd_Pa)
    real*8          :: eignval_res(rank_rsvd_Pa), LAM(neign), LAM_hess(rankA)
 
-   integer         :: iens, jens, i, j, k, ij, ic, itype, dummy, info, neign_trunc
+   integer         :: iens, jens, i, j, k, ij, ic, itype, dummy, info, neign_trunc, l
 
    if (trace_use) call da_trace_entry("da_evaluate_decomp")
 
@@ -116,14 +116,14 @@ if (hess_comp_x) then
 !   end if
 
    !=====================================================================
-   ! Compare xhat_approx to xhat_hess
+   ! Compare xhat_approx to xhat_REF
    !  (1a)  v - increment in preconditioned v-space
    !  (1b)  x - increment in state x-space
    !  (1c)  x _ Pa^-1 - increment in state x-space normalized by Pa
    !=====================================================================
 
    !=====================================================================
-   ! Compare xhat to xhat_hess and Uxhat to Uxhat_hess (vtox)
+   ! Compare xhat to xhat_REF and Uxhat to Uxhat_REF (vtox)
    !=====================================================================
    write(unit=stdout,fmt='(A)') 'Evaluating (xa_ - xa)'
    do itype = 1, 2
@@ -152,10 +152,14 @@ if (hess_comp_x) then
          xhat = xhat + ghat0
       end if
 
+      if (check_precon) &
+         call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
+                              1, xhat, xhat, 'TL' )
+
       !----------------------
       ! (1a) ||dva_ - dva||^2
       !----------------------
-      diffvec = xhat - xhat_hess
+      diffvec = xhat - xhat_REF(:,itype)
       EUCNORM_v(itype) = da_dot_cv(cv_size, diffvec, diffvec, grid, mz, jp_start, jp_end)
 
       !----------------------
@@ -222,7 +226,7 @@ if (hess_comp_x) then
 
 
    !=====================================================================
-   ! Compare directions of xhat/xhat_hess and Uxhat/Uxhat_hess
+   ! Compare directions of xhat/xhat_REF and Uxhat/Uxhat_REF
    !  (1d)  v - increment in preconditioned v-space
    !  (1e)  x - increment in state x-space
    !=====================================================================
@@ -571,8 +575,8 @@ if (.true.) then
       deallocate(qhat_Pa)
 
       !Evaluate Spectral/Frobenius norms from eigenvalues
-      SPECNORM_Pa(itype) = maxval(abs(eignval_res(1:dummy)))
-      FROBNORM_Pa(itype) = sqrt(sum(eignval_res(1:dummy)*eignval_res(1:dummy)))
+      SPECNORM_Pa(itype) = maxval(abs(eignval_res(1:rank_rsvd_Pa)))
+      FROBNORM_Pa(itype) = sqrt(sum(eignval_res(1:rank_rsvd_Pa)*eignval_res(1:rank_rsvd_Pa)))
 
       write(unit=stdout,fmt='(A)') '    SPECNORM_Pa    FROBNORM_Pa'
       write(unit=stdout,fmt='(2D15.5)')SPECNORM_Pa(itype),FROBNORM_Pa(itype)
@@ -669,12 +673,19 @@ if (.true. .and. &
       deallocate(LaVlS)
 
       !Subtract truth component before spectral decomp
+      l = max(min(rankA,spectral_trunc(1)),0)
+
       do iens = 1, rankA
          if (itype .eq. 1) then !LRA
             LaPaLa_reduced(iens,iens) = LaPaLa_reduced(iens,iens) - 1.D0
          end if
          if (itype .eq. 2) then !LRU
-            LaPaLa_reduced(iens,iens) = LaPaLa_reduced(iens,iens) - (eignval_hess(iens) - 1.D0)
+            if (check_precon) then
+               !Limit reference Pa to preconditioned section of Hessian
+               LaPaLa_reduced(iens,iens) = LaPaLa_reduced(iens,iens) - (eignval_hess(iens+l) - 1.D0)
+            else
+               LaPaLa_reduced(iens,iens) = LaPaLa_reduced(iens,iens) - (eignval_hess(iens) - 1.D0)
+            end if
          end if
       end do
 

@@ -36,8 +36,8 @@ subroutine da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, nouter_prev, 
 
    if (trace_use) call da_trace_entry("da_spectral_precon")
 
-   write(unit=stdout,fmt='(2A)') 'Apply Spectral preconditioner in mode: ', trim(mode)
    write(unit=stdout,fmt=*) ' '
+   write(unit=stdout,fmt='(2A)') 'Apply Spectral preconditioner in mode: ', trim(mode)
 
    if (trim(mode) == 'TL') then !Tangent preconditioner
       outer_start = nouter_prev
@@ -73,17 +73,20 @@ subroutine da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, nouter_prev, 
 
       call da_hessian_io ('r',grid,cv_size,it,nmodes,neign)
 
-      allocate(eignval(nmodes))
-      allocate(eignvec(nmodes,nmodes))
-      allocate(qhat(cv_size,0:nmodes))
-
-      call da_hessian_io ('r',grid,cv_size,it,nmodes,neign,&
-                         eignvec,eignval,qhat,mz)
-
       ! Precondition with the l leading eigen modes from iteration it
       !  (requires eignval/eignvec to be sorted by decreasing value)
       l = max(min(neign,spectral_trunc(it)),0)
+
+      write(unit=stdout,fmt='(A,I0,A,I0)') ' Using ', l, ' eigen modes from outer iteration ', it
+
       if (l .gt. 0) then
+         allocate(eignval(nmodes))
+         allocate(eignvec(nmodes,nmodes))
+         allocate(qhat(cv_size,0:nmodes))
+
+         call da_hessian_io ('r',grid,cv_size,it,nmodes,neign,&
+                            eignvec,eignval,qhat,mz)
+
          do imode = 1, l
             eignval(imode) = eignval(imode)**expon - 1.D0
          end do
@@ -95,11 +98,12 @@ subroutine da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, nouter_prev, 
                                 eignval,eignvec,qhat,&
                                 cv_z,cv_z0)
          cv_z = cv_z + cv_z0
+
+         deallocate(eignval)
+         deallocate(eignvec)
+         deallocate(qhat)
       end if
 
-      deallocate(eignval)
-      deallocate(eignvec)
-      deallocate(qhat)
    end do
 
    if (trace_use) call da_trace_exit("da_spectral_precon")

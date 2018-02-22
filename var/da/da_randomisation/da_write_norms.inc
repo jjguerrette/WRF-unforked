@@ -4,7 +4,7 @@ subroutine da_write_norms(    EUCNORM_x, FROBNORM_Pa, SPECNORM_Pa, &
                               EUCNORM_xPa, FROBNORM_PaPa, SPECNORM_PaPa, &
                               DIRNORM1_v, DIRNORM1_x, &
                               DIRNORM2_v, DIRNORM2_x, &
-                              neign, suffix)
+                              neign, p, suffix)
 
    !-------------------------------------------------------------------------
    ! Purpose:   Write norms for Pa and increment approximations
@@ -26,6 +26,7 @@ subroutine da_write_norms(    EUCNORM_x, FROBNORM_Pa, SPECNORM_Pa, &
 !!   real*8, intent(in)        :: EUCNORM_xB(3), FROBNORM_PaB(3), SPECNORM_PaB(3)
 
    integer, intent(in)       :: neign
+   integer, intent(in)       :: p
    character(*), intent(in)  :: suffix
 
    real*8                       :: vals(3)
@@ -82,7 +83,7 @@ subroutine da_write_norms(    EUCNORM_x, FROBNORM_Pa, SPECNORM_Pa, &
          ! open file
          ! =========
          call da_get_unit(ounit)
-         if (neign .eq. 1) then
+         if (neign-p .eq. 1) then
             open(unit   = ounit,     &
                FILE   = trim(filename), &
                FORM   = 'FORMATTED',  &
