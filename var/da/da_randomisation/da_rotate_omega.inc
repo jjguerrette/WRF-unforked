@@ -46,7 +46,9 @@ subroutine da_rotate_omega(grid, cv_size, mz, jp_start, jp_end, nouter_prev, cv_
    eig_total = 0
    do it = 1, nouter_prev
       call da_hessian_io ('r',grid, cv_size,it,nmodes,neign)
-      eig_total = eig_total + neign
+      l = max(min(neign,spectral_trunc(it)),0)
+
+      eig_total = eig_total + l
    end do
    allocate(nuhat_all(cv_size,0:eig_total))
    allocate(lam_all(eig_total))
@@ -59,17 +61,19 @@ subroutine da_rotate_omega(grid, cv_size, mz, jp_start, jp_end, nouter_prev, cv_
    do it = 1, nouter_prev
       call da_hessian_io ('r',grid, cv_size,it,nmodes,neign)
 
-      allocate(eignvec(nmodes,nmodes))
-      allocate(eignval(nmodes))
-      allocate(qhat(cv_size,0:nmodes))
-
-      call da_hessian_io ('r',grid, cv_size,it,nmodes,neign,&
-                         eignvec,eignval,qhat,mz)
-
       ! Precondition with the l leading eigen modes from iteration it
       !  (requires eignval/eignvec to be sorted by decreasing value)
       l = max(min(neign,spectral_trunc(it)),0)
+
       if (l .gt. 0) then
+
+         allocate(eignvec(nmodes,nmodes))
+         allocate(eignval(nmodes))
+         allocate(qhat(cv_size,0:nmodes))
+
+         call da_hessian_io ('r',grid, cv_size,it,nmodes,neign,&
+                            eignvec,eignval,qhat,mz)
+
          do imode = 1, l
             eig_count = eig_count + 1
             lam_all(eig_count) = eignval(imode)
@@ -77,11 +81,12 @@ subroutine da_rotate_omega(grid, cv_size, mz, jp_start, jp_end, nouter_prev, cv_
                nuhat_all(:,eig_count) = nuhat_all(:,eig_count) + qhat(:,i) * eignvec(i,imode)
             end do
          end do
+
+         deallocate(eignvec)
+         deallocate(eignval)
+         deallocate(qhat)
       end if
 
-      deallocate(eignvec)
-      deallocate(eignval)
-      deallocate(qhat)
    end do
 
    eig_total = eig_count
@@ -109,14 +114,15 @@ subroutine da_rotate_omega(grid, cv_size, mz, jp_start, jp_end, nouter_prev, cv_
    do it=1, nouter_prev
       call da_hessian_io ('r',grid, cv_size,it,nmodes,neign)
 
-      allocate(eignval(neign))
-      allocate(eignvec(neign,neign))
-      allocate(nuhat(cv_size,0:neign))
-
       ! Precondition with the l leading eigen modes from iteration it
       !  (requires eignval/eignvec to be sorted by decreasing value)
       l = max(min(neign,spectral_trunc(it)),0)
+
       if (l .gt. 0) then
+         allocate(eignval(neign))
+         allocate(eignvec(neign,neign))
+         allocate(nuhat(cv_size,0:neign))
+
          eignval = 0.D0
          do imode = 1, l
             eig_count = eig_count + 1
@@ -131,11 +137,11 @@ subroutine da_rotate_omega(grid, cv_size, mz, jp_start, jp_end, nouter_prev, cv_
                                 eignval,eignvec,nuhat,&
                                 cv_v,cv_v0,.true.)
          cv_v = cv_v + cv_v0
-      end if
 
-      deallocate(eignval)
-      deallocate(eignvec)
-      deallocate(nuhat)
+         deallocate(eignval)
+         deallocate(eignvec)
+         deallocate(nuhat)
+      end if
    end do
 
    deallocate(nuhat_all)

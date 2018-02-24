@@ -125,7 +125,7 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
 !                                    rand_outer-1, omega(:,1), omega(:,1), 'IT' )
          end if
 
-         if (.not. read_omega) then
+         if (.not. read_omega .or. (rotate_omega .and. spectral_precon .and. rand_outer.gt.1)) then
             !Write omega to file
             filename = trim(randvecdir)//'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
             call da_cv_io ('w', filename, cv_size, omega(1:cv_size,1), grid, mz)
