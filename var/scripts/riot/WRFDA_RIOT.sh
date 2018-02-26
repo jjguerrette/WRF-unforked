@@ -628,27 +628,24 @@ do
       echo "EXIT: STAGE1 > 0 required for multiple outer iterations"; echo 11; exit 11;
    fi
 
-   #-------------------------------------------------------------------
-   # Check for presence of checkpoint and obs output files (CHEM only)
-   #-------------------------------------------------------------------
-   if [ $CPDT -gt 0 ]; then
-      if [ $(ls "$CWD"/wrf_checkpoint_d01* | wc -l) -eq 0 ]; then echo "ERROR: Missing checkpoint files"; echo 13; exit 13; fi
-      if [ $WRF_MET -gt 0 ]; then
-         if [ $(ls "$CWD"/xtraj_for_obs_d01* | wc -l) -eq 0 ]; then echo "ERROR: Missing xtraj_for_obs files"; echo 14; exit 14; fi
+   if [ $rand_type -ne 3 ]; then
+      #-------------------------------------------------------------------
+      # Check for presence of checkpoint files
+      #-------------------------------------------------------------------
+      if [ $CPDT -gt 0 ]; then
+         if [ $(ls "$CWD"/wrf_checkpoint_d01* | wc -l) -eq 0 ]; then echo "ERROR: Missing checkpoint files"; echo 13; exit 13; fi
+         if [ $WRF_MET -gt 0 ]; then
+            if [ $(ls "$CWD"/xtraj_for_obs_d01* | wc -l) -eq 0 ]; then echo "ERROR: Missing xtraj_for_obs files"; echo 14; exit 14; fi
+         fi
       fi
-   fi
-   if [ $WRF_CHEM -gt 0 ]; then
-      if [ $FORCE_SURFACE -eq 1 ] && [ $(ls "$CWD"/SURFACE_Hx_y* | wc -l) -eq 0 ]; then echo "ERROR: Missing SURFACE_Hx_y files"; echo 15; exit 15; fi
-      if [ $FORCE_AIRCRAFT -eq 1 ] && [ $(ls "$CWD"/AIRCRAFT_Hx_y* | wc -l) -eq 0 ]; then echo "ERROR: Missing AIRCRAFT_Hx_y files"; echo 16; exit 16; fi
-# Something like this would allow storing checkpoint files in a temporary directory (hard disk, not memory due to size)
-#         if [ $it -gt $itstart ]; then
-#            pbsdsh -- rm $TMPDIR/wrf_checkpoint_d01*
-#         fi
-#
-#         #These cp's take extra time, which could be avoided if simultaneous access is allowed.
-#         pbsdsh -- cp $CWD/wrf_checkpoint_d01* $TMPDIR
-#         pbsdsh -- cp $CWD/SURFACE_Hx_y* $TMPDIR
-#         pbsdsh -- cp $CWD/AIRCRAFT_Hx_y* $TMPDIR
+
+      #-------------------------------------------------------------------
+      # Check for presence of obs output files (CHEM only)
+      #-------------------------------------------------------------------
+      if [ $WRF_CHEM -gt 0 ]; then
+         if [ $FORCE_SURFACE -eq 1 ] && [ $(ls "$CWD"/SURFACE_Hx_y* | wc -l) -eq 0 ]; then echo "ERROR: Missing SURFACE_Hx_y files"; echo 15; exit 15; fi
+         if [ $FORCE_AIRCRAFT -eq 1 ] && [ $(ls "$CWD"/AIRCRAFT_Hx_y* | wc -l) -eq 0 ]; then echo "ERROR: Missing AIRCRAFT_Hx_y files"; echo 16; exit 16; fi
+      fi
    fi
 
 
@@ -804,6 +801,37 @@ do
       sec0=$(($SECONDS % 60))
       if [ $sec0 -lt 10 ]; then sec0="0"$sec0; fi
       echo "Iteration $it gradient realization time: $hr0:$min0:$sec0"
+
+      #-------------------------------------------------------------------
+      # Check for presence of checkpoint files
+      #-------------------------------------------------------------------
+      if [ $CPDT -gt 0 ]; then
+         if [ $(ls ../run.0001/wrf_checkpoint_d01* | wc -l) -eq 0 ]; then echo "ERROR: Missing checkpoint files"; echo 13; exit 13; fi
+         rm wrf_checkpoint_d01*
+         mv ../run.0001/wrf_checkpoint_d01* ./
+         rm ../run.*/wrf_checkpoint_d01*
+
+         if [ $WRF_MET -gt 0 ]; then
+            if [ $(ls ../run.0001/xtraj_for_obs_d01* | wc -l) -eq 0 ]; then echo "ERROR: Missing xtraj_for_obs files"; echo 14; exit 14; fi
+            rm xtraj_for_obs_d01*
+            mv ../run.0001/xtraj_for_obs_d01* ./
+            rm ../run.*/xtraj_for_obs_d01*
+         fi
+      fi
+
+      #-------------------------------------------------------------------
+      # Check for presence of obs output files (CHEM only)
+      #-------------------------------------------------------------------
+      if [ $WRF_CHEM -gt 0 ]; then
+         if [ $FORCE_SURFACE -eq 1 ] && [ $(ls ../run.0001/SURFACE_Hx_y* | wc -l) -eq 0 ]; then echo "ERROR: Missing SURFACE_Hx_y files"; echo 15; exit 15; fi
+         rm SURFACE_Hx_y*
+         mv ../run.0001/SURFACE_Hx_y* ./
+         rm ../run.*/SURFACE_Hx_y*
+         if [ $FORCE_AIRCRAFT -eq 1 ] && [ $(ls ../run.0001/AIRCRAFT_Hx_y* | wc -l) -eq 0 ]; then echo "ERROR: Missing AIRCRAFT_Hx_y files"; echo 16; exit 16; fi
+         rm AIRCRAFT_Hx_y*
+         mv ../run.0001/AIRCRAFT_Hx_y* ./
+         rm ../run.*/AIRCRAFT_Hx_y*
+      fi
 
       innerSECONDS=$SECONDS
       innerSECONDS0=$SECONDS

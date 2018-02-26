@@ -40,8 +40,8 @@ subroutine da_rotate_omega(grid, cv_size, mz, jp_start, jp_end, nouter_prev, cv_
 
    if (trace_use) call da_trace_entry("da_rotate_omega")
 
-   write(unit=stdout,fmt='(A)') 'Prerotate Gaussian random vector with previous Hessian eigenvectors for RSVD. '
    write(unit=stdout,fmt=*) ' '
+   write(unit=stdout,fmt='(A)') 'Prerotate Gaussian random vector with previous Hessian eigenvectors for RSVD. '
 
    eig_total = 0
    do it = 1, nouter_prev
@@ -64,6 +64,8 @@ subroutine da_rotate_omega(grid, cv_size, mz, jp_start, jp_end, nouter_prev, cv_
       ! Precondition with the l leading eigen modes from iteration it
       !  (requires eignval/eignvec to be sorted by decreasing value)
       l = max(min(neign,spectral_trunc(it)),0)
+
+      write(unit=stdout,fmt='(A,I0,A,I0)') ' Using ', l, ' eigen modes from outer iteration ', it
 
       if (l .gt. 0) then
 

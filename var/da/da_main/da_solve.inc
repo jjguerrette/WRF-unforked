@@ -947,7 +947,7 @@
             end do
             deallocate(omega)
 
-            if (checkpoint_interval .le. 0) then
+            if (checkpoint_interval.le.0 .or. rand_type.eq.3) then
                call da_deallocate_observations (iv)
                call da_deallocate_y (ob)
                if (use_background_errors) call da_deallocate_background_errors (be)
@@ -1126,12 +1126,13 @@
          ! Avoid re-calling nl model when obs trajectory values are stored in files for this outer iteration
          ! (currently only chemobs or non-chemobs with checkpoint_interval>0 
          !   have been enabled to read H(x) from files instead of calling NL model)
-         if ( &
-             (checkpoint_interval.gt.0 &
+         if ( use_randomblock .and. &
+              ((rand_stage.gt.0 .and. rand_type.ne.3) .or. (rand_stage.gt.1 .and. rand_type.eq.3)) &
+              .and. ( checkpoint_interval.gt.0 &
 #if (WRF_CHEM == 1)
-              .or. (.not.use_offlineobs .and. use_onlineobs .and. use_chemobs) &
+                .or. (.not.use_offlineobs .and. use_onlineobs .and. use_chemobs) &
 #endif
-             ) .and. use_randomblock .and. rand_stage.gt.0) then
+               ) ) then
             write_checkpoints = 2
             disable_traj = .true.
          end if
