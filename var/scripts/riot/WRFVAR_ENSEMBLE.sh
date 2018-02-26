@@ -39,7 +39,8 @@ do
    proc_i=$((proc_i+npiens))
 
    ./WRFVAR_MEMBER.sh "$iSAMP" "$npiens" "$it" "$rand_stage" "$innerit" &
-   wait_pids+=($!)
+#   wait_pids+=($!)
+   wait_pids2[$iSAMP]=$!
 done
 
 ## Are there limitations to running large numbers of background processes?
@@ -47,9 +48,20 @@ done
 # (on small scale tests, this does not seem to give an advantage; need to try larger-scale tests)
 # parallel -j $NJOBS ./WRFVAR_MEMBER.sh ::: `seq 1 $NJOBS` ::: "$NSAMP" ::: "$it" ::: "$rand_stage" ::: "$innerit"
 
-#WAIT for all ensembles to finish
-echo "wait ${wait_pids[@]}"
-wait "${wait_pids[@]}"
+##WAIT for all ensembles to finish
+#echo "wait ${wait_pids[@]}"
+#wait "${wait_pids[@]}"
+
+EXIT_CODE=0
+for (( iSAMP = $iSAMP0 ; iSAMP <= $NJOBS ; iSAMP++))
+do
+   wait "${wait_pids2[$iSAMP]}"
+   errcode=$?
+   if [ $errcode -ne 0 ]; then 
+      echo "WRFVAR_MEMBER $iSAMP with PID ${wait_pids2[$iSAMP]} failed with exit code $errcode"
+      EXIT_CODE=1
+   fi
+done
 
 #Reset PBS_NODEFILE
 export PBS_NODEFILE=$PBSNODE0
@@ -62,3 +74,5 @@ sec0=$(($SECONDS % 60))
 if [ $sec0 -lt 10 ]; then sec0="0"$sec0; fi
 echo "WRFVAR_ENSEMBLE time: $hr0:$min0:$sec0"
 
+echo "WRFVAR_ENSEMBLE EXIT_CODE => $EXIT_CODE"
+exit "$EXIT_CODE"
