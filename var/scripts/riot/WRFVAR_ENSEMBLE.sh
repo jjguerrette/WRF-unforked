@@ -11,6 +11,23 @@ it="$1"; iSAMP0="$2"; NSAMP="$3"; NJOBS="$4"; rand_stage="$5"; innerit="$6"
 
 if [ $NJOBS -gt $((NSAMP+1)) ]; then echo "ERROR: NJOBS should never be more than NSAMP+1"; echo $((rand_stage*100+4)); exit $((rand_stage*100+4)); fi
 
+
+set -m          # allow for job control
+EXIT_CODE=0     # exit code of overall script
+function job_exit_codes() {
+    for job in `jobs -p`; do
+        echo "PID => ${job}"
+         CODE=0;
+         wait ${job} || CODE=$?
+         if [[ "${CODE}" != "0" ]]; then
+            echo "At least one WRFVAR_MEMBER failed with exit code => ${CODE}" ;
+            EXIT_CODE=1;
+         fi
+    done
+}
+trap 'job_exit_codes' CHLD
+
+
 proc_i=0
 for (( iSAMP = $iSAMP0 ; iSAMP <= $NJOBS ; iSAMP++))
 #for (( iSAMP = $NJOBS ; iSAMP >= $iSAMP0 ; iSAMP--))

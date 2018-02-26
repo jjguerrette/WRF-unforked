@@ -160,3 +160,4 @@ if [ $sec0 -lt 10 ]; then sec0="0"$sec0; fi
 echo "WRFVAR_MEMBER.$ii time: $hr0:$min0:$sec0;"$'\n'"INIT_TIME: $inithr0:$initmin0:$initsec0"$'\n'"w/ WRFDA return value: $mpireturn"
 
 exit "$mpireturn"
+
