@@ -17,7 +17,7 @@ if [ $iSAMP -lt 10 ]; then ii="0"$ii; fi
 if [ $iSAMP -lt 100 ]; then ii="0"$ii; fi
 if [ $iSAMP -lt 1000 ]; then ii="0"$ii; fi
 
-cd ../run.$ii
+cd $MEMBERPREFIX$ii
 
 it0=$it
 if [ $it -lt 10 ]; then it0="0"$it0; fi
@@ -52,24 +52,6 @@ else
    mv rsl.* oldrsl_$it0".iter"$innerit0_last".stage3"
 fi
 
-if [ $rand_stage -eq 3 ] && [ $rand_type -eq 3 ]; then
-   #Check for presence of qhat vectors for this ensemble member (cv space)
-   vectors=("qhat.e")
-   vectors2=(".iter$innerit0")
-
-   vcount=0
-   for var in ${vectors[@]}
-   do
-      suffix=${vectors2[$vcount]}
-      echo "Checking for $var$ii.*$suffix files"
-
-      #Test for the presence of qhat for this ensemble member
-      if [ $(ls ../vectors_$it0/$var$ii.*$suffix | wc -l) -eq 0 ]; then echo "ERROR: Missing $var$ii.*$suffix"; echo $((rand_stage*100+2)); exit $((rand_stage*100+2)); fi
-
-      vcount=$((vcount+1))
-   done
-fi
-
 #Handle external checkpoint and obs associated files that change each outer iteration
 if [ $rand_stage -eq 1 ] && [ $rand_type -eq 3 ]; then
    if [ $CPDT -gt 0 ]; then
@@ -83,7 +65,7 @@ if [ $rand_stage -eq 1 ] && [ $rand_type -eq 3 ]; then
       fi
    fi
 else if ([ $rand_stage -eq 3 ] && [ $rand_type -eq 3 ]) || \
-        ([ $rand_stage -eq 1 ] && [ $rand_type -eq 1 ]); then
+        ([ $rand_stage -eq 1 ] && [ $rand_type -eq 6 ]); then
    if [ $CPDT -gt 0 ]; then
       ln -sf $CWD_rel/wrf_checkpoint_d01_* ./
       if [ $WRF_MET -gt 0 ]; then
@@ -104,6 +86,23 @@ if [ $it -gt 1 ] && ([ $RIOT_RESTART -eq 0 ] || [ $RIOT_RESTART -eq 2 ]); then
    ln -sf $CWD_rel/cvt.* ./
 fi
 
+if [ $rand_stage -eq 3 ] && [ $rand_type -eq 3 ]; then
+   #Check for presence of qhat vectors for this ensemble member (cv space)
+   vectors=("qhat.e")
+   vectors2=(".iter$innerit0")
+
+   vcount=0
+   for var in ${vectors[@]}
+   do
+      suffix=${vectors2[$vcount]}
+      echo "Checking for $var$ii.*$suffix files"
+
+      #Test for the presence of qhat for this ensemble member
+      if [ $(ls ../vectors_$it0/$var$ii.*$suffix | wc -l) -eq 0 ]; then echo "ERROR: Missing $var$ii.*$suffix"; echo $((rand_stage*100+2)); exit $((rand_stage*100+2)); fi
+
+      vcount=$((vcount+1))
+   done
+fi
 
 cp $CWD/namelist.input ./
 ex -c :"/ensmember" +:":s/=.*/=$iSAMP,/" +:wq namelist.input
@@ -131,13 +130,6 @@ mpistring="$MPICALL $DEBUGSTR -np $npiens $RIOT_EXECUTABLE $BACKG_STRING"
 #      (may need earlier calls to mpdallexit and mpdboot)
 #mpistring="$MPICALL -np $npiens --hostfile $(pwd)/hostlist $RIOT_EXECUTABLE $BACKG_STRING"
 
-inithr0=$(($SECONDS / 3600))
-if [ $inithr0 -lt 10 ]; then inithr0="0"$inithr0; fi
-initmin0=$((($SECONDS / 60) % 60))
-if [ $initmin0 -lt 10 ]; then initmin0="0"$initmin0; fi
-initsec0=$(($SECONDS % 60))
-if [ $initsec0 -lt 10 ]; then initsec0="0"$initsec0; fi
-
 #Use these if $BACKGR_STRING does not place mpirun in background (no trailing "&"):
 echo "JOB $iSAMP; $mpistring; $(date)"
 eval "$mpistring"
@@ -151,13 +143,16 @@ eval "$mpistring"
 
 mpireturn=$?
 
+#Reset PBS_NODEFILE
+export PBS_NODEFILE=$PBSNODE0
+
 hr0=$(($SECONDS / 3600))
 if [ $hr0 -lt 10 ]; then hr0="0"$hr0; fi
 min0=$((($SECONDS / 60) % 60))
 if [ $min0 -lt 10 ]; then min0="0"$min0; fi
 sec0=$(($SECONDS % 60))
 if [ $sec0 -lt 10 ]; then sec0="0"$sec0; fi
-echo "WRFVAR_MEMBER.$ii time: $hr0:$min0:$sec0;"$'\n'"INIT_TIME: $inithr0:$initmin0:$initsec0"$'\n'"w/ WRFDA return value: $mpireturn"
+echo "WRFVAR_MEMBER.$ii time: $hr0:$min0:$sec0;"$'\n'"w/ WRFDA return value: $mpireturn"
 
 exit "$mpireturn"
 

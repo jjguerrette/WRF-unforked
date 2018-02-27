@@ -1261,10 +1261,6 @@
       end if
 
 
-#ifdef DM_PARALLEL
-   IF ( rootproc ) CALL end_timing('da_end_timing: OUTER_it_INIT2')
-#endif
-
       ! [8.4] Minimize cost function:
       call wrf_message("*** WRF-Var Part 8.4 ***")
 
@@ -1273,6 +1269,10 @@
 #if (WRF_CHEM == 1)
       call da_allocate_y_chem (iv, re)
       call da_allocate_y_chem (iv, y)
+#endif
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: OUTER_it_INIT2')
 #endif
 
       !=======================================================

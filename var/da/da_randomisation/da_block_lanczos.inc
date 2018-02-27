@@ -113,10 +113,16 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
 
          ghat = - ghat
 
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
          ! Write ghat realization to file
          filename = trim(randvecdir)//'ghat.e'//trim(adjustl(cens))// &
                         '.p'//trim(adjustl(cproc))
          call da_cv_io ('w', filename, cv_size, ghat, grid, mz )
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: RIOT_IO_cv_ghat')
+#endif
       else
          write(unit=stdout,fmt='(A,I4)') 'FATAL ERROR: ensmember should be between 1 and nsamp, not ',ensmember
          CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
@@ -278,13 +284,16 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
 !            write(cinner,fmt='(i4.4)') iter
 
             write(unit=stdout,fmt='("Reading yhat vectors; iter = ",i3)') iter
-            allocate(yhat(1:cv_size,block_start:block_end))
+!            allocate(yhat(1:cv_size,block_start:block_end))
+            allocate(yhat(1:cv_size,1:nsamp))
+
             do iens = 1, nsamp
                write(cens,fmt='(i4.4)') iens
                filename = trim(randvecdir)//'yhat.e'//trim(adjustl(cens))// &
                               '.p'//trim(adjustl(cproc))// &
                               '.iter'//trim(adjustl(cinner))
-               call da_cv_io ('r', filename, cv_size, yhat(1:cv_size,block_start+iens-1), grid, mz )
+!               call da_cv_io ('r', filename, cv_size, yhat(1:cv_size,block_start+iens-1), grid, mz )
+               call da_cv_io ('r', filename, cv_size, yhat(1:cv_size,iens), grid, mz )
             end do
 
 #ifdef DM_PARALLEL
@@ -303,9 +312,10 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
             do iens = 1,nsamp
                iiens = block_start+iens-1
                do jens = 1, nsamp
-                  jjens = block_start+jens-1
+!                  jjens = block_start+jens-1
                   MMAT(iens,jens,iter) = da_dot_cv(cv_size, qhat_(:,iiens), &
-                                                    yhat(:,jjens), grid, mz, jp_start, jp_end)
+                                                    yhat(:,jens), grid, mz, jp_start, jp_end)
+!                                                    yhat(:,jjens), grid, mz, jp_start, jp_end)
                end do
             end do
             MMAT(:,:,iter) = (MMAT(:,:,iter) + TRANSPOSE(MMAT(:,:,iter))) / 2.D0
@@ -402,12 +412,12 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
            if (.NOT. swapped) exit
          end do
 
-         !neign should be less than nobs or rank of Hessian update
-         ! (only a concern for small problems)
-!         neign = nmodes
-
-         ! Adjust neign according to how many eigenvalues are positive
          neign = nmodes
+
+         !Note: neign should be less than nobs or rank of Hessian update
+         ! (not a concern for large systems, but is for single/low # obs systems)
+
+!        ! Optional: Adjust neign according to how many eigenvalues are positive (very small impact)
 !         do i = 1, nmodes
 !            if (i.gt.1 .and. LAM(i) .lt. 0.D0) then
 !               neign = i-1
@@ -459,7 +469,7 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
             allocate(hessian_info%eigs(1)%eignvec(1:nmodes,1:nmodes))
 
             !neign should be less than nobs or rank of Hessian update 
-            ! (only a concern for small problems)
+            ! (only a concern for small systems)
             hessian_info%eigs(1)%neign = neign
             hessian_info%eigs(1)%eignval = eignval
             hessian_info%eigs(1)%eignvec = eignvec
@@ -542,8 +552,9 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
             end do
          end do
          do iens = 1,nsamp
-            iiens = block_start+iens-1
-            RMAT(:,iens) = yhat(:,iiens) - qM(:,iens)
+!            iiens = block_start+iens-1
+!            RMAT(:,iens) = yhat(:,iiens) - qM(:,iens)
+            RMAT(:,iens) = yhat(:,iens) - qM(:,iens)
          end do
          deallocate(qM)
          deallocate(MMAT)

@@ -21,6 +21,10 @@ subroutine da_cv_io (io_config, filename, cv_size, rcv, grid, mz, ascii_bool)
 
    integer                         :: cv_unit, dummy
 
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing
+#endif
+
    if (trace_use) call da_trace_entry("da_cv_io")
 
    if (use_global_cv_io .and. present(grid) .and. present(mz)) then
@@ -64,5 +68,9 @@ subroutine da_cv_io (io_config, filename, cv_size, rcv, grid, mz, ascii_bool)
    end if
 
    if (trace_use) call da_trace_exit ("da_cv_io")
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: IO_cv_generic')
+#endif
 
 end subroutine da_cv_io

@@ -93,17 +93,6 @@ if [ -z "$nin_RIOT" ]; then #Could be defined externally
    export nin_RIOT=1
 fi
 
-#Manually set the maximum number of processes per job 
-# - limited by WRF patch overlap
-# - depends on domain (nx x ny) and PPN
-# - critical for speeding up single-job (serial) portions of RIOT 
-#    (e.g., STAGE 2 of RSVD5.6 and Block Lanczos, and STAGE 4 of Block Lanczos)
-# - A good rule of thumb is (nx/10 * ny/10) <= NPpJMAX << (nx/5 * ny/5)
-# - Requirement: NPpJMAX <= NUMPROC (see below)
-if [ -z "$NPpJMAX" ]; then
-   export NPpJMAX=64
-fi
-
 #Manually turn on/off gathering of subprocedure times
 export SUBTIMING=1 #0 or 1
 #####################################################################################
@@ -195,8 +184,10 @@ echo ""
 echo "(7) LRA-LRU Adaptation: ADAPT_SVD=$ADAPT_SVD"
 echo ""
 if [ -z "$GLOBAL_OPT" ]; then
-   GLOBAL_OPT="true" #default choice
+   GLOBAL_OPT="false" #default choice
 fi
+GLOBAL_OPT="false" #default choice
+
 echo "(9) GLOBAL_OPT=$GLOBAL_OPT"
 if [ "$GLOBAL_OPT" == "true" ]; then
    echo "For very large size(cv), global cv I/O requires"
@@ -239,11 +230,40 @@ else
    echo "Automatically determining cores per node: PPN=$PPN"
 fi
 
+#Manually set the maximum number of processes per job 
+# - limited by WRF patch overlap
+# - depends on domain (nx x ny) and PPN
+# - critical for speeding up single-job (serial) portions of RIOT 
+#    (e.g., STAGE 2 of RSVD5.6 and Block Lanczos, and STAGE 4 of Block Lanczos)
+# - A good rule of thumb is (nx/10 * ny/10) <= NPpJMAX << (nx/5 * ny/5)
+# - Requirement: NPpJMAX <= NUMPROC
+if [ -z "$NPpJMAX" ]; then
+#   export NPpJMAX=64
+
+   nx=`grep e_we namelist.input`
+   nx=${nx#*=}
+   nx=${nx%,*}
+
+   ny=`grep e_sn namelist.input`
+   ny=${ny#*=}
+   ny=${ny%,*}
+
+   NPFAC=8
+#   NPFAC=10 #Will be required in WRF V4.0
+   export NPpJMAX=$(($((nx*ny))/$((NPFAC*NPFAC))))
+
+   #Use integer number of nodes (optional)
+   NODEMAX=$((NPpJMAX/PPN))
+   export NPpJMAX=$((NODEMAX*PPN))
+fi
+
 if [ $NPpJMAX -gt $NUMPROC ]; then
    NPpJMAX=$NUMPROC
    export NPpJMAX=$NPpJMAX
-#   echo "ERROR: NPpJMAX must be set <= total number of processors"
-#   echo 8; exit 8
+
+   #Use integer number of nodes (optional)
+   NODEMAX=$((NPpJMAX/PPN))
+   export NPpJMAX=$((NODEMAX*PPN))
 fi
 #Use as many of the cores as possible for ensemble members
 #NODES_all_ens=$((NUMNODES/NSAMP))
@@ -484,8 +504,10 @@ if [ $OSSE -gt 0 ]; then
 fi 
 
 
+export MEMBERPREFIX="../run."
+
 #Populate ensemble member directories
-if [ $(ls "../run.*" | wc -l) -gt 0 ]; then  rm -r ../run.[0-9]*; fi
+if [ $(ls $MEMBERPREFIX".*" | wc -l) -gt 0 ]; then  rm -r ../run.[0-9]*; fi
 if [ $WRF_CHEM -gt 0 ]; then rm *Hx*; fi
 
 for (( iSAMP = 1 ; iSAMP <= $NJOBS ; iSAMP++))
@@ -495,8 +517,8 @@ do
    if [ $iSAMP -lt 100 ]; then ii="0"$ii; fi
    if [ $iSAMP -lt 1000 ]; then ii="0"$ii; fi
 
-   mkdir ../run.$ii
-   cd ../run.$ii
+   mkdir $MEMBERPREFIX$ii
+   cd $MEMBERPREFIX$ii
 
    # link all files necessary to run da_wrfvar.exe
    ln -s $CWD_rel/* ./
@@ -601,7 +623,8 @@ do
       if [ $CPDT -gt 0 ] || [ "$GLOBAL_OMEGA" == "true"  ] ; then
          echo "Generating checkpoint files and/or global omega..."
 
-         if [ "$GLOBAL_OMEGA" == "true" ] && [ "$GLOBAL_OPT" == "false" ]; then
+#         if [ "$GLOBAL_OMEGA" == "true" ] && [ "$GLOBAL_OPT" == "false" ]; then
+         if [ "$GLOBAL_OPT" == "false" ]; then #(For cvt reading and GLOBAL_OMEGA writing)
             npiens=$nproc_local
          else
             npiens=$nproc_global
@@ -657,20 +680,21 @@ do
    cd $CWD
    ex -c :"/rand_stage" +:":s/=.*/=1,/" +:wq namelist.input
 
-   dependent_grad=0
-   if [ $rand_type -eq 3 ]; then dependent_grad=1; fi
    if [ $it -gt $itstart ] || ([ $it -gt 1 ] && [ $RIOT_RESTART -eq 2 ]); then
+      dependent_grad=0
+      if [ $rand_type -eq 3 ]; then dependent_grad=1; fi
+
       #----------------------------------------------------
       # Redistribute cores among samples as NSAMP changes
       #----------------------------------------------------
-      # When max(ntmax_array(iteration>=it)) ~= max(ntmax_array(iteration<it)), 
+      # When max(ntmax_array(iteration>=it)) < max(ntmax_array(iteration<it)), 
       # or ntmax_array(it) ~= ntmax_array(it-1), there are several
       # options for improved efficiency or performance:
 
       ##--------------------------------------------------------------------------
       ## 1 - Release nodes that would go unused (narrow the job width on the fly)
       ##  --> Possible on NAS Pleiades with pbs_release_nodes...still need to script
-      #
+      ##  --> Available on any other systems?
       ##--------------------------------------------------------------------------
 
       ##--------------------------------------------------------------------------
@@ -703,9 +727,16 @@ do
 
 #====================================================================================
 #====================================================================================
-   echo "======================================================="
-   echo "SVD STAGE 1: Multiply A * OMEGA, and calculate GRAD(J)"
-   echo "======================================================="
+   if [ $rand_type -eq 6 ] || [ $rand_type -eq 2 ]; then
+      echo "============================================================================="
+      echo "SVD STAGE 1: Multiply Hessian by $NSAMP OMEGA samples and calculate GRAD(J)"
+      echo "============================================================================="
+   fi
+   if [ $rand_type -eq 3 ]; then
+      echo "======================================================="
+      echo "SVD STAGE 1: Generate $NSAMP Gradient Realizations"
+      echo "======================================================="
+   fi
 
    ./WRFVAR_ENSEMBLE.sh "$it" "1" "$NSAMP" "$NJOBS" "1" "1"
    err=$?; if [ $err -ne 0 ]; then echo $err; exit $err; fi
@@ -724,12 +755,12 @@ do
             if [ $iSAMP -lt 10 ]; then ii="0"$ii; fi
             if [ $iSAMP -lt 100 ]; then ii="0"$ii; fi
             if [ $iSAMP -lt 1000 ]; then ii="0"$ii; fi
-            cat ../run.$ii/cost_fn > ../cost_fn.$ii
-            cat ../run.$ii/grad_fn > ../grad_fn.$ii
+            cat $MEMBERPREFIX$ii/cost_fn > ../cost_fn.$ii
+            cat $MEMBERPREFIX$ii/grad_fn > ../grad_fn.$ii
          done
       else
-         cat ../run.$ii_grad/cost_fn > ../cost_fn
-         cat ../run.$ii_grad/grad_fn > ../grad_fn
+         cat $MEMBERPREFIX$ii_grad/cost_fn > ../cost_fn
+         cat $MEMBERPREFIX$ii_grad/grad_fn > ../grad_fn
       fi
    else
       if [ $rand_type -eq 3 ]; then
@@ -739,13 +770,13 @@ do
             if [ $iSAMP -lt 10 ]; then ii="0"$ii; fi
             if [ $iSAMP -lt 100 ]; then ii="0"$ii; fi
             if [ $iSAMP -lt 1000 ]; then ii="0"$ii; fi
-            grep [0-9] ../run.$ii/cost_fn >> ../cost_fn.$ii
-            grep [0-9] ../run.$ii/grad_fn >> ../grad_fn.$ii
+            grep [0-9] $MEMBERPREFIX$ii/cost_fn >> ../cost_fn.$ii
+            grep [0-9] $MEMBERPREFIX$ii/grad_fn >> ../grad_fn.$ii
          done
       else
          # Use these lines if cost_fn file is overwritten each outer iteration
-         grep [0-9] ../run.$ii_grad/cost_fn >> ../cost_fn
-         grep [0-9] ../run.$ii_grad/grad_fn >> ../grad_fn
+         grep [0-9] $MEMBERPREFIX$ii_grad/cost_fn >> ../cost_fn
+         grep [0-9] $MEMBERPREFIX$ii_grad/grad_fn >> ../grad_fn
       fi
    fi
 
@@ -759,9 +790,9 @@ do
       echo "================================================="
    fi
    if [ $rand_type -eq 3 ]; then
-      echo "================================================="
-      echo "SVD STAGE 2: Orthogonalize Gradient Realizations"
-      echo "================================================="
+      echo "=============================================================="
+      echo "SVD STAGE 2: Orthogonalize Gradient Realizations, generate Q"
+      echo "=============================================================="
    fi
 
    ./check_vectors.sh "$it" "$NSAMP" "2" "1"
@@ -770,7 +801,14 @@ do
    cd $CWD
    ex -c :"/rand_stage" +:":s/=.*/=2,/" +:wq namelist.input
 
-   npiens=$nproc_global
+   if [ "$GLOBAL_OPT" == "false" ]; then #(For cvt reading/writing, ghat+yhat+omega reading, and qhat writing)
+      npiens=$nproc_local
+   else
+      npiens=$nproc_global
+      #Could make this faster (more memory) by distributing across more nodes 
+      # - currently chooses first $npiens processors in $PBS_NODEFILE
+   fi
+
    mpistring="$MPICALL $DEBUGSTR -np $npiens $RIOT_EXECUTABLE"
    #Could make this faster (more memory) by distributing across more nodes 
    # - currently chooses first $npiens processors in $PBS_NODEFILE
@@ -868,7 +906,14 @@ do
          cd $CWD
          ex -c :"/rand_stage" +:":s/=.*/=4,/" +:wq namelist.input
 
-         npiens=$nproc_global
+         if [ "$GLOBAL_OPT" == "false" ]; then #(For cvt reading, ghat+yhat_i+qhat_i reading, and qhat_i+1 writing)
+            npiens=$nproc_local
+         else
+            npiens=$nproc_global
+            #Could make this faster (more memory) by distributing across more nodes 
+            # - currently chooses first $npiens processors in $PBS_NODEFILE
+         fi
+
          mpistring="$MPICALL $DEBUGSTR -np $npiens $RIOT_EXECUTABLE"
          #Could make this faster (more memory) by distributing across more nodes 
          # - currently chooses first $npiens processors in $PBS_NODEFILE
