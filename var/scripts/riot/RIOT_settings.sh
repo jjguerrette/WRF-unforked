@@ -7,6 +7,9 @@
 # needed to run RIOT. See WRFDA_RIOT.sh for more info.
 #---------------------------------------------------------------------------------------
 
+export WRF_MET=1
+export WRF_CHEM=0
+
 export nout_RIOT=3 # number of outer iterations (overrides max_ext_its from namelist.input)
 export nin_RIOT=1  # number of Block Lanczos inner iterations
 export NBLOCK=40   # number of ensemble members in first outer iteration

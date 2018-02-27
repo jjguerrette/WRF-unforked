@@ -52,6 +52,18 @@ fi
 echo "MPI Calling Wrapper = "
 echo "==> "$MPICALL
 
+#=======================================================================================
+# Begin User Options
+#=======================================================================================
+#####################################################################################
+#Modify RIOT_settings.sh to control RIOT behavior
+
+#Read in baseline RIOT settings
+if [ -z "$RIOT_SETTINGS_CALLED" ]; then
+   echo "Running default settings file: RIOT_settings.sh"
+   . ./RIOT_settings.sh
+fi
+
 if [ -z "$WRF_CHEM" ]; then #Could be defined externally
    # Set to 0 (default) to not conduct CHEM DA
    # 1 to conduct chemical emission inversion (requires WRFDA-Chem)
@@ -79,18 +91,6 @@ fi
 
 if [ -z "$nin_RIOT" ]; then #Could be defined externally
    export nin_RIOT=1
-fi
-
-#=======================================================================================
-# Begin User Options
-#=======================================================================================
-#####################################################################################
-#Modify RIOT_settings.sh to control RIOT behavior
-
-#Read in baseline RIOT settings
-if [ -z "$RIOT_SETTINGS_CALLED" ]; then
-   echo "Running default settings file: RIOT_settings.sh"
-   . ./RIOT_settings.sh
 fi
 
 #Manually set the maximum number of processes per job 
