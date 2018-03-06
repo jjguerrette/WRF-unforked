@@ -393,6 +393,7 @@ rconfig   logical   use_lanczos             namelist,wrfvar6  1  .false.  - "use
 rconfig   logical   read_lanczos            namelist,wrfvar6  1  .false.  - "read_lanczos"             ""  ""
 rconfig   logical   write_lanczos           namelist,wrfvar6  1  .false.  - "write_lanczos"            ""  ""
 rconfig   logical   orthonorm_gradient      namelist,wrfvar6  1  .false.  - "orthonorm_gradient"       ""  ""
+rconfig   integer   grm_shmt_order          namelist,wrfvar6  1  1        - "grm_shmt_order"           ""  ""
 rconfig   logical   info_stop               namelist,wrfvar6  1  .true.   -  "info_stop"               ""  ""
 rconfig   integer   cv_options              namelist,wrfvar7  1  5        - "cv_options"               ""  ""
 rconfig   integer   cloud_cv_options        namelist,wrfvar7  1  1        - "cloud_cv_options"         ""  ""

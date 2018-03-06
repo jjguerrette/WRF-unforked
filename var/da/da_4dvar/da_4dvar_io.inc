@@ -76,6 +76,23 @@ subroutine input_nl_xtraj ( time )
 
 end subroutine input_nl_xtraj
 
+subroutine input_nl_xtraj_checkpt ( time )
+
+   implicit none
+
+   character*256, intent(in) :: time
+   character(len=256)        :: filename
+
+   if (trace_use_dull) call da_trace_entry("input_nl_xtraj_checkpt")
+
+   filename = trim(xtrajprefix)//"_d01_"//trim(time)
+
+   call read_nl_xtraj_checkpt (filename, io_form_xtraj, config_flags)
+
+   if (trace_use_dull) call da_trace_entry("input_nl_xtraj_checkpt")
+
+end subroutine input_nl_xtraj_checkpt
+
 subroutine push_tl_pert (time )
 
    implicit none

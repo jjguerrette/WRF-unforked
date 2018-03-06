@@ -8,7 +8,7 @@ module da_transfer_model
    use module_date_time, only : geth_julgmt, current_date, start_date
    use module_domain, only : domain, domain_clock_get, x_type, vp_type, ep_type
    use module_io_domain, only : open_r_dataset, close_dataset, input_auxinput17, &
-      output_auxinput7, open_w_dataset
+      output_auxinput17, open_w_dataset
    use module_state_description, only : dyn_em_ad, dyn_em, dyn_em_tl, &
 #if (WRF_CHEM == 1)
       num_chem_surf, num_chem_acft, num_scaleant, num_scalebb, &
@@ -84,7 +84,7 @@ module da_transfer_model
    use module_big_step_utilities_em, only : calc_mu_uv
    use g_module_big_step_utilities_em, only : g_calc_mu_uv
    use a_module_big_step_utilities_em, only : a_calc_mu_uv
-   USE module_io_wrf, only : auxinput8_alarm, auxhist8_alarm, auxhist17_alarm
+   USE module_io_wrf, only : auxinput18_alarm, auxhist18_alarm, auxhist17_alarm
 #ifdef DM_PARALLEL
    use mediation_pertmod_io, only : da_halo_em_e_ad
 #endif

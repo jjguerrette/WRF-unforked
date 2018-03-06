@@ -18,19 +18,31 @@ subroutine da_read_basicstates ( xbx, grid, config_flags, timestr, fgat )
 #ifdef VAR4D
    if ( grid%var4d ) then
       if ( grid%trajectory_io ) then
-         call input_nl_xtraj (timestr)
+         if ( checkpoint_interval .le. 0 ) then
+            call input_nl_xtraj (timestr)
+         else
+            call input_nl_xtraj_checkpt (timestr)
+         end if
          call da_swap_xtraj (grid)
       else
-         config_flags%auxinput6_inname = "auxhist6_d<domain>_<date>"
-         call med_auxinput_in ( grid, auxinput6_only, config_flags )
+         config_flags%auxinput16_inname = "auxhist6_d<domain>_<date>"
+         call med_auxinput_in ( grid, auxinput16_only, config_flags )
       endif
       call da_transfer_wrftoxb(xbx, grid, config_flags)
+      ! Needed when chem IC's added as CVs
+!#if (WRF_CHEM == 1)
+!      call da_transfer_wrftoxb_chem(grid)
+!#endif
    endif
 #endif
 ! Following codes are for FGAT
    if ( .not. grid%var4d .and. grid%num_fgat_time > 1 .and. present(fgat) ) then
       call da_med_initialdata_input (grid, config_flags, trim(fgat))
       call da_transfer_wrftoxb(xbx, grid, config_flags)
+      ! Needed when chem IC's added as CVs
+!#if (WRF_CHEM == 1)
+!      call da_transfer_wrftoxb_chem(grid)
+!#endif
    end if
    return
 

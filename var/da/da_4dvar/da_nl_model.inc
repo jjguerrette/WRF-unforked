@@ -11,7 +11,7 @@ subroutine da_nl_model (it)
    integer :: time_step, alarmid
    character(len=256) :: rst_outname
 #if (WRF_CHEM == 1)
-   integer :: ioform8
+   integer :: ioform8, ioform16, io_form
    integer :: end_year0, end_month0, end_day0, end_hour0
 #endif
 
@@ -54,6 +54,18 @@ subroutine da_nl_model (it)
    call nl_set_io_form_auxhist6 ( head_grid%id, 2 ) 
    call nl_set_frames_per_auxhist6 ( head_grid%id, 1 ) 
 
+   if (any(write_checkpoints.eq.(/1/)) &
+#if (WRF_CHEM == 1)
+        .and. use_nonchemobs &
+#endif
+        ) then
+      model_config_rec%auxhist16_outname = trim(xtrajprefix)//"_d<domain>_<date>"
+      call nl_set_auxhist16_interval_s (head_grid%id, var4d_bin )
+      call nl_get_io_form_auxhist16 ( head_grid%id, ioform16 )
+      if (ioform16 .le. 0) call nl_set_io_form_auxhist16 ( head_grid%id, io_form_xtraj )
+      call nl_set_frames_per_auxhist16 ( head_grid%id, 1 )
+   end if
+
    if ( write_checkpoints .eq. 1 ) then
       !Turn off xtraj writing
       call nl_set_auxhist6_interval_s ( head_grid%id, 0 )
@@ -62,7 +74,8 @@ subroutine da_nl_model (it)
          !Turn on Output for checkpoint files
          call nl_get_restart_interval_h ( head_grid%id, original_restart_interval)
          call nl_set_restart_interval_m ( head_grid%id, checkpoint_interval)
-         call nl_set_io_form_restart ( head_grid%id, 2 )
+         call nl_get_io_form_restart ( head_grid%id, io_form )
+         if (io_form .le. 0) call nl_set_io_form_restart ( head_grid%id, io_form_xtraj )
          rst_outname = "wrf_checkpoint_d<domain>_<date>"
          call nl_set_rst_outname ( head_grid%id, rst_outname)
          !call nl_set_restart_begin_m( head_grid%id, checkpoint_interval )
@@ -116,7 +129,7 @@ subroutine da_nl_model (it)
    call init_4dvar
 
 #if (WRF_CHEM == 1)
-   if ( model_config_rec%chem_obs_cost ) then
+   if ( .not. use_nonchemobs ) then
       call da_copy_chem_to_model( head_grid, it )
 
       !Need a first guess file that includes scaleant and scalebb
@@ -165,8 +178,19 @@ subroutine da_nl_model (it)
    call nl_set_io_form_auxhist6 ( head_grid%id, 0 ) 
    call nl_set_auxhist6_interval_s ( head_grid%id, 0 ) 
 
+   if (any(write_checkpoints.eq.(/1/)) &
+#if (WRF_CHEM == 1)
+        .and. use_nonchemobs &
+#endif
+        ) then
+      model_config_rec%auxhist16_outname = "auxhist16_d<domain>_<date>"
+      call nl_set_auxhist16_interval_s (head_grid%id, 0 )
+      call nl_set_io_form_auxhist16 ( head_grid%id, ioform16 )
+   end if
+
    if ( write_checkpoints .eq. 1 ) then
       call nl_set_restart_interval_h ( head_grid%id, original_restart_interval)
+      call nl_set_restart_interval_m ( head_grid%id, 0)
       call nl_set_io_form_restart ( head_grid%id, 0 )
       rst_outname = "wrfrst_d<domain>_<date>"
       call nl_set_rst_outname ( head_grid%id, rst_outname)

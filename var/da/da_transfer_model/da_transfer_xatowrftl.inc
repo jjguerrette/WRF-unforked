@@ -382,7 +382,7 @@ subroutine da_transfer_xatowrftl(grid, config_flags, filnam, timestr)
 #endif
 
    if ( .not. trajectory_io .or. var4d_detail_out ) &
-      call  med_hist_out ( grid , AUXHIST8_ALARM , config_flags )
+      call  med_hist_out ( grid , AUXHIST18_ALARM , config_flags )
 
    if (trace_use) call da_trace_exit("da_transfer_xatowrftl")
 

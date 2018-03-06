@@ -19,11 +19,11 @@ subroutine da_ad_model ()
 
    IF ( checkpoint_interval .LE. 0 ) THEN
       ! Set the file names and interval for reading basic states.
-      model_config_rec%auxinput6_inname = "auxhist6_d<domain>_<date>"
+      model_config_rec%auxinput16_inname = "auxhist6_d<domain>_<date>"
       call nl_get_time_step ( head_grid%id, time_step )
-      call nl_set_auxinput6_interval_s (head_grid%id, time_step )
-      call nl_set_io_form_auxinput6 ( head_grid%id, 2 )
-      call nl_set_frames_per_auxinput6 ( head_grid%id, 1 )
+      call nl_set_auxinput16_interval_s (head_grid%id, time_step )
+      call nl_set_io_form_auxinput16 ( head_grid%id, 2 )
+      call nl_set_frames_per_auxinput16 ( head_grid%id, 1 )
 
       ! Set the file names and interval for reading adjoint forcing.
       model_config_rec%auxinput17_inname = "af_d<domain>_<date>"
@@ -237,14 +237,17 @@ subroutine da_ad_model ()
    call nl_set_var4d_run (head_grid%id, .true.)
 
    ! WRF model time-stepping.  Calls integrate().
-   IF ( checkpoint_interval .GT. 0 ) THEN
-
+   IF ( checkpoint_interval .LE. 0 ) THEN
+      call wrf_run_ad
+   ELSE
       end_year0 = model_config_rec%end_year(head_grid%id)
       end_month0 = model_config_rec%end_month(head_grid%id)
       end_day0 = model_config_rec%end_day(head_grid%id)
       end_hour0 = model_config_rec%end_hour(head_grid%id)
 
       call da_set_run_hours ()
+
+      io_form_checkpt = io_form_xtraj
 
       call wrf_run_ad_checkpt
 
@@ -274,8 +277,6 @@ subroutine da_ad_model ()
          call Setup_Timekeeping ( head_grid )
 
       end if 
-   ELSE
-      call wrf_run_ad
    ENDIF
 
    ! restore the physics options to the originals
@@ -293,8 +294,8 @@ subroutine da_ad_model ()
    !call nl_set_isfflx (head_grid%id, original_isfflx)
 
    IF ( checkpoint_interval .LE. 0 ) THEN
-   ! Turn off auxinput6,17 reading and auxhist17 output
-      call nl_set_auxinput6_interval_s (head_grid%id, 0 )
+   ! Turn off auxinput16,17 reading and auxhist17 output
+      call nl_set_auxinput16_interval_s (head_grid%id, 0 )
       call nl_set_auxinput17_interval_s ( head_grid%id, 0 )
    ENDIF
 

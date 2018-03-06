@@ -136,10 +136,20 @@ subroutine da_minimise_lz(grid, config_flags,            &
       alpha(iter) = da_dot_cv(cv_size, qhat(:,iter), fhat, grid, mz, jp_start, jp_end)
 
       ghat        = fhat - alpha(iter)*qhat(:,iter) - beta(iter-1)*qhat(:,iter-1)
-      do i = iter, 1, -1
-         gdot = da_dot_cv(cv_size, ghat, qhat(:,i), grid, mz, jp_start, jp_end)
-         ghat = ghat - gdot * qhat(:,i)
-      end do
+
+      if (grm_shmt_order .eq. 1) then
+         do i = iter, 1, -1
+            gdot = da_dot_cv(cv_size, ghat, qhat(:,i), grid, mz, jp_start, jp_end)
+            ghat = ghat - gdot * qhat(:,i)
+         end do
+      else
+         do j = 1,2 !Second iteration improves orthogonalization for numerical precision (Bjorck, 1994)
+         do i = 1, iter !Reordering reduces numerical error for high iter
+            gdot = da_dot_cv(cv_size, ghat, qhat(:,i), grid, mz, jp_start, jp_end)
+            ghat = ghat - gdot * qhat(:,i)
+         end do
+         end do
+      end if
 
       beta(iter)  = SQRT(da_dot_cv (cv_size, ghat, ghat, grid, mz, jp_start, jp_end))
       

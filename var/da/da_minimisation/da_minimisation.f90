@@ -56,7 +56,7 @@ module da_minimisation
       sigma_r_acft, sigma_c_acft, &
       num_ant_steps, num_bb_steps, &
 #endif
-      info_stop, &
+      info_stop, grm_shmt_order, &
       sound, mtgirs, sonde_sfc, synop, profiler, gpsref, gpspw, polaramv, geoamv, ships, metar, &
       satem, radar, ssmi_rv, ssmi_tb, ssmt1, ssmt2, airsr, pilot, airep,tamdar, tamdar_sfc, rain, &
       bogus, buoy, qscat,pseudo, radiance, monitor_on, max_ext_its, use_rttov_kmatrix,&
@@ -188,12 +188,13 @@ module da_minimisation
    use da_wrfvar_io, only : da_med_initialdata_input
    use da_transfer_model, only : da_transfer_wrftoxb
 #ifdef VAR4D
-   use da_4dvar, only : da_tl_model, da_ad_model, model_grid, input_nl_xtraj, &
+   use da_4dvar, only : da_tl_model, da_ad_model, model_grid, &
+       input_nl_xtraj,  xtrajprefix, io_form_xtraj, input_nl_xtraj_checkpt, &
        kj_swap_reverse, upsidedown_ad_forcing, u6_2, v6_2, w6_2, t6_2, ph6_2, p6, &
       mu6_2, psfc6, moist6
    use da_transfer_model, only : da_transfer_xatowrftl_lbc, da_transfer_xatowrftl_adj_lbc, &
       da_transfer_wrftl_lbc_t0, da_transfer_wrftl_lbc_t0_adj, da_get_2nd_firstguess
-   USE module_io_wrf, only : auxinput6_only, auxhist18_alarm
+   USE module_io_wrf, only : auxinput16_only, auxhist18_alarm
 #endif
 
    implicit none
