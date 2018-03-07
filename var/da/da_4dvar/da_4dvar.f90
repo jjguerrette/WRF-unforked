@@ -1,15 +1,21 @@
 module da_4dvar
 
 use da_tracing, only : da_trace_entry, da_trace_exit
-use da_reporting, only : da_error
+use da_reporting, only : da_error, message
 use da_control, only : comm, var4d_bin, var4d_lbc, trace_use_dull, num_fgat_time, multi_inc, &
                        run_hours, run_days, adtl_run_hours, &
+                       rootproc, &
 #if (WRF_CHEM == 1)
-                       calc_hx_only, use_nonchemobs, &
+                       calc_hx_only, use_nonchemobs, cv_options, &
 #endif
                        checkpoint_interval, write_checkpoints, cycle_interval
 
 #ifdef VAR4D
+
+#if (WRF_CHEM == 1)
+   use, intrinsic :: iso_c_binding,                       &
+                     ONLY: c_int32_t, C_CHAR, C_NULL_CHAR
+#endif
 
 use module_streams, only : MAX_WRF_ALARMS
 use module_wrf_top, only : domain, head_grid, config_flags, &
@@ -67,6 +73,7 @@ contains
 #if (WRF_CHEM == 1)
 #include "da_init_model_output.inc"
 #include "da_init_model_input.inc"
+#include "da_add_var_to_firstguess.inc"
 #endif
 #endif
 

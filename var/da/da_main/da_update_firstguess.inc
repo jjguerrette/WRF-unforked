@@ -95,19 +95,19 @@ subroutine da_update_firstguess(grid, out_filename)
      if (file_name == 'ana02') then
         fgname = 'fg02'
      else
-#if (WRF_CHEM == 1)
-        fgname = 'fgc'
-#else
+!#if (WRF_CHEM == 1)
+!        fgname = 'fgc'
+!#else
         fgname = 'fg'
-#endif
+!#endif
      endif
   else
      file_name = 'wrfvar_output'
-#if (WRF_CHEM == 1)
-     fgname = 'fgc'
-#else
+!#if (WRF_CHEM == 1)
+!     fgname = 'fgc'
+!#else
      fgname = 'fg'
-#endif
+!#endif
   endif
 
   if (rootproc) then

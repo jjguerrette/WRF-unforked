@@ -10,7 +10,7 @@ subroutine da_init_model_input
 
    head_grid%itimestep = 0
 
-   config_flags%input_inname = "fgc"
+   config_flags%input_inname = "fg"
 
    call med_initialdata_input (head_grid, config_flags)
 

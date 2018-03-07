@@ -449,8 +449,8 @@ subroutine da_read_obs_chem(grid, iv)
          else
             iv%info(chem_acft)%i(iplt,itime) = missing
             iv%info(chem_acft)%j(iplt,itime) = missing
-            iv%chem_acft(iobs)%ti = missing_r
-            iv%chem_acft(iobs)%tf = missing_r
+            iv%chem_acft(itime)%ti = missing_r
+            iv%chem_acft(itime)%tf = missing_r
             do ichem = 1, num_chem_acft-1
                iv%chem_acft(itime)%chem(ichem,iplt)%inv = missing_r
                iv%chem_acft(itime)%chem(ichem,iplt)%error = missing_r
