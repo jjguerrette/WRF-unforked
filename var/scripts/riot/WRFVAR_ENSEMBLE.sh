@@ -14,9 +14,11 @@ if [ $NJOBS -gt $((NSAMP+1)) ]; then echo "ERROR: NJOBS should never be more tha
 echo "Starting $NSAMP WRFVAR ensemble members"
 if [ $NJOBS -eq $((NSAMP+1)) ]; then echo "and one WRFVAR gradient member"; fi
 echo "in $NJOBS jobs for RIOT"
+
+#Setup ensemble members
+SETUPTIME=$SECONDS
 proc_i=0
 for (( iSAMP = $iSAMP0 ; iSAMP <= $NJOBS ; iSAMP++))
-## for (( iSAMP = $NJOBS ; iSAMP >= $iSAMP0 ; iSAMP--))
 do
    ii=$iSAMP
    if [ $iSAMP -lt 10 ]; then ii="0"$ii; fi
@@ -39,7 +41,34 @@ do
 
    proc_i=$((proc_i+npiens))
 
-   ./WRFVAR_MEMBER.sh "$iSAMP" "$npiens" "$it" "$rand_stage" "$innerit" &
+   ./WRFVAR_MEMBER1.sh "$iSAMP" "$it" "$rand_stage" "$innerit" &
+   wait_pids1+=($!)
+done
+echo "wait ${wait_pids1[@]}"
+wait "${wait_pids1[@]}"
+
+SETUPTIME=$((SECONDS-SETUPTIME))
+echo "WRFVAR_ENSEMBLE iteration $it, inner $innerit, stage $rand_stage parasitic setup time: $SETUPTIME sec."
+#Note: The wall-time is marginally shorter for a single script that combines WRFVAR_MEMBER1 and WRFVAR_MEMBER2.  Separating them like this allows for the sequential SETUPTIME and ENSTIME to be quantified.
+
+#Execute ensemble members
+ENSTIME=$SECONDS
+for (( iSAMP = $iSAMP0 ; iSAMP <= $NJOBS ; iSAMP++))
+do
+   ii=$iSAMP
+   if [ $iSAMP -lt 10 ]; then ii="0"$ii; fi
+   if [ $iSAMP -lt 100 ]; then ii="0"$ii; fi
+   if [ $iSAMP -lt 1000 ]; then ii="0"$ii; fi
+
+   cd $MEMBERPREFIX$ii
+
+   # Assign the processes to the hostlist for the current ensemble member
+   npiens=$nproc_local
+   if [ $iSAMP -eq $((NSAMP+1)) ]; then
+      npiens=$nproc_local_grad
+   fi
+
+   ./WRFVAR_MEMBER2.sh "$iSAMP" "$npiens" &
 #   wait_pids+=($!)
    wait_pids2[$iSAMP]=$!
 done
@@ -65,13 +94,16 @@ do
    fi
 done
 
+ENSTIME=$((SECONDS-ENSTIME))
+echo "WRFVAR_ENSEMBLE iteration $it, inner $innerit, stage $rand_stage ensemble time: $ENSTIME sec."
+
 hr0=$(($SECONDS / 3600))
 if [ $hr0 -lt 10 ]; then hr0="0"$hr0; fi
 min0=$((($SECONDS / 60) % 60))
 if [ $min0 -lt 10 ]; then min0="0"$min0; fi
 sec0=$(($SECONDS % 60))
 if [ $sec0 -lt 10 ]; then sec0="0"$sec0; fi
-echo "WRFVAR_ENSEMBLE time: $hr0:$min0:$sec0"
+echo "WRFVAR_ENSEMBLE iteration $it, inner $innerit, stage $rand_stage total time: $hr0:$min0:$sec0"
 
 echo "WRFVAR_ENSEMBLE EXIT_CODE => $EXIT_CODE"
 exit "$EXIT_CODE"

@@ -795,7 +795,7 @@
 
       !Transform initial state update to T0 boundary condition update
       call da_transform_xatowrftl_lbc_wrapper( &
-              global_it, cv_size, be, grid%ep, &
+              1, cv_size, be, grid%ep, &
               omega(:,1), iv, grid%vp6, grid%vv6, xbx, &
               grid, config_flags &
 !#if (WRF_CHEM == 1)
@@ -931,9 +931,10 @@
             call wrf_message("Generating global omega")
             allocate(omega(cv_size,nsamp))
 
+!            !Use prime numbers: 65537, 44701
 !            put_rand_seed = .true.
-!            seed_array1 = 2343*nsamp
-!            seed_array2 = 5677*global_it
+!            seed_array1 = 65537*nsamp
+!            seed_array2 = 44701*global_it
 
             call da_gen_omega(omega, cv_size, nsamp, grid, mz)
 

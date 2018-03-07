@@ -106,10 +106,7 @@ DEBUGSTR=
 #DEBUGSTR="-verbose"
 
 export MPI_VERBOSE=1
-#export BACKG_STRING="< /dev/null &> out.run &"
-export BACKG_STRING="< /dev/null &> out.run"
-
-export RIOT_EXECUTABLE="./da_wrfvar.exe"
+RIOT_EXECUTABLE="./da_wrfvar.exe"
 
 #------------------------------------
 CLEANUP=2 #Takes extra time or space:
@@ -556,7 +553,7 @@ export PBSNODE0
 export MPICALL
 export DEBUGSTR
 export RIOT_EXECUTABLE
-export BACKG_STRING
+export CLEANUP
 
 ## BEGIN Outer Loop
 for (( it = $itstart ; it <= $NOUTER ; it++))
@@ -612,13 +609,15 @@ do
    if [ $NJOBS -lt 100 ]; then ii_grad="0"$ii_grad; fi
    if [ $NJOBS -lt 1000 ]; then ii_grad="0"$ii_grad; fi
 
+   RSLTIME=0
+   FILETIME=0
    if [ $STAGE0 -gt 0 ]; then
 #====================================================================================
 #====================================================================================
       echo "============="
       echo "SVD STAGE 0"
       echo "============="
-      # This stage only necessary to generate checkpoint files
+      # This stage only necessary to generate checkpoint files or global OMEGA vectors
       ex -c :"/rand_stage" +:":s/=.*/=0,/" +:wq namelist.input
       if [ $CPDT -gt 0 ] || [ "$GLOBAL_OMEGA" == "true"  ] ; then
          echo "Generating checkpoint files and/or global omega..."
@@ -641,9 +640,10 @@ do
          echo "WRFDA return value: $mpireturn"
 
          if [ $SUBTIMING -eq 1 ]; then grep da_end_timing rsl.out.0000 > ../bench_time_stage0.it$it0; fi
+         TEMPTIME=$SECONDS
          mkdir oldrsl_$it0".stage0"
-         mv -v rsl.* oldrsl_$it0".stage0"
-
+         mv rsl.* oldrsl_$it0".stage0"
+         RSLTIME=$((RSLTIME+$((SECONDS-TEMPTIME))))
       fi
    fi
 
@@ -829,8 +829,10 @@ do
 #===================================================================================
    if [ $rand_type -eq 3 ]; then
       cd $CWD
+      TEMPTIME=$SECONDS
       mkdir oldrsl_$it0".iter0001.stage2"
-      mv -v rsl.* oldrsl_$it0".iter0001.stage2"
+      mv rsl.* oldrsl_$it0".iter0001.stage2"
+      RSLTIME=$((RSLTIME+$((SECONDS-TEMPTIME))))
 
       hr0=$(($SECONDS / 3600))
       if [ $hr0 -lt 10 ]; then hr0="0"$hr0; fi
@@ -930,8 +932,10 @@ do
          fi
 
          if [ $innerit -lt $NINNER ]; then
+            TEMPTIME=$SECONDS
             mkdir oldrsl_$it0".iter"$innerit0".stage4"
-            mv -v rsl.* oldrsl_$it0".iter"$innerit0".stage4"
+            mv rsl.* oldrsl_$it0".iter"$innerit0".stage4"
+            RSLTIME=$((RSLTIME+$((SECONDS-TEMPTIME))))
          fi
 
          hr0=$(($((SECONDS-innerSECONDS)) / 3600))
@@ -963,12 +967,14 @@ do
    fi
 
 
-#==============================================================================
-   echo ""
-   echo "Extract analysis for current outer loop, and initialize the next one..."
-   echo ""
-#==============================================================================
    if [ $it -lt $NOUTER ]; then
+#==============================================================================
+      echo ""
+      echo "Extract analysis for current outer loop, and initialize the next one..."
+      echo ""
+#==============================================================================
+
+      TEMPTIME=$SECONDS
       if [ $it -eq $itstart ]; then cp -v fg fg_it0; fi
       mv -v wrfvar_output wrfvar_output_$it0
       ln -sfv ./wrfvar_output_$it0 ./fg 
@@ -981,13 +987,16 @@ do
          mv -v wrfvar_bdyout wrfvar_bdyout_$it0
          ln -sfv ./wrfvar_bdyout_$it0 ./wrfbdy_d01
       fi
+      FILETIME=$((FILETIME+$((SECONDS-TEMPTIME))))
 
+      TEMPTIME=$SECONDS
       mkdir oldrsl_$it0
-      mv -v rsl.* oldrsl_$it0
+      mv rsl.* oldrsl_$it0
+      RSLTIME=$((RSLTIME+$((SECONDS-TEMPTIME))))
    fi
    if [ $WRF_CHEM -gt 0 ]; then
       if [ $it -eq $itstart ]; then mkdir oldhxy; fi
-      mv -v *Hx_y* oldhxy/
+      mv *Hx_y* oldhxy/
    fi
 
    hr0=$(($SECONDS / 3600))
@@ -997,6 +1006,9 @@ do
    sec0=$(($SECONDS % 60))
    if [ $sec0 -lt 10 ]; then sec0="0"$sec0; fi
    echo "Iteration $it compute time: $hr0:$min0:$sec0"
+
+   echo "Iteration $it rsl archive time: $RSLTIME sec."
+   echo "Iteration $it wrfinput,wrfbdy update time: $FILETIME sec."
 
    iteration_sec=$((iteration_sec+SECONDS))
    hr0=$(($iteration_sec / 3600))

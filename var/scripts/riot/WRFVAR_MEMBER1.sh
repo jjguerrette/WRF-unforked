@@ -3,14 +3,7 @@ SECONDS=0
 #========================================================
 #WRFVAR_MEMBER.sh is used to run a single ensemble member
 #========================================================
-iSAMP="$1"; npiens="$2"; it="$3"; rand_stage="$4"; innerit="$5"
-
-## Alternative compatible with GNU parallel
-#   NSAMP="$2"
-#   npiens=$nproc_local
-#   if [ $1 -eq $((NSAMP+1)) ]; then
-#      npiens=$nproc_local_grad
-#   fi
+iSAMP="$1"; it="$2"; rand_stage="$3"; innerit="$4"
 
 ii=$iSAMP
 if [ $iSAMP -lt 10 ]; then ii="0"$ii; fi
@@ -36,6 +29,7 @@ if [ $((innerit-1)) -lt 100 ]; then innerit0_last="0"$innerit0_last; fi
 if [ $((innerit-1)) -lt 1000 ]; then innerit0_last="0"$innerit0_last; fi
 
 # Archive old log files
+TEMPTIME=$SECONDS
 if [ $innerit -eq 1 ]; then
    if [ $rand_stage -eq 1 ]; then
       if [ $it -gt 1 ] && \
@@ -51,8 +45,18 @@ else
    mkdir oldrsl_$it0".iter"$innerit0_last".stage3"
    mv rsl.* oldrsl_$it0".iter"$innerit0_last".stage3"
 fi
+TEMPTIME=$((SECONDS-TEMPTIME))
+hr_temp1=$(($TEMPTIME / 3600))
+if [ $hr_temp1 -lt 10 ]; then hr_temp1="0"$hr_temp1; fi
+min_temp1=$((($TEMPTIME / 60) % 60))
+if [ $min_temp1 -lt 10 ]; then min_temp1="0"$min_temp1; fi
+sec_temp1=$(($TEMPTIME % 60))
+if [ $sec_temp1 -lt 10 ]; then sec_temp1="0"$sec_temp1; fi
+
 
 #Handle external checkpoint and obs associated files that change each outer iteration
+TEMPTIME=$SECONDS
+if [ $innerit -eq 1 ]; then
 if [ $rand_stage -eq 1 ] && [ $rand_type -eq 3 ]; then
    if [ $CPDT -gt 0 ]; then
       rm wrf_checkpoint_d01_*
@@ -78,15 +82,28 @@ else if ([ $rand_stage -eq 3 ] && [ $rand_type -eq 3 ]) || \
    fi
 fi
 fi
-
-#Link cvt file for current outer iteration
-if [ $it -gt 1 ] && ([ $RIOT_RESTART -eq 0 ] || [ $RIOT_RESTART -eq 2 ]); then
-   #Test for the presence of cvt
-   if [ $(ls "$CWD"/cvt.it"$it0_last".* | wc -l) -eq 0 ]; then echo "ERROR: Missing cvt.*"; echo $((rand_stage*100+3)); exit $((rand_stage*100+3)); fi
-   ln -sf $CWD_rel/cvt.* ./
 fi
 
-if [ $rand_stage -eq 3 ] && [ $rand_type -eq 3 ]; then
+#Link cvt file for current outer iteration
+if [ $it -gt 1 ] && [ $rand_stage -eq 1 ] && ([ $RIOT_RESTART -eq 0 ] || [ $RIOT_RESTART -eq 2 ]); then
+   #Test for the presence of cvt
+   if [ $(ls "$CWD"/cvt.it"$it0_last".* | wc -l) -eq 0 ]; then echo "ERROR: Missing cvt.it$it0_last"; echo $((rand_stage*100+3)); exit $((rand_stage*100+3)); fi
+   ln -sf $CWD_rel/cvt.it$it0_last* ./
+#   ln -sf $CWD_rel/cvt.* ./
+fi
+
+TEMPTIME=$((SECONDS-TEMPTIME))
+hr_temp2=$(($TEMPTIME / 3600))
+if [ $hr_temp2 -lt 10 ]; then hr_temp2="0"$hr_temp2; fi
+min_temp2=$((($TEMPTIME / 60) % 60))
+if [ $min_temp2 -lt 10 ]; then min_temp2="0"$min_temp2; fi
+sec_temp2=$(($TEMPTIME % 60))
+if [ $sec_temp2 -lt 10 ]; then sec_temp2="0"$sec_temp2; fi
+
+
+TEMPTIME=$SECONDS
+#Large source of load imbalance as written.  Need to rewrite.
+if [ $innerit -eq 1 ] && [ $rand_stage -eq 3 ] && [ $rand_type -eq 3 ]; then
    #Check for presence of qhat vectors for this ensemble member (cv space)
    vectors=("qhat.e")
    vectors2=(".iter$innerit0")
@@ -95,7 +112,7 @@ if [ $rand_stage -eq 3 ] && [ $rand_type -eq 3 ]; then
    for var in ${vectors[@]}
    do
       suffix=${vectors2[$vcount]}
-      echo "Checking for $var$ii.*$suffix files"
+#      echo "Checking for $var$ii.*$suffix files"
 
       #Test for the presence of qhat for this ensemble member
       if [ $(ls ../vectors_$it0/$var$ii.*$suffix | wc -l) -eq 0 ]; then echo "ERROR: Missing $var$ii.*$suffix"; echo $((rand_stage*100+2)); exit $((rand_stage*100+2)); fi
@@ -104,47 +121,13 @@ if [ $rand_stage -eq 3 ] && [ $rand_type -eq 3 ]; then
    done
 fi
 
-cp $CWD/namelist.input ./
-ex -c :"/ensmember" +:":s/=.*/=$iSAMP,/" +:wq namelist.input
-
-# Multiply A^T * A * q_i [iSAMP<=NSAMP] or A^T * R^-1/2 * [h(x + dx) - y + dy] [iSAMP==NSAMP+1]
-# A = R^-1/2 * H * L
-# dx and dy are only used in Block Lanczos (rand_type==3)
-# Note: The implementation through mpirun or mpiexec is 
-#       unique for your cluster and MPI implementation
-
-# DEFAULT - WORKS FOR:
-#  1a NASA Pleiades for SGI MPT
-#  1b NOAA Theia for Intel MPI
-#  *Please add more as verified or other solutions developed
-
-export PBS_NODEFILE=$(pwd)/hostlist #.$ii
-
-mpistring="$MPICALL $DEBUGSTR -np $npiens $RIOT_EXECUTABLE $BACKG_STRING"
-
-# 2 - Potentially generic solution for Intel MPI implmentations
-#      (may need earlier calls to mpdallexit and mpdboot)
-#mpistring="$MPICALL -np $npiens -machinefile $(pwd)/hostlist $RIOT_EXECUTABLE $BACKG_STRING"
-
-# 3 - Potentially generic solution for Open MPI implmentations
-#      (may need earlier calls to mpdallexit and mpdboot)
-#mpistring="$MPICALL -np $npiens --hostfile $(pwd)/hostlist $RIOT_EXECUTABLE $BACKG_STRING"
-
-#Use these if $BACKGR_STRING does not place mpirun in background (no trailing "&"):
-echo "JOB $iSAMP; $mpistring; $(date)"
-eval "$mpistring"
-
-##   #Use these if $BACKGR_STRING places mpirun in background (trailing "&"):
-##   eval "$mpistring"; wait_pids+=($!)
-##   echo "JOB $iSAMP; wait ${wait_pids[@]}"
-##   wait "${wait_pids[@]}"
-
-#NOTE: Redirected input ($BACKG_STRING) necessary to run in background and ensures clean log files
-
-mpireturn=$?
-
-#Reset PBS_NODEFILE
-export PBS_NODEFILE=$PBSNODE0
+TEMPTIME=$((SECONDS-TEMPTIME))
+hr_temp3=$(($TEMPTIME / 3600))
+if [ $hr_temp3 -lt 10 ]; then hr_temp3="0"$hr_temp3; fi
+min_temp3=$((($TEMPTIME / 60) % 60))
+if [ $min_temp3 -lt 10 ]; then min_temp3="0"$min_temp3; fi
+sec_temp3=$(($TEMPTIME % 60))
+if [ $sec_temp3 -lt 10 ]; then sec_temp3="0"$sec_temp3; fi
 
 hr0=$(($SECONDS / 3600))
 if [ $hr0 -lt 10 ]; then hr0="0"$hr0; fi
@@ -152,7 +135,7 @@ min0=$((($SECONDS / 60) % 60))
 if [ $min0 -lt 10 ]; then min0="0"$min0; fi
 sec0=$(($SECONDS % 60))
 if [ $sec0 -lt 10 ]; then sec0="0"$sec0; fi
-echo "WRFVAR_MEMBER.$ii time: $hr0:$min0:$sec0;"$'\n'"w/ WRFDA return value: $mpireturn"
+echo "WRFVAR_MEMBER.$ii time, TOTAL-$hr0:$min0:$sec0; "$'\n'"ARCHIVE-$hr_temp1:$min_temp1:$sec_temp1; "$'\n'"LINK-$hr_temp2:$min_temp2:$sec_temp2; "$'\n'"CHECK-$hr_temp3:$min_temp3:$sec_temp3; "
 
-exit "$mpireturn"
+exit 0
 
