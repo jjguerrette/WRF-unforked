@@ -451,6 +451,11 @@ else if [ $RIOT_RESTART ] && [ $RIOT_RESTART -eq 2 ]; then
 #   fi
 else
    itstart=1 #default
+
+   if [ $(ls ./fg_orig | wc -l) -eq 0 ]; then cp -v fg fg_orig; fi
+   if [ $(ls ./fg_orig | wc -l) -eq 0 ]; then ; echo 17; exit 17;fi
+   ln -sf ./fg_orig ./fg
+   ln -sf ./fg_orig ./wrfinput_d01
 fi
 fi
 
