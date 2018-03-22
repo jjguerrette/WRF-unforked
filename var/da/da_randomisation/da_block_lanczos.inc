@@ -417,18 +417,24 @@ subroutine da_block_lanczos(grid, mz, config_flags,        &
          !Note: neign should be less than nobs or rank of Hessian update
          ! (not a concern for large systems, but is for single/low # obs systems)
 
-!        ! Optional: Adjust neign according to how many eigenvalues are positive (very small impact)
-!         do i = 1, nmodes
-!            if (i.gt.1 .and. LAM(i) .lt. 0.D0) then
-!               neign = i-1
-!               exit
-!            end if
-!         end do
+         if (enforce_posdef) then
+            ! Optional: Adjust neign to enforce positive definite Hessian approximation
+            do i = 1, nmodes
+               if (i.gt.1 .and. LAM(i) .lt. 0.D0) then
+                  neign = i-1
+                  exit
+               end if
+            end do
 
-!         !Preconditioned observation Hessian should be positive semi-definite
-!         do i = 1, nmodes
-!            LAM(i) = max(LAM(i),0.D0)
-!         end do
+!!Alternative
+!            !Preconditioned observation Hessian should be positive semi-definite
+!            do i = 1, nmodes
+!               LAM(i) = max(LAM(i),0.D0)
+!            end do
+
+         end if
+
+
          eignval = LAM
 !END ENCAPUSLATE THIS EIGENDECOMP --> Same as second half of da_rsvd56
 

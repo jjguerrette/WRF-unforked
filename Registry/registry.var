@@ -418,6 +418,8 @@ rconfig   integer   ensmember               namelist,wrfvar6  1  0        - "ens
 rconfig   logical   read_omega              namelist,wrfvar6  1  .false.  - "read_omega"               ""  ""
 rconfig   logical   rotate_omega            namelist,wrfvar6  1  .false.  -  "rotate_omega"            ""  ""
 rconfig   logical   use_global_cv_io        namelist,wrfvar6  1  .true.   - "use_global_cv_io"         ""  ""
+rconfig   logical   enforce_posdef          namelist,wrfvar6  1  .false.  - "enforce_posdef"           ""  ""
+
 rconfig   integer   adapt_svd               namelist,wrfvar6  1  0        - "adapt_svd"                ""  ""
 rconfig   integer   svd_p                   namelist,wrfvar6  1  0        - "svd_p"                    ""  ""
 rconfig   integer   cv_options              namelist,wrfvar7  1  5        - "cv_options"               ""  ""

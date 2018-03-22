@@ -21,6 +21,7 @@ module da_randomisation
        read_omega, svd_p, ierr, comm, &
        use_global_cv_io, nmodes_global, var4d_inc_out, inc_out_interval, &
        spectral_precon, rotate_omega, spectral_trunc, &
+       enforce_posdef, &
 #if (WRF_CHEM == 1)
        chem_surf, chem_acft, &
        num_ant_steps, num_bb_steps, &
@@ -43,11 +44,10 @@ module da_randomisation
    use da_tools, only: da_set_randomcv
    use da_tracing, only : da_trace_entry, da_trace_exit,da_trace
    use da_lapack, only : dsteqr !WRFDA-specific version of dsteqr (not MKL)
+
 #if defined(LAPACK)
    use f95_precision, only: WP => DP
    use lapack95, only: gesv, syev, gesvd
-
-
 #endif
 
    implicit none
