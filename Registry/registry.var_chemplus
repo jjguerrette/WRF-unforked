@@ -7,29 +7,29 @@
 dimspec ant      3                 namelist=num_ant_steps    z   anthro_emiss_scale_size
 dimspec bb       3                 namelist=num_bb_steps     z   burn_emiss_scale_size
 dimspec nsurf    -                 namelist=num_surf_obs     c   num_surf_obs
-dimspec nacft    -                 namelist=num_acft_obs     c   num_acft_obs
+#dimspec nacft    -                 namelist=num_acft_obs     c   num_acft_obs
 dimspec ntim     -                 namelist=num_ts           c   num_ts
 dimspec nplt     -                 namelist=num_platform     c   num_platform
 
-rconfig integer  num_ant_steps     namelist,chem     1           1   rh  "num_scale_ant"   ""   ""
-rconfig integer  num_bb_steps      namelist,chem     1           1   rh  "num_scale_bb"   ""   ""
+rconfig integer  num_ant_steps     namelist,chem     1           1   rh  "num_scale_ant"     ""   ""
+rconfig integer  num_bb_steps      namelist,chem     1           1   rh  "num_scale_bb"      ""   ""
 
-rconfig integer  num_surf_obs      namelist,chem     1           0   rh  "num_surf_obs"   ""   ""
-rconfig integer  num_acft_obs      namelist,chem     1           0   rh  "num_acft_obs"   ""   ""
-rconfig integer  num_ts            namelist,chem     1           0   rh  "num_ts"   ""   ""
-rconfig integer  num_platform      namelist,chem     1           1   rh  "num_platform"   ""   ""
+rconfig integer  num_surf_obs      namelist,chem     1           0   rh  "num_surf_obs"      ""   ""
+rconfig integer  num_acft_obs      namelist,chem     1           0   rh  "num_acft_obs"      ""   ""
+rconfig integer  num_ts            namelist,chem     1           0   rh  "num_ts"            ""   ""
+rconfig integer  num_platform      namelist,chem     1           1   rh  "num_platform"      ""   ""
 
-rconfig integer  chemda_opt        namelist,chem     1           1   rh  "chemda_opt"   ""   ""
+rconfig integer  insitu_chem_opt   namelist,chem     1           1   rh  "insitu_chem_opt"   ""   ""
 
-rconfig integer  scaleant_frq      namelist,chem     1           0   rh  "scale_ant_frq"    ""    ""
-rconfig integer  scalebb_frq       namelist,chem     1           0   rh  "scale_bb_frq"    ""    ""
-rconfig integer  scaleant_rpt_int  namelist,chem     1           0   rh  "scale_ant_rpt_int"    ""    ""
-rconfig integer  scalebb_rpt_int   namelist,chem     1           0   rh  "scale_bb_rpt_int"    ""    ""
+rconfig integer  scaleant_frq      namelist,chem     1           0   rh  "scale_ant_frq"     ""   ""
+rconfig integer  scalebb_frq       namelist,chem     1           0   rh  "scale_bb_frq"      ""   ""
+rconfig integer  scaleant_rpt_int  namelist,chem     1           0   rh  "scale_ant_rpt_int" ""   ""
+rconfig integer  scalebb_rpt_int   namelist,chem     1           0   rh  "scale_bb_rpt_int"  ""   ""
 rconfig integer  scale_emiss_opt   namelist,chem     max_domains 3   rh  "scale_emiss_opt"   ""   ""
-rconfig integer  scale_burn_opt    namelist,chem     max_domains 1   rh  "scale_burn_opt"   ""   ""
+rconfig integer  scale_burn_opt    namelist,chem     max_domains 1   rh  "scale_burn_opt"    ""   ""
 rconfig integer  nta_chem_opt      namelist,chem     max_domains 0   rh  "nta_chem_opt"      ""   ""
 
-rconfig real     init_scale        namelist,wrfvarchem     1         1.0   rh  "init_scale"        ""   ""
+rconfig real     init_scale        namelist,wrfvarchem     1     1.0 rh  "init_scale"        ""   ""
 
 state   integer  STEPSCALEANT            -            misc         1   -   r   "STEPSCALEANT" "NUMBER OF FUNDAMENTAL TIMESTEPS BETWEEN SCALING ANTHROPOGENIC EMISSIONS"
 state   integer  STEPSCALEBB             -            misc         1   -   r   "STEPSCALEBB" "NUMBER OF FUNDAMENTAL TIMESTEPS BETWEEN SCALING BIOMASS BURNING EMISSIONS"
@@ -43,39 +43,39 @@ rconfig   integer pinterp_option   namelist,perturbation         1   1       -  
 
 # chem observation arrays
 ## SURFACE
-state    real  i_surf  {nsurf}  misc           1         -      h{17}      "i_surf"        "surf_obs grid location"             ""
-state    real  j_surf  {nsurf}  misc           1         -      h{17}      "j_surf"        "surf_obs grid location"             ""
-state    real  k_surf  {nsurf}  misc           1         -      h{17}      "k_surf"        "surf_obs grid location"             ""
-state    real  ti_surf {nsurf}  misc           1         -      h{17}      "ti_surf"        "surf_obs start itime"             ""
-state    real  tf_surf {nsurf}  misc           1         -      h{17}      "tf_surf"        "surf_obs end itime"             ""
+state    real  i_surf  {nsurf}  misc           1         -      h      "i_surf"        "surf_obs grid location"             ""
+state    real  j_surf  {nsurf}  misc           1         -      h      "j_surf"        "surf_obs grid location"             ""
+state    real  k_surf  {nsurf}  misc           1         -      h      "k_surf"        "surf_obs grid location"             ""
+state    real  ti_surf {nsurf}  misc           1         -      h      "ti_surf"        "surf_obs start itime"             ""
+state    real  tf_surf {nsurf}  misc           1         -      h      "tf_surf"        "surf_obs end itime"             ""
 
 state    real   -                  f  chem_surf               -         -      -       -   "Chemical Surface Obs."  ""
-state    real   chems_bc           f  chem_surf               1         -      h{17}      "chems_bc"   "black carbon observation"             "ug/m^3"
-state    real   chems_oc           f  chem_surf               1         -      h{17}      "chems_oc"   "organic carbon observation"             "ug/m^3"
-state    real   chems_co           f  chem_surf               1         -      h{17}      "chems_co"   "carbon monoxide observation"       "ppb"
-state    real   chems_co2          f  chem_surf               1         -      h{17}      "chems_co2"   "carbon dioxide observation"      "ppm"
-state    real   chems_ch4          f  chem_surf               1         -      h{17}      "chems_ch4"   "methane observation"             "ppb"
+state    real   chems_bc           f  chem_surf               1         -      h      "chems_bc"   "black carbon observation"             "ug/m^3"
+state    real   chems_oc           f  chem_surf               1         -      h      "chems_oc"   "organic carbon observation"             "ug/m^3"
+state    real   chems_co           f  chem_surf               1         -      h      "chems_co"   "carbon monoxide observation"       "ppb"
+state    real   chems_co2          f  chem_surf               1         -      h      "chems_co2"   "carbon dioxide observation"      "ppm"
+state    real   chems_ch4          f  chem_surf               1         -      h      "chems_ch4"   "methane observation"             "ppb"
 
 state    real    -           {nsurf}f  surf_hx       1         -     -          -  "surface model concentrations" ""
-state    real    surf_bc     {nsurf}f  surf_hx       1         -     h{17}      "surf_bc"     "surface modeled bc"    "ug/m^3"
-state    real    surf_oc     {nsurf}f  surf_hx       1         -     h{17}      "surf_oc"     "surface modeled oc"    "ug/m^3"
-state    real    surf_co     {nsurf}f  surf_hx       1         -     h{17}      "surf_co"     "surface modeled co"    "ppb"
-state    real    surf_co2    {nsurf}f  surf_hx       1         -     h{17}      "surf_co2"    "surface modeled co2"   "ppm"
-state    real    surf_ch4    {nsurf}f  surf_hx       1         -     h{17}      "surf_ch4"    "surface modeled ch4"   "ppb"
+state    real    surf_bc     {nsurf}f  surf_hx       1         -     h      "surf_bc"     "surface modeled bc"    "ug/m^3"
+state    real    surf_oc     {nsurf}f  surf_hx       1         -     h      "surf_oc"     "surface modeled oc"    "ug/m^3"
+state    real    surf_co     {nsurf}f  surf_hx       1         -     h      "surf_co"     "surface modeled co"    "ppb"
+state    real    surf_co2    {nsurf}f  surf_hx       1         -     h      "surf_co2"    "surface modeled co2"   "ppm"
+state    real    surf_ch4    {nsurf}f  surf_hx       1         -     h      "surf_ch4"    "surface modeled ch4"   "ppb"
 
-#state    real    surf_sulf   {nsurf}f  surf_hx       1         -     h{17}      "surf_sulf"    "aircraft modeled sulfate"   "ppmv"
-state    real    surf_pblh   {nsurf}f  surf_hx       1         -     h{17}      "surf_pblh"    "aircraft modeled pblh"   "m"
-#state    real    surf_hgt    {nsurf}f  surf_hx       1         -     h{17}      "surf_hgt"    "aircraft modeled hgt"   "m"
-#state    real    surf_t_phy  {nsurf}f  surf_hx       1         -     h{17}      "surf_t_phy"    "aircraft modeled t_phy"   "K"
-#state    real    surf_wspd   {nsurf}f  surf_hx       1         -     h{17}      "surf_wspd"    "aircraft modeled wspd"   "m/2"
-#state    real    surf_qv     {nsurf}f  surf_hx       1         -     h{17}      "surf_qv"    "aircraft modeled qv"   "kg kg^-1"
+#state    real    surf_sulf   {nsurf}f  surf_hx       1         -     h      "surf_sulf"    "aircraft modeled sulfate"   "ppmv"
+state    real    surf_pblh   {nsurf}f  surf_hx       1         -     h      "surf_pblh"    "aircraft modeled pblh"   "m"
+#state    real    surf_hgt    {nsurf}f  surf_hx       1         -     h      "surf_hgt"    "aircraft modeled hgt"   "m"
+#state    real    surf_t_phy  {nsurf}f  surf_hx       1         -     h      "surf_t_phy"    "aircraft modeled t_phy"   "K"
+#state    real    surf_wspd   {nsurf}f  surf_hx       1         -     h      "surf_wspd"    "aircraft modeled wspd"   "m/2"
+#state    real    surf_qv     {nsurf}f  surf_hx       1         -     h      "surf_qv"    "aircraft modeled qv"   "kg kg^-1"
 
 state    real    -             {nsurf}f  g_surf_hx       1         -     -          -  "surface model concentrations" ""
-state    real    g_surf_bc     {nsurf}f  g_surf_hx       1         -     h{17}      "g_surf_bc"     "surface modeled bc"    "ug/m^3"
-state    real    g_surf_oc     {nsurf}f  g_surf_hx       1         -     h{17}      "g_surf_oc"     "surface modeled oc"    "ug/m^3"
-state    real    g_surf_co     {nsurf}f  g_surf_hx       1         -     h{17}      "g_surf_co"     "surface modeled co"    "ppb"
-state    real    g_surf_co2    {nsurf}f  g_surf_hx       1         -     h{17}      "g_surf_co2"    "surface modeled co2"   "ppm"
-state    real    g_surf_ch4    {nsurf}f  g_surf_hx       1         -     h{17}      "g_surf_ch4"    "surface modeled ch4"   "ppb"
+state    real    g_surf_bc     {nsurf}f  g_surf_hx       1         -     h{18}      "g_surf_bc"     "surface modeled bc"    "ug/m^3"
+state    real    g_surf_oc     {nsurf}f  g_surf_hx       1         -     h{18}      "g_surf_oc"     "surface modeled oc"    "ug/m^3"
+state    real    g_surf_co     {nsurf}f  g_surf_hx       1         -     h{18}      "g_surf_co"     "surface modeled co"    "ppb"
+state    real    g_surf_co2    {nsurf}f  g_surf_hx       1         -     h{18}      "g_surf_co2"    "surface modeled co2"   "ppm"
+state    real    g_surf_ch4    {nsurf}f  g_surf_hx       1         -     h{18}      "g_surf_ch4"    "surface modeled ch4"   "ppb"
 
 state    real    -             {nsurf}f  a_surf_hx       1         -     -          -  "surface model concentrations" ""
 state    real    a_surf_bc     {nsurf}f  a_surf_hx       1         -     h{17}      "a_surf_bc"     "surface modeled bc"    "ug/m^3"
@@ -87,39 +87,39 @@ state    real    a_surf_ch4    {nsurf}f  a_surf_hx       1         -     h{17}  
 
 ## AIRCRAFT
 
-state    real     i_acft         {ntim}{nplt}  misc           1         -      h{17}      "i_acft"        "acft_obs grid location"             ""
-state    real     j_acft         {ntim}{nplt}  misc           1         -      h{17}      "j_acft"        "acft_obs grid location"             ""
-state    real     k_acft         {ntim}{nplt}  misc           1         -      h{17}      "k_acft"        "acft_obs grid location"             ""
-state    real     p_acft         {ntim}{nplt}  misc           1         -      h{17}      "p_acft"        "acft_obs pressure"             "hPa"
-state    integer  acft_obs_count     {ntim}{nplt}  misc           1         -      h{17}      "acft_obs_count" "acft_obs count"             ""
+state    real     i_acft         {ntim}{nplt}  misc           1         -      h      "i_acft"        "acft_obs grid location"             ""
+state    real     j_acft         {ntim}{nplt}  misc           1         -      h      "j_acft"        "acft_obs grid location"             ""
+state    real     k_acft         {ntim}{nplt}  misc           1         -      h      "k_acft"        "acft_obs grid location"             ""
+state    real     p_acft         {ntim}{nplt}  misc           1         -      h      "p_acft"        "acft_obs pressure"             "hPa"
+state    integer  acft_obs_count {ntim}{nplt}  misc           1         -      h      "acft_obs_count" "acft_obs count"             ""
 
 state    real   -                  f  chem_acft               -         -      -       -   "Chemical Aircraft Obs."  ""
-state    real   chema_bc           f  chem_acft               1         -      h{17}      "chema_bc"   "black carbon observation"             "ug/m^3"
-state    real   chema_oc           f  chem_acft               1         -      h{17}      "chema_oc"   "organic carbon observation"             "ug/m^3"
-state    real   chema_co           f  chem_acft               1         -      h{17}      "chema_co"   "carbon monoxide observation"       "ppb"
-state    real   chema_co2          f  chem_acft               1         -      h{17}      "chema_co2"   "carbon dioxide observation"      "ppm"
-state    real   chema_ch4          f  chem_acft               1         -      h{17}      "chema_ch4"   "methane observation"             "ppb"
+state    real   chema_bc           f  chem_acft               1         -      h      "chema_bc"   "black carbon observation"             "ug/m^3"
+state    real   chema_oc           f  chem_acft               1         -      h      "chema_oc"   "organic carbon observation"             "ug/m^3"
+state    real   chema_co           f  chem_acft               1         -      h      "chema_co"   "carbon monoxide observation"       "ppb"
+state    real   chema_co2          f  chem_acft               1         -      h      "chema_co2"   "carbon dioxide observation"      "ppm"
+state    real   chema_ch4          f  chem_acft               1         -      h      "chema_ch4"   "methane observation"             "ppb"
 
-state    real    -           {ntim}{nplt}f  acft_hx       1         -     -          -  "aircraft model concentrations" ""
-state    real    acft_bc     {ntim}{nplt}f  acft_hx       1         -     h{17}      "acft_bc"     "aircraft modeled bc"    "ug/m^3 @ 1013 hPa, 273K"
-state    real    acft_oc     {ntim}{nplt}f  acft_hx       1         -     h{17}      "acft_oc"     "aircraft modeled oc"    "ug/m^3 @ 1013 hPa, 273K"
-state    real    acft_co     {ntim}{nplt}f  acft_hx       1         -     h{17}      "acft_co"     "aircraft modeled co"    "ppb"
-state    real    acft_co2    {ntim}{nplt}f  acft_hx       1         -     h{17}      "acft_co2"    "aircraft modeled co2"   "ppm"
-state    real    acft_ch4    {ntim}{nplt}f  acft_hx       1         -     h{17}      "acft_ch4"    "aircraft modeled ch4"   "ppb"
+state    real    -             {ntim}{nplt}f  acft_hx       1         -     -          -  "aircraft model concentrations" ""
+state    real    acft_bc       {ntim}{nplt}f  acft_hx       1         -     h      "acft_bc"     "aircraft modeled bc"    "ug/m^3 @ 1013 hPa, 273K"
+state    real    acft_oc       {ntim}{nplt}f  acft_hx       1         -     h      "acft_oc"     "aircraft modeled oc"    "ug/m^3 @ 1013 hPa, 273K"
+state    real    acft_co       {ntim}{nplt}f  acft_hx       1         -     h      "acft_co"     "aircraft modeled co"    "ppb"
+state    real    acft_co2      {ntim}{nplt}f  acft_hx       1         -     h      "acft_co2"    "aircraft modeled co2"   "ppm"
+state    real    acft_ch4      {ntim}{nplt}f  acft_hx       1         -     h      "acft_ch4"    "aircraft modeled ch4"   "ppb"
 
-state    real    acft_sulf    {ntim}{nplt}f  acft_hx       1         -     h{17}      "acft_sulf"    "aircraft modeled sulfate"   "ppmv"
-state    real    acft_pblh     {ntim}{nplt}f  acft_hx       1         -     h{17}      "acft_pblh"    "aircraft modeled pblh"   "m"
-state    real    acft_hgt      {ntim}{nplt}f  acft_hx       1         -     h{17}      "acft_hgt"    "aircraft modeled hgt"   "m"
-state    real    acft_t_phy    {ntim}{nplt}f  acft_hx       1         -     h{17}      "acft_t_phy"    "aircraft modeled t_phy"   "K"
-state    real    acft_wspd     {ntim}{nplt}f  acft_hx       1         -     h{17}      "acft_wspd"    "aircraft modeled wspd"   "m/2"
-state    real    acft_qv       {ntim}{nplt}f  acft_hx       1         -     h{17}      "acft_qv"    "aircraft modeled qv"   "kg kg^-1"
+state    real    acft_sulf     {ntim}{nplt}f  acft_hx       1         -     h      "acft_sulf"    "aircraft modeled sulfate"   "ppmv"
+state    real    acft_pblh     {ntim}{nplt}f  acft_hx       1         -     h      "acft_pblh"    "aircraft modeled pblh"   "m"
+state    real    acft_hgt      {ntim}{nplt}f  acft_hx       1         -     h      "acft_hgt"    "aircraft modeled hgt"   "m"
+state    real    acft_t_phy    {ntim}{nplt}f  acft_hx       1         -     h      "acft_t_phy"    "aircraft modeled t_phy"   "K"
+state    real    acft_wspd     {ntim}{nplt}f  acft_hx       1         -     h      "acft_wspd"    "aircraft modeled wspd"   "m/2"
+state    real    acft_qv       {ntim}{nplt}f  acft_hx       1         -     h      "acft_qv"    "aircraft modeled qv"   "kg kg^-1"
 
 state    real    -             {ntim}{nplt}f  g_acft_hx       1         -     -          -  "aircraft model concentrations" ""
-state    real    g_acft_bc     {ntim}{nplt}f  g_acft_hx       1         -     h{17}      "g_acft_bc"     "aircraft modeled bc"    "ug/m^3 @ 1013 hPa, 273K"
-state    real    g_acft_oc     {ntim}{nplt}f  g_acft_hx       1         -     h{17}      "g_acft_oc"     "aircraft modeled oc"    "ug/m^3 @ 1013 hPa, 273K"
-state    real    g_acft_co     {ntim}{nplt}f  g_acft_hx       1         -     h{17}      "g_acft_co"     "aircraft modeled co"    "ppb"
-state    real    g_acft_co2    {ntim}{nplt}f  g_acft_hx       1         -     h{17}      "g_acft_co2"    "aircraft modeled co2"   "ppm"
-state    real    g_acft_ch4    {ntim}{nplt}f  g_acft_hx       1         -     h{17}      "g_acft_ch4"    "aircraft modeled ch4"   "ppb"
+state    real    g_acft_bc     {ntim}{nplt}f  g_acft_hx       1         -     h{18}      "g_acft_bc"     "aircraft modeled bc"    "ug/m^3 @ 1013 hPa, 273K"
+state    real    g_acft_oc     {ntim}{nplt}f  g_acft_hx       1         -     h{18}      "g_acft_oc"     "aircraft modeled oc"    "ug/m^3 @ 1013 hPa, 273K"
+state    real    g_acft_co     {ntim}{nplt}f  g_acft_hx       1         -     h{18}      "g_acft_co"     "aircraft modeled co"    "ppb"
+state    real    g_acft_co2    {ntim}{nplt}f  g_acft_hx       1         -     h{18}      "g_acft_co2"    "aircraft modeled co2"   "ppm"
+state    real    g_acft_ch4    {ntim}{nplt}f  g_acft_hx       1         -     h{18}      "g_acft_ch4"    "aircraft modeled ch4"   "ppb"
 
 state    real    -             {ntim}{nplt}f  a_acft_hx       1         -     -          -  "aircraft model concentrations" ""
 state    real    a_acft_bc     {ntim}{nplt}f  a_acft_hx       1         -     h{17}      "a_acft_bc"     "aircraft modeled bc"    "ug/m^3 @ 1013 hPa, 273K"
@@ -3857,6 +3857,7 @@ package   nta_gocart_simple     nta_chem_opt==300                   -           
 #
 # EMISSION SCALING FACTOR PACKAGE DEFINITIONS
 #
+package   sc_none            scale_emiss_opt==0                   -             - 
 package   sc_eradm           scale_emiss_opt==2                   -             scaleant:scant_iso,scant_so2,scant_no,scant_co,scant_eth,scant_hc3,scant_hc5,scant_hc8,scant_xyl,scant_ol2,scant_olt,scant_oli,scant_tol,scant_csl,scant_hcho,scant_ald,scant_ket,scant_ora2,scant_nh3;a_scaleant:a_scant_iso,a_scant_so2,a_scant_no,a_scant_co,a_scant_eth,a_scant_hc3,a_scant_hc5,a_scant_hc8,a_scant_xyl,a_scant_ol2,a_scant_olt,a_scant_oli,a_scant_tol,a_scant_csl,a_scant_hcho,a_scant_ald,a_scant_ket,a_scant_ora2,a_scant_nh3;g_scaleant:g_scant_iso,g_scant_so2,g_scant_no,g_scant_co,g_scant_eth,g_scant_hc3,g_scant_hc5,g_scant_hc8,g_scant_xyl,g_scant_ol2,g_scant_olt,g_scant_oli,g_scant_tol,g_scant_csl,g_scant_hcho,g_scant_ald,g_scant_ket,g_scant_ora2,g_scant_nh3
 package   sc_eradmsorg       scale_emiss_opt==3                   -             scaleant:scant_iso,scant_so2,scant_no,scant_no2,scant_co,scant_eth,scant_hc3,scant_hc5,scant_hc8,scant_xyl,scant_ol2,scant_olt,scant_oli,scant_tol,scant_csl,scant_hcho,scant_ald,scant_ket,scant_ora2,scant_nh3,scant_pm25i,scant_pm25j,scant_pm_10,scant_eci,scant_ecj,scant_orgi,scant_orgj,scant_so4i,scant_so4j,scant_no3i,scant_no3j,scant_naaj,scant_naai,scant_orgi_a,scant_orgj_a,scant_orgi_bb,scant_orgj_bb;a_scaleant:a_scant_iso,a_scant_so2,a_scant_no,a_scant_no2,a_scant_co,a_scant_eth,a_scant_hc3,a_scant_hc5,a_scant_hc8,a_scant_xyl,a_scant_ol2,a_scant_olt,a_scant_oli,a_scant_tol,a_scant_csl,a_scant_hcho,a_scant_ald,a_scant_ket,a_scant_ora2,a_scant_nh3,a_scant_pm25i,a_scant_pm25j,a_scant_pm_10,a_scant_eci,a_scant_ecj,a_scant_orgi,a_scant_orgj,a_scant_so4i,a_scant_so4j,a_scant_no3i,a_scant_no3j,a_scant_naaj,a_scant_naai,a_scant_orgi_a,a_scant_orgj_a,a_scant_orgi_bb,a_scant_orgj_bb;g_scaleant:g_scant_iso,g_scant_so2,g_scant_no,g_scant_no2,g_scant_co,g_scant_eth,g_scant_hc3,g_scant_hc5,g_scant_hc8,g_scant_xyl,g_scant_ol2,g_scant_olt,g_scant_oli,g_scant_tol,g_scant_csl,g_scant_hcho,g_scant_ald,g_scant_ket,g_scant_ora2,g_scant_nh3,g_scant_pm25i,g_scant_pm25j,g_scant_pm_10,g_scant_eci,g_scant_ecj,g_scant_orgi,g_scant_orgj,g_scant_so4i,g_scant_so4j,g_scant_no3i,g_scant_no3j,g_scant_naaj,g_scant_naai,g_scant_orgi_a,g_scant_orgj_a,g_scant_orgi_bb,g_scant_orgj_bb
 package   sc_ecbmz_mosaic    scale_emiss_opt==4                   -             scaleant:scant_iso,scant_so2,scant_no,scant_co,scant_eth,scant_hc3,scant_hc5,scant_hc8,scant_xyl,scant_ol2,scant_olt,scant_oli,scant_tol,scant_csl,scant_hcho,scant_ald,scant_ket,scant_ora2,scant_nh3,scant_no2,scant_ch3oh,scant_c2h5oh,scant_pm25i,scant_pm25j,scant_eci,scant_ecj,scant_orgi,scant_orgj,scant_so4i,scant_so4j,scant_no3i,scant_no3j,scant_so4c,scant_no3c,scant_orgc,scant_ecc;a_scaleant:a_scant_iso,a_scant_so2,a_scant_no,a_scant_co,a_scant_eth,a_scant_hc3,a_scant_hc5,a_scant_hc8,a_scant_xyl,a_scant_ol2,a_scant_olt,a_scant_oli,a_scant_tol,a_scant_csl,a_scant_hcho,a_scant_ald,a_scant_ket,a_scant_ora2,a_scant_nh3,a_scant_no2,a_scant_ch3oh,a_scant_c2h5oh,a_scant_pm25i,a_scant_pm25j,a_scant_eci,a_scant_ecj,a_scant_orgi,a_scant_orgj,a_scant_so4i,a_scant_so4j,a_scant_no3i,a_scant_no3j,a_scant_so4c,a_scant_no3c,a_scant_orgc,a_scant_ecc;g_scaleant:g_scant_iso,g_scant_so2,g_scant_no,g_scant_co,g_scant_eth,g_scant_hc3,g_scant_hc5,g_scant_hc8,g_scant_xyl,g_scant_ol2,g_scant_olt,g_scant_oli,g_scant_tol,g_scant_csl,g_scant_hcho,g_scant_ald,g_scant_ket,g_scant_ora2,g_scant_nh3,g_scant_no2,g_scant_ch3oh,g_scant_c2h5oh,g_scant_pm25i,g_scant_pm25j,g_scant_eci,g_scant_ecj,g_scant_orgi,g_scant_orgj,g_scant_so4i,g_scant_so4j,g_scant_no3i,g_scant_no3j,g_scant_so4c,g_scant_no3c,g_scant_orgc,g_scant_ecc
@@ -3872,6 +3873,7 @@ package   sc_eco2            scale_emiss_opt==16                  -             
 package   sc_eghg            scale_emiss_opt==17                  -             scaleant:scant_co2,scant_co2tst,scant_co,scant_cotst,scant_ch4,scant_ch4tst;a_scaleant:a_scant_co2,a_scant_co2tst,a_scant_co,a_scant_cotst,a_scant_ch4,a_scant_ch4tst;g_scaleant:g_scant_co2,g_scant_co2tst,g_scant_co,g_scant_cotst,g_scant_ch4,g_scant_ch4tst
 
 #Biomass burning scale packages
+package   sc_biomassb_none scale_burn_opt==0             -          - 
 package   sc_biomassb      scale_burn_opt==1             -          scalebb:scbb_no,scbb_no2,scbb_co,scbb_co2,scbb_eth,scbb_hc3,scbb_hc5,scbb_hc8,scbb_ete,scbb_olt,scbb_oli,scbb_pm25,scbb_pm10,scbb_dien,scbb_iso,scbb_api,scbb_lim,scbb_tol,scbb_csl,scbb_hcho,scbb_ald,scbb_xyl,scbb_ket,scbb_macr,scbb_ora1,scbb_ora2,scbb_so2,scbb_nh3,scbb_oc,scbb_bc,scbb_sulf,scbb_dms;a_scalebb:a_scbb_no,a_scbb_no2,a_scbb_co,a_scbb_co2,a_scbb_eth,a_scbb_hc3,a_scbb_hc5,a_scbb_hc8,a_scbb_ete,a_scbb_olt,a_scbb_oli,a_scbb_pm25,a_scbb_pm10,a_scbb_dien,a_scbb_iso,a_scbb_api,a_scbb_lim,a_scbb_tol,a_scbb_csl,a_scbb_hcho,a_scbb_ald,a_scbb_xyl,a_scbb_ket,a_scbb_macr,a_scbb_ora1,a_scbb_ora2,a_scbb_so2,a_scbb_nh3,a_scbb_oc,a_scbb_bc,a_scbb_sulf,a_scbb_dms;g_scalebb:g_scbb_no,g_scbb_no2,g_scbb_co,g_scbb_co2,g_scbb_eth,g_scbb_hc3,g_scbb_hc5,g_scbb_hc8,g_scbb_ete,g_scbb_olt,g_scbb_oli,g_scbb_pm25,g_scbb_pm10,g_scbb_dien,g_scbb_iso,g_scbb_api,g_scbb_lim,g_scbb_tol,g_scbb_csl,g_scbb_hcho,g_scbb_ald,g_scbb_xyl,g_scbb_ket,g_scbb_macr,g_scbb_ora1,g_scbb_ora2,g_scbb_so2,g_scbb_nh3,g_scbb_oc,g_scbb_bc,g_scbb_sulf,g_scbb_dms
 package   sc_biomassb_mozc      scale_burn_opt==2             -          scalebb:scbb_co,scbb_no,scbb_no2,scbb_bigalk,scbb_bigene,scbb_c2h4,scbb_c2h5oh,scbb_c2h6,scbb_c3h6,scbb_c3h8,scbb_ch2o,scbb_ch3cho,scbb_ch3coch3,scbb_ch3oh,scbb_mek,scbb_so2,scbb_toluene,scbb_nh3,scbb_oc,scbb_bc,scbb_pm25,scbb_pm10,scbb_open,scbb_c10h16,scbb_mgly,scbb_ch3cooh,scbb_cres,scbb_glyald,scbb_gly,scbb_acetol,scbb_isop,scbb_macr,scbb_mvk;a_scalebb:a_scbb_co,a_scbb_no,a_scbb_no2,a_scbb_bigalk,a_scbb_bigene,a_scbb_c2h4,a_scbb_c2h5oh,a_scbb_c2h6,a_scbb_c3h6,a_scbb_c3h8,a_scbb_ch2o,a_scbb_ch3cho,a_scbb_ch3coch3,a_scbb_ch3oh,a_scbb_mek,a_scbb_so2,a_scbb_toluene,a_scbb_nh3,a_scbb_oc,a_scbb_bc,a_scbb_pm25,a_scbb_pm10,a_scbb_open,a_scbb_c10h16,a_scbb_mgly,a_scbb_ch3cooh,a_scbb_cres,a_scbb_glyald,a_scbb_gly,a_scbb_acetol,a_scbb_isop,a_scbb_macr,a_scbb_mvk;g_scalebb:g_scbb_co,g_scbb_no,g_scbb_no2,g_scbb_bigalk,g_scbb_bigene,g_scbb_c2h4,g_scbb_c2h5oh,g_scbb_c2h6,g_scbb_c3h6,g_scbb_c3h8,g_scbb_ch2o,g_scbb_ch3cho,g_scbb_ch3coch3,g_scbb_ch3oh,g_scbb_mek,g_scbb_so2,g_scbb_toluene,g_scbb_nh3,g_scbb_oc,g_scbb_bc,g_scbb_pm25,g_scbb_pm10,g_scbb_open,g_scbb_c10h16,g_scbb_mgly,g_scbb_ch3cooh,g_scbb_cres,g_scbb_glyald,g_scbb_gly,g_scbb_acetol,g_scbb_isop,g_scbb_macr,g_scbb_mvk
 package   sc_biomassb_moz       scale_burn_opt==3             -          scalebb:scbb_co,scbb_no,scbb_no2,scbb_bigalk,scbb_bigene,scbb_c2h4,scbb_c2h5oh,scbb_c2h6,scbb_c3h6,scbb_c3h8,scbb_ch2o,scbb_ch3cho,scbb_ch3coch3,scbb_ch3oh,scbb_mek,scbb_so2,scbb_toluene,scbb_nh3,scbb_open,scbb_c10h16,scbb_mgly,scbb_ch3cooh,scbb_cres,scbb_glyald,scbb_gly,scbb_acetol,scbb_isop,scbb_macr,scbb_mvk;a_scalebb:a_scbb_co,a_scbb_no,a_scbb_no2,a_scbb_bigalk,a_scbb_bigene,a_scbb_c2h4,a_scbb_c2h5oh,a_scbb_c2h6,a_scbb_c3h6,a_scbb_c3h8,a_scbb_ch2o,a_scbb_ch3cho,a_scbb_ch3coch3,a_scbb_ch3oh,a_scbb_mek,a_scbb_so2,a_scbb_toluene,a_scbb_nh3,a_scbb_open,a_scbb_c10h16,a_scbb_mgly,a_scbb_ch3cooh,a_scbb_cres,a_scbb_glyald,a_scbb_gly,a_scbb_acetol,a_scbb_isop,a_scbb_macr,a_scbb_mvk;g_scalebb:g_scbb_co,g_scbb_no,g_scbb_no2,g_scbb_bigalk,g_scbb_bigene,g_scbb_c2h4,g_scbb_c2h5oh,g_scbb_c2h6,g_scbb_c3h6,g_scbb_c3h8,g_scbb_ch2o,g_scbb_ch3cho,g_scbb_ch3coch3,g_scbb_ch3oh,g_scbb_mek,g_scbb_so2,g_scbb_toluene,g_scbb_nh3,g_scbb_open,g_scbb_c10h16,g_scbb_mgly,g_scbb_ch3cooh,g_scbb_cres,g_scbb_glyald,g_scbb_gly,g_scbb_acetol,g_scbb_isop,g_scbb_macr,g_scbb_mvk
@@ -3885,40 +3887,45 @@ package   sc_biomassb_ghg  scale_burn_opt==5          -             scalebb:scbb
 
 ## 4D-Var chem and nta_chem packages
 #Excluding many species to reduce memory footprint and wall-time of an inversion.
-package   gocart_bcco          chem_opt==304                   -             chem:co,bc1,bc2
-package   nta_gocart_bcco      nta_chem_opt==304                   -             a_chem:a_co,a_bc1,a_bc2;g_chem:g_co,g_bc1,g_bc2
+package   gocart_bcco        chem_opt==304                   -             chem:co,bc1,bc2
+package   gocart_bc          chem_opt==305                   -             chem:bc1,bc2
 
+package   nta_none           nta_chem_opt==0                 -             -
+package   nta_gocart_bcco    nta_chem_opt==304               -             a_chem:a_co,a_bc1,a_bc2;g_chem:g_co,g_bc1,g_bc2
+package   nta_gocart_bc      nta_chem_opt==305               -             a_chem:a_bc1,a_bc2;g_chem:g_bc1,g_bc2
 
 ##4D-Var ANT options for emissions (emiss_opt) and scaling factors (scale_emiss_opt)
 ### Create new options or add species as necessary.  Each species requires membership in the following 4D arrays: emis_ant, scaleant, g_scaleant, a_scaleant, alpha_ant. Modification of these options and creation of new ones requires corresponding code in emission_driver source files. These options should have matching entries in the WRFPLUS registry.chemplus file, with the exception of the alpha_ant array.
 
 #Excluding many anthropogenic species to reduce memory footprint.  
-package   adtlant     emiss_opt==98                  -             emis_ant:e_so2,e_pm25i,e_pm25j,e_eci,e_ecj,e_orgi,e_orgj,e_so4i,e_so4j,e_no3i,e_no3j
-package   adtlant_bcco  emiss_opt==99                  -             emis_ant:e_co,e_eci,e_ecj
+package   adtlant     emiss_opt==97                  -             emis_ant:e_so2,e_pm25i,e_pm25j,e_eci,e_ecj,e_orgi,e_orgj,e_so4i,e_so4j,e_no3i,e_no3j
+package   adtlant_bcco  emiss_opt==98                  -             emis_ant:e_co,e_eci,e_ecj
+package   adtlant_bc  emiss_opt==99                  -             emis_ant:e_eci,e_ecj
 
-package   sc_adtlant     scale_emiss_opt==98                        -             scaleant:scant_so2,scant_pm_25,scant_bc,scant_oc,scant_sulf,scant_no3;g_scaleant:g_scant_so2,g_scant_pm_25,g_scant_bc,g_scant_oc,g_scant_sulf,g_scant_no3;a_scaleant:a_scant_so2,a_scant_pm_25,a_scant_bc,a_scant_oc,a_scant_sulf,a_scant_no3;alpha_ant:alpha_ant_so2,alpha_ant_pm_25,alpha_ant_bc,alpha_ant_oc,alpha_ant_sulf,alpha_ant_no3
-package   sc_adtlant_bcco  scale_emiss_opt==99                        -             scaleant:scant_co,scant_bc;g_scaleant:g_scant_co,g_scant_bc;a_scaleant:a_scant_co,a_scant_bc;alpha_ant:alpha_ant_co,alpha_ant_bc
-
+package   sc_adtlant     scale_emiss_opt==97                        -             scaleant:scant_so2,scant_pm_25,scant_bc,scant_oc,scant_sulf,scant_no3;g_scaleant:g_scant_so2,g_scant_pm_25,g_scant_bc,g_scant_oc,g_scant_sulf,g_scant_no3;a_scaleant:a_scant_so2,a_scant_pm_25,a_scant_bc,a_scant_oc,a_scant_sulf,a_scant_no3;alpha_ant:alpha_ant_so2,alpha_ant_pm_25,alpha_ant_bc,alpha_ant_oc,alpha_ant_sulf,alpha_ant_no3
+package   sc_adtlant_bcco  scale_emiss_opt==98                        -             scaleant:scant_co,scant_bc;g_scaleant:g_scant_co,g_scant_bc;a_scaleant:a_scant_co,a_scant_bc;alpha_ant:alpha_ant_co,alpha_ant_bc
+package   sc_adtlant_bc  scale_emiss_opt==99                        -             scaleant:scant_bc;g_scaleant:g_scant_bc;a_scaleant:a_scant_bc;alpha_ant:alpha_ant_bc
 
 ##4D-Var BB options for emissions (biomass_burn_opt) and scaling factors (scale_burn_opt)
 ### Create new options or add species as necessary.  Each species requires membership in the following 4D arrays: ebu, ebu_in, scalebb, g_scalebb, a_scalebb, alpha_bb. Modification of these options and creation of new ones requires corresponding code in emission_driver source files.  These options should have matching entries in the WRFPLUS registry.chemplus file, with the exception of the alpha_bb array.
 
 #Excluding pm25,pm10,sulf,dms in BB emissions because not present in FINN (they use extra memory and generate extraneous error messages).
-package   adtlbb      biomass_burn_opt==98             -          state:mean_fct_agtf,mean_fct_agef,mean_fct_agsv,mean_fct_aggr,firesize_agtf,firesize_agef,firesize_agsv,firesize_aggr;ebu:ebu_so2,ebu_oc,ebu_bc;ebu_in:ebu_in_so2,ebu_in_oc,ebu_in_bc
-package   adtlbb_bcco   biomass_burn_opt==99             -          state:mean_fct_agtf,mean_fct_agef,mean_fct_agsv,mean_fct_aggr,firesize_agtf,firesize_agef,firesize_agsv,firesize_aggr;ebu:ebu_co,ebu_bc;ebu_in:ebu_in_co,ebu_in_bc
+package   adtlbb        biomass_burn_opt==97             -          state:mean_fct_agtf,mean_fct_agef,mean_fct_agsv,mean_fct_aggr,firesize_agtf,firesize_agef,firesize_agsv,firesize_aggr;ebu:ebu_so2,ebu_oc,ebu_bc;ebu_in:ebu_in_so2,ebu_in_oc,ebu_in_bc
+package   adtlbb_bcco   biomass_burn_opt==98             -          state:mean_fct_agtf,mean_fct_agef,mean_fct_agsv,mean_fct_aggr,firesize_agtf,firesize_agef,firesize_agsv,firesize_aggr;ebu:ebu_co,ebu_bc;ebu_in:ebu_in_co,ebu_in_bc
+package   adtlbb_bc     biomass_burn_opt==99             -          state:mean_fct_agtf,mean_fct_agef,mean_fct_agsv,mean_fct_aggr,firesize_agtf,firesize_agef,firesize_agsv,firesize_aggr;ebu:ebu_bc;ebu_in:ebu_in_bc
 
-package   sc_adtlbb         scale_burn_opt==98             -          scalebb:scbb_so2,scbb_oc,scbb_bc;g_scalebb:g_scbb_so2,g_scbb_oc,g_scbb_bc;a_scalebb:a_scbb_so2,a_scbb_oc,a_scbb_bc;alpha_bb:alpha_bb_so2,alpha_bb_oc,alpha_bb_bc
-package   sc_adtlbb_bcco      scale_burn_opt==99             -          scalebb:scbb_co,scbb_bc;g_scalebb:g_scbb_co,g_scbb_bc;a_scalebb:a_scbb_co,a_scbb_bc;alpha_bb:alpha_bb_co,alpha_bb_bc
-
+package   sc_adtlbb         scale_burn_opt==97             -          scalebb:scbb_so2,scbb_oc,scbb_bc;g_scalebb:g_scbb_so2,g_scbb_oc,g_scbb_bc;a_scalebb:a_scbb_so2,a_scbb_oc,a_scbb_bc;alpha_bb:alpha_bb_so2,alpha_bb_oc,alpha_bb_bc
+package   sc_adtlbb_bcco    scale_burn_opt==98             -          scalebb:scbb_co,scbb_bc;g_scalebb:g_scbb_co,g_scbb_bc;a_scalebb:a_scbb_co,a_scbb_bc;alpha_bb:alpha_bb_co,alpha_bb_bc
+package   sc_adtlbb_bc      scale_burn_opt==99             -          scalebb:scbb_bc;g_scalebb:g_scbb_bc;a_scalebb:a_scbb_bc;alpha_bb:alpha_bb_bc
 
 ## Observation packages.  The order of the species in each array (chem_acft, acft_hx, g_acft_hx, a_acft_hx, chem_surf, surf_hx, g_surf_hx, a_surf_hx) should be the same and corresponds to the order of the observations in the input files AIRCRAFT_DATA.txt and SURFACE_DATA.txt. Add new options and species as needed. Observation operators for each species must be in share/mediation_pertmod_io.F of the WRFPLUS directory. Your desired options must also appear in the WRFPLUS registry.chemplus file.
-package   bc_only          chemda_opt==1                      -          chem_acft:chema_bc;chem_surf:chems_bc;acft_hx:acft_bc;g_acft_hx:g_acft_bc;a_acft_hx:a_acft_bc;surf_hx:surf_bc;g_surf_hx:g_surf_bc;a_surf_hx:a_surf_bc
-package   oc_only          chemda_opt==2                      -          chem_acft:chema_oc;chem_surf:chems_oc;acft_hx:acft_oc;g_acft_hx:g_acft_oc;a_acft_hx:a_acft_oc;surf_hx:surf_oc;g_surf_hx:g_surf_oc;a_surf_hx:a_surf_oc
-package   co_only          chemda_opt==3                      -          chem_acft:chema_co;chem_surf:chems_co;acft_hx:acft_co;g_acft_hx:g_acft_co;a_acft_hx:a_acft_co;surf_hx:surf_co;g_surf_hx:g_surf_co;a_surf_hx:a_surf_co
-package   co2_only         chemda_opt==4                      -          chem_acft:chema_co2;chem_surf:chems_co2;acft_hx:acft_co2;g_acft_hx:g_acft_co2;a_acft_hx:a_acft_co2;surf_hx:surf_co2;g_surf_hx:g_surf_co2;a_surf_hx:a_surf_co2
-package   ch4_only         chemda_opt==5                      -          chem_acft:chema_ch4;chem_surf:chems_ch4;acft_hx:acft_ch4;g_acft_hx:g_acft_ch4;a_acft_hx:a_acft_ch4;surf_hx:surf_ch4;g_surf_hx:g_surf_ch4;a_surf_hx:a_surf_ch4
+package   no_insitu        insitu_chem_opt==0                      -          - 
+package   bc_only          insitu_chem_opt==1                      -          chem_acft:chema_bc;chem_surf:chems_bc;acft_hx:acft_bc;g_acft_hx:g_acft_bc;a_acft_hx:a_acft_bc;surf_hx:surf_bc;g_surf_hx:g_surf_bc;a_surf_hx:a_surf_bc
+package   oc_only          insitu_chem_opt==2                      -          chem_acft:chema_oc;chem_surf:chems_oc;acft_hx:acft_oc;g_acft_hx:g_acft_oc;a_acft_hx:a_acft_oc;surf_hx:surf_oc;g_surf_hx:g_surf_oc;a_surf_hx:a_surf_oc
+package   co_only          insitu_chem_opt==3                      -          chem_acft:chema_co;chem_surf:chems_co;acft_hx:acft_co;g_acft_hx:g_acft_co;a_acft_hx:a_acft_co;surf_hx:surf_co;g_surf_hx:g_surf_co;a_surf_hx:a_surf_co
+package   co2_only         insitu_chem_opt==4                      -          chem_acft:chema_co2;chem_surf:chems_co2;acft_hx:acft_co2;g_acft_hx:g_acft_co2;a_acft_hx:a_acft_co2;surf_hx:surf_co2;g_surf_hx:g_surf_co2;a_surf_hx:a_surf_co2
+package   ch4_only         insitu_chem_opt==5                      -          chem_acft:chema_ch4;chem_surf:chems_ch4;acft_hx:acft_ch4;g_acft_hx:g_acft_ch4;a_acft_hx:a_acft_ch4;surf_hx:surf_ch4;g_surf_hx:g_surf_ch4;a_surf_hx:a_surf_ch4
 
-package   all_acft         chemda_opt==10                     -          chem_acft:chema_bc,chema_oc,chema_co,chema_co2,chema_ch4;acft_hx:acft_bc,acft_oc,acft_co,acft_co2,acft_ch4;g_acft_hx:g_acft_bc,g_acft_oc,g_acft_co,g_acft_co2,g_acft_ch4;a_acft_hx:a_acft_bc,a_acft_oc,a_acft_co,a_acft_co2,a_acft_ch4
-package   all_surf         chemda_opt==11                     -          chem_surf:chems_bc,chems_oc,chems_co,chems_co2,chems_ch4;surf_hx:surf_bc,surf_oc,surf_co,surf_co2,surf_ch4;g_surf_hx:g_surf_bc,g_surf_oc,g_surf_co,g_surf_co2,g_surf_ch4;a_surf_hx:a_surf_bc,a_surf_oc,a_surf_co,a_surf_co2,a_surf_ch4
-
+package   all_acft         insitu_chem_opt==10                     -          chem_acft:chema_bc,chema_oc,chema_co,chema_co2,chema_ch4;acft_hx:acft_bc,acft_oc,acft_co,acft_co2,acft_ch4;g_acft_hx:g_acft_bc,g_acft_oc,g_acft_co,g_acft_co2,g_acft_ch4;a_acft_hx:a_acft_bc,a_acft_oc,a_acft_co,a_acft_co2,a_acft_ch4
+package   all_surf         insitu_chem_opt==11                     -          chem_surf:chems_bc,chems_oc,chems_co,chems_co2,chems_ch4;surf_hx:surf_bc,surf_oc,surf_co,surf_co2,surf_ch4;g_surf_hx:g_surf_bc,g_surf_oc,g_surf_co,g_surf_co2,g_surf_ch4;a_surf_hx:a_surf_bc,a_surf_oc,a_surf_co,a_surf_co2,a_surf_ch4
 
