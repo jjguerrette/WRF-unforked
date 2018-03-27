@@ -7,6 +7,7 @@ use da_control, only : comm, var4d_bin, var4d_lbc, trace_use_dull, num_fgat_time
                        rootproc, &
 #if (WRF_CHEM == 1)
                        calc_hx_only, use_nonchemobs, cv_options, &
+                       init_chem_scale, &
 #endif
                        checkpoint_interval, write_checkpoints, cycle_interval
 

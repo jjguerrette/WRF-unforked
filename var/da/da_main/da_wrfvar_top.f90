@@ -20,7 +20,7 @@ module da_wrfvar_top
       da_ad_model, da_init_model_input, &
 #endif
       mu6_2, psfc6, moist6, kj_swap, da_finalize_model, da_model_lbc_off
-   !use da_wrfvar_io, only : da_med_initialdata_output_lbc
+   use da_wrfvar_io, only : da_med_initialdata_output_lbc
 #endif
 
 #if defined(RTTOV) || defined(CRTM)

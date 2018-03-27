@@ -26,6 +26,7 @@
    type (y_type)                :: re          ! Residual (o-a) structure.
    type (y_type)                :: y           ! y = H(x_inc) structure.
    integer                      :: it          ! External loop counter.
+   integer                      :: global_it   ! External loop counter.
    integer                      :: neign       
    type (j_type)                :: j           ! Cost function.
    type (y_type)                :: jo_grad_y   ! Grad_y(jo)
@@ -115,6 +116,11 @@
               use_airsretobs .or. use_rainobs .or. &
               use_iasiobs .or. use_radarobs .or. use_radar_rv .or. use_radar_rf)
    end if
+
+   init_chem_scale = &
+      ( cv_options.eq.10 .and. chem_opt(1).gt.0 &
+         .and. (iouter_restart.eq.1 .or. .not.outer_loop_restart) )
+
 #endif
 
    ! Calculate the num_fgat_time based on time_window_min, time_window_max
@@ -550,8 +556,10 @@
 !      end if
 
       if ( outer_loop_restart ) then
-         !call da_get_unit(cvt_unit)
-         cvt_unit=600
+         global_it = iouter_restart
+
+         call da_get_unit(cvt_unit)
+         !cvt_unit=600
          if ( max_ext_its > 1 ) then
            max_ext_its=1
            write(unit=message(1),fmt='(a)') "Re-set max_ext_its = 1 for outer_loop_restart"
@@ -574,6 +582,14 @@
            write(unit=message(1),fmt='(a)') "cvt file '"//trim(cvtfile)//"' does not exists, initiallizing cvt."
            call da_message(message(1:1))
            call da_initialize_cv (cv_size, cvt)
+           if (iouter_restart .gt. 1) then
+              write(unit=message(1),fmt='(a)') "Re-set outer_loop_restart=.false. and iouter_restart=1."
+              call da_message(message(1:1))
+
+              outer_loop_restart = .false.
+              iouter_restart = 1
+              global_it = 1
+           end if
          end if
       else
          call da_initialize_cv (cv_size, cvt)
@@ -599,12 +615,13 @@
 
    j_grad_norm_target = 1.0
    do it = 1, max_ext_its
-
 !  Dynamically allocate the variables which depend on ntmax
+      if (.not.outer_loop_restart) global_it = it
+      nmodes_global=ntmax(global_it)
       if (use_lanczos) then
-         allocate (qhat(1:cv_size, 0:ntmax(it)))
-         allocate (eignvec(ntmax(it), ntmax(it)))
-         allocate (eignval(ntmax(it)))
+         allocate (qhat(1:cv_size, 0:nmodes_global))
+         allocate (eignvec(nmodes_global, nmodes_global))
+         allocate (eignval(nmodes_global))
       end if
 
 ! Re-scale the variances and the scale-length for outer-loop > 1:
@@ -784,7 +801,7 @@
 
 #if (WRF_CHEM == 1)
          call da_retrieve_chem_hx( model_grid, iv )
-         call da_write_obs_chem( iv, ob, it )
+         call da_write_obs_chem( iv, ob, global_it )
 
          ! Use this to exit after writing chem hx values
          if( config_flags%calc_hx_only) then
@@ -817,7 +834,7 @@
       ! [8.2] Calculate innovation vector (O-B):
 
       num_qcstat_conv=0
-      call da_get_innov_vector (it, num_qcstat_conv, ob, iv, grid , config_flags)
+      call da_get_innov_vector (global_it, num_qcstat_conv, ob, iv, grid , config_flags)
       if ( multi_inc == 1 ) then 
          if (trace_use) call da_trace_exit ("da_solve")
          return
@@ -855,25 +872,25 @@
 
       if (use_lanczos) then
          if (read_lanczos) then
-            call da_lanczos_io('r',cv_size,ntmax(it),neign,eignvec,eignval,qhat)
+            call da_lanczos_io('r',cv_size,nmodes_global,neign,eignvec,eignval,qhat)
 
-            call da_kmat_mul(grid,config_flags,it,cv_size,xbx, &
+            call da_kmat_mul(grid,config_flags,global_it,cv_size,xbx, &
                              be,iv,xhat,qhat,cvt,re,y,j,eignvec,eignval,neign)
           ! Output Cost Function
             call da_calculate_j(it, 1, cv_size, be%cv%size_jb, be%cv%size_je, be%cv%size_jp, &
                              be%cv%size_jl, xbx, be, iv, xhat, cvt, re, y, j, xhat, grid, config_flags )
 
          else
-            call da_minimise_lz(grid, config_flags, it, cv_size, xbx,& 
+            call da_minimise_lz(grid, config_flags, global_it, cv_size, xbx,& 
                              be, iv, j_grad_norm_target, xhat, qhat, cvt, re, y, j, eignvec, eignval, neign )
 #if (WRF_CHEM == 1)
-            if (calc_aminusb) call da_calculate_aminusb(grid,config_flags,it,cv_size,xbx, &
+            if (calc_aminusb) call da_calculate_aminusb(grid,config_flags,global_it,cv_size,xbx, &
                                 be,qhat,eignvec,eignval,neign)
 #endif
 
          end if
 
-         if (write_lanczos) call da_lanczos_io('w',cv_size,ntmax(it),neign,eignvec,eignval,qhat)
+         if (write_lanczos) call da_lanczos_io('w',cv_size,nmodes_global,neign,eignvec,eignval,qhat)
 
          if (adj_sens) call da_sensitivity(grid,config_flags,it,cv_size,xbx, &
                                            be,iv,xhat,qhat,cvt,y,eignvec,eignval,neign )
@@ -888,7 +905,7 @@
 #if (WRF_CHEM == 1)
    if (cv_options .eq. 10) then
       if ( dgn_emiss .eq. 1 .and. eta_emiss .lt. 1.D0 .and. eta_emiss .gt. 0.D0 ) &
-         call da_hdgn(it, cv_size, be, xhat )
+         call da_hdgn(global_it, cv_size, be, xhat )
 
       if (dgn_emiss .eq. 2) &
          call da_dgn(grid, cv_size, xbx, be, iv, xhat, cvt, ob, config_flags, j % total )
@@ -908,7 +925,7 @@
         call da_message(message(1:1))
         write(cvt_unit) cvt
         close(cvt_unit)
-        !call da_free_unit(cvt_unit)
+        call da_free_unit(cvt_unit)
       end if
       !------------------------------------------------------------------------
 
@@ -943,7 +960,7 @@
 
       ! [8.7] Write out diagnostics
 
-      call da_write_diagnostics (it, grid, num_qcstat_conv, ob, iv, re, y, j)
+      call da_write_diagnostics (global_it, grid, num_qcstat_conv, ob, iv, re, y, j)
 
       ! Write "clean" QCed observations if requested:
       if (anal_type_qcobs) then
@@ -952,7 +969,7 @@
             call da_write_modified_filtered_obs (grid, ob, iv, &
                coarse_ix, coarse_jy, start_x, start_y)
           else
-            call da_write_filtered_obs (it, grid, ob, iv, &
+            call da_write_filtered_obs (global_it, grid, ob, iv, &
                coarse_ix, coarse_jy, start_x, start_y)
           end if     
          ! end if     
@@ -961,7 +978,7 @@
       ! [8.7.1] Write Ascii radar OMB and OMA file
 
       if (use_radarobs) then
-         call da_write_oa_radar_ascii (ob,iv,re,it)
+         call da_write_oa_radar_ascii (ob,iv,re,global_it)
       end if
 
       ! [8.3] Interpolate x_g to low resolution grid
@@ -970,14 +987,14 @@
 
 #if defined(CRTM) || defined(RTTOV)
       if (use_rad .and. write_oa_rad_ascii) then
-         call da_write_oa_rad_ascii (it,ob,iv,re)
+         call da_write_oa_rad_ascii (global_it,ob,iv,re)
       end if
 #endif
 
       ! [8.9] Update VarBC parameters and write output file
 #if defined(CRTM) || defined(RTTOV)      
       if ( use_rad .and. (use_varbc.or.freeze_varbc) ) &
-                call da_varbc_update(it, cv_size, xhat, iv)
+                call da_varbc_update(global_it, cv_size, xhat, iv)
 #endif
 
 
@@ -985,12 +1002,15 @@
       ! [8.10] Output WRFVAR analysis and analysis increments:
       !------------------------------------------------------------------------
 
-      call da_transfer_xatoanalysis (it, xbx, grid, config_flags)
+      call da_transfer_xatoanalysis (global_it, xbx, grid, config_flags)
 
      if ( it < max_ext_its .and. print_detail_outerloop ) then
         write(outerloop,'(i2.2)') it
         call da_update_firstguess(grid,'wrfvar_output_'//outerloop)
 #ifdef VAR4D
+        if (var4d .and. (&
+            outer_loop_restart &
+            )) call da_med_initialdata_output_lbc (grid , config_flags, 'wrfvar_bdyout_'//outerloop)
         !if (var4d) call da_med_initialdata_output_lbc (grid , config_flags, 'wrfvar_bdyout_'//outerloop)
 #endif
      end if
@@ -1016,6 +1036,9 @@
       call da_update_firstguess(input_grid)
 #ifdef VAR4D
       !if (var4d) call da_med_initialdata_output_lbc (head_grid , config_flags)
+      if (var4d .and. (&
+            outer_loop_restart &
+            )) call da_med_initialdata_output_lbc (input_grid , config_flags, 'wrfvar_bdyout')
       if ( var4d_lbc ) then
          call domain_clock_get (grid, stop_timestr=timestr1)
          call domain_clock_set( grid, current_timestr=timestr1 )

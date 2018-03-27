@@ -42,7 +42,7 @@ subroutine da_nl_model (it)
       call da_copy_chem_to_model( head_grid, it )
 
       !Need a first guess file that includes scaleant and scalebb
-      if ( it == 1 ) then
+      if ( it == 1 .and. init_chem_scale ) then
          call da_add_var_to_firstguess()
       end if
    end if
@@ -90,6 +90,13 @@ subroutine da_nl_model (it)
          !call nl_set_restart_begin_m( head_grid%id, checkpoint_interval )
          call nl_set_restart_begin_m( head_grid%id, 0 )
       endif
+
+      ! input_inname used to initialize first checkpoints in TL/AD models
+      if (it .eq. 1) then
+         model_config_rec%input_inname = "fg"
+      else if (it .gt. 1) then
+         write(model_config_rec%input_inname,fmt='("wrfvar_output_",I2.2)') it-1
+      end if
 
 #if (WRF_CHEM == 1)
 !   else if ( write_checkpoints .eq. 2 ) then
