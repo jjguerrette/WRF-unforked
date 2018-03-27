@@ -39,7 +39,8 @@ echo ""
 #  jonathan.guerrette@colorado.edu
 #
 #=======================================================================================
-
+if [ $(ls da_wrfvar.exe | wc -l) -eq 0 ]; then echo "da_wrfvar.exe required for WRFDA-RIOT"; echo 101; exit 101; fi
+if [ $(ls namelist.input | wc -l) -eq 0 ]; then echo "namelist.input required for WRFDA-RIOT"; echo 102; exit 102; fi
 
 if [ -z "$MPICALL" ]; then #Could be defined externally
    ##Check the manual for your compute system in order to choose one of the following:
