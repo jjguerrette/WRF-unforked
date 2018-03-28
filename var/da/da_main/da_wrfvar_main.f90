@@ -70,7 +70,7 @@ program da_wrfvar_main
    if (trace_use) call da_trace_report
 
 #ifdef DM_PARALLEL
-   IF ( rootproc ) CALL end_timing('da_end_timing: WRFVARRUN')
+   IF ( rootproc ) CALL end_timing('da_end_timing: AFTER_OUTER')
 #endif
 
    call wrfu_finalize

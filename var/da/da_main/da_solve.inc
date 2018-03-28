@@ -104,7 +104,7 @@
 #endif
 
 #ifdef DM_PARALLEL
-   IF ( rootproc ) CALL start_timing !Level 1
+   IF ( rootproc ) CALL start_timing !Level 0
 #endif
 
    if ( config_flags%use_baseparam_fr_nml ) then
@@ -883,6 +883,10 @@
    IF ( rootproc ) CALL end_timing('da_end_timing: SOLVEINIT')
 #endif
 
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL end_timing('da_end_timing: BEFORE_OUTER')
+#endif
+
    !---------------------------------------------------------------------------
    ! [8] Outerloop and chem Sensitivity
    !---------------------------------------------------------------------------
@@ -894,9 +898,10 @@
 
    j_grad_norm_target = 1.0
    do it = 1, max_ext_its
+      disable_traj = .false.
 
 #ifdef DM_PARALLEL
-   IF ( rootproc ) CALL start_timing !Level 1
+   IF ( rootproc ) CALL start_timing !Level 0
 #endif
 
 !  Dynamically allocate the variables which depend on ntmax
@@ -960,9 +965,6 @@
 
                call wrf_message("*** WRF-Var-RIOT generated OMEGA successfully ***")
 
-#ifdef DM_PARALLEL
-   IF ( rootproc ) CALL end_timing('da_end_timing: WRFVARRUN')
-#endif
                if (trace_use) call da_trace_exit ("da_solve")
 
                if (trace_use) call da_trace_exit("da_wrfvar_main")
@@ -996,7 +998,7 @@
                call da_nl_model(1)
 
 #ifdef DM_PARALLEL
-   IF ( rootproc ) CALL start_timing !Level 1
+   IF ( rootproc ) CALL start_timing !Level 0
 #endif
 
                !!-------------------------------------------------------------------
@@ -1146,7 +1148,7 @@
          call da_nl_model(it)
 
 #ifdef DM_PARALLEL
-   IF ( rootproc ) CALL start_timing !Level 1
+   IF ( rootproc ) CALL start_timing !Level 0
 #endif
 
          ! Use this to exit after writing chem hx values
@@ -1194,10 +1196,6 @@
 
 #ifdef DM_PARALLEL
             IF ( rootproc ) CALL end_timing('da_end_timing: CHEM_HX')
-#endif
-
-#ifdef DM_PARALLEL
-   IF ( rootproc ) CALL end_timing('da_end_timing: WRFVARRUN')
 #endif
 
             if (trace_use) call da_trace_exit("da_wrfvar_main")
@@ -1281,7 +1279,7 @@
       !=======================================================
       if (use_lanczos .or. use_randomblock) then
 #ifdef DM_PARALLEL
-   IF ( rootproc ) CALL start_timing !Level 1
+   IF ( rootproc ) CALL start_timing !Level 0
 #endif
          if (use_lanczos) then
             if (read_lanczos) then
@@ -1401,7 +1399,7 @@
 
          if ( var4d .and. var4d_inc_out .and. allocated(hessian_info%ghat) ) then
 #ifdef DM_PARALLEL
-            IF ( rootproc ) CALL start_timing !Level 1
+            IF ( rootproc ) CALL start_timing !Level 0
 #endif
             call da_output_increments( grid,config_flags,mz, &
                                        global_it,cv_size,xbx,be, &
@@ -1455,9 +1453,6 @@
             if (trace_use) call da_trace_exit("da_wrfvar_main")
             if (trace_use) call da_trace_report
 
-#ifdef DM_PARALLEL
-            IF ( rootproc ) CALL end_timing('da_end_timing: RIOT_STAGE')   
-#endif
             call wrfu_finalize
             call wrf_shutdown
             stop
@@ -1486,7 +1481,7 @@
 #ifdef VAR4D
       if (var4d) then
 #ifdef DM_PARALLEL
-      IF ( rootproc ) CALL start_timing !Level 1
+      IF ( rootproc ) CALL start_timing !Level 0
 #endif
 
       if (dgn_search(global_it).eq.1 .and. .not.var4d_lbc) then
@@ -1506,7 +1501,7 @@
 #endif
 
 #ifdef DM_PARALLEL
-   IF ( rootproc ) CALL start_timing !Level 1
+   IF ( rootproc ) CALL start_timing !Level 0
 #endif
       ! Update outer-loop control variable
       cvt = cvt + xhat
@@ -1733,6 +1728,10 @@
 #endif
 
    end do !END OF OUTER ITERATION
+
+#ifdef DM_PARALLEL
+   IF ( rootproc ) CALL start_timing !Level 0
+#endif
 
 #ifdef DM_PARALLEL
    IF ( rootproc ) CALL start_timing !Level 1

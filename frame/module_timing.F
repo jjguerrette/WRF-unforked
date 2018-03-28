@@ -18,16 +18,14 @@ MODULE module_timing
 CONTAINS
 
    SUBROUTINE init_module_timing
-      if (cn .eq. 0) then
 #if defined(OLD_TIMERS)
-         ! Nothing to do here.
+      ! Nothing to do here.
 #else
-         ! Initialize the high-res timer.  This is optional, but will allow
-         ! higher precision.  Read hires_timer.c for details.
-         call init_hires_timer()
+      ! Initialize the high-res timer.  This is optional, but will allow
+      ! higher precision.  Read hires_timer.c for details.
+      call init_hires_timer()
 #endif
-         cn = 0
-      end if
+      cn = 0
    END SUBROUTINE init_module_timing
 
 
