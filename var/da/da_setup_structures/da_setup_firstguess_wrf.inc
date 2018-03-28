@@ -218,9 +218,8 @@ subroutine da_setup_firstguess_wrf(xbx, grid, config_flags, ens)
       do ic = PARAM_FIRST_SCALAR, num_scalebb
          grid%scalebb(:,:,:,ic) = REAL( init_scale, 8 )
       end do
-#if defined(LAPACK)
    end if
-#endif
+
    call da_transfer_wrftoxb_chem(grid)
 #endif
 
