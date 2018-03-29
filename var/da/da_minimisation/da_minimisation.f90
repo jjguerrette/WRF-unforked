@@ -199,7 +199,12 @@ module da_minimisation
 !       Setup_Timekeeping
    use module_symbols_util, only : wrfu_finalize, wrfu_alarmringeron !, &
 !       wrfu_clockdestroy, wrfu_alarmdestroy
+#if defined(LAPACK)
+   use lapack95, only : rsteqr
+#else
    use da_lapack, only : dsteqr
+#endif
+
    use da_wrfvar_io, only : da_med_initialdata_input
 #ifdef VAR4D
    use da_4dvar, only : da_tl_model, da_ad_model, da_nl_model, model_grid, &

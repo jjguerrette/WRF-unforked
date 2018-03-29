@@ -898,8 +898,6 @@
 
    j_grad_norm_target = 1.0
    do it = 1, max_ext_its
-      disable_traj = .false.
-
 #ifdef DM_PARALLEL
    IF ( rootproc ) CALL start_timing !Level 0
 #endif
@@ -1014,15 +1012,6 @@
                else
                   call da_gen_omega(omega, cv_size, 1, grid, mz)
                end if
-!               je_start   = be%cv%size_jb + 1
-!               je_end     = be%cv%size_jb + be%cv%size_je
-!               jp_start   = be%cv%size_jb + be%cv%size_je + 1
-!               jp_end     = be%cv%size_jb + be%cv%size_je + be%cv%size_jp
-!               jl_start   = be%cv%size_jb + be%cv%size_je + be%cv%size_jp + 1
-!               jl_end     = be%cv%size_jb + be%cv%size_je + be%cv%size_jp + be%cv%size_jl
-!               if ( be%cv%size_jp.gt.0) omega(jp_start:jp_end,1) = 0.D0
-!               if ( be%cv%size_je.gt.0) omega(je_start:je_end,1) = 0.D0
-!               if ( .not. var4d_lbc .and. be%cv%size_jl.gt.0) omega(jl_start:jl_end,1) = 0.D0
 
                call da_transform_vtox (grid,be%cv%size_jb,xbx,be,grid%ep,&
                                         omega(1:be%cv%size_jb,1),grid%vv,grid%vp &
@@ -1110,6 +1099,7 @@
 
          !Restore default trajectory setting
          write_checkpoints = 0
+         disable_traj = .false.
 
 #if defined(LAPACK)
          ! Avoid re-calling nl model in stages where trajectory is not needed

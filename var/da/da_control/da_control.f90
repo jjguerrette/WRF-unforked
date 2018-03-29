@@ -365,9 +365,7 @@ module da_control
 
    ! Line Search
    logical       :: evalj=.false.
-#if defined(LAPACK)
    logical       :: disable_traj=.false.
-#endif
 
    ! Namelist variables in future?:
    real, parameter :: maximum_rh = 100.0

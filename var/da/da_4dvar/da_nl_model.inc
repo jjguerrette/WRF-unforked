@@ -58,9 +58,7 @@ subroutine da_nl_model (it)
       nl_called = nl_called + 1
    end if
 
-#if defined(LAPACK)
    if (disable_traj) return
-#endif
 
 #ifdef DM_PARALLEL
    IF ( rootproc ) CALL start_timing

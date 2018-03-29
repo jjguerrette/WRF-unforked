@@ -104,7 +104,7 @@ subroutine da_rsvd56(grid, mz, jp_start, jp_end, &
          write(unit=stdout,fmt='(A,'//trim(cnsamp)//'E27.16E3)') 'F1: ',F1(iens,1:nsamp)
       end do
 
-      write(stdout,*) 'Error in randomised SVD: GESV returned ',info
+      write(stdout,*) 'Error in randomised SVD: GESVD returned ',info
       CALL wrf_error_fatal('Canceling RANDOMIZED SVD')
    end if
 
