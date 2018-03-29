@@ -26,10 +26,8 @@ module da_randomisation
        chem_surf, chem_acft, &
        num_ant_steps, num_bb_steps, &
 #endif
-       sound, mtgirs, sonde_sfc, synop, profiler, gpsref, gpspw, polaramv, geoamv, ships, metar, &
-       satem, radar, ssmi_rv, ssmi_tb, ssmt1, ssmt2, airsr, pilot, airep,tamdar, tamdar_sfc, rain, &
-       bogus, buoy, qscat, pseudo, radiance, &
        its, ite, jts, jte
+
    use da_minimisation, only: da_transform_vtoy, da_transform_vtoy_adj, &
        da_calculate_grady, da_calculate_j, da_calculate_gradj
    use da_linear_ops, only:  da_gram_schmidt, da_amat_mul_trunc, &
@@ -43,11 +41,10 @@ module da_randomisation
    use da_tools_serial, only : da_get_unit,da_free_unit
    use da_tools, only: da_set_randomcv
    use da_tracing, only : da_trace_entry, da_trace_exit,da_trace
-   use da_lapack, only : dsteqr !WRFDA-specific version of dsteqr (not MKL)
 
 #if defined(LAPACK)
    use f95_precision, only: WP => DP
-   use lapack95, only: gesv, syev, gesvd
+   use lapack95, only: syev, gesvd
 #endif
 
    implicit none

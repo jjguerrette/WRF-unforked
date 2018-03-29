@@ -43,17 +43,18 @@ subroutine da_minimise_lz(grid, config_flags,            &
    type(hessian_type), intent(inout), optional :: hessian_info
  
    integer                           :: i, j, k, n, inst, iter
+   integer                           :: info, nsstwrk
 #if (WRF_CHEM != 1)
 #ifdef CLOUD_CV
-   integer                           :: mz(13), info, nsstwrk
+   integer                           :: mz(13)
 #else
-   integer                           :: mz(7), info, nsstwrk
+   integer                           :: mz(7)
 #endif
 #else
 #ifdef CLOUD_CV
-   integer                           :: mz(15), info, nsstwrk
+   integer                           :: mz(15)
 #else
-   integer                           :: mz(9), info, nsstwrk
+   integer                           :: mz(9)
 #endif
 #endif
    integer                           :: npred, ipred
@@ -73,6 +74,11 @@ subroutine da_minimise_lz(grid, config_flags,            &
    real                              :: dfs, dfsmax
    character(len=3) :: dummychar=""
    integer          :: ii
+!#if defined(LAPACK)
+!   real*8                            :: KMAT(ntmax(it),ntmax(it))
+!#endif
+
+
 #if (WRF_CHEM == 1)
    character(len=2) :: iterc,itc
 #endif
@@ -106,6 +112,9 @@ subroutine da_minimise_lz(grid, config_flags,            &
            be%alpha_ant_chem(PARAM_FIRST_SCALAR)%mz, be%alpha_bb_chem(PARAM_FIRST_SCALAR)%mz /)
 #endif
 #endif
+!#if defined(LAPACK)
+!   KMAT = 0.D0
+!#endif
    jp_start   = be % cv % size_jb + be % cv % size_je + 1
    jp_end     = be % cv % size_jb + be % cv % size_je + be % cv % size_jp
    
@@ -183,14 +192,30 @@ subroutine da_minimise_lz(grid, config_flags,            &
       
     ! Determine eigenvalues and eigenvectors of the Lanczos tri-diagonal matrix
     !--------------------------------------------------------------------------
+
+      info              = 0
+
+!!#if defined(LAPACK)
+!!      KMAT(iter,iter) = alpha(iter)
+!!      if (iter .gt. 1) then
+!!         KMAT (iter-1,iter) = beta(iter-1)
+!!         KMAT (iter,iter-1) = beta(iter-1)
+!!      end if
+!!      eignvec(1:iter,1:iter)=KMAT(1:iter,1:iter)
+!!      call SYEV(eignvec(1:iter,1:iter), eignval(1:iter), JOBZ = 'V' , INFO = info) !F95
+!!
+!!#else
       eignval(1:iter)   = alpha(1:iter)
       subdiag(1:iter-1) = beta(1:iter-1)
       nsstwrk           = MAX(2*iter-2,1)
-      info              = 0
+#if defined(LAPACK)
+      call RSTEQR(eignval(1:iter),subdiag(1:iter-1),eignvec(:,1:iter),'I', INFO = info) !F95
+#else
       call DSTEQR('I',iter,eignval(1:iter),subdiag(1:iter-1),eignvec(:,1:iter),ntmax(it),&
 	           sstwrk(1:nsstwrk),info)
+#endif
       if (info /=0) write(stdout,*) 'Error in Lanczos minimization: SSTEQR returned ',info 
-            
+
     ! Count converged eigenpairs (using Arnoldi relation)
     !----------------------------------------------------
       bndlm        = eps(it) * eignval(iter)  
