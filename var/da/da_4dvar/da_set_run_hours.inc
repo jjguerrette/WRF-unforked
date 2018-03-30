@@ -8,14 +8,15 @@ subroutine da_set_run_hours ()
    implicit none
    
    integer :: alarmid
-   integer :: end_year0,end_month0,end_day0,end_hour0
    integer :: end_year,end_month,end_day,end_hour
    integer :: start_year0,start_month0
    integer , dimension(12) :: days_in_month = (/31,28,31,30,31,30,31,31,30,31,30,31/)
 
    if (trace_use_dull) call da_trace_entry("da_set_run_hours")
 
-   if ( run_hours .gt. adtl_run_hours .and. run_days .eq. 0 ) then
+   if ( adtl_run_hours.gt.0 &
+        .and. run_hours.gt.adtl_run_hours &
+        .and. run_days.eq.0 ) then
       start_year0 = model_config_rec%start_year(head_grid%id)
       start_month0 = model_config_rec%start_month(head_grid%id)
 

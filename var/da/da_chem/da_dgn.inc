@@ -98,8 +98,8 @@ subroutine da_dgn( grid, cv_size, xbx, be, iv, xhat, cv, ob, config_flags, ja_to
       else
          jd = jout
       end if
-      write(unit=stdout,fmt='("DGN: i  eta_a eta_b       ja          jb          jc          jd")')
-      write(unit=stdout,fmt='("DGN:",I4,2F6.3,4F11.3)') itgold,eta_a,eta_b,ja,jb,jc,jd
+      write(unit=stdout,fmt='("DGN: i  eta_a  eta_c  eta_d  eta_b       ja         jc         jd         jb")')
+      write(unit=stdout,fmt='("DGN:",I4,4F7.3,4F11.3)') itgold,eta_a,eta_c,eta_d,eta_b,ja,jc,jd,jb
 
 
       if (jc .lt. jd) then

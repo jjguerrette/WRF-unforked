@@ -62,6 +62,8 @@ REAL , DIMENSION(:,:,:) , ALLOCATABLE  :: u6_2, v6_2, w6_2, t6_2, ph6_2, p6
 REAL , DIMENSION(:,:,:,:) , ALLOCATABLE  :: moist6
 REAL , DIMENSION(:,:) , ALLOCATABLE  :: mu6_2, psfc6
 
+integer :: end_year0, end_month0, end_day0, end_hour0
+
 contains
 
 #include "da_nl_model.inc"
@@ -71,6 +73,7 @@ contains
 #include "da_4dvar_io.inc"
 #include "da_4dvar_lbc.inc"
 #include "da_set_run_hours.inc"
+#include "da_reset_run_hours.inc"
 #if (WRF_CHEM == 1)
 #include "da_init_model_output.inc"
 #include "da_init_model_input.inc"

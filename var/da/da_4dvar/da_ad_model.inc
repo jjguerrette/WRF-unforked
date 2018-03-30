@@ -9,8 +9,6 @@ subroutine da_ad_model ()
 
    integer :: time_step, alarmid, gwd_opt
 
-   integer :: end_year0, end_month0, end_day0, end_hour0
-
    if (trace_use_dull) call da_trace_entry("da_ad_model")
 
 #ifdef _OPENMP
@@ -92,6 +90,7 @@ subroutine da_ad_model ()
    head_grid%a_rqvften = 0.0
    head_grid%a_rthcuten = 0.0
    head_grid%a_rqvcuten = 0.0
+   head_grid%a_rthraten = 0.0
    head_grid%a_muts = 0.0
    head_grid%a_mudf = 0.0
    head_grid%a_ru_m = 0.0
@@ -141,30 +140,50 @@ subroutine da_ad_model ()
    head_grid%a_smois = 0.0
    head_grid%a_canwat = 0.0
 
-   head_grid%a_u_bxs = 0.0; head_grid%a_u_bxe = 0.0; head_grid%a_u_bys = 0.0; head_grid%a_u_bye = 0.0
-   head_grid%a_v_bxs = 0.0; head_grid%a_v_bxe = 0.0; head_grid%a_v_bys = 0.0; head_grid%a_v_bye = 0.0
-   head_grid%a_w_bxs = 0.0; head_grid%a_w_bxe = 0.0; head_grid%a_w_bys = 0.0; head_grid%a_w_bye = 0.0
-   head_grid%a_ph_bxs = 0.0; head_grid%a_ph_bxe = 0.0; head_grid%a_ph_bys = 0.0; head_grid%a_ph_bye = 0.0
-   head_grid%a_t_bxs = 0.0; head_grid%a_t_bxe = 0.0; head_grid%a_t_bys = 0.0; head_grid%a_t_bye = 0.0
-   head_grid%a_mu_bxs = 0.0; head_grid%a_mu_bxe = 0.0; head_grid%a_mu_bys = 0.0; head_grid%a_mu_bye = 0.0
-   head_grid%a_moist_bxs = 0.0; head_grid%a_moist_bxe = 0.0; head_grid%a_moist_bys = 0.0; head_grid%a_moist_bye = 0.0
-   head_grid%a_scalar_bxs = 0.0; head_grid%a_scalar_bxe = 0.0; head_grid%a_scalar_bys = 0.0; head_grid%a_scalar_bye = 0.0
-   head_grid%a_tracer_bxs = 0.0; head_grid%a_tracer_bxe = 0.0; head_grid%a_tracer_bys = 0.0; head_grid%a_tracer_bye = 0.0
+   head_grid%a_u_bxs = 0.0; head_grid%a_u_bxe = 0.0
+   head_grid%a_u_bys = 0.0; head_grid%a_u_bye = 0.0
+   head_grid%a_v_bxs = 0.0; head_grid%a_v_bxe = 0.0
+   head_grid%a_v_bys = 0.0; head_grid%a_v_bye = 0.0
+   head_grid%a_w_bxs = 0.0; head_grid%a_w_bxe = 0.0
+   head_grid%a_w_bys = 0.0; head_grid%a_w_bye = 0.0
+   head_grid%a_ph_bxs = 0.0; head_grid%a_ph_bxe = 0.0
+   head_grid%a_ph_bys = 0.0; head_grid%a_ph_bye = 0.0
+   head_grid%a_t_bxs = 0.0; head_grid%a_t_bxe = 0.0
+   head_grid%a_t_bys = 0.0; head_grid%a_t_bye = 0.0
+   head_grid%a_mu_bxs = 0.0; head_grid%a_mu_bxe = 0.0
+   head_grid%a_mu_bys = 0.0; head_grid%a_mu_bye = 0.0
+   head_grid%a_moist_bxs = 0.0; head_grid%a_moist_bxe = 0.0
+   head_grid%a_moist_bys = 0.0; head_grid%a_moist_bye = 0.0
+   head_grid%a_scalar_bxs = 0.0; head_grid%a_scalar_bxe = 0.0
+   head_grid%a_scalar_bys = 0.0; head_grid%a_scalar_bye = 0.0
+   head_grid%a_tracer_bxs = 0.0; head_grid%a_tracer_bxe = 0.0
+   head_grid%a_tracer_bys = 0.0; head_grid%a_tracer_bye = 0.0
 #if (WRF_CHEM == 1)
-   head_grid%a_chem_bxs = 0.0; head_grid%a_chem_bxe = 0.0; head_grid%a_chem_bys = 0.0; head_grid%a_chem_bye = 0.0
+   head_grid%a_chem_bxs = 0.0; head_grid%a_chem_bxe = 0.0
+   head_grid%a_chem_bys = 0.0; head_grid%a_chem_bye = 0.0
 #endif
 
-   head_grid%a_u_btxs = 0.0; head_grid%a_u_btxe = 0.0; head_grid%a_u_btys = 0.0; head_grid%a_u_btye = 0.0
-   head_grid%a_v_btxs = 0.0; head_grid%a_v_btxe = 0.0; head_grid%a_v_btys = 0.0; head_grid%a_v_btye = 0.0
-   head_grid%a_w_btxs = 0.0; head_grid%a_w_btxe = 0.0; head_grid%a_w_btys = 0.0; head_grid%a_w_btye = 0.0
-   head_grid%a_ph_btxs = 0.0; head_grid%a_ph_btxe = 0.0; head_grid%a_ph_btys = 0.0; head_grid%a_ph_btye = 0.0
-   head_grid%a_t_btxs = 0.0; head_grid%a_t_btxe = 0.0; head_grid%a_t_btys = 0.0; head_grid%a_t_btye = 0.0
-   head_grid%a_mu_btxs = 0.0; head_grid%a_mu_btxe = 0.0; head_grid%a_mu_btys = 0.0; head_grid%a_mu_btye = 0.0
-   head_grid%a_moist_btxs = 0.0; head_grid%a_moist_btxe = 0.0; head_grid%a_moist_btys = 0.0; head_grid%a_moist_btye = 0.0
-   head_grid%a_scalar_btxs = 0.0; head_grid%a_scalar_btxe = 0.0; head_grid%a_scalar_btys = 0.0; head_grid%a_scalar_btye = 0.0
-   head_grid%a_tracer_btxs = 0.0; head_grid%a_tracer_btxe = 0.0; head_grid%a_tracer_btys = 0.0; head_grid%a_tracer_btye = 0.0
+   head_grid%a_u_btxs = 0.0; head_grid%a_u_btxe = 0.0
+   head_grid%a_u_btys = 0.0; head_grid%a_u_btye = 0.0
+   head_grid%a_v_btxs = 0.0; head_grid%a_v_btxe = 0.0
+   head_grid%a_v_btys = 0.0; head_grid%a_v_btye = 0.0
+   head_grid%a_w_btxs = 0.0; head_grid%a_w_btxe = 0.0
+   head_grid%a_w_btys = 0.0; head_grid%a_w_btye = 0.0
+   head_grid%a_ph_btxs = 0.0; head_grid%a_ph_btxe = 0.0
+   head_grid%a_ph_btys = 0.0; head_grid%a_ph_btye = 0.0
+   head_grid%a_t_btxs = 0.0; head_grid%a_t_btxe = 0.0
+   head_grid%a_t_btys = 0.0; head_grid%a_t_btye = 0.0
+   head_grid%a_mu_btxs = 0.0; head_grid%a_mu_btxe = 0.0
+   head_grid%a_mu_btys = 0.0; head_grid%a_mu_btye = 0.0
+   head_grid%a_moist_btxs = 0.0; head_grid%a_moist_btxe = 0.0
+   head_grid%a_moist_btys = 0.0; head_grid%a_moist_btye = 0.0
+   head_grid%a_scalar_btxs = 0.0; head_grid%a_scalar_btxe = 0.0
+   head_grid%a_scalar_btys = 0.0; head_grid%a_scalar_btye = 0.0
+   head_grid%a_tracer_btxs = 0.0; head_grid%a_tracer_btxe = 0.0
+   head_grid%a_tracer_btys = 0.0; head_grid%a_tracer_btye = 0.0
 #if (WRF_CHEM == 1)
-   head_grid%a_chem_btxs = 0.0; head_grid%a_chem_btxe = 0.0; head_grid%a_chem_btys = 0.0; head_grid%a_chem_btye = 0.0
+   head_grid%a_chem_btxs = 0.0; head_grid%a_chem_btxe = 0.0
+   head_grid%a_chem_btys = 0.0; head_grid%a_chem_btye = 0.0
 #endif
 
    head_grid%g_u_1 = 0.0  
@@ -207,24 +226,35 @@ subroutine da_ad_model ()
    head_grid%g_rainc  = 0.0
    head_grid%g_raincv = 0.0
    head_grid%g_pratec = 0.0
-
    ! Set the physics options to what they are in TL and AD
-   if (original_mp_physics .NE. 0 .and. original_mp_physics .NE. 98 .and. original_mp_physics .NE. 99) &
-      call nl_set_mp_physics (head_grid%id, original_mp_physics_ad) 
-   if ( original_sf_surface_physics .ne. 1 .AND. &
-        original_sf_surface_physics .ne. 7 ) then
+#if (WRF_CHEM == 1)
+   IF ( .not.use_nonchemobs) THEN
+      if ( original_sf_surface_physics .ne. 1 .AND. &
+           original_sf_surface_physics .ne. 7 ) then
+         call nl_set_ra_lw_physics (head_grid%id, 0)
+         call nl_set_ra_sw_physics (head_grid%id, 0)
+      end if
+      if ( original_sf_sfclay_physics .gt. 0 .and. &
+           original_sf_sfclay_physics .ne. 7 .and. &
+           original_sf_sfclay_physics .ne. 91 ) &
+         call nl_set_sf_sfclay_physics (head_grid%id, 0)
+      if ( original_bl_pbl_physics .gt. 0 .and. original_bl_pbl_physics .ne. 7) &
+         call nl_set_bl_pbl_physics (head_grid%id, 98)
+   ELSE
+#endif
       call nl_set_ra_lw_physics (head_grid%id, 0)
       call nl_set_ra_sw_physics (head_grid%id, 0)
-   end if
-   if ( original_sf_sfclay_physics .gt. 0 .and. &
-        original_sf_sfclay_physics .ne. 7 .and. &
-        original_sf_sfclay_physics .ne. 91 ) &
       call nl_set_sf_sfclay_physics (head_grid%id, 0)
-   if ( original_bl_pbl_physics .gt. 0 .and. original_bl_pbl_physics .ne. 7) &
-      call nl_set_bl_pbl_physics (head_grid%id, 98)
-   if ( original_cu_physics .gt. 0 ) then
+      if (original_bl_pbl_physics .gt. 0) &
+         call nl_set_bl_pbl_physics (head_grid%id, 98)
+#if (WRF_CHEM == 1)
+   END IF
+#endif
+   if (original_mp_physics .NE. 0 .and. original_mp_physics .NE. 98 .and. original_mp_physics .NE. 99) &
+      call nl_set_mp_physics (head_grid%id, original_mp_physics_ad) 
+   if (original_cu_physics .gt. 0) then
       call nl_set_cu_physics (head_grid%id, 98) 
-      head_grid%cudt =0
+      head_grid%cudt = 0
    endif
    !call nl_set_mp_zero_out (head_grid%id, 0)
    !call nl_set_sf_surface_physics (head_grid%id, 1)
@@ -240,43 +270,13 @@ subroutine da_ad_model ()
    IF ( checkpoint_interval .LE. 0 ) THEN
       call wrf_run_ad
    ELSE
-      end_year0 = model_config_rec%end_year(head_grid%id)
-      end_month0 = model_config_rec%end_month(head_grid%id)
-      end_day0 = model_config_rec%end_day(head_grid%id)
-      end_hour0 = model_config_rec%end_hour(head_grid%id)
-
       call da_set_run_hours ()
 
       io_form_checkpt = io_form_xtraj
 
       call wrf_run_ad_checkpt
 
-      if ( run_hours .gt. adtl_run_hours .and. run_days .eq. 0 ) then
-         model_config_rec%run_hours = run_hours
-
-         model_config_rec%end_year(head_grid%id) = end_year0
-         model_config_rec%end_month(head_grid%id) = end_month0
-         model_config_rec%end_day(head_grid%id) = end_day0
-         model_config_rec%end_hour(head_grid%id) = end_hour0
-
-         IF ( ASSOCIATED( head_grid%domain_clock ) ) THEN
-           IF ( head_grid%domain_clock_created ) THEN
-             CALL WRFU_ClockDestroy( head_grid%domain_clock )
-             head_grid%domain_clock_created = .FALSE.
-           ENDIF
-         ENDIF
-         IF ( ASSOCIATED( head_grid%alarms ) .AND. &
-              ASSOCIATED( head_grid%alarms_created ) ) THEN
-           DO alarmid = 1, MAX_WRF_ALARMS
-             IF ( head_grid%alarms_created( alarmid ) ) THEN
-               CALL WRFU_AlarmDestroy( head_grid%alarms( alarmid ) )
-               head_grid%alarms_created( alarmid ) = .FALSE.
-             ENDIF
-           ENDDO
-         ENDIF
-         call Setup_Timekeeping ( head_grid )
-
-      end if 
+      call da_reset_run_hours ()
    ENDIF
 
    ! restore the physics options to the originals
