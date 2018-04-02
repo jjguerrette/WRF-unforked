@@ -985,8 +985,9 @@ BENCH_START(pbl_driver_tim)
 #     include "HALO_EM_PHYS_A_BL_SURF.inc"
       ENDIF
 #endif
-
+#if (WRF_CHEM == 1)
       CALL PUSHREAL8ARRAY(chem, (ime-ims+1)*(kme-kms+1)*(jme-jms+1)*num_chem)
+#endif
       CALL PUSHREAL8ARRAY(grid%pblh, (ime-ims+1)*(jme-jms+1))
 
       CALL pbl_driver(                                                              &
@@ -1295,7 +1296,9 @@ BENCH_END(a_cu_driver_tim)
       CALL wrf_debug ( 200 , ' call a_pbl_driver' )
 BENCH_START(a_pbl_driver_tim)
       CALL POPREAL8ARRAY(grid%pblh, (ime-ims+1)*(jme-jms+1))
+#if (WRF_CHEM == 1)
       CALL POPREAL8ARRAY(chem, (ime-ims+1)*(kme-kms+1)*(jme-jms+1)*num_chem)
+#endif
       CALL a_pbl_driver(                                                            &
      &         AKHS=grid%akhs          ,AKMS=grid%akms                              &
      &        ,BL_PBL_PHYSICS=config_flags%bl_pbl_physics                           &
