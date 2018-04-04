@@ -93,6 +93,8 @@ subroutine da_tl_model ()
    head_grid%g_rthcuten = 0.0
    head_grid%g_rqvcuten = 0.0
    head_grid%g_rthraten = 0.0
+   head_grid%g_rublten = 0.0
+   head_grid%g_rvblten = 0.0
    head_grid%g_muts = 0.0
    head_grid%g_mudf = 0.0
    head_grid%g_ru_m = 0.0
