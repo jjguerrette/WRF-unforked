@@ -170,10 +170,12 @@ tile_lon_loop:DO i=its,ite
         CALL G_RC(rcx, g_rcx, ta, rad, rhchem, g_rhchem, iland, iseason&
 &            , numgas, wetflag, rainflag, highnh3, iprt, moist(i, kts, j&
 &            , p_qv), p8w(i, kts, j), config_flags%chem_opt)
-        if( config_flags%chem_opt == MOZART_KPP .or. &
-            config_flags%chem_opt == MOZCART_KPP .or. &
-            config_flags%chem_opt == MOZART_MOSAIC_4BIN_KPP .or. &
-            config_flags%chem_opt == MOZART_MOSAIC_4BIN_AQ_KPP )   then
+        if( config_flags%chem_opt /= MOZART_KPP .and. &
+            config_flags%chem_opt /= MOZCART_KPP .and. &
+            config_flags%chem_opt /= MOZART_MOSAIC_4BIN_KPP .and. &
+            config_flags%chem_opt /= MOZART_MOSAIC_4BIN_AQ_KPP .and. &
+            config_flags%chem_opt /= gocart_bc)  then
+
           g_srfres(1:numgas-2) = g_rcx(1:numgas-2)
           srfres(1:numgas-2) = rcx(1:numgas-2)
           g_srfres(numgas-1:numgas) = 0.0_8

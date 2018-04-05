@@ -238,7 +238,8 @@ tile_lon_loop : &
             if( config_flags%chem_opt /= MOZART_KPP .and. &
                 config_flags%chem_opt /= MOZCART_KPP .and. &
                 config_flags%chem_opt /= MOZART_MOSAIC_4BIN_KPP .and. &
-                config_flags%chem_opt /= MOZART_MOSAIC_4BIN_AQ_KPP)  then
+                config_flags%chem_opt /= MOZART_MOSAIC_4BIN_AQ_KPP .and. &
+                config_flags%chem_opt /= gocart_bc)  then
                srfres(1:numgas-2) = rcx(1:numgas-2)
                srfres(numgas-1:numgas) = 0.
             else

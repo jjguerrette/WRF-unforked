@@ -956,8 +956,8 @@ BENCH_START(pbl_driver_tim)
                     grid%dep_vel,grid%num_vert_mix,                      &
                     ids,ide, jds,jde, kds,kde,                                           &
                     ims,ime, jms,jme, kms,kme,                                           &
-                    grid%i_start(ij), grid%i_end(ij), &
-                    grid%j_start(ij), grid%j_end(ij), &
+                    grid%i_start(ij), min(grid%i_end(ij),ide-1), &
+                    grid%j_start(ij), min(grid%j_end(ij),jde-1), &
                     k_start, k_end                   )
                  
                if( config_flags%chem_opt == MOZART_KPP .or. &
@@ -1461,8 +1461,8 @@ BENCH_START(a_pbl_driver_tim)
                     grid%dep_vel,grid%a_dep_vel,grid%num_vert_mix,                      &
                     ids,ide, jds,jde, kds,kde,                                           &
                     ims,ime, jms,jme, kms,kme,                                           &
-                    grid%i_start(ij), grid%i_end(ij), &
-                    grid%j_start(ij), grid%j_end(ij), &
+                    grid%i_start(ij), min(grid%i_end(ij),ide-1), &
+                    grid%j_start(ij), min(grid%j_end(ij),jde-1), &
                     k_start, k_end                   )
 
 !               if( config_flags%chem_opt == MOZART_KPP .or. &
