@@ -986,7 +986,8 @@ BENCH_START(pbl_driver_tim)
       ENDIF
 #endif
 #if (WRF_CHEM == 1)
-      CALL PUSHREAL8ARRAY(chem, (ime-ims+1)*(kme-kms+1)*(jme-jms+1)*num_chem)
+      IF ( num_chem >= PARAM_FIRST_SCALAR ) &
+         CALL PUSHREAL8ARRAY(chem, (ime-ims+1)*(kme-kms+1)*(jme-jms+1)*num_chem)
 #endif
       CALL PUSHREAL8ARRAY(grid%pblh, (ime-ims+1)*(jme-jms+1))
 
@@ -1297,7 +1298,8 @@ BENCH_END(a_cu_driver_tim)
 BENCH_START(a_pbl_driver_tim)
       CALL POPREAL8ARRAY(grid%pblh, (ime-ims+1)*(jme-jms+1))
 #if (WRF_CHEM == 1)
-      CALL POPREAL8ARRAY(chem, (ime-ims+1)*(kme-kms+1)*(jme-jms+1)*num_chem)
+      IF ( num_chem >= PARAM_FIRST_SCALAR ) &
+         CALL POPREAL8ARRAY(chem, (ime-ims+1)*(kme-kms+1)*(jme-jms+1)*num_chem)
 #endif
       CALL a_pbl_driver(                                                            &
      &         AKHS=grid%akhs          ,AKMS=grid%akms                              &

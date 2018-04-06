@@ -713,8 +713,10 @@ BENCH_END(set_phys_bc_tim)
 !              3D TKE and mixing.
 !<pre>
 !</DESCRIPTION>
-       CALL PUSHREAL8ARRAY ( chem, (ime-ims+1)*(kme-kms+1)*(jme-jms+1)*num_chem )
-
+#if (WRF_CHEM == 1)
+       IF ( num_chem >= PARAM_FIRST_SCALAR ) &   
+          CALL PUSHREAL8ARRAY ( chem, (ime-ims+1)*(kme-kms+1)*(jme-jms+1)*num_chem )
+#endif
        CALL PUSHREAL8ARRAY ( grid%rublten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
        CALL PUSHREAL8ARRAY ( grid%rvblten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
        CALL PUSHREAL8ARRAY ( grid%rthblten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
@@ -798,9 +800,11 @@ BENCH_END(set_phys_bc_tim)
        CALL PUSHREAL8ARRAY ( grid%rqicuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
 
        CALL PUSHREAL8ARRAY(grid%rthraten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
+#if (WRF_CHEM == 1)
 !       CALL PUSHREAL8ARRAY ( chem_tend, (ime-ims+1)*(kme-kms+1)*(jme-jms+1)*num_chem )
-       CALL PUSHREAL8ARRAY ( chem, (ime-ims+1)*(kme-kms+1)*(jme-jms+1)*num_chem )
-
+       IF ( num_chem >= PARAM_FIRST_SCALAR ) &   
+          CALL PUSHREAL8ARRAY ( chem, (ime-ims+1)*(kme-kms+1)*(jme-jms+1)*num_chem )
+#endif
        CALL first_rk_step_part2 (    grid, config_flags         &
                              , moist , moist_tend               &
                              , chem  , chem_tend                &
@@ -7820,9 +7824,11 @@ BENCH_START(adj_rk_tend_tim)
 BENCH_END(adj_rk_tend_tim)
 
      adj_rk_step_is_one : IF (rk_step == 1) THEN ! only need to initialize diffusion tendencies
-
-       CALL POPREAL8ARRAY ( chem, (ime-ims+1)*(kme-kms+1)*(jme-jms+1)*num_chem )
+#if (WRF_CHEM == 1)
+       IF ( num_chem >= PARAM_FIRST_SCALAR ) &   
+          CALL POPREAL8ARRAY ( chem, (ime-ims+1)*(kme-kms+1)*(jme-jms+1)*num_chem )
 !       CALL POPREAL8ARRAY ( chem_tend, (ime-ims+1)*(kme-kms+1)*(jme-jms+1)*num_chem )
+#endif
        CALL POPREAL8ARRAY(grid%rthraten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1))
 
        CALL POPREAL8ARRAY ( grid%rqicuten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
@@ -7903,9 +7909,10 @@ BENCH_END(adj_rk_tend_tim)
        CALL POPREAL8ARRAY ( grid%rthblten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
        CALL POPREAL8ARRAY ( grid%rvblten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
        CALL POPREAL8ARRAY ( grid%rublten, (ime-ims+1)*(kme-kms+1)*(jme-jms+1) )
-
-       CALL POPREAL8ARRAY ( chem, (ime-ims+1)*(kme-kms+1)*(jme-jms+1)*num_chem )
-
+#if (WRF_CHEM == 1)
+       IF ( num_chem >= PARAM_FIRST_SCALAR ) &   
+          CALL POPREAL8ARRAY ( chem, (ime-ims+1)*(kme-kms+1)*(jme-jms+1)*num_chem )
+#endif
        CALL a_first_rk_step_part1 (    grid, config_flags         &
                              , moist , a_moist, moist_tend, a_moist_tend  &
                              , chem  , a_chem,   chem_tend,   a_chem_tend     &
