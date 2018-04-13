@@ -23,6 +23,9 @@ echo ""
 #   with additional modifications automated by this script. You must have access to the
 #   parent directory within which this working directory is located.  This script will
 #   generate directories such as ../run.0001, ../run.0002, etc. that are essential.
+
+export MEMBERPREFIX="../run."
+
 # Fill in the environment variables in RIOT_settings.sh and the User Options section. 
 #   - nout_RIOT takes the place of max_ext_its in namelist.input as the # outer iterations
 #   - ntmax(1) in namelist.input is replaced by NBLOCK
@@ -382,7 +385,7 @@ do
 done
 
 echo "=================================================="
-echo " Setup ensemble member directories"
+echo " Setup all working directories"
 echo "=================================================="
 CWD=$(pwd)
 echo "WORKING DIRECTORY: "$CWD
@@ -393,8 +396,6 @@ CWD_rel="../"$CWD_rel0 #Use for linking, more stable
 cd $CWD
 
 #Cleanup Parent
-dummy=$(ls ../run.*)
-if [ $? -eq 0 ]; then  rm -r ../run.[0-9]*; fi
 dummy=$(ls ../cost_fn*)
 if [ $? -eq 0 ]; then  rm -r ../cost_fn*; fi
 dummy=$(ls ../grad_fn*)
@@ -416,7 +417,6 @@ if [ $RIOT_RESTART ] && [ $RIOT_RESTART -eq 1 ]; then
 #----------------------------------------------------------------
 # Either setup links here or externally
    ln -sfv $ALT_START ./fg
-   ln -sfv $ALT_START ./wrfinput_d01
 
    itstart=2
    NOUTER=$((NOUTER+1))
@@ -427,7 +427,6 @@ else if [ $RIOT_RESTART ] && [ $RIOT_RESTART -eq 2 ]; then
 #------------------------------------------------------------------
 # Either setup links here or externally
    ln -sfv $ALT_START ./fg
-   ln -sfv $ALT_START ./wrfinput_d01
 
    itstart=$ALT_it1
    if [ -z "$itstart" ]; then
@@ -450,15 +449,16 @@ else if [ $RIOT_RESTART ] && [ $RIOT_RESTART -eq 2 ]; then
 ##      ln -sfv $ALT_hess ./hessian_eigenpairs.it"$ii".0000
 #      cd $CWD
 #   fi
-else
-   itstart=1 #default
+   else
+      itstart=1 #default
 
-   if [ $(ls ./fg_orig | wc -l) -eq 0 ]; then cp -v fg fg_orig; fi
-   if [ $(ls ./fg_orig | wc -l) -eq 0 ]; then echo 17; exit 17;fi
-   ln -sf ./fg_orig ./fg
-   ln -sf ./fg_orig ./wrfinput_d01
+      if [ $(ls ./fg_orig | wc -l) -eq 0 ]; then cp -v fg fg_orig; fi
+      if [ $(ls ./fg_orig | wc -l) -eq 0 ]; then echo 17; exit 17;fi
+      ln -sfv ./fg_orig ./fg
+   fi
 fi
-fi
+ln -sfv ./fg ./wrfinput_d01
+
 
 #Currently only available for WRF_CHEM==1
 if [ $OSSE -gt 0 ]; then
@@ -499,18 +499,14 @@ if [ $OSSE -gt 0 ]; then
       mv fg fg_0
 
       cp -v ./fg_osse ./fg
-      ln -sfv ./fg ./wrfinput_d01
    fi
 
    ex -c :"/osse_chem" +:":s/=.*,/=true,/g" +:wq namelist.input
    ex -c :"/init_osse_chem" +:":s/=.*,/=false,/g" +:wq namelist.input
 fi 
 
-
-export MEMBERPREFIX="../run."
-
 #Populate ensemble member directories
-if [ $(ls $MEMBERPREFIX".*" | wc -l) -gt 0 ]; then  rm -r ../run.[0-9]*; fi
+if [ $(ls $MEMBERPREFIX* | wc -l) -gt 0 ]; then  rm -r $MEMBERPREFIX[0-9]*; fi
 if [ $WRF_CHEM -gt 0 ]; then rm *Hx*; fi
 
 for (( iSAMP = 1 ; iSAMP <= $NJOBS ; iSAMP++))
@@ -826,7 +822,7 @@ do
    echo "WRFDA return value: $mpireturn"
 
    if ([ $rand_type -eq 6 ] || [ $rand_type -eq 3 ]) && [ $SUBTIMING -eq 1 ]; then
-      grep da_end_timing ../run.*/rsl.out.0000 > ../bench_time_hess-vec.it$it0
+      grep da_end_timing $MEMBERPREFIX*/rsl.out.0000 > ../bench_time_hess-vec.it$it0
       grep da_end_timing rsl.out.0000 > ../bench_time_finalize-riot.it$it0
    fi
 
@@ -848,35 +844,35 @@ do
       if [ $sec0 -lt 10 ]; then sec0="0"$sec0; fi
       echo "Iteration $it gradient realization time: $hr0:$min0:$sec0"
 
-      #-------------------------------------------------------------------
-      # Check for presence of checkpoint files
-      #-------------------------------------------------------------------
+      #--------------------------------------------------------------------
+      # Establish identical checkpointed trajectories for stage > 1
+      #--------------------------------------------------------------------
       if [ $CPDT -gt 0 ]; then
-         if [ $(ls ../run.0001/wrf_checkpoint_d01* | wc -l) -eq 0 ]; then echo "ERROR: Missing checkpoint files"; echo 13; exit 13; fi
+         if [ $(ls "$MEMBERPREFIX"0001/wrf_checkpoint_d01* | wc -l) -eq 0 ]; then echo "ERROR: Missing checkpoint files"; echo 13; exit 13; fi
          rm wrf_checkpoint_d01*
-         mv ../run.0001/wrf_checkpoint_d01* ./
-         rm ../run.*/wrf_checkpoint_d01*
+         mv "$MEMBERPREFIX"0001/wrf_checkpoint_d01* ./
+         rm $MEMBERPREFIX*/wrf_checkpoint_d01*
 
          if [ $WRF_MET -gt 0 ]; then
-            if [ $(ls ../run.0001/xtraj_for_obs_d01* | wc -l) -eq 0 ]; then echo "ERROR: Missing xtraj_for_obs files"; echo 14; exit 14; fi
+            if [ $(ls "$MEMBERPREFIX"0001/xtraj_for_obs_d01* | wc -l) -eq 0 ]; then echo "ERROR: Missing xtraj_for_obs files"; echo 14; exit 14; fi
             rm xtraj_for_obs_d01*
-            mv ../run.0001/xtraj_for_obs_d01* ./
-            rm ../run.*/xtraj_for_obs_d01*
+            mv "$MEMBERPREFIX"0001/xtraj_for_obs_d01* ./
+            rm $MEMBERPREFIX*/xtraj_for_obs_d01*
          fi
       fi
 
-      #-------------------------------------------------------------------
-      # Check for presence of obs output files (CHEM only)
-      #-------------------------------------------------------------------
+      #--------------------------------------------------------------------
+      # Establish identical checkpointed CHEM obs for stage > 1
+      #--------------------------------------------------------------------
       if [ $WRF_CHEM -gt 0 ]; then
-         if [ $FORCE_SURFACE -eq 1 ] && [ $(ls ../run.0001/SURFACE_Hx_y* | wc -l) -eq 0 ]; then echo "ERROR: Missing SURFACE_Hx_y files"; echo 15; exit 15; fi
+         if [ $FORCE_SURFACE -eq 1 ] && [ $(ls "$MEMBERPREFIX"0001/SURFACE_Hx_y* | wc -l) -eq 0 ]; then echo "ERROR: Missing SURFACE_Hx_y files"; echo 15; exit 15; fi
          rm SURFACE_Hx_y*
-         mv ../run.0001/SURFACE_Hx_y* ./
-         rm ../run.*/SURFACE_Hx_y*
-         if [ $FORCE_AIRCRAFT -eq 1 ] && [ $(ls ../run.0001/AIRCRAFT_Hx_y* | wc -l) -eq 0 ]; then echo "ERROR: Missing AIRCRAFT_Hx_y files"; echo 16; exit 16; fi
+         mv "$MEMBERPREFIX"0001/SURFACE_Hx_y* ./
+         rm $MEMBERPREFIX*/SURFACE_Hx_y*
+         if [ $FORCE_AIRCRAFT -eq 1 ] && [ $(ls "$MEMBERPREFIX"0001/AIRCRAFT_Hx_y* | wc -l) -eq 0 ]; then echo "ERROR: Missing AIRCRAFT_Hx_y files"; echo 16; exit 16; fi
          rm AIRCRAFT_Hx_y*
-         mv ../run.0001/AIRCRAFT_Hx_y* ./
-         rm ../run.*/AIRCRAFT_Hx_y*
+         mv "$MEMBERPREFIX"0001/AIRCRAFT_Hx_y* ./
+         rm $MEMBERPREFIX*/AIRCRAFT_Hx_y*
       fi
 
       innerSECONDS=$SECONDS
@@ -933,7 +929,7 @@ do
          echo "WRFDA return value: $mpireturn"
 
          if [ $SUBTIMING -eq 1 ]; then
-            grep da_end_timing ../run.*/rsl.out.0000 > ../bench_time_hess-vec.it$it0"."$innerit0
+            grep da_end_timing $MEMBERPREFIX*/rsl.out.0000 > ../bench_time_hess-vec.it$it0"."$innerit0
             grep da_end_timing rsl.out.0000 > ../bench_time_finalize-riot.it$it0"."$innerit0
          fi
 
@@ -984,7 +980,6 @@ do
       if [ $it -eq $itstart ]; then cp -v fg fg_it0; fi
       mv -v wrfvar_output wrfvar_output_$it0
       ln -sfv ./wrfvar_output_$it0 ./fg 
-      ln -sfv ./wrfvar_output_$it0 ./wrfinput_d01
 
       if [ $WRF_MET -gt 0 ]; then
          it1=$it
