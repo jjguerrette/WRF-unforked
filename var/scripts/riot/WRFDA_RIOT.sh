@@ -795,54 +795,6 @@ do
       echo "=============================================================="
       echo "SVD STAGE 2: Orthogonalize Gradient Realizations, generate Q"
       echo "=============================================================="
-   fi
-
-   ./check_vectors.sh "$it" "$NSAMP" "2" "1"
-   err=$?; if [ $err -ne 0 ]; then echo $err; exit $err; fi
-
-   cd $CWD
-   ex -c :"/rand_stage" +:":s/=.*/=2,/" +:wq namelist.input
-
-   if [ "$GLOBAL_OPT" == "false" ]; then #(For cvt reading/writing, ghat+yhat+omega reading, and qhat writing)
-      npiens=$nproc_local
-   else
-      npiens=$nproc_global
-      #Could make this faster (more memory) by distributing across more nodes 
-      # - currently chooses first $npiens processors in $PBS_NODEFILE
-   fi
-
-   mpistring="$MPICALL $DEBUGSTR -np $npiens $RIOT_EXECUTABLE"
-   #Could make this faster (more memory) by distributing across more nodes 
-   # - currently chooses first $npiens processors in $PBS_NODEFILE
-
-   echo "$mpistring"
-   eval "$mpistring"
-
-   mpireturn=$?
-   echo "WRFDA return value: $mpireturn"
-
-   if ([ $rand_type -eq 6 ] || [ $rand_type -eq 3 ]) && [ $SUBTIMING -eq 1 ]; then
-      grep da_end_timing $MEMBERPREFIX*/rsl.out.0000 > ../bench_time_hess-vec.it$it0
-      grep da_end_timing rsl.out.0000 > ../bench_time_finalize-riot.it$it0
-   fi
-
-
-#===================================================================================
-#===================================================================================
-   if [ $rand_type -eq 3 ]; then
-      cd $CWD
-      TEMPTIME=$SECONDS
-      mkdir oldrsl_$it0".iter0001.stage2"
-      mv rsl.* oldrsl_$it0".iter0001.stage2"
-      RSLTIME=$((RSLTIME+$((SECONDS-TEMPTIME))))
-
-      hr0=$(($SECONDS / 3600))
-      if [ $hr0 -lt 10 ]; then hr0="0"$hr0; fi
-      min0=$((($SECONDS / 60) % 60))
-      if [ $min0 -lt 10 ]; then min0="0"$min0; fi
-      sec0=$(($SECONDS % 60))
-      if [ $sec0 -lt 10 ]; then sec0="0"$sec0; fi
-      echo "Iteration $it gradient realization time: $hr0:$min0:$sec0"
 
       #--------------------------------------------------------------------
       # Establish identical checkpointed trajectories for stage > 1
@@ -874,6 +826,53 @@ do
          mv "$MEMBERPREFIX"0001/AIRCRAFT_Hx_y* ./
          rm $MEMBERPREFIX*/AIRCRAFT_Hx_y*
       fi
+   fi
+
+   ./check_vectors.sh "$it" "$NSAMP" "2" "1"
+   err=$?; if [ $err -ne 0 ]; then echo $err; exit $err; fi
+
+   cd $CWD
+   ex -c :"/rand_stage" +:":s/=.*/=2,/" +:wq namelist.input
+
+   if [ "$GLOBAL_OPT" == "false" ]; then #(For cvt reading/writing, ghat+yhat+omega reading, and qhat writing)
+      npiens=$nproc_local
+   else
+      npiens=$nproc_global
+      #Could make this faster (more memory) by distributing across more nodes 
+      # - currently chooses first $npiens processors in $PBS_NODEFILE
+   fi
+
+   mpistring="$MPICALL $DEBUGSTR -np $npiens $RIOT_EXECUTABLE"
+   #Could make this faster (more memory) by distributing across more nodes 
+   # - currently chooses first $npiens processors in $PBS_NODEFILE
+
+   echo "$mpistring"
+   eval "$mpistring"
+
+   mpireturn=$?
+   echo "WRFDA return value: $mpireturn"
+
+   if ([ $rand_type -eq 6 ] || [ $rand_type -eq 3 ]) && [ $SUBTIMING -eq 1 ]; then
+      grep da_end_timing $MEMBERPREFIX*/rsl.out.0000 > ../bench_time_hess-vec.it$it0
+      grep da_end_timing rsl.out.0000 > ../bench_time_finalize-riot.it$it0
+   fi
+
+#===================================================================================
+#===================================================================================
+   if [ $rand_type -eq 3 ]; then
+      cd $CWD
+      TEMPTIME=$SECONDS
+      mkdir oldrsl_$it0".iter0001.stage2"
+      mv rsl.* oldrsl_$it0".iter0001.stage2"
+      RSLTIME=$((RSLTIME+$((SECONDS-TEMPTIME))))
+
+      hr0=$(($SECONDS / 3600))
+      if [ $hr0 -lt 10 ]; then hr0="0"$hr0; fi
+      min0=$((($SECONDS / 60) % 60))
+      if [ $min0 -lt 10 ]; then min0="0"$min0; fi
+      sec0=$(($SECONDS % 60))
+      if [ $sec0 -lt 10 ]; then sec0="0"$sec0; fi
+      echo "Iteration $it gradient realization time: $hr0:$min0:$sec0"
 
       innerSECONDS=$SECONDS
       innerSECONDS0=$SECONDS

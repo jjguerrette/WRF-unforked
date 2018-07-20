@@ -44,7 +44,7 @@ subroutine da_read_obs_chem_again ( iv, ob, it, model_grid )
             POSITION = 'rewind')
    
          if (iostat /= 0) then
-            write(unit=message(1),fmt='(A,I5)') "Error message: ",iostat
+            write(unit=message(1),fmt='(A,I5,2A)') "Error message: ",iostat,"; ",trim(surf_file)
             call da_warning(__FILE__,__LINE__,message(1:1))
             call da_wrf_error_fatal('Error opening surface Hx_y file')
          end if
@@ -117,7 +117,7 @@ subroutine da_read_obs_chem_again ( iv, ob, it, model_grid )
             POSITION = 'rewind')
       
          if (iostat /= 0) then
-            write(unit=message(1),fmt='(A,I5)') "Error message: ",iostat
+            write(unit=message(1),fmt='(A,I5,2A)') "Error message: ",iostat,"; ",trim(acft_file)
             call da_warning(__FILE__,__LINE__,message(1:1))
             call da_wrf_error_fatal('Error opening aircraft Hx_y file')
          end if   
