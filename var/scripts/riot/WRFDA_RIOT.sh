@@ -187,7 +187,7 @@ echo ""
 if [ -z "$GLOBAL_OPT" ]; then
    GLOBAL_OPT="false" #default choice
 fi
-GLOBAL_OPT="false" #default choice
+#GLOBAL_OPT="false" #default choice
 
 echo "(9) GLOBAL_OPT=$GLOBAL_OPT"
 if [ "$GLOBAL_OPT" == "true" ]; then
