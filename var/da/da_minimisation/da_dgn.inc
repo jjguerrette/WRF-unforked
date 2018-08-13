@@ -40,7 +40,7 @@ subroutine da_dgn(grid, config_flags, cv_size, xhat, cv, &
    integer, dimension(1:ncv_type) :: &
              cv_s, cv_e, ncv, branch
    logical, dimension(1:ncv_type) :: &
-             exit_array, linear_bool
+             exit_array, linearity_test
    character(1) :: ncv_char
 
    integer :: jl_start, jl_end
@@ -141,7 +141,6 @@ subroutine da_dgn(grid, config_flags, cv_size, xhat, cv, &
                          cv_s, cv_e, eta_b, jb, &
                          xbx, be, iv, xhat, cv, ob, &
                          it, mz, 1)
-
    write(unit=stdout,fmt='("DGN:   i  eta_b          jb")')
    do i = 1, ncv_type
       if ( ncv(i) .le. 0 ) cycle
@@ -152,7 +151,6 @@ subroutine da_dgn(grid, config_flags, cv_size, xhat, cv, &
                          cv_s, cv_e, eta_c, jc, &
                          xbx, be, iv, xhat, cv, ob, &
                          it, mz, 2)
-
    write(unit=stdout,fmt='("DGN:   i  eta_c          jc")')
    do i = 1, ncv_type
       if ( ncv(i) .le. 0 ) cycle
@@ -161,7 +159,7 @@ subroutine da_dgn(grid, config_flags, cv_size, xhat, cv, &
 
    branch = 2
    isearch = 2
-   linear_bool = .false.
+   linearity_test = .false.
    do while ( .not.all(exit_array) )
       isearch = isearch + 1
       call da_evaluate_j(grid, config_flags, cv_size, be%cv%size_jb, &
@@ -188,7 +186,7 @@ subroutine da_dgn(grid, config_flags, cv_size, xhat, cv, &
                 .and. jc(i) .lt. ja(i) &
                 ) then
             exit_array(i) = .true.
-            linear_bool(i) = .true.
+            linearity_test(i) = .true.
             write(unit=stdout,fmt='("DGN: Accepting eta=1 for icv=",I4)') i
          end if
 
@@ -220,7 +218,7 @@ subroutine da_dgn(grid, config_flags, cv_size, xhat, cv, &
 
             if (eta(i).gt.(1.d0 - dgn_tol(it))) then
                exit_array(i) = .true.
-               linear_bool(i) = .true.
+               linearity_test(i) = .true.
                write(unit=stdout,fmt='("DGN: Accepting eta=1 for icv=",I4)') i
             end if
 
@@ -231,7 +229,7 @@ subroutine da_dgn(grid, config_flags, cv_size, xhat, cv, &
 
    do i = 1, ncv_type
       if ( ncv(i) .le. 0 ) cycle
-      if (linear_bool(i)) eta(i) = 1.D0
+      if (linearity_test(i)) eta(i) = 1.D0
       if (eta(i) .lt. 1.D0 ) eta(i) = (eta_a(i) + eta_b(i)) / 2.D0
       xhat(cv_s(i):cv_e(i)) = eta(i) * xhat(cv_s(i):cv_e(i))
    end do

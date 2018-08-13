@@ -51,7 +51,7 @@ subroutine da_evaluate_j(grid, config_flags, cv_size, cv_size_jb, &
    type (y_type)    :: jo_grad_y 
    type (y_type)    :: re     ! residual vector (o-a).
    type (y_type)    :: y      ! y = H(x_inc) = 0.; just a placeholder here
-   integer          :: i
+   integer          :: i, ic
    integer, dimension(1:ncv_type) :: ncv
    integer          :: rc
    character(len=filename_len) :: fg_filename
@@ -141,7 +141,7 @@ subroutine da_evaluate_j(grid, config_flags, cv_size, cv_size_jb, &
 #endif
 
    num_qcstat_conv=0
-   call da_get_innov_vector (it+1+100*iter, num_qcstat_conv, ob, iv, grid , config_flags)
+   call da_get_innov_vector (it+1+10*iter, num_qcstat_conv, ob, iv, grid , config_flags)
 
    call da_allocate_y (iv, re)
    call da_allocate_y (iv, y)
@@ -237,8 +237,8 @@ subroutine da_evaluate_j(grid, config_flags, cv_size, cv_size_jb, &
    ! Reset xb, which get_innov_vector modifies above
    call da_transfer_wrftoxb(xbx, grid, config_flags)
 
-   ! Needed for chem IC's when they are added as CVs
 #if (WRF_CHEM == 1)
+   ! Also needed for chem IC's when they are added as CVs
    call da_transfer_wrftoxb_chem(grid)
 #endif
 

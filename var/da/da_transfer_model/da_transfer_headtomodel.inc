@@ -21,7 +21,7 @@ subroutine da_transfer_headtomodel ( grid )
 
 #if (WRF_CHEM == 1)
    if (.not. use_nonchemobs .and. cv_options.eq.0) then
-      ! Reset MET variables in model_grid to their initial values
+      ! Reset MET (and chem) variables in model_grid to their initial values
       call da_init_model_input
    else
 #endif
@@ -75,7 +75,6 @@ subroutine da_transfer_headtomodel ( grid )
          call kj_swap (grid%scalebb(:,:,:,i), model_grid%scalebb(:,:,:,i), &
                        grid%xp%ims, grid%xp%ime, grid%xp%jms, grid%xp%jme, 1, num_bb_steps)
       enddo
-
    end if
 
    !T0 met boundary updates

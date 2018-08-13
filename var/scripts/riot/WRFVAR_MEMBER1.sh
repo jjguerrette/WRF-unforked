@@ -89,6 +89,8 @@ if [ $it -gt 1 ] && [ $rand_stage -eq 1 ] && ([ $RIOT_RESTART -eq 0 ] || [ $RIOT
    #Test for the presence of cvt
    if [ $(ls "$CWD"/cvt.it"$it0_last".* | wc -l) -eq 0 ]; then echo "ERROR: Missing cvt.it$it0_last"; echo $((rand_stage*100+3)); exit $((rand_stage*100+3)); fi
    ln -sf $CWD_rel/cvt.it$it0_last* ./
+   rm fg
+   ln -sf $CWD_rel/fg ./
 #   ln -sf $CWD_rel/cvt.* ./
 fi
 
