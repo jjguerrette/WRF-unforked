@@ -239,6 +239,7 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
                                     DIRNORM1_v, DIRNORM1_x, &
                                     DIRNORM2_v, DIRNORM2_x )
 
+            call da_write_eigs(     eignval_hess(1:neign), neign, nsamp, suffix )
 
             call da_write_norms(    EUCNORM_x, FROBNORM_Pa, SPECNORM_Pa, &
                                     EUCNORM_v, FROBNORM_Pav, SPECNORM_Pav, &
@@ -406,6 +407,8 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
                                  DIRNORM1_v, DIRNORM1_x, &
                                  DIRNORM2_v, DIRNORM2_x )
 
+         call da_write_eigs(     eignval, neign, nsamp, suffix )
+
          deallocate(eignval)
          deallocate(eignvec)
 
@@ -489,6 +492,8 @@ subroutine da_compare_decomp_methods(grid, xbx, be, mz, jp_start, jp_end, cv_siz
                         eignval, eignvec, neign)
 
          eignval = eignval + 1.D0
+
+         call da_write_eigs(    eignval, neign, nsamp, "rsvd" )
 
          if (check_precon .and. mod(neign,5).eq.0) then
             if(rootproc) then

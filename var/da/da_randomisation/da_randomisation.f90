@@ -138,6 +138,7 @@ contains
 #include "da_evaluate_decomp.inc"
 #include "da_evaluate_decomp_init.inc"
 #include "da_write_norms.inc"
+#include "da_write_eigs.inc"
 #include "da_check_hess_symm.inc"
 #if (WRF_CHEM == 1)
 #include "da_evaluate_increment.inc"
