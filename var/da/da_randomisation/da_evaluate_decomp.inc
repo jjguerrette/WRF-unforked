@@ -392,8 +392,11 @@ if (.true.) then
       deallocate(qhat_Pav)
 
       !Evaluate Spectral/Frobenius norms from eigenvalues
-      SPECNORM_Pav(itype) = maxval(abs(eignval_res(1:dummy)))
-      FROBNORM_Pav(itype) = sqrt(sum(eignval_res(1:dummy)*eignval_res(1:dummy)))
+!      SPECNORM_Pav(itype) = maxval(abs(eignval_res(1:dummy)))
+!      FROBNORM_Pav(itype) = sqrt(sum(eignval_res(1:dummy)*eignval_res(1:dummy)))
+
+      SPECNORM_Pav(itype) = maxval(abs(eignval_res(1:rank_rsvd_Pa)))
+      FROBNORM_Pav(itype) = sqrt(sum(eignval_res(1:rank_rsvd_Pa)*eignval_res(1:rank_rsvd_Pa)))
 
       write(unit=stdout,fmt='(A)') '    SPECNORM_Pav   FROBNORM_Pav'
       write(unit=stdout,fmt='(2D15.5)')SPECNORM_Pav(itype),FROBNORM_Pav(itype)
