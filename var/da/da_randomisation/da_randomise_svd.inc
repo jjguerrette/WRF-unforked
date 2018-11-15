@@ -116,16 +116,20 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
          if ( be%cv%size_je.gt.0) omega(je_start:je_end,1) = 0.D0
          if ( .not. var4d_lbc .and. be%cv%size_jl.gt.0) omega(jl_start:jl_end,1) = 0.D0
 
-         if (rotate_omega .and. spectral_precon .and. rand_outer.gt.1) then
+!         if (rotate_omega .and. spectral_precon .and. rand_outer.gt.1) then
+         if (rotate_omega .and. rand_outer.gt.1) then
             call da_rotate_omega(grid, cv_size, mz, jp_start, jp_end, &
                                     rand_outer-1, omega(:,1), omega(:,1))
 
-!            !Included in da_rotate_omega to save hessian I/O time
-!            call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
-!                                    rand_outer-1, omega(:,1), omega(:,1), 'IT' )
+            !Included in da_rotate_omega to save hessian I/O time
+            if (spectral_precon) &
+               call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
+                                       rand_outer-1, omega(:,1), omega(:,1), 'IT' )
          end if
 
-         if (.not. read_omega .or. (rotate_omega .and. spectral_precon .and. rand_outer.gt.1)) then
+!         if (.not. read_omega .or. (rotate_omega .and. spectral_precon .and. rand_outer.gt.1)) then
+         if (.not. read_omega .or. (rotate_omega .and. rand_outer.gt.1)) then
+
             !Write omega to file
             filename = trim(randvecdir)//'omega.e'//trim(adjustl(cens))//'.p'//trim(adjustl(cproc))
             call da_cv_io ('w', filename, cv_size, omega(1:cv_size,1), grid, mz)
@@ -290,7 +294,7 @@ subroutine da_randomise_svd(grid, mz, config_flags,        &
          call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
                                  rand_outer-1, xhat, xhat, 'TL' )
 
-      if (spectral_precon) &
+      if (spectral_precon .or. rotate_omega) &
          call da_hessian_io ('w',grid, cv_size,rand_outer,neign,neign,&
                             eignvec(1:neign,1:neign),eignval(1:neign),qhat(:,0:neign),mz,ghat)
 

@@ -61,6 +61,7 @@ contains
 #include "da_gram_schmidt.inc"
 #include "da_amat_mul_trunc.inc"
 #include "da_spectral_precon.inc"
+#include "da_spectral_precon_2d.inc"
 #include "da_output_increments.inc"
 
 end module da_linear_ops

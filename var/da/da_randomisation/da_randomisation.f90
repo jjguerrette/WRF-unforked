@@ -31,8 +31,8 @@ module da_randomisation
    use da_minimisation, only: da_transform_vtoy, da_transform_vtoy_adj, &
        da_calculate_grady, da_calculate_j, da_calculate_gradj
    use da_linear_ops, only:  da_gram_schmidt, da_amat_mul_trunc, &
-       da_cv_io, da_cv_io_global, da_spectral_precon, da_hessian_io, &
-       da_dot_cv, da_dot, da_mat_io
+       da_cv_io, da_cv_io_global, da_spectral_precon, da_spectral_precon_2d, &
+       da_hessian_io, da_dot_cv, da_dot, da_mat_io
    use da_vtox_transforms, only : da_transform_vtox, da_transform_vtox_adj
    use da_define_structures, only : iv_type, y_type, j_type, be_type, xbx_type, &
        hessian_type

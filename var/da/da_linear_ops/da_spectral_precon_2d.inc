@@ -1,0 +1,114 @@
+subroutine da_spectral_precon_2d(grid, cv_size, nvec, mz, jp_start, jp_end, nouter_prev, cv_v, cv_z, mode )
+
+   !-------------------------------------------------------------------------
+   ! Purpose:   Apply cummulative square-root spectral preconditioner
+   !
+   ! Called from ???
+   !
+   ! History: 10/31/2017  Creation (JJ Guerrette)
+   !
+   ! References: Tshimanga et al. (2008) and Gratton et al. (2011)
+   !
+   !-------------------------------------------------------------------------
+
+   implicit none
+
+   type(domain), intent(inout)  :: grid
+   integer, intent(in)          :: cv_size                ! Total cv size
+   integer, intent(in)          :: nvec
+   integer, intent(in)          :: mz(:)
+   integer, intent(in)          :: jp_start, jp_end
+   integer, intent(in)          :: nouter_prev
+   real*8, intent(in)           :: cv_v(cv_size,nvec)    ! Background square-root preconditioned CV
+   real*8, intent(out)          :: cv_z(cv_size,nvec)    ! Spectral square-root preconditioned CV
+   character*2, intent(in)      :: mode
+
+   real*8                       :: cv_z0(cv_size,nvec)
+   integer                      :: it, imode, l
+   character*10                 :: cproc, cens
+   character(len=filename_len)  :: filename
+
+   real*8, allocatable   :: eignvec(:,:)
+   real*8, allocatable   :: eignval(:)
+   real*8, allocatable   :: qhat(:,:)
+
+   integer  :: nmodes, neign, outer_start, outer_end, increment, ivec
+   real     :: expon
+
+   if (trace_use) call da_trace_entry("da_spectral_precon_2d")
+
+   write(unit=stdout,fmt=*) ' '
+   write(unit=stdout,fmt='(2A)') 'Apply Spectral preconditioner in mode: ', trim(mode)
+
+   if (trim(mode) == 'TL') then !Tangent preconditioner
+      outer_start = nouter_prev
+      outer_end = 1
+      increment = -1
+      expon = -0.5D0
+   else if (trim(mode) == 'AD') then !Adjoint or Transpose of preconditioner
+      outer_start = 1
+      outer_end = nouter_prev
+      increment = 1
+      expon = -0.5D0
+   else if (trim(mode) == 'IT') then !Inverse of tangent preconditioner
+      outer_start = 1
+      outer_end = nouter_prev
+      increment = 1
+      expon = 0.5D0
+   else if (trim(mode) == 'IA') then !Inverse of adjoint preconditioner
+      outer_start = nouter_prev
+      outer_end = 1
+      increment = -1
+      expon = 0.5D0
+   else
+      call da_error(__FILE__,__LINE__, &
+       (/"Spectral preconditioning must use TL, AD, IT, or IA mode."/))
+   end if
+
+   cv_z = cv_v
+
+   do it = outer_start, outer_end, increment
+      if (.not.any((/use_lanczos,use_randomblock/))) &
+         call da_error(__FILE__,__LINE__, &
+          (/"Spectral preconditioning can only be used with Lanczos or RSVD."/))
+
+      call da_hessian_io ('r',grid,cv_size,it,nmodes,neign)
+
+      ! Precondition with the l leading eigen modes from iteration it
+      !  (requires eignval/eignvec to be sorted by decreasing value)
+      l = max(min(neign,spectral_trunc(it)),0)
+
+      write(unit=stdout,fmt='(A,I0,A,I0)') ' Using ', l, ' eigen modes from outer iteration ', it
+
+      if (l .gt. 0) then
+         allocate(eignval(nmodes))
+         allocate(eignvec(nmodes,nmodes))
+         allocate(qhat(cv_size,0:nmodes))
+
+         call da_hessian_io ('r',grid,cv_size,it,nmodes,neign,&
+                            eignvec,eignval,qhat,mz)
+
+         do imode = 1, l
+            eignval(imode) = eignval(imode)**expon - 1.D0
+         end do
+
+         ! cv_z^it = (I_n + V (LAM^expon - I_l) V^T ) * cv_z^it-1
+         cv_z0 = 0.D0
+         do ivec = 1, nvec
+            call da_amat_mul_trunc(grid,mz,jp_start,jp_end,cv_size,&
+                                   nmodes,neign,l, &
+                                   eignval,eignvec,qhat,&
+                                   cv_z(:,ivec),cv_z0(:,ivec))
+         end do
+         cv_z = cv_z + cv_z0
+
+         deallocate(eignval)
+         deallocate(eignvec)
+         deallocate(qhat)
+      end if
+
+   end do
+
+   if (trace_use) call da_trace_exit("da_spectral_precon_2d")
+
+end subroutine da_spectral_precon_2d
