@@ -61,8 +61,10 @@ subroutine da_minimise_lz(grid, config_flags,            &
    integer                           :: jp_start, jp_end       ! Start/end indices of Jp.
    real                              :: fhat(1:cv_size)        ! cv copy.
    real                              :: ghat(1:cv_size)        ! cv copy.
-   real                              :: ghat0(1:cv_size)       ! cv copy.
-   real                              :: shat(1:cv_size)        ! cv copy.
+   real, target                      :: ghat0(1:cv_size)       ! cv copy.
+   real, pointer                     :: phat1(:)               ! cv copy.
+   real                              :: phat2(1:cv_size)       ! cv copy.
+
    real                              :: gdot, rho, mu, bndlm
    real                              :: alpha(ntmax(it)), beta(0:ntmax(it))
    real*8                            :: subdiag(ntmax(it))
@@ -128,6 +130,14 @@ subroutine da_minimise_lz(grid, config_flags,            &
       return
    end if
    ghat      = - ghat0
+   if (spectral_precon .and. it.gt.1) then
+      allocate( phat1(1:cv_size) )
+      call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
+                              it-1, ghat0, phat1, 'IA' )
+   else
+      phat1  => ghat0
+   end if
+
    beta(0)   = SQRT(da_dot_cv(cv_size, ghat, ghat, grid, mz, jp_start, jp_end))
    qhat(:,0) = 0.D0
    j_grad_norm_target = beta(0)
@@ -224,7 +234,16 @@ subroutine da_minimise_lz(grid, config_flags,            &
                
     ! Print Cost Function and Infomation Content
     !-----------------------------------
-      j_total = j0_total + 0.5 * da_dot_cv(cv_size,ghat0,xhat,grid,mz,jp_start,jp_end)
+      ! Need to precondition increment to get back to cv space 
+      ! note: this takes extra time in each iteration
+      if (spectral_precon .and. it.gt.1) then
+         call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
+                                 it-1, xhat, phat2, 'TL' )
+      else
+         phat2 = xhat
+      end if
+
+      j_total = j0_total + 0.5 * da_dot_cv(cv_size,phat1,phat2,grid,mz,jp_start,jp_end)
       write(unit=stdout,fmt='(A)') 'Iter     Cost Function       Info Content'
       write(unit=stdout,fmt=12)iter, j_total, dfs      	 
 12    format(i3,5x,1PD15.8,5x,1PD15.8)
@@ -237,7 +256,7 @@ subroutine da_minimise_lz(grid, config_flags,            &
     ! ----------------------------------------------
       if (calculate_cg_cost_fn) &
          call da_calculate_j(it, iter, cv_size, be%cv%size_jb, be%cv%size_je, be%cv%size_jp, &
-	                     be%cv%size_jl, xbx, be, iv, xhat, cv, re, y, j_cost, fhat, grid, config_flags)
+	                     be%cv%size_jl, xbx, be, iv, phat2, cv, re, y, j_cost, fhat, grid, config_flags)
 
     ! Print current eigenvalues
     ! ----------------------------------------------
@@ -280,21 +299,6 @@ subroutine da_minimise_lz(grid, config_flags,            &
    !-------------------------------------------------------------------------
    iter = MIN(iter, ntmax(it))
    
-   write(unit=stdout,fmt='(A)') &
-      '----------------------------------------------------------'
-   write(unit=stdout,fmt='(A)') " "
-   write(unit=stdout, fmt='("Inner iteration stopped after ",i4," iterations")') iter
-   write(unit=stdout,fmt='(A)') " "
-
-   call da_calculate_j(it, iter, cv_size, be%cv%size_jb, be%cv%size_je, be%cv%size_jp, &
-                       be%cv%size_jl, xbx, be, iv, xhat, cv, re, y, j_cost, ghat, grid, config_flags)
-
-   write(unit=stdout,fmt=15) iter, j_cost%total , &
-                             SQRT(da_dot_cv(cv_size, ghat, ghat, grid, mz, jp_start, jp_end))
-15  format('Final: ',I3,' iter, J=',1PD15.8,', g=',1PD15.8)
-   write(unit=stdout,fmt='(A)') &
-      '----------------------------------------------------------'
-
    write(stdout,*) 'Ritz eigenvalues: ',eignval(iter:1:-1)     
    write(stdout,*) 'Number of converged eigenpairs: ', neign
    neign = iter
@@ -325,10 +329,29 @@ subroutine da_minimise_lz(grid, config_flags,            &
                          eignvec(1:neign,1:neign),eignval(1:neign),qhat(:,0:neign),mz)
 !      ntused(it) = neign
 
-      if (it.gt.1) &
-         call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
-                                 it-1, xhat, xhat, 'TL' )
+      if (it.gt.1) then
+!         call da_spectral_precon(grid, cv_size, mz, jp_start, jp_end, &
+!                                 it-1, xhat, xhat, 'TL' )
+         xhat = phat2
+         deallocate( phat1 )
+      end if
    end if
+
+   write(unit=stdout,fmt='(A)') &
+      '----------------------------------------------------------'
+   write(unit=stdout,fmt='(A)') " "
+   write(unit=stdout, fmt='("Inner iteration stopped after ",i4," iterations")') iter
+   write(unit=stdout,fmt='(A)') " "
+
+   call da_calculate_j(it, iter, cv_size, be%cv%size_jb, be%cv%size_je, be%cv%size_jp, &
+                       be%cv%size_jl, xbx, be, iv, xhat, cv, re, y, j_cost, ghat, grid, config_flags)
+
+   write(unit=stdout,fmt=15) iter, j_cost%total , &
+                             SQRT(da_dot_cv(cv_size, ghat, ghat, grid, mz, jp_start, jp_end))
+15  format('Final: ',I3,' iter, J=',1PD15.8,', g=',1PD15.8)
+   write(unit=stdout,fmt='(A)') &
+      '----------------------------------------------------------'
+
 
    if (trace_use) call da_trace_exit("da_minimise_lz")
 
