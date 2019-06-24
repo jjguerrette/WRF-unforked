@@ -3900,7 +3900,7 @@ package   adtlbb_bcco   biomass_burn_opt==98             -          state:mean_f
 package   adtlbb_bc   biomass_burn_opt==99             -          state:mean_fct_agtf,mean_fct_agef,mean_fct_agsv,mean_fct_aggr,firesize_agtf,firesize_agef,firesize_agsv,firesize_aggr;ebu:ebu_bc;ebu_in:ebu_in_bc
 
 package   sc_adtlbb         scale_burn_opt==97             -          scalebb:scbb_so2,scbb_oc,scbb_bc;g_scalebb:g_scbb_so2,g_scbb_oc,g_scbb_bc;a_scalebb:a_scbb_so2,a_scbb_oc,a_scbb_bc
-package   sc_adtlbb_bcco      scale_burn_opt==98             -          scalebb:scbb_co,scbb_bc;g_scalebb:g_scbb_co,g_scbb_bc;a_scalebb:a_scbb_bc,a_scbb_bc
+package   sc_adtlbb_bcco      scale_burn_opt==98             -          scalebb:scbb_co,scbb_bc;g_scalebb:g_scbb_co,g_scbb_bc;a_scalebb:a_scbb_co,a_scbb_bc
 package   sc_adtlbb_bc      scale_burn_opt==99             -          scalebb:scbb_bc;g_scalebb:g_scbb_bc;a_scalebb:a_scbb_bc
 
 #package   adtlbb      biomass_burn_opt==98             -          state:mean_fct_agtf,mean_fct_agef,mean_fct_agsv,mean_fct_aggr,firesize_agtf,firesize_agef,firesize_agsv,firesize_aggr;ebu:ebu_pm25,ebu_pm10,ebu_so2,ebu_oc,ebu_bc,ebu_sulf,ebu_dms;ebu_in:ebu_in_pm25,ebu_in_pm10,ebu_in_so2,ebu_in_oc,ebu_in_bc,ebu_in_sulf,ebu_in_dms
